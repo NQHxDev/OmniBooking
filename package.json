@@ -17,7 +17,7 @@
       "Client/**/*.{js,jsx,ts,tsx}": [
          "npm run lint --prefix Client"
       ],
-      "**/*.{java,js,jsx,ts,tsx,json,css,md}": [
+      "**/*.{js,jsx,ts,tsx,json,css,md}": [
          "prettier --write"
       ]
    }

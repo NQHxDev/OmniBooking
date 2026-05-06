@@ -1,3 +1,9 @@
+iffile := $(wildcard .env)
+ifneq ($(iffile),)
+  include .env
+  export $(shell sed 's/=.*//' .env)
+endif
+
 .PHONY: install dev dev-server dev-client build clean up down logs restart infra help
 
 .DEFAULT_GOAL := help

@@ -24,9 +24,8 @@ public class SecurityConfig {
                   .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                   .requestMatchers("/actuator/**").permitAll()
 
-                  // For now, permit all in /api/v1 for development
-                  // Later, we will secure specific endpoints
-                  .requestMatchers("/api/v1/**").permitAll()
+                  // For now, permit all in this context for development
+                  .requestMatchers("/**").permitAll()
 
                   .anyRequest().authenticated());
 
