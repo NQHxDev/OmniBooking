@@ -17,8 +17,8 @@ Server/.settings/
 Server/.project
 Server/.classpath
 Server/.factorypath
-Server/.mvn/
-Server/!.mvn/wrapper/maven-wrapper.jar
+Server/.mvn/wrapper/*.jar
+!Server/.mvn/wrapper/maven-wrapper.jar
 
 # --- Frontend (Client - Next.js / Node) ---
 Client/.next/
