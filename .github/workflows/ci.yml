@@ -11,35 +11,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
-          
-      - name: Make mvnw executable
-        run: chmod +x Server/mvnw
-        
+
       - name: Build Server
-        run: cd Server && ./mvnw clean package -DskipTests
+        run: cd Server && mvn clean package -DskipTests
 
   build-client:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '23'
           cache: 'npm'
           cache-dependency-path: Client/package-lock.json
-          
+
       - name: Install dependencies
         run: npm install --prefix Client
-        
+
       - name: Build Client
         run: npm run build --prefix Client
         env:
