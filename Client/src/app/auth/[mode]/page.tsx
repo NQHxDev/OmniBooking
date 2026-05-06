@@ -5,20 +5,77 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Mail, Lock, User, ArrowRight, ChevronLeft } from "lucide-react";
 
+import { useState } from "react";
+import { useAuthStore, type User as AuthUser } from "@/store/useAuthStore";
+import { Loader2 } from "lucide-react";
+import apiClient from "@/lib/api/apiClient";
+
 export default function AuthPage() {
    const params = useParams();
    const router = useRouter();
    const mode = params?.mode as string;
-
    const isLogin = mode === "login";
 
+   const setAuth = useAuthStore((state) => state.setAuth);
+
+   const [formData, setFormData] = useState({
+      email: "",
+      password: "",
+      fullName: "",
+   });
+   const [loading, setLoading] = useState(false);
+   const [error, setError] = useState("");
+
+   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFormData({ ...formData, [e.target.name]: e.target.value });
+   };
+
    const handleToggle = (login: boolean) => {
+      setError("");
       router.push(`/auth/${login ? "login" : "register"}`, { scroll: false });
+   };
+
+   const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      setError("");
+
+      const endpoint = isLogin ? "auth/login" : "auth/register";
+      const payload = isLogin
+         ? { email: formData.email, password: formData.password }
+         : { email: formData.email, password: formData.password, fullName: formData.fullName };
+
+      try {
+         interface AuthApiResponse {
+            status: string;
+            data: AuthUser;
+            message?: string;
+         }
+
+         const result = (await apiClient.post(endpoint, payload, {
+            withCredentials: true,
+         })) as AuthApiResponse;
+
+         if (result.status === "success") {
+            if (isLogin) {
+               setAuth(result.data);
+               router.push("/");
+               router.refresh();
+            } else {
+               router.push("/auth/login");
+            }
+         }
+      } catch (err: unknown) {
+         const errorMessage = err instanceof Error ? err.message : "Đăng nhập thất bại";
+         setError(errorMessage);
+      } finally {
+         setLoading(false);
+      }
    };
 
    return (
       <div className="flex min-h-screen bg-white font-sans text-[#1a1a1a]">
-         {/* Left Side: Image & Branding (Hidden on mobile) */}
+         {/* Left Side: Image & Branding (Keep your UI exactly as is) */}
          <div className="relative hidden w-1/2 overflow-hidden lg:block">
             <Image
                src="/images/hero_banner.png"
@@ -157,7 +214,13 @@ export default function AuthPage() {
                      </p>
                   </div>
 
-                  <form className="space-y-5">
+                  {error && (
+                     <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm animate-in fade-in slide-in-from-top-1">
+                        {error}
+                     </div>
+                  )}
+
+                  <form onSubmit={handleSubmit} className="space-y-5">
                      {!isLogin && (
                         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                            <label className="mb-1.5 block text-sm font-semibold text-zinc-700">
@@ -166,8 +229,12 @@ export default function AuthPage() {
                            <div className="relative">
                               <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                               <input
+                                 name="fullName"
                                  type="text"
+                                 required
                                  placeholder="Nguyễn Văn A"
+                                 value={formData.fullName}
+                                 onChange={handleChange}
                                  className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
                               />
                            </div>
@@ -181,8 +248,12 @@ export default function AuthPage() {
                         <div className="relative">
                            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                            <input
+                              name="email"
                               type="email"
+                              required
                               placeholder="name@company.com"
+                              value={formData.email}
+                              onChange={handleChange}
                               className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
                            />
                         </div>
@@ -203,8 +274,12 @@ export default function AuthPage() {
                         <div className="relative">
                            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                            <input
+                              name="password"
                               type="password"
+                              required
                               placeholder="••••••••"
+                              value={formData.password}
+                              onChange={handleChange}
                               className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
                            />
                         </div>
@@ -212,10 +287,17 @@ export default function AuthPage() {
 
                      <button
                         type="submit"
-                        className="group flex w-full items-center justify-center gap-2 rounded-xl bg-[#006ce4] py-4 text-sm font-bold text-white shadow-xl shadow-blue-200 transition-all hover:bg-[#0057b7] hover:shadow-blue-300 active:scale-[0.98]"
+                        disabled={loading}
+                        className="group flex w-full items-center justify-center gap-2 rounded-xl bg-[#006ce4] py-4 text-sm font-bold text-white shadow-xl shadow-blue-200 transition-all hover:bg-[#0057b7] hover:shadow-blue-300 active:scale-[0.98] disabled:opacity-70"
                      >
-                        {isLogin ? "Đăng nhập ngay" : "Tạo tài khoản ngay"}
-                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        {loading ? (
+                           <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                           <>
+                              {isLogin ? "Đăng nhập ngay" : "Tạo tài khoản ngay"}
+                              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                           </>
+                        )}
                      </button>
                   </form>
 

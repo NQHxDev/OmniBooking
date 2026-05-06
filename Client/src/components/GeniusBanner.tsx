@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useAuthStore } from "@/store/useAuthStore";
 
 interface GeniusBannerProps {
    isLoggedIn?: boolean;
@@ -10,10 +12,22 @@ interface GeniusBannerProps {
 }
 
 export default function GeniusBanner({
-   isLoggedIn = false,
-   userName,
+   isLoggedIn: propIsLoggedIn,
+   userName: propUserName,
    userAvatar,
 }: GeniusBannerProps) {
+   const [mounted, setMounted] = useState(false);
+   const storeIsLoggedIn = useAuthStore((state) => state.isLoggedIn);
+   const storeUser = useAuthStore((state) => state.user);
+
+   useEffect(() => {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMounted(true);
+   }, []);
+
+   const isLoggedIn = propIsLoggedIn ?? (mounted ? storeIsLoggedIn : false);
+   const userName = propUserName ?? (mounted ? storeUser?.fullName || storeUser?.username : "");
+
    return (
       <div className="mt-16 flex flex-col md:flex-row items-center gap-8 rounded-2xl border border-zinc-200 p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] bg-white transition-all hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden relative group">
          {/* Decorative Background Element */}
@@ -55,6 +69,15 @@ export default function GeniusBanner({
                         >
                            Xem chi tiết ưu đãi →
                         </Link>
+                        <button
+                           onClick={async () => {
+                              await useAuthStore.getState().logout();
+                              window.location.reload();
+                           }}
+                           className="text-sm font-bold text-red-500 hover:underline ml-4"
+                        >
+                           Đăng xuất
+                        </button>
                      </div>
                   </div>
                </div>

@@ -1,68 +1,12 @@
-import Image from "next/image";
-import Link from "next/link";
-import { BedDouble, Calendar, Globe, Heart, Bell } from "lucide-react";
+import Navbar from "@/components/Navbar";
 import GeniusBanner from "@/components/GeniusBanner";
 import SearchBar from "@/components/SearchBar";
+import Image from "next/image";
 
 export default function Home() {
    return (
       <div className="flex min-h-screen flex-col bg-white">
-         {/* Navigation Header */}
-         <header className="bg-[#003580] text-white">
-            <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-               <div className="flex items-center gap-8">
-                  <h1 className="text-2xl font-bold tracking-tight">OmniBooking.com</h1>
-                  <nav className="hidden space-x-6 text-sm font-medium md:flex">
-                     <a
-                        href="#"
-                        className="flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-2"
-                     >
-                        <BedDouble className="h-5 w-5" />
-                        Lưu trú
-                     </a>
-                     <a
-                        href="#"
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-colors"
-                     >
-                        <Globe className="h-5 w-5" />
-                        Chuyến bay
-                     </a>
-                     <a
-                        href="#"
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-colors"
-                     >
-                        <Calendar className="h-5 w-5" />
-                        Thuê xe
-                     </a>
-                  </nav>
-               </div>
-               <div className="flex items-center gap-4">
-                  <button className="rounded-full p-2 hover:bg-white/10 transition-colors">
-                     <Bell className="h-6 w-6" />
-                  </button>
-                  <button className="rounded-full p-2 hover:bg-white/10 transition-colors">
-                     <Heart className="h-6 w-6" />
-                  </button>
-                  <div className="hidden items-center gap-4 sm:flex">
-                     <button className="text-sm font-semibold hover:underline">
-                        Đăng chỗ nghỉ của Quý vị
-                     </button>
-                     <Link
-                        href="/auth/register"
-                        className="rounded-sm bg-white px-4 py-1 text-sm font-bold text-[#003580] hover:bg-zinc-100"
-                     >
-                        Đăng ký
-                     </Link>
-                     <Link
-                        href="/auth/login"
-                        className="rounded-sm bg-white px-4 py-1 text-sm font-bold text-[#003580] hover:bg-zinc-100"
-                     >
-                        Đăng nhập
-                     </Link>
-                  </div>
-               </div>
-            </div>
-         </header>
+         <Navbar />
 
          {/* Hero Section */}
          <section className="bg-[#003580] pb-16 pt-12 text-white">

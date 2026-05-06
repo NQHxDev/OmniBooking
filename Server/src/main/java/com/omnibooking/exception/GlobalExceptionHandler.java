@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -36,7 +35,7 @@ public class GlobalExceptionHandler {
          errors.put(fieldName, errorMessage);
       });
       return ResponseEntity.badRequest()
-            .body(ApiResponse.error("Validation failed", "INVALID_REQUEST", errors, requestId));
+            .body(ApiResponse.error("Validation failed", ErrorCode.INVALID_KEY.getCode(), errors, requestId));
    }
 
    @ExceptionHandler(Exception.class)
@@ -44,8 +43,10 @@ public class GlobalExceptionHandler {
          Exception ex, jakarta.servlet.http.HttpServletRequest request) {
 
       String requestId = (String) request.getAttribute("requestId");
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiResponse.error("An unexpected error occurred", "INTERNAL_SERVER_ERROR", ex.getMessage(),
+      ErrorCode error = ErrorCode.INTERNAL_SERVER_ERROR;
+      return ResponseEntity.status(Objects.requireNonNull(error.getStatus()))
+            .body(ApiResponse.error(error.getMessage(), error.getCode(), ex.getMessage(),
                   requestId));
    }
+
 }

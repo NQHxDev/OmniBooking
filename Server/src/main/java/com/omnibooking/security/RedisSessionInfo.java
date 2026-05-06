@@ -18,6 +18,8 @@ public class RedisSessionInfo {
 
    private String email;
 
+   private String fullName;
+
    private String role;
 
    private String hashedRefreshToken;

@@ -3,6 +3,7 @@ package com.omnibooking.controller;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.LoginRequest;
+import com.omnibooking.security.Anonymous;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.dto.RegisterRequest;
 import com.omnibooking.services.AuthService;
@@ -22,6 +23,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import org.springframework.web.bind.annotation.CrossOrigin;
+
+@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true", allowedHeaders = "*")
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -29,15 +33,18 @@ public class AuthController {
 
    private final AuthService authService;
 
+   @Anonymous
    @PostMapping("/register")
    public ResponseEntity<ApiResponse<AuthResponse>> register(
          @Valid @RequestBody RegisterRequest request,
          HttpServletRequest httpRequest) {
       String requestId = (String) httpRequest.getAttribute("requestId");
       AuthResponse response = authService.register(request);
-      return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response, requestId));
+      return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse.success(response, "User registered successfully", requestId));
    }
 
+   @Anonymous
    @PostMapping("/login")
    public ResponseEntity<ApiResponse<AuthResponse>> login(
          @Valid @RequestBody LoginRequest request,
@@ -49,9 +56,10 @@ public class AuthController {
       String requestId = (String) httpRequest.getAttribute("requestId");
 
       AuthResponse authResponse = authService.login(request, ip, userAgent, httpResponse);
-      return ResponseEntity.ok(ApiResponse.success(authResponse, requestId));
+      return ResponseEntity.ok(ApiResponse.success(authResponse, "Login successful", requestId));
    }
 
+   @Anonymous
    @PostMapping("/refresh")
    public ResponseEntity<ApiResponse<AuthResponse>> refresh(
          @CookieValue(name = "session_id") String sessionId,
@@ -64,9 +72,10 @@ public class AuthController {
       String requestId = (String) httpRequest.getAttribute("requestId");
 
       AuthResponse authResponse = authService.refresh(sessionId, refreshToken, ip, userAgent, httpResponse);
-      return ResponseEntity.ok(ApiResponse.success(authResponse, requestId));
+      return ResponseEntity.ok(ApiResponse.success(authResponse, "Token refreshed successfully", requestId));
    }
 
+   @Anonymous
    @PostMapping("/logout")
    public ResponseEntity<ApiResponse<Void>> logout(
          @CookieValue(name = "session_id") String sessionId,
@@ -77,7 +86,7 @@ public class AuthController {
       String requestId = (String) httpRequest.getAttribute("requestId");
       authService.logout(UUID.fromString(sessionId), principal.getId(), httpResponse);
 
-      return ResponseEntity.ok(ApiResponse.success(null, requestId));
+      return ResponseEntity.ok(ApiResponse.success(null, "Logout successful", requestId));
    }
 
    private String getClientIp(HttpServletRequest request) {

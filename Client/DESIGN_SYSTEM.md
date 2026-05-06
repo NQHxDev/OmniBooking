@@ -34,17 +34,42 @@ Tài liệu này quy định các tiêu chuẩn về giao diện (UI) và trải
 
 ### Inputs
 
-- Border: `1px solid #868686`.
-- Focus: `outline: 2px solid #006ce4`, `outline-offset: -1px`.
-- Border-radius: `4px` (sm).
+- **Standard**: Border `#d9d9d9`, Text `#1a1a1a`, `rounded-sm`, hover/focus border `#006ce4`.
 
-### Layout
+## 4. Kiến trúc dữ liệu (Data Architecture)
 
-- Max-width: `1280px` (`max-w-7xl`).
-- Spacing: Sử dụng hệ thống Tailwind (px, py, gap).
+### API Integration
 
-## 4. Nguyên tắc thiết kế (Design Principles)
+- **Client**: Luôn sử dụng `apiClient` từ `@/lib/api/apiClient`.
+- **Nguyên tắc**:
+   - KHÔNG sử dụng `fetch` hoặc `axios` trực tiếp trong components.
+   - Sử dụng `withCredentials: true` cho các yêu cầu cần session.
+   - Xử lý lỗi tập trung qua Interceptors (đã có Toast thông báo).
+
+### State Management
+
+- **Zustand**: Sử dụng `useAuthStore` để quản lý trạng thái đăng nhập.
+- **Persistence**: Token và thông tin user được lưu vào `localStorage` qua middleware `persist`.
+- **Hydration**: Luôn kiểm tra trạng thái `mounted` trước khi truy cập store trong Client Components để tránh lỗi Hydration.
+
+## 5. Cấu trúc thư mục (Folder Structure)
+
+- `src/components`: UI components dùng chung.
+- `src/store`: Quản lý trạng thái toàn cục (Zustand).
+- `src/lib/api`: Cấu hình API Client.
+- `src/app`: Routes và Pages (Next.js App Router).
+
+## 6. Nguyên tắc thiết kế (Design Principles)
 
 1. **Tin cậy (Trust)**: Sử dụng các icon minh họa rõ ràng, thông báo bảo mật.
 2. **Tối giản (Minimalism)**: Không làm người dùng xao nhãng khỏi mục tiêu chính (Đặt phòng/Đăng ký).
 3. **Phản hồi (Feedback)**: Hiệu ứng hover cho mọi thành phần tương tác.
+
+## 7. Thẩm mỹ cao cấp (Rich Aesthetics)
+
+Dự án hướng tới một giao diện hiện đại, sang trọng và tràn đầy sức sống:
+
+- **Animations**: Sử dụng `framer-motion` hoặc Tailwind CSS animations (animate-in, fade-in, slide-in) để tạo cảm giác mượt mà khi chuyển trang hoặc hiển thị component.
+- **Micro-interactions**: Hiệu ứng hover cho buttons, cards phải tinh tế (thay đổi độ bóng, scale nhẹ 1.02x).
+- **Glassmorphism**: Sử dụng hiệu ứng nền mờ (backdrop-blur) cho các thành phần nổi (overlays, floating menus).
+- **Gradients**: Kết hợp các dải màu gradient nhẹ nhàng để tạo chiều sâu, tránh sử dụng màu phẳng đơn điệu.

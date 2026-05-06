@@ -30,9 +30,13 @@ public class ApiResponse<T> {
    private Instant timestamp = Instant.now();
 
    public static <T> ApiResponse<T> success(T data, String requestId) {
+      return success(data, "Success", requestId);
+   }
+
+   public static <T> ApiResponse<T> success(T data, String message, String requestId) {
       return ApiResponse.<T>builder()
             .status("success")
-            .message("Operation completed successfully")
+            .message(message)
             .data(data)
             .requestId(requestId)
             .build();

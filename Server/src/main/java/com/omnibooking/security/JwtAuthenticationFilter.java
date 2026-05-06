@@ -16,10 +16,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-@Component
 @RequiredArgsConstructor
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -34,6 +32,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
          @org.springframework.lang.NonNull HttpServletResponse response,
          @org.springframework.lang.NonNull FilterChain filterChain)
          throws ServletException, IOException {
+
+      if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+         filterChain.doFilter(request, response);
+         return;
+      }
 
       try {
          String accessToken = getCookieValue(request, "access_token");

@@ -19,6 +19,7 @@ public class HealthController {
 
       return ApiResponse.success(
             Map.of("status", "UP", "message", "OmniBooking API is running"),
+            "System is healthy",
             requestId);
    }
 
