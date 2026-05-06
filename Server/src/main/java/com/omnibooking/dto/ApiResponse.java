@@ -1,7 +1,7 @@
 package com.omnibooking.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,10 +22,12 @@ public class ApiResponse<T> {
 
    private Object errors;
 
+   private String errorCode;
+
    private String requestId;
 
    @Builder.Default
-   private ZonedDateTime timestamp = ZonedDateTime.now();
+   private Instant timestamp = Instant.now();
 
    public static <T> ApiResponse<T> success(T data, String requestId) {
       return ApiResponse.<T>builder()
@@ -36,10 +38,11 @@ public class ApiResponse<T> {
             .build();
    }
 
-   public static <T> ApiResponse<T> error(String message, Object errors, String requestId) {
+   public static <T> ApiResponse<T> error(String message, String errorCode, Object errors, String requestId) {
       return ApiResponse.<T>builder()
             .status("error")
             .message(message)
+            .errorCode(errorCode)
             .errors(errors)
             .requestId(requestId)
             .build();

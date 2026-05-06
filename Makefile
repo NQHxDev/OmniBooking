@@ -36,7 +36,7 @@ up:
 
 down:
 	@echo "Stopping all Docker services..."
-	@docker-compose down
+	@docker-compose down -v
 
 logs:
 	@docker-compose logs -f
@@ -47,6 +47,8 @@ restart:
 
 # Install dependencies for both projects
 install:
+	@echo "Installing Root dependencies..."
+	@npm install
 	@echo "Installing Server dependencies..."
 	@cd Server && ./mvnw dependency:resolve
 	@echo "Installing Client dependencies..."
