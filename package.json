@@ -1,0 +1,24 @@
+{
+   "name": "omnibooking-monorepo",
+   "version": "1.0.0",
+   "private": true,
+   "scripts": {
+      "prepare": "husky",
+      "lint:client": "npm run lint --prefix Client",
+      "lint:server": "cd Server && ./mvnw checkstyle:check",
+      "format": "prettier --write ."
+   },
+   "devDependencies": {
+      "husky": "^9.1.7",
+      "lint-staged": "^15.4.3",
+      "prettier": "^3.5.1"
+   },
+   "lint-staged": {
+      "Client/**/*.{js,jsx,ts,tsx}": [
+         "npm run lint --prefix Client"
+      ],
+      "**/*.{js,jsx,ts,tsx,json,css,md}": [
+         "prettier --write"
+      ]
+   }
+}

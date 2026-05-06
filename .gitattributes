@@ -1,0 +1,11 @@
+# Git Attributes for OmniBooking Monorepo
+
+# Ensure Maven wrapper has LF line endings for Unix systems
+Server/mvnw text eol=lf
+
+# Ensure Windows batch files have CRLF line endings
+**/*.cmd text eol=crlf
+**/*.bat text eol=crlf
+
+# Standard text file handling
+* text=auto

@@ -1,0 +1,37 @@
+# --- General & OS ---
+.DS_Store
+.vscode/
+.idea/
+*.log
+*.tmp
+*.swp
+node_modules/
+.env
+.env.local
+.env.*.local
+
+# --- Backend (Server - Spring Boot / Maven) ---
+Server/target/
+Server/bin/
+Server/.settings/
+Server/.project
+Server/.classpath
+Server/.factorypath
+Server/.mvn/
+Server/!.mvn/wrapper/maven-wrapper.jar
+
+# --- Frontend (Client - Next.js / Node) ---
+Client/.next/
+Client/out/
+Client/build/
+Client/coverage/
+Client/next-env.d.ts
+Client/.pnp*
+Client/.pnp.js
+
+# --- Docker ---
+.docker/
+**/data/
+
+# --- Husky ---
+.husky/_/
