@@ -28,9 +28,8 @@ export default function Navbar() {
    const logout = useAuthStore((state) => state.logout);
 
    useEffect(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMounted(true);
-
+      const timer = setTimeout(() => setMounted(true), 0);
+      
       const handleClickOutside = (event: MouseEvent) => {
          if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
             setIsMenuOpen(false);
@@ -38,7 +37,10 @@ export default function Navbar() {
       };
 
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () => {
+         clearTimeout(timer);
+         document.removeEventListener("mousedown", handleClickOutside);
+      };
    }, []);
 
    return (

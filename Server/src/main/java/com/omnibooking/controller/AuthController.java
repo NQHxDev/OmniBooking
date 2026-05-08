@@ -37,9 +37,14 @@ public class AuthController {
    @PostMapping("/register")
    public ResponseEntity<ApiResponse<AuthResponse>> register(
          @Valid @RequestBody RegisterRequest request,
-         HttpServletRequest httpRequest) {
+         HttpServletRequest httpRequest,
+         HttpServletResponse httpResponse) {
+
+      String ip = getClientIp(httpRequest);
+      String userAgent = httpRequest.getHeader("User-Agent");
       String requestId = (String) httpRequest.getAttribute("requestId");
-      AuthResponse response = authService.register(request);
+
+      AuthResponse response = authService.register(request, ip, userAgent, httpResponse);
       return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success(response, "User registered successfully", requestId));
    }
@@ -87,6 +92,17 @@ public class AuthController {
       authService.logout(UUID.fromString(sessionId), principal.getId(), httpResponse);
 
       return ResponseEntity.ok(ApiResponse.success(null, "Logout successful", requestId));
+   }
+
+   @Anonymous
+   @org.springframework.web.bind.annotation.GetMapping("/verify")
+   public ResponseEntity<ApiResponse<Void>> verify(
+         @org.springframework.web.bind.annotation.RequestParam String token,
+         HttpServletRequest httpRequest) {
+
+      String requestId = (String) httpRequest.getAttribute("requestId");
+      authService.verifyEmail(token);
+      return ResponseEntity.ok(ApiResponse.success(null, "Email verified successfully", requestId));
    }
 
    private String getClientIp(HttpServletRequest request) {

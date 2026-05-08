@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useAuthStore, type User as AuthUser } from "@/store/useAuthStore";
 import { Loader2 } from "lucide-react";
 import apiClient from "@/lib/api/apiClient";
+import { toast } from "sonner";
 
 export default function AuthPage() {
    const params = useParams();
@@ -57,13 +58,15 @@ export default function AuthPage() {
          })) as AuthApiResponse;
 
          if (result.status === "success") {
-            if (isLogin) {
-               setAuth(result.data);
-               router.push("/");
-               router.refresh();
-            } else {
-               router.push("/auth/login");
+            setAuth(result.data);
+            if (!isLogin) {
+               toast.success("Đăng ký thành công!", {
+                  description: "Vui lòng kiểm tra email để xác nhận tài khoản.",
+                  duration: 6000,
+               });
             }
+            router.push("/");
+            router.refresh();
          }
       } catch (err: unknown) {
          const errorMessage = err instanceof Error ? err.message : "Đăng nhập thất bại";

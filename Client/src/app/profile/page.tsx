@@ -33,8 +33,8 @@ export default function ProfilePage() {
    const user = useAuthStore((state) => state.user);
 
    useEffect(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMounted(true);
+      const timer = setTimeout(() => setMounted(true), 0);
+      return () => clearTimeout(timer);
    }, []);
 
    if (!mounted) return null;

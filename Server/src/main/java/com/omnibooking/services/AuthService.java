@@ -8,7 +8,7 @@ import java.util.UUID;
 
 public interface AuthService {
 
-   AuthResponse register(RegisterRequest request);
+   AuthResponse register(RegisterRequest request, String ip, String userAgent, HttpServletResponse response);
 
    AuthResponse login(LoginRequest request, String ip, String userAgent, HttpServletResponse response);
 
@@ -16,5 +16,7 @@ public interface AuthService {
          HttpServletResponse response);
 
    void logout(UUID sessionId, UUID userId, HttpServletResponse response);
+
+   void verifyEmail(String token);
 
 }

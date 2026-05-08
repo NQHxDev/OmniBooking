@@ -20,8 +20,8 @@ export default function BecomeAHostPage() {
    const [mounted, setMounted] = useState(false);
 
    useEffect(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMounted(true);
+      const timer = setTimeout(() => setMounted(true), 0);
+      return () => clearTimeout(timer);
    }, []);
 
    if (!mounted) return null;
@@ -73,13 +73,15 @@ export default function BecomeAHostPage() {
                         </ul>
 
                         <div className="mt-8 pt-6 border-t border-zinc-100">
-                           <button className="flex w-full items-center justify-center gap-2 rounded-md bg-[#006ce4] py-4 text-lg font-bold text-white hover:bg-[#0057b7] transition-all active:scale-[0.98] shadow-lg shadow-blue-100 group">
+                           <Link
+                              href="/become-a-host/register"
+                              className="flex w-full items-center justify-center gap-2 rounded-md bg-[#006ce4] py-4 text-lg font-bold text-white hover:bg-[#0057b7] transition-all active:scale-[0.98] shadow-lg shadow-blue-100 group text-center"
+                           >
                               Bắt đầu ngay
                               <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-                           </button>
+                           </Link>
                            <p className="mt-4 text-center text-xs text-zinc-400">
-                              Bằng cách tiếp tục, bạn đồng ý với các Điều khoản và Điều kiện của
-                              chúng tôi.
+                              OmniBooking rất vui được hợp tác với bạn!
                            </p>
                         </div>
                      </div>
@@ -181,9 +183,12 @@ export default function BecomeAHostPage() {
                </div>
 
                <div className="mt-16">
-                  <button className="rounded-md bg-[#006ce4] px-6 py-3 text-sm font-bold text-white hover:bg-[#0057b7] transition-all shadow-md active:scale-95">
+                  <Link
+                     href="/become-a-host/register"
+                     className="inline-block rounded-md bg-[#006ce4] px-6 py-3 text-sm font-bold text-white hover:bg-[#0057b7] transition-all shadow-md active:scale-95"
+                  >
                      Kiếm thêm thu nhập ngay hôm nay
-                  </button>
+                  </Link>
                </div>
             </div>
          </section>

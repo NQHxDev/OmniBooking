@@ -21,8 +21,8 @@ export default function GeniusBanner({
    const storeUser = useAuthStore((state) => state.user);
 
    useEffect(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMounted(true);
+      const timer = setTimeout(() => setMounted(true), 0);
+      return () => clearTimeout(timer);
    }, []);
 
    const isLoggedIn = propIsLoggedIn ?? (mounted ? storeIsLoggedIn : false);
@@ -69,15 +69,6 @@ export default function GeniusBanner({
                         >
                            Xem chi tiết ưu đãi →
                         </Link>
-                        <button
-                           onClick={async () => {
-                              await useAuthStore.getState().logout();
-                              window.location.reload();
-                           }}
-                           className="text-sm font-bold text-red-500 hover:underline ml-4"
-                        >
-                           Đăng xuất
-                        </button>
                      </div>
                   </div>
                </div>

@@ -38,10 +38,11 @@ public class AuthServiceImpl implements AuthService {
    private final JWTService jwtService;
    private final SessionService sessionService;
    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+   private final com.omnibooking.services.VerificationService verificationService;
 
    @Override
    @Transactional
-   public AuthResponse register(RegisterRequest request) {
+   public AuthResponse register(RegisterRequest request, String ip, String userAgent, HttpServletResponse response) {
 
       if (userRepository.existsByEmail(request.getEmail())) {
          throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
@@ -81,15 +82,30 @@ public class AuthServiceImpl implements AuthService {
 
       userProfileRepository.save(profile);
 
-      // Publish Event
-      eventPublisher.publishEvent(new com.omnibooking.event.UserRegisteredEvent(this, savedUser));
+      // Publish Event (For background email)
+      eventPublisher.publishEvent(new com.omnibooking.event.UserRegisteredEvent(this, savedUser, request.getFullName()));
+
+      // --- AUTOMATIC LOGIN LOGIC ---
+      UUID sessionId = UUID.randomUUID();
+      UUID refreshToken = UUID.randomUUID();
+      String roleName = userRole.getName();
+
+      String accessToken = jwtService.generateAccessToken(savedUser.getId(), roleName, sessionId);
+
+      // Store in Redis
+      sessionService.saveSession(savedUser.getId(), savedUser.getUsername(), savedUser.getEmail(),
+            request.getFullName(),
+            roleName, sessionId, refreshToken, ip, userAgent);
+
+      // Set Cookies
+      setAuthCookies(response, accessToken, sessionId.toString(), refreshToken.toString());
 
       return AuthResponse.builder()
             .id(savedUser.getId())
             .username(savedUser.getUsername())
             .email(savedUser.getEmail())
             .fullName(request.getFullName())
-            .roles(Collections.singletonList(userRole.getName()))
+            .roles(Collections.singletonList(roleName))
             .build();
    }
 
@@ -161,6 +177,24 @@ public class AuthServiceImpl implements AuthService {
    public void logout(UUID sessionId, UUID userId, HttpServletResponse response) {
       sessionService.deleteSession(sessionId);
       clearAuthCookies(response);
+   }
+
+   @Override
+   @Transactional
+   public void verifyEmail(String token) {
+      UUID userId = verificationService.verifyToken(token);
+      
+      if (userId == null) {
+         throw new AppException(ErrorCode.INVALID_TOKEN);
+      }
+
+      User user = userRepository.findById(userId)
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+      user.setIsActive(true);
+      userRepository.save(user);
+      
+      log.info("User {} verified successfully", user.getEmail());
    }
 
    private void setAuthCookies(HttpServletResponse response, String accessToken, String sessionId,
