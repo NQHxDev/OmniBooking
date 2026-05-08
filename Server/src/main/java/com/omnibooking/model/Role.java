@@ -9,10 +9,10 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import java.util.Set;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "roles")
@@ -20,7 +20,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@SuperBuilder
 public class Role extends BaseEntity {
 
    @Column(nullable = false, unique = true, length = 50)
