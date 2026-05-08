@@ -1,3 +1,9 @@
+iffile := $(wildcard .env)
+ifneq ($(iffile),)
+  include .env
+  export $(shell sed 's/=.*//' .env)
+endif
+
 .PHONY: install dev dev-server dev-client build clean up down logs restart infra help
 
 .DEFAULT_GOAL := help
@@ -20,7 +26,7 @@ dev-client:
 # Infrastructure Commands
 infra:
 	@echo "Starting infrastructure..."
-	@docker-compose up -d db redis
+	@docker-compose up -d db redis kafka kafdrop
 	@echo "Infrastructure is Ready..."
 
 # Docker Full Stack Commands
@@ -30,7 +36,7 @@ up:
 
 down:
 	@echo "Stopping all Docker services..."
-	@docker-compose down
+	@docker-compose down -v
 
 logs:
 	@docker-compose logs -f
@@ -41,6 +47,8 @@ restart:
 
 # Install dependencies for both projects
 install:
+	@echo "Installing Root dependencies..."
+	@npm install
 	@echo "Installing Server dependencies..."
 	@cd Server && ./mvnw dependency:resolve
 	@echo "Installing Client dependencies..."

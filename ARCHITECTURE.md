@@ -95,7 +95,28 @@ Implemented `redis/redis-stack-server` to support high-performance operations:
 
 - **Security Foundation**: Robust `SecurityConfig` set up with CSRF protection disabled (for tokens), CORS enabled, and stateless session policy.
 - **Public/Private Split**: Clear separation between public metadata/swagger endpoints and secured API routes.
+- **RBAC (Role-Based Access Control)**: Comprehensive system with `roles` (Admin, Partner, Driver, User) and granular `permissions` (e.g., `property:write`, `ride:manage`). Managed via `SecurityConstants` for type-safety.
+
+## 7. Messaging & Asynchronous Processing
+
+To ensure high performance and non-blocking operations, the system implements an asynchronous messaging pipeline:
+
+- **Kafka Integration**: Used as the primary message broker for cross-service communication and background tasks.
+- **Background Email System**:
+    - **Producer**: `EmailProducer` pushes events to `omnibooking-mail-topic`.
+    - **Consumer**: `EmailConsumer` listens to the topic and processes emails.
+    - **Delivery**: Integrated with **Resend SDK** for professional email delivery.
+- **Template Engine**: Uses **Thymeleaf** to render premium HTML email templates with dynamic data injection.
+
+## 8. Configuration Management (NestJS Style)
+
+The system uses a centralized, type-safe configuration pattern similar to NestJS ConfigModule:
+
+- **Centralized POJO**: `AppProperties` class serves as the single source of truth for all custom configurations.
+- **Grouped Settings**: Properties are logically grouped (e.g., `app.security`, `app.mail`).
+- **Validation & Fail-Fast**: Uses Bean Validation (`@NotBlank`, `@Validated`) to ensure all critical environment variables are present at startup.
+- **Environment Mapping**: Mapped from the root `.env` file into `application.properties` via `${VAR_NAME}` syntax.
 
 ---
 
-_Last Updated: 2026-05-06_
+_Last Updated: 2026-05-08_

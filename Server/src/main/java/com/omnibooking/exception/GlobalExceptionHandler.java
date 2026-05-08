@@ -3,7 +3,8 @@ package com.omnibooking.exception;
 import com.omnibooking.dto.ApiResponse;
 import java.util.HashMap;
 import java.util.Map;
-import org.springframework.http.HttpStatus;
+import java.util.Objects;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -12,6 +13,15 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+   @ExceptionHandler(AppException.class)
+   public ResponseEntity<ApiResponse<Object>> handleAppException(
+         AppException ex, jakarta.servlet.http.HttpServletRequest request) {
+
+      String requestId = (String) request.getAttribute("requestId");
+      return ResponseEntity.status(Objects.requireNonNull(ex.getStatus()))
+            .body(ApiResponse.error(ex.getMessage(), ex.getErrorCode(), null, requestId));
+   }
 
    @ExceptionHandler(MethodArgumentNotValidException.class)
    public ResponseEntity<ApiResponse<Object>> handleValidationExceptions(
@@ -24,7 +34,8 @@ public class GlobalExceptionHandler {
          String errorMessage = error.getDefaultMessage();
          errors.put(fieldName, errorMessage);
       });
-      return ResponseEntity.badRequest().body(ApiResponse.error("Validation failed", errors, requestId));
+      return ResponseEntity.badRequest()
+            .body(ApiResponse.error("Validation failed", ErrorCode.INVALID_KEY.getCode(), errors, requestId));
    }
 
    @ExceptionHandler(Exception.class)
@@ -32,7 +43,10 @@ public class GlobalExceptionHandler {
          Exception ex, jakarta.servlet.http.HttpServletRequest request) {
 
       String requestId = (String) request.getAttribute("requestId");
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiResponse.error("An unexpected error occurred", ex.getMessage(), requestId));
+      ErrorCode error = ErrorCode.INTERNAL_SERVER_ERROR;
+      return ResponseEntity.status(Objects.requireNonNull(error.getStatus()))
+            .body(ApiResponse.error(error.getMessage(), error.getCode(), ex.getMessage(),
+                  requestId));
    }
+
 }

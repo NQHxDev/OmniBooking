@@ -1,0 +1,42 @@
+package com.omnibooking.config;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.validation.annotation.Validated;
+
+@Configuration
+@ConfigurationProperties(prefix = "app")
+@Data
+@Validated
+public class AppProperties {
+
+   @NotBlank
+   private String baseUrl;
+
+   @NotBlank
+   private String clientUrl;
+
+   @NotBlank
+   private String contextPath;
+
+   private final Security security = new Security();
+   private final Mail mail = new Mail();
+
+   @Data
+   public static class Security {
+      @NotBlank
+      private String jwtSecret;
+      private long jwtExpirationMs;
+   }
+
+   @Data
+   public static class Mail {
+      @NotBlank
+      private String resendApiKey;
+      @NotBlank
+      private String fromEmail;
+   }
+
+}
