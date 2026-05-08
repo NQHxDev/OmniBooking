@@ -1,4 +1,5 @@
 {
+   "description": "OmniBooking Monorepo",
    "name": "omnibooking-monorepo",
    "version": "1.0.0",
    "private": true,
@@ -6,6 +7,8 @@
       "prepare": "husky",
       "lint:client": "npm run lint --prefix Client",
       "lint:server": "cd Server && ./mvnw checkstyle:check",
+      "build:client": "npm run build --prefix Client",
+      "check:all": "npm run lint:client && npm run build:client",
       "format": "prettier --write ."
    },
    "devDependencies": {
