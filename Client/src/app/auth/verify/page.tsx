@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, XCircle, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api/apiClient";
 
-export default function VerifyPage() {
+function VerifyContent() {
    const searchParams = useSearchParams();
    const token = searchParams.get("token");
 
@@ -29,8 +29,9 @@ export default function VerifyPage() {
             setMessage("Tài khoản của bạn đã được xác thực thành công!");
          } catch (err: unknown) {
             setStatus("error");
-            const errorMessage = (err as { response?: { data?: { message?: string } } }).response?.data?.message 
-               || "Xác thực thất bại. Vui lòng thử lại sau.";
+            const errorMessage =
+               (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
+               "Xác thực thất bại. Vui lòng thử lại sau.";
             setMessage(errorMessage);
          }
       };
@@ -82,9 +83,7 @@ export default function VerifyPage() {
                   <div className="mb-6 flex justify-center text-red-500">
                      <XCircle className="h-16 w-16" />
                   </div>
-                  <p className="mb-8 text-zinc-600 leading-relaxed">
-                     {message}
-                  </p>
+                  <p className="mb-8 text-zinc-600 leading-relaxed">{message}</p>
                   <div className="space-y-3">
                      <Link
                         href="/auth/login"
@@ -93,7 +92,10 @@ export default function VerifyPage() {
                         Quay lại Đăng nhập
                      </Link>
                      <p className="text-xs text-zinc-400">
-                        Bạn cần hỗ trợ? <a href="#" className="text-blue-500 hover:underline">Liên hệ chúng tôi</a>
+                        Bạn cần hỗ trợ?{" "}
+                        <a href="#" className="text-blue-500 hover:underline">
+                           Liên hệ chúng tôi
+                        </a>
                      </p>
                   </div>
                </div>
@@ -107,5 +109,24 @@ export default function VerifyPage() {
             <span className="text-xs">© 2026 Toàn bộ quyền được bảo lưu</span>
          </div>
       </div>
+   );
+}
+
+export default function VerifyPage() {
+   return (
+      <Suspense
+         fallback={
+            <div className="flex min-h-screen flex-col items-center justify-center bg-[#f8fafc] px-4 font-sans">
+               <div className="w-full max-w-md rounded-3xl bg-white p-12 text-center shadow-2xl shadow-blue-100 border border-blue-50">
+                  <div className="flex flex-col items-center gap-4 py-8">
+                     <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+                     <p className="text-zinc-500 animate-pulse">Đang tải...</p>
+                  </div>
+               </div>
+            </div>
+         }
+      >
+         <VerifyContent />
+      </Suspense>
    );
 }
