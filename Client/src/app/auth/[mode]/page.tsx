@@ -52,9 +52,9 @@ export default function AuthPage() {
                  fullName: formData.fullName,
               });
 
-         // Since apiClient handles errors via interceptors, if we are here, it's likely a success
-         if (result && result.data) {
-            setAuth(result.data.data);
+         // result is now the User object directly
+         if (result) {
+            setAuth(result);
             if (!isLogin) {
                toast.success("Đăng ký thành công!", {
                   description: "Vui lòng kiểm tra email để xác nhận tài khoản.",

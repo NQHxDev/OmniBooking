@@ -26,10 +26,10 @@ public class JWTService {
    /**
     * Generate an Access Token with userId, roles, and sessionId.
     */
-   public String generateAccessToken(UUID userId, String role, UUID sessionId, String fingerprintHash) {
+   public String generateAccessToken(UUID userId, java.util.Collection<String> roles, UUID sessionId, String fingerprintHash) {
       return Jwts.builder()
             .subject(userId.toString())
-            .claim("role", role)
+            .claim("roles", roles)
             .claim("sessionId", sessionId.toString())
             .claim("fgh", fingerprintHash)
             .issuedAt(new Date())

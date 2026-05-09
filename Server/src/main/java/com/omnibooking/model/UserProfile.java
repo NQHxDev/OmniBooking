@@ -54,6 +54,17 @@ public class UserProfile {
    @JoinColumn(name = "rank_id")
    private Rank rank;
 
+   @Builder.Default
+   @Column(name = "reputation_score")
+   private Double reputationScore = 100.0;
+
+   @Builder.Default
+   @Column(name = "is_verified")
+   private Boolean isVerified = false;
+
+   @Column(name = "partner_bio", columnDefinition = "TEXT")
+   private String partnerBio;
+
    @Version
    private Long version;
 

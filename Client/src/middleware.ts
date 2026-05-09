@@ -2,52 +2,46 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * Danh sách các route yêu cầu đăng nhập.
- * Bạn có thể mở rộng danh sách này khi có thêm các tính năng mới.
- */
-const protectedRoutes = ["/become-a-host/register", "/partner", "/profile"];
-
-/**
  * Middleware để kiểm tra quyền truy cập của người dùng dựa trên Cookies.
- * Đảm bảo người dùng bị "đá ra ngoài ngay" nếu chưa đăng nhập.
+ * Chiến thuật:
+ * - Guest Guard: Không cho người đã đăng nhập vào trang login/register.
+ * - Partner Hub: Cho phép qua để Server Component tự xử lý (ổn định hơn cho F5).
+ * - Profile/Settings: Chặn trực tiếp ở đây.
  */
 export function middleware(request: NextRequest) {
    const { pathname } = request.nextUrl;
 
-   // Kiểm tra xem route hiện tại có nằm trong danh sách cần bảo vệ không
-   const isProtected = protectedRoutes.some((route) => pathname.startsWith(route));
+   // Lấy session_id và refresh_token để kiểm tra đăng nhập
+   const sessionId = request.cookies.get("session_id")?.value;
+   const refreshToken = request.cookies.get("refresh_token")?.value;
 
-   if (isProtected) {
-      const accessToken = request.cookies.get("access_token")?.value;
-      const sessionId = request.cookies.get("session_id")?.value;
+   const hasSession = !!(sessionId || refreshToken);
 
-      // Nếu thiếu token hoặc session id thì coi như chưa đăng nhập
-      if (!accessToken || !sessionId) {
-         const loginUrl = new URL("/auth/login", request.url);
+   // 1. GUEST GUARD: Nếu đã login thì không cho vào trang auth
+   if (pathname.startsWith("/auth/") && hasSession) {
+      return NextResponse.redirect(new URL("/", request.url));
+   }
 
-         // Lưu lại URL hiện tại để sau khi đăng nhập xong có thể quay lại đúng chỗ
-         loginUrl.searchParams.set("callbackUrl", pathname);
+   // 2. PARTNER HUB: Để cho Page (Server Component) tự xử lý vì nó đọc cookie tốt hơn ở Edge Runtime
+   if (pathname.startsWith("/partner")) {
+      return NextResponse.next();
+   }
 
-         return NextResponse.redirect(loginUrl);
-      }
+   // 3. AUTH GUARD: Bảo vệ các trang cá nhân
+   const isProtected = ["/profile", "/settings", "/bookings"].some((route) =>
+      pathname.startsWith(route)
+   );
+
+   if (isProtected && !hasSession) {
+      const loginUrl = new URL("/auth/login", request.url);
+      loginUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(loginUrl);
    }
 
    return NextResponse.next();
 }
 
-/**
- * Cấu hình matcher để loại bỏ các file tĩnh và API routes khỏi middleware
- * nhằm tối ưu hiệu năng.
- */
+// Chỉ chạy middleware trên các đường dẫn cần thiết
 export const config = {
-   matcher: [
-      /*
-       * Khớp tất cả các đường dẫn ngoại trừ:
-       * - api (các endpoint backend hoặc route handlers)
-       * - _next/static (file tĩnh của Next.js)
-       * - _next/image (file ảnh tối ưu hóa)
-       * - favicon.ico, public files
-       */
-      "/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)",
-   ],
+   matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
 };

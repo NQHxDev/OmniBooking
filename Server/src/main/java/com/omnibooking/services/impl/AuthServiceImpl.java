@@ -20,9 +20,13 @@ import com.omnibooking.util.CookieUtils;
 import com.omnibooking.util.SecurityUtils;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.servlet.http.HttpServletResponse;
+
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -84,7 +88,9 @@ public class AuthServiceImpl implements AuthService {
             .publishEvent(new com.omnibooking.event.UserRegisteredEvent(this, savedUser, request.getFullName()));
 
       // Automatic Login
-      return issueTokensAndBuildResponse(savedUser, userRole.getName(), request.getFullName(), ip, userAgent, response);
+      Set<String> roles = Collections.singleton(userRole.getName());
+      return issueTokensAndBuildResponse(savedUser, roles, request.getFullName(), null, profile, ip, userAgent,
+            response);
    }
 
    @Override
@@ -96,11 +102,15 @@ public class AuthServiceImpl implements AuthService {
          throw new AppException(ErrorCode.INVALID_CREDENTIALS);
       }
 
-      String role = user.getRoles().iterator().next().getName();
+      Set<String> roles = user.getRoles().stream()
+            .map(com.omnibooking.model.Role::getName)
+            .collect(java.util.stream.Collectors.toSet());
+
       UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
       String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
+      String avatarUrl = profile != null ? profile.getAvatarUrl() : null;
 
-      return issueTokensAndBuildResponse(user, role, fullName, ip, userAgent, response);
+      return issueTokensAndBuildResponse(user, roles, fullName, avatarUrl, profile, ip, userAgent, response);
    }
 
    @Override
@@ -114,16 +124,20 @@ public class AuthServiceImpl implements AuthService {
       }
 
       RedisSessionInfo info = sessionService.getSession(sId);
-      String role = info.getRole();
 
-      // Re-use user object for response building
-      User user = User.builder()
-            .id(info.getUserId())
-            .username(info.getUsername())
-            .email(info.getEmail())
-            .build();
+      // Fetch fresh user data from DB to ensure roles and profile are up to date
+      User user = userRepository.findById(Objects.requireNonNull(info.getUserId()))
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-      return issueTokensAndBuildResponse(user, role, info.getFullName(), ip, userAgent, response);
+      Set<String> roles = user.getRoles().stream()
+            .map(com.omnibooking.model.Role::getName)
+            .collect(java.util.stream.Collectors.toSet());
+
+      UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+      String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
+      String avatarUrl = profile != null ? profile.getAvatarUrl() : null;
+
+      return issueTokensAndBuildResponse(user, roles, fullName, avatarUrl, profile, ip, userAgent, response);
    }
 
    @Override
@@ -149,8 +163,8 @@ public class AuthServiceImpl implements AuthService {
    /**
     * Centralized logic to issue tokens, save sessions, and set cookies.
     */
-   private AuthResponse issueTokensAndBuildResponse(User user, String role, String fullName,
-         String ip, String userAgent, HttpServletResponse response) {
+   private AuthResponse issueTokensAndBuildResponse(User user, Set<String> roles, String fullName,
+         String avatarUrl, UserProfile profile, String ip, String userAgent, HttpServletResponse response) {
       UUID sessionId = UUID.randomUUID();
       UUID refreshToken = UUID.randomUUID();
 
@@ -158,10 +172,10 @@ public class AuthServiceImpl implements AuthService {
       String fingerprint = UuidCreator.getTimeOrderedEpoch().toString();
       String fgpHash = SecurityUtils.hashFingerprint(fingerprint);
 
-      String accessToken = jwtService.generateAccessToken(user.getId(), role, sessionId, fgpHash);
+      String accessToken = jwtService.generateAccessToken(user.getId(), roles, sessionId, fgpHash);
 
       // Save to Redis
-      sessionService.saveSession(user.getId(), user.getUsername(), user.getEmail(), fullName, role,
+      sessionService.saveSession(user.getId(), user.getUsername(), user.getEmail(), fullName, roles,
             sessionId, refreshToken, ip, userAgent);
 
       // Set Cookies
@@ -173,7 +187,12 @@ public class AuthServiceImpl implements AuthService {
             .username(user.getUsername())
             .email(user.getEmail())
             .fullName(fullName)
-            .roles(Collections.singletonList(role))
+            .avatarUrl(avatarUrl)
+            .roles(new ArrayList<>(roles))
+            .reputationScore(profile != null ? profile.getReputationScore() : 100.0)
+            .isVerified(profile != null ? profile.getIsVerified() : false)
+            .rankName(profile != null && profile.getRank() != null ? profile.getRank().getName() : "Bronze")
+            .partnerBio(profile != null ? profile.getPartnerBio() : null)
             .build();
    }
 
@@ -200,8 +219,14 @@ public class AuthServiceImpl implements AuthService {
 
       log.info("Upgrading user {} to ROLE_PARTNER", user.getEmail());
 
-      // Issue new tokens with the new role
-      return issueTokensAndBuildResponse(user, partnerRole.getName(), fullName, ip, userAgent, response);
+      Set<String> roles = user.getRoles().stream()
+            .map(com.omnibooking.model.Role::getName)
+            .collect(Collectors.toSet());
+
+      String avatarUrl = profile != null ? profile.getAvatarUrl() : null;
+
+      // Issue new tokens with all current roles
+      return issueTokensAndBuildResponse(user, roles, fullName, avatarUrl, profile, ip, userAgent, response);
    }
 
 }

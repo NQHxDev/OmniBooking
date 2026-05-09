@@ -1,5 +1,6 @@
 package com.omnibooking.security;
 
+import java.util.Set;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,7 +21,7 @@ public class RedisSessionInfo {
 
    private String fullName;
 
-   private String role;
+   private Set<String> roles;
 
    private String hashedRefreshToken;
 

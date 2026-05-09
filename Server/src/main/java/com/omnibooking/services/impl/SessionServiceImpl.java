@@ -25,7 +25,7 @@ public class SessionServiceImpl implements SessionService {
    private static final long REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
    @Override
-   public void saveSession(UUID userId, String username, String email, String fullName, String role, UUID sessionId,
+   public void saveSession(UUID userId, String username, String email, String fullName, java.util.Set<String> roles, UUID sessionId,
          UUID refreshToken,
          String ip, String userAgent) {
       try {
@@ -35,7 +35,7 @@ public class SessionServiceImpl implements SessionService {
                .username(username)
                .email(email)
                .fullName(fullName)
-               .role(role)
+               .roles(roles)
                .hashedRefreshToken(passwordEncoder.encode(refreshToken.toString()))
                .ip(ip)
                .userAgent(userAgent)

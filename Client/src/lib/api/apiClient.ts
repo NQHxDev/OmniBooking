@@ -42,8 +42,12 @@ apiClient.interceptors.response.use(
 
       const errorCode = error.response?.data?.errorCode;
 
-      // If error is 401 and errorCode is TOKEN_EXPIRED (AUTH_006)
-      if (status === 401 && errorCode === "AUTH_006" && !originalRequest._retry) {
+      // If error is 401 and errorCode is TOKEN_EXPIRED (AUTH_006) or INVALID_CREDENTIALS (AUTH_003)
+      if (
+         status === 401 &&
+         (errorCode === "AUTH_006" || errorCode === "AUTH_003") &&
+         !originalRequest._retry
+      ) {
          originalRequest._retry = true;
 
          try {

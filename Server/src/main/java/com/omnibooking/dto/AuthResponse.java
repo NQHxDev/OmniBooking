@@ -23,6 +23,16 @@ public class AuthResponse {
 
    private String fullName;
 
+   private String avatarUrl;
+
    private List<String> roles;
+
+   private Double reputationScore;
+
+   private Boolean isVerified;
+
+   private String rankName;
+
+   private String partnerBio;
 
 }
