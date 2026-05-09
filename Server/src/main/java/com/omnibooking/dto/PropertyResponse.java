@@ -17,4 +17,5 @@ public class PropertyResponse {
    private String propertyType;
    private String city;
    private String country;
+   private String imageUrl;
 }

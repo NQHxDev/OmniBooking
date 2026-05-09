@@ -1,4 +1,4 @@
-import apiClient from "./apiClient";
+import apiClient, { getBaseURL } from "./apiClient";
 import { ApiResponse } from "./services/authService";
 
 export interface PropertyRequest {
@@ -20,39 +20,52 @@ export interface PropertyResponse {
    propertyType: string;
    city: string;
    country: string;
+   imageUrl?: string;
 }
 
 export const propertyService = {
    createProperty: async (data: PropertyRequest) => {
-      const response = await apiClient.post<PropertyResponse>("/partner/properties", data);
+      const response = await apiClient.post<unknown, ApiResponse<PropertyResponse>>(
+         "/partner/properties",
+         data
+      );
       return response.data;
    },
 
    getMyProperties: async (): Promise<PropertyResponse[]> => {
-      const response = await apiClient.get<ApiResponse<PropertyResponse[]>>(
+      const response = await apiClient.get<unknown, ApiResponse<PropertyResponse[]>>(
          "/partner/properties/mine"
       );
-      return response.data.data;
+
+      return response.data || [];
    },
 
-   getMyPropertiesServer: async (cookiesStr: string): Promise<PropertyResponse[]> => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1/";
-      const url = `${baseUrl.endsWith("/") ? baseUrl : baseUrl + "/"}partner/properties/mine`;
+   getMyPropertiesServer: async (
+      cookiesStr: string,
+      fingerprint?: string
+   ): Promise<PropertyResponse[] | null> => {
+      const url = `${getBaseURL()}partner/properties/mine`;
 
       try {
+         const headers: Record<string, string> = {
+            Cookie: cookiesStr,
+         };
+
+         if (fingerprint) {
+            headers["x-fgp"] = fingerprint;
+         }
+
          const res = await fetch(url, {
-            headers: {
-               Cookie: cookiesStr,
-            },
+            headers,
             cache: "no-store",
          });
 
-         if (!res.ok) return [];
+         if (!res.ok) return null;
+
          const json: ApiResponse<PropertyResponse[]> = await res.json();
          return json.data || [];
-      } catch (error) {
-         console.error("Failed to fetch properties on server:", error);
-         return [];
+      } catch (_error) {
+         return null;
       }
    },
 

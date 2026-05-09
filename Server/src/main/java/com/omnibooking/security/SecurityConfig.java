@@ -59,6 +59,7 @@ public class SecurityConfig {
             "X-CSRF-Token",
             "X-Requested-With",
             "X-Request-ID",
+            "x-fgp",
             "Accept",
             "Origin"));
       config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

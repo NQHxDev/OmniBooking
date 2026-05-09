@@ -48,9 +48,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             UUID sessionIdFromJwt = jwtService.extractSessionId(accessToken);
             String fgpHashFromJwt = jwtService.extractFingerprintHash(accessToken);
             String fingerprintFromCookie = CookieUtils.getCookieValue(request, CookieUtils.FINGERPRINT);
+            if (fingerprintFromCookie == null) {
+               fingerprintFromCookie = request.getHeader("x-fgp");
+            }
 
             // 1. Verify SessionID consistency
-            if (!sessionIdFromJwt.toString().equals(sessionIdFromCookie)) {
+            if (sessionIdFromCookie == null || !sessionIdFromJwt.toString().equals(sessionIdFromCookie)) {
                log.warn("Session ID mismatch detected for user: {}", userId);
                filterChain.doFilter(request, response);
                return;

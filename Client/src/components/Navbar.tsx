@@ -33,14 +33,18 @@ export default function Navbar() {
          if (isLoggedIn) {
             try {
                const freshUser = await authService.refresh();
-               setAuth(freshUser);
-            } catch (error) {
-               console.error("[Navbar] Session sync failed:", error);
+               if (freshUser) setAuth(freshUser);
+            } catch (error: unknown) {
+               // Silence 401/403 sync errors as they are expected when session expires
+               const err = error as { status?: number; message?: string };
+               if (err?.status !== 401 && err?.status !== 403) {
+                  console.error("[Navbar] Session sync failed:", err.message || err);
+               }
             }
          }
       };
       syncSession();
-   }, []);
+   }, [isLoggedIn, setAuth]);
 
    // Tối ưu check partner để hỗ trợ cả data cũ và mới trong store
    const isPartner = user?.roles?.includes("ROLE_PARTNER");

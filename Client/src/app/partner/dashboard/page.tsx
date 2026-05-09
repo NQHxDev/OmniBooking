@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Plus, Bell, Search } from "lucide-react";
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import DashboardSidebar from "@/components/partner/DashboardSidebar";
 import DashboardStats from "@/components/partner/DashboardStats";
@@ -16,9 +16,14 @@ export default async function PartnerDashboard() {
    }
 
    // Adhering to the principle of using services for all API calls
-   const cookieHeader = cookieStore.toString();
-   const properties = await propertyService.getMyPropertiesServer(cookieHeader);
+   const allCookies = cookieStore.getAll();
+   const cookieHeader = allCookies.map((c) => `${c.name}=${c.value}`).join("; ");
+   const fingerprint = cookieStore.get("x_fgp")?.value;
+   const properties = await propertyService.getMyPropertiesServer(cookieHeader, fingerprint);
 
+   if (properties === null) {
+      redirect("/auth/login?callbackUrl=/partner/dashboard");
+   }
    return (
       <div className="min-h-screen bg-zinc-50/50 font-sans">
          <DashboardSidebar />

@@ -53,12 +53,25 @@ public class CookieUtils {
    }
 
    public static String getCookieValue(HttpServletRequest request, String name) {
-      if (request.getCookies() == null)
-         return null;
-      return Arrays.stream(request.getCookies())
-            .filter(cookie -> name.equals(cookie.getName()))
-            .map(Cookie::getValue)
-            .findFirst()
-            .orElse(null);
+      if (request.getCookies() != null) {
+         return Arrays.stream(request.getCookies())
+               .filter(cookie -> name.equals(cookie.getName()))
+               .map(Cookie::getValue)
+               .findFirst()
+               .orElse(null);
+      }
+
+      // Manual parsing if getCookies() is null (common in server-to-server fetches)
+      String cookieHeader = request.getHeader("Cookie");
+      if (cookieHeader != null) {
+         return Arrays.stream(cookieHeader.split(";"))
+               .map(String::trim)
+               .filter(s -> s.startsWith(name + "="))
+               .map(s -> s.substring(name.length() + 1))
+               .findFirst()
+               .orElse(null);
+      }
+
+      return null;
    }
 }

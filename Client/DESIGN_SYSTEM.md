@@ -86,3 +86,19 @@ Sử dụng cho các trang landing quan trọng (Home, Become a Host):
 ### Auth Card
 
 Thẻ đăng nhập/đăng ký tập trung ở giữa màn hình hoặc lệch phải trên Desktop, hỗ trợ chuyển đổi mượt mà giữa các tab Login/Register.
+
+## 9. Thẩm mỹ Partner Hub (Partner Dashboard Aesthetics)
+
+Giao diện dành cho đối tác cần sự chuyên nghiệp, sạch sẽ nhưng vẫn giữ được nét hiện đại:
+
+- **Dashboard Layout**: Sử dụng cấu hình Sidebar cố định (64px/256px) kết hợp Header dính (Sticky).
+- **Stats Cards**: Sử dụng các mảng màu Pastel nhẹ nhàng kết hợp icon màu sắc để phân loại dữ liệu (Green cho doanh thu, Blue cho booking).
+- **Tables**: Sử dụng bo góc lớn (rounded-3xl), khoảng cách hàng thưa, và hiệu ứng hover hàng (bg-zinc-50/50).
+- **Empty States**: Luôn có hình ảnh minh họa (icon lớn) kèm CTA rõ ràng để dẫn dắt người dùng.
+
+## 10. Quy tắc xử lý Hình ảnh (Image Handling)
+
+- **Next.js Image**: Bắt buộc sử dụng `next/image` thay cho thẻ `<img>` truyền thống.
+- **Placeholder**: Sử dụng màu nền hoặc Skeleton trong lúc tải ảnh.
+- **Preview**: Đối với ảnh vừa upload, sử dụng `URL.createObjectURL` để hiển thị preview tức thì và đừng quên cleanup URL sau khi component unmount.
+- **Optimization**: Thiết lập thuộc tính `sizes` phù hợp để Next.js tự động tối ưu hóa kích thước ảnh theo viewport.

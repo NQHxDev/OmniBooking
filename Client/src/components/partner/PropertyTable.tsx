@@ -1,103 +1,180 @@
 "use client";
 
+import React, { useState } from "react";
 import { PropertyResponse } from "@/lib/api/propertyService";
-import { Star, MapPin, MoreVertical, Building2 } from "lucide-react";
+import { MapPin, Hotel, ChevronLeft, ChevronRight, Eye, Edit3, Trash2, Star } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 interface PropertyTableProps {
    properties: PropertyResponse[];
 }
 
+const ITEMS_PER_PAGE = 4;
+
 export default function PropertyTable({ properties }: PropertyTableProps) {
+   const [currentPage, setCurrentPage] = useState(1);
+
+   // Pagination logic
+   const totalPages = Math.ceil(properties.length / ITEMS_PER_PAGE);
+   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+   const visibleProperties = properties.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
    if (properties.length === 0) {
       return (
-         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-dashed border-zinc-200">
-            <div className="h-16 w-16 bg-zinc-50 rounded-2xl flex items-center justify-center mb-4">
-               <Building2 className="h-8 w-8 text-zinc-300" />
+         <div className="flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-zinc-200 bg-white p-20 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 text-[#006ce4]">
+               <Hotel className="h-10 w-10" />
             </div>
-            <h3 className="text-lg font-bold text-zinc-900">Chưa có chỗ nghỉ nào</h3>
-            <p className="text-zinc-500 text-sm mt-1 mb-6">
-               Hãy bắt đầu bằng việc đăng ký chỗ nghỉ đầu tiên của bạn.
+            <h3 className="mt-6 text-xl font-bold text-zinc-900">Chưa có chỗ nghỉ nào</h3>
+            <p className="mt-2 max-w-xs text-zinc-500 font-medium">
+               Bắt đầu hành trình kinh doanh của bạn bằng cách đăng ký chỗ nghỉ đầu tiên ngay hôm
+               nay.
             </p>
             <Link
                href="/partner/properties/new"
-               className="px-6 py-2.5 bg-[#006ce4] text-white rounded-xl font-bold text-sm hover:bg-[#0057b7] transition-all shadow-lg shadow-blue-100"
+               className="mt-8 rounded-2xl bg-[#006ce4] px-8 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 hover:bg-[#0057b7] transition-all"
             >
-               Thêm chỗ nghỉ ngay
+               Đăng ký ngay
             </Link>
          </div>
       );
    }
 
    return (
-      <div className="overflow-hidden bg-white rounded-3xl border border-zinc-100 shadow-sm">
-         <table className="w-full text-left">
-            <thead>
-               <tr className="border-b border-zinc-50 bg-zinc-50/50">
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-zinc-400">
-                     Chỗ nghỉ
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-zinc-400">
-                     Loại hình
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-zinc-400">
-                     Vị trí
-                  </th>
-                  <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-zinc-400">
-                     Trạng thái
-                  </th>
-                  <th className="px-6 py-4 text-right"></th>
-               </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-50">
-               {properties.map((property) => (
-                  <tr key={property.id} className="group hover:bg-zinc-50/50 transition-colors">
-                     <td className="px-6 py-4">
-                        <div className="flex items-center gap-4">
-                           <div className="h-12 w-12 rounded-xl bg-blue-50 flex items-center justify-center text-[#003580] font-bold overflow-hidden border border-blue-100">
-                              {property.name.charAt(0)}
-                           </div>
-                           <div>
-                              <p className="font-bold text-zinc-900 group-hover:text-[#006ce4] transition-colors">
-                                 {property.name}
-                              </p>
-                              <div className="flex items-center gap-1 mt-1">
-                                 <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                                 <span className="text-[11px] font-bold text-zinc-500">
-                                    4.8 (124 đánh giá)
-                                 </span>
-                              </div>
-                           </div>
+      <div className="space-y-8">
+         {/* Grid View - Smaller and more elegant cards */}
+         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {visibleProperties.map((property) => (
+               <div
+                  key={property.id}
+                  className="group relative flex flex-col overflow-hidden rounded-[2rem] bg-white shadow-sm border border-zinc-100 hover:shadow-xl hover:shadow-zinc-200 transition-all duration-500"
+               >
+                  {/* Image Section - Reduced height */}
+                  <div className="relative h-48 w-full overflow-hidden">
+                     <Image
+                        src={
+                           property.imageUrl ||
+                           "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=800"
+                        }
+                        alt={property.name}
+                        fill
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        className="object-cover transition-transform duration-700 group-hover:scale-110"
+                        unoptimized={!property.imageUrl}
+                     />
+                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                     {/* Badge Status - Smaller */}
+                     <div className="absolute left-4 top-4">
+                        <div className="flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 backdrop-blur-md shadow-sm">
+                           <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+                           <span className="text-[10px] font-bold text-zinc-900 uppercase tracking-wider">
+                              Active
+                           </span>
                         </div>
-                     </td>
-                     <td className="px-6 py-4">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600 uppercase tracking-tighter">
-                           {property.propertyType}
-                        </span>
-                     </td>
-                     <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 text-zinc-500">
-                           <MapPin className="h-3.5 w-3.5" />
-                           <span className="text-sm">
+                     </div>
+
+                     {/* Quick Actions Overlay - Smaller buttons */}
+                     <div className="absolute right-4 top-4 flex flex-col gap-1.5 translate-x-12 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-500">
+                        <button className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-zinc-600 hover:bg-[#006ce4] hover:text-white shadow-lg transition-colors">
+                           <Edit3 className="h-3.5 w-3.5" />
+                        </button>
+                        <button className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-zinc-600 hover:bg-red-500 hover:text-white shadow-lg transition-colors">
+                           <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                     </div>
+                  </div>
+
+                  {/* Content Section - More compact */}
+                  <div className="flex flex-1 flex-col p-6">
+                     <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                           <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#006ce4] uppercase tracking-widest mb-1.5">
+                              <Hotel className="h-3 w-3" />
+                              {property.propertyType}
+                           </div>
+                           <h3 className="text-lg font-black text-zinc-900 group-hover:text-[#006ce4] transition-colors leading-tight truncate">
+                              {property.name}
+                           </h3>
+                        </div>
+                        <div className="flex items-center gap-1 rounded-lg bg-zinc-50 px-2 py-1 border border-zinc-100 ml-2">
+                           <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                           <span className="text-[11px] font-black text-zinc-900">4.8</span>
+                        </div>
+                     </div>
+
+                     <div className="mt-4 flex flex-wrap gap-2 text-[12px] font-medium text-zinc-500">
+                        <div className="flex items-center gap-1.5 bg-zinc-50 px-3 py-1.5 rounded-xl border border-zinc-100 truncate max-w-full">
+                           <MapPin className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                           <span className="truncate">
                               {property.city}, {property.country}
                            </span>
                         </div>
-                     </td>
-                     <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 text-green-600">
-                           <div className="h-1.5 w-1.5 rounded-full bg-green-600 animate-pulse" />
-                           <span className="text-[13px] font-bold">Đang hoạt động</span>
+                     </div>
+
+                     <div className="mt-6 flex items-center justify-between border-t border-zinc-50 pt-5">
+                        <div className="flex flex-col">
+                           <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                              Inventory
+                           </span>
+                           <span className="text-sm font-black text-zinc-900">12 Rooms</span>
                         </div>
-                     </td>
-                     <td className="px-6 py-4 text-right">
-                        <button className="p-2 hover:bg-zinc-100 rounded-lg transition-colors text-zinc-400">
-                           <MoreVertical className="h-5 w-5" />
+                        <button className="flex items-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-zinc-800 transition-all shadow-md shadow-zinc-100 active:scale-[0.98]">
+                           <Eye className="h-3.5 w-3.5" />
+                           Chi tiết
                         </button>
-                     </td>
-                  </tr>
-               ))}
-            </tbody>
-         </table>
+                     </div>
+                  </div>
+               </div>
+            ))}
+         </div>
+
+         {/* Pagination Controls */}
+         {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-zinc-100 pt-8">
+               <div className="text-sm font-medium text-zinc-500">
+                  Hiển thị{" "}
+                  <span className="font-bold text-zinc-900">
+                     {startIndex + 1}-
+                     {Math.min(startIndex + visibleProperties.length, properties.length)}
+                  </span>{" "}
+                  trên tổng số <span className="font-bold text-zinc-900">{properties.length}</span>{" "}
+                  chỗ nghỉ
+               </div>
+               <div className="flex items-center gap-2">
+                  <button
+                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                     disabled={currentPage === 1}
+                     className="flex h-12 w-12 items-center justify-center rounded-2xl border border-zinc-200 bg-white text-zinc-600 hover:border-[#006ce4] hover:text-[#006ce4] disabled:opacity-30 disabled:hover:border-zinc-200 disabled:hover:text-zinc-600 transition-all"
+                  >
+                     <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <div className="flex gap-1">
+                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                           key={page}
+                           onClick={() => setCurrentPage(page)}
+                           className={`h-12 w-12 rounded-2xl text-sm font-bold transition-all ${
+                              currentPage === page
+                                 ? "bg-[#006ce4] text-white shadow-lg shadow-blue-100"
+                                 : "bg-white border border-zinc-200 text-zinc-600 hover:border-zinc-300"
+                           }`}
+                        >
+                           {page}
+                        </button>
+                     ))}
+                  </div>
+                  <button
+                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                     disabled={currentPage === totalPages}
+                     className="flex h-12 w-12 items-center justify-center rounded-2xl border border-zinc-200 bg-white text-zinc-600 hover:border-[#006ce4] hover:text-[#006ce4] disabled:opacity-30 disabled:hover:border-zinc-200 disabled:hover:text-zinc-600 transition-all"
+                  >
+                     <ChevronRight className="h-5 w-5" />
+                  </button>
+               </div>
+            </div>
+         )}
       </div>
    );
 }
