@@ -4,7 +4,7 @@ ifneq ($(iffile),)
   export $(shell sed 's/=.*//' .env)
 endif
 
-.PHONY: install dev dev-server dev-client build clean up down logs restart infra help
+.PHONY: install dev dev-server dev-client build clean up down docker-stop logs restart infra help
 
 .DEFAULT_GOAL := help
 
@@ -37,6 +37,10 @@ up:
 down:
 	@echo "Stopping all Docker services..."
 	@docker-compose down -v
+
+docker-stop:
+	@echo "Stopping all Docker services..."
+	@docker-compose stop
 
 logs:
 	@docker-compose logs -f

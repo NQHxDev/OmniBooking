@@ -176,4 +176,32 @@ public class AuthServiceImpl implements AuthService {
             .roles(Collections.singletonList(role))
             .build();
    }
+
+   @Override
+   public void clearAllCookies(HttpServletResponse response) {
+      CookieUtils.clearAuthCookies(response, cookieSecure);
+   }
+
+   @Override
+   @Transactional
+   public AuthResponse upgradeToPartner(UUID userId, String ip, String userAgent, HttpServletResponse response) {
+      User user = userRepository.findById(Objects.requireNonNull(userId))
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+      Role partnerRole = roleRepository.findByName("ROLE_PARTNER")
+            .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+
+      // Add ROLE_PARTNER to the user's roles
+      user.getRoles().add(partnerRole);
+      userRepository.save(user);
+
+      UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+      String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
+
+      log.info("Upgrading user {} to ROLE_PARTNER", user.getEmail());
+
+      // Issue new tokens with the new role
+      return issueTokensAndBuildResponse(user, partnerRole.getName(), fullName, ip, userAgent, response);
+   }
+
 }

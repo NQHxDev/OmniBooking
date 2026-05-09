@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Xác thực đối tác OmniBooking</title>
+   <style>
+      body {
+         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+         line-height: 1.6;
+         color: #333;
+         margin: 0;
+         padding: 0;
+         background-color: #f4f7f9;
+      }
+
+      .container {
+         max-width: 600px;
+         margin: 40px auto;
+         background: #ffffff;
+         border-radius: 12px;
+         overflow: hidden;
+         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      }
+
+      .header {
+         background-color: #003580;
+         color: #ffffff;
+         padding: 40px 20px;
+         text-align: center;
+      }
+
+      .header h1 {
+         margin: 0;
+         font-size: 28px;
+         letter-spacing: -1px;
+      }
+
+      .content {
+         padding: 40px;
+      }
+
+      .otp-box {
+         background-color: #f0f7ff;
+         border: 2px dashed #006ce4;
+         border-radius: 8px;
+         padding: 20px;
+         text-align: center;
+         margin: 30px 0;
+      }
+
+      .otp-code {
+         font-size: 36px;
+         font-weight: bold;
+         color: #006ce4;
+         letter-spacing: 5px;
+      }
+
+      .footer {
+         background-color: #f9f9f9;
+         padding: 20px;
+         text-align: center;
+         font-size: 12px;
+         color: #888;
+      }
+
+      .btn {
+         display: inline-block;
+         padding: 12px 30px;
+         background-color: #006ce4;
+         color: #ffffff;
+         text-decoration: none;
+         border-radius: 6px;
+         font-weight: bold;
+         margin-top: 20px;
+      }
+   </style>
+</head>
+
+<body>
+   <div class="container">
+      <div class="header">
+         <h1>OmniBooking<span style="color: #00bfff;">.</span></h1>
+         <p>Đối tác chiến lược</p>
+      </div>
+      <div class="content">
+         <h2 th:text="'Xin chào ' + ${userName} + '!'">Xin chào Đối tác!</h2>
+         <p>Chúng tôi rất vui mừng khi Quý vị chọn <strong>OmniBooking</strong> để bắt đầu hành trình kinh doanh chỗ
+            nghỉ. Để đảm bảo an toàn cho tài khoản đối tác, vui lòng sử dụng mã xác thực dưới đây để hoàn tất quy trình
+            đăng ký:</p>
+
+         <div class="otp-box">
+            <div class="otp-code" th:text="${otpCode}">123456</div>
+            <p style="margin-top: 10px; font-size: 13px; color: #666;">Mã này có hiệu lực trong vòng 10 phút</p>
+         </div>
+
+         <p>Nếu Quý vị không thực hiện yêu cầu này, vui lòng bỏ qua email hoặc liên hệ với bộ phận hỗ trợ của chúng tôi
+            để được giải đáp.</p>
+
+         <p>Trân trọng,<br>Đội ngũ OmniBooking</p>
+      </div>
+      <div class="footer">
+         <p>&copy; 2026 OmniBooking.com. Toàn bộ quyền được bảo lưu.</p>
+         <p>Địa chỉ: 123 Đường Du Lịch, Quận 1, TP. Hồ Chí Minh</p>
+      </div>
+   </div>
+</body>
+
+</html>

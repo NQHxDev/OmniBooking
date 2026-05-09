@@ -3,9 +3,12 @@
 .vscode/
 .idea/
 *.log
+*.gz
 *.tmp
 *.swp
 node_modules/
+.antigravity/
+
 .env
 .env.local
 .env.*.local

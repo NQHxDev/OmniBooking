@@ -13,10 +13,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class JWTService {
 
-   @Value("${jwt.secret}")
+   @Value("${app.security.jwt-secret}")
    private String secret;
-
-   @Value("${jwt.access-token-expiration-ms:900000}") // Default 15m
+ 
+   @Value("${app.security.jwt-expiration-ms:900000}") // Default 15m
    private long expiration;
 
    private SecretKey getSigningKey() {

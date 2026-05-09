@@ -26,10 +26,11 @@ export default function Navbar() {
    const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
    const user = useAuthStore((state) => state.user);
    const logout = useAuthStore((state) => state.logout);
+   const isPartner = user?.roles?.includes("ROLE_PARTNER");
 
    useEffect(() => {
       const timer = setTimeout(() => setMounted(true), 0);
-      
+
       const handleClickOutside = (event: MouseEvent) => {
          if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
             setIsMenuOpen(false);
@@ -93,7 +94,11 @@ export default function Navbar() {
 
                <div className="flex items-center gap-4">
                   <button className="hidden lg:block text-[13px] font-semibold hover:bg-white/10 px-3 py-1.5 rounded-md transition-colors">
-                     <Link href="/become-a-host">Đăng chỗ nghỉ của Quý vị</Link>
+                     {isLoggedIn && isPartner ? (
+                        <Link href="/partner/dashboard">Quản lý chỗ nghỉ</Link>
+                     ) : (
+                        <Link href="/become-a-host">Đăng chỗ nghỉ của Quý vị</Link>
+                     )}
                   </button>
 
                   {mounted && isLoggedIn ? (
