@@ -7,9 +7,11 @@ import DashboardStats from "@/components/partner/DashboardStats";
 import PropertyTable from "@/components/partner/PropertyTable";
 import DashboardHeader from "@/components/partner/DashboardHeader";
 import { propertyService } from "@/lib/api/propertyService";
+import { getTranslations } from "next-intl/server";
 
 export default async function PartnerDashboard() {
    const cookieStore = await cookies();
+   const t = await getTranslations("Partner.dashboard");
 
    if (!cookieStore.get("session_id") && !cookieStore.get("refresh_token")) {
       redirect("/auth/login?callbackUrl=/partner/dashboard");
@@ -36,18 +38,16 @@ export default async function PartnerDashboard() {
                <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
                   <div>
                      <h1 className="text-3xl font-black tracking-tight text-zinc-900">
-                        Partner Dashboard
+                        {t("title")}
                      </h1>
-                     <p className="mt-1 text-zinc-500 font-medium">
-                        Chào mừng bạn quay lại! Dưới đây là tình hình kinh doanh của bạn.
-                     </p>
+                     <p className="mt-1 text-zinc-500 font-medium">{t("welcome")}</p>
                   </div>
                   <Link
                      href="/partner/properties/new"
                      className="flex items-center justify-center gap-2 rounded-2xl bg-[#006ce4] px-6 py-3.5 text-sm font-bold text-white shadow-xl shadow-blue-100 hover:bg-[#0057b7] hover:shadow-blue-200 active:scale-[0.98] transition-all"
                   >
                      <Plus className="h-5 w-5" />
-                     Thêm chỗ nghỉ mới
+                     {t("addNew")}
                   </Link>
                </div>
 
@@ -58,16 +58,14 @@ export default async function PartnerDashboard() {
                <div className="mt-12">
                   <div className="mb-6 flex items-center justify-between px-2">
                      <div>
-                        <h2 className="text-xl font-bold text-zinc-900">Danh sách chỗ nghỉ</h2>
-                        <p className="text-sm text-zinc-500 mt-1">
-                           Quản lý và cập nhật thông tin các cơ sở của bạn
-                        </p>
+                        <h2 className="text-xl font-bold text-zinc-900">{t("properties.title")}</h2>
+                        <p className="text-sm text-zinc-500 mt-1">{t("properties.subtitle")}</p>
                      </div>
                      <Link
                         href="/partner/properties"
                         className="text-sm font-bold text-[#006ce4] hover:underline"
                      >
-                        Xem tất cả
+                        {t("properties.viewAll")}
                      </Link>
                   </div>
 

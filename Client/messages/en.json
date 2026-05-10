@@ -39,15 +39,15 @@
       "countries": "Countries",
       "regions": "Regions",
       "cities": "Cities",
-      "allRightsReserved": "All rights reserved.",
+      "allRightsReserved": "All rights reserved",
       "privacy": "Privacy Policy",
       "terms": "Terms of Service"
    },
    "Auth": {
       "loginTitle": "Welcome back!",
       "registerTitle": "Create a free account",
-      "loginSub": "Please enter your details to access your account.",
-      "registerSub": "It only takes a few minutes to start saving on every trip.",
+      "loginSub": "Please enter your details to access your account",
+      "registerSub": "It only takes a few minutes to start saving on every trip",
       "emailLabel": "Email Address",
       "passwordLabel": "Password",
       "fullNameLabel": "Full Name",
@@ -57,44 +57,178 @@
       "orContinueWith": "Or continue with",
       "backToHome": "Back to Home",
       "successRegister": "Registration successful!",
-      "successRegisterDesc": "Please check your email to confirm your account.",
+      "successRegisterDesc": "Please check your email to confirm your account",
       "heroBadge": "Travel with comfort",
       "heroTitle": "Discover the <highlight>world</highlight><newline></newline>your own way",
       "heroTitleHighlight": "world",
-      "heroSub": "Join over 10 million travelers to receive exclusive offers and 24/7 support on every journey.",
+      "heroSub": "Join over 10 million travelers to receive exclusive offers and 24/7 support on every journey",
       "quickBooking": "Fast booking",
       "quickBookingSub": "Confirm in 30 seconds",
       "securePayment": "Absolute security",
       "securePaymentSub": "100% safe payment",
       "fullNamePlaceholder": "John Doe",
       "forgotPasswordTitle": "Forgot password?",
-      "forgotPasswordSub": "No worries, enter your email and we'll send you a password reset link.",
+      "forgotPasswordSub": "No worries, enter your email and we'll send you a password reset link",
       "sendResetLink": "Send reset link",
       "backToLogin": "Back to login",
       "resetPasswordTitle": "Reset password",
-      "resetPasswordSub": "Please enter a new password for your account.",
+      "resetPasswordSub": "Please enter a new password for your account",
       "newPasswordLabel": "New password",
       "confirmPasswordLabel": "Confirm password",
       "resetPasswordButton": "Update password",
       "successReset": "Password reset successfully!",
-      "successResetDesc": "You can now use your new password to login.",
+      "successResetDesc": "You can now use your new password to login",
       "successForgot": "Check your Email",
-      "successForgotDesc": "We have sent a password reset link to your email. Please check your inbox (including spam).",
+      "successForgotDesc": "We have sent a password reset link to your email. Please check your inbox (including spam)",
       "logoutAllDevices": "Sign out from all other devices"
    },
    "Errors": {
-      "AUTH_001": "Username already exists.",
-      "AUTH_002": "Email already exists.",
-      "AUTH_003": "Invalid email or password.",
-      "AUTH_004": "Required role not found.",
-      "AUTH_005": "Invalid session or expired refresh token.",
-      "AUTH_006": "Access token has expired.",
-      "AUTH_007": "Invalid or expired verification token.",
-      "AUTH_008": "User not found.",
-      "AUTH_010": "Invalid or expired reset token.",
-      "AUTH_011": "Rate limit exceeded, please try again later.",
-      "GEN_999": "An unexpected error occurred.",
-      "GEN_500": "Internal server error.",
-      "FORBIDDEN": "You do not have permission to perform this action."
+      "AUTH_001": "Username already exists",
+      "AUTH_002": "Email already exists",
+      "AUTH_003": "Invalid email or password",
+      "AUTH_004": "Required role not found",
+      "AUTH_005": "Invalid session or expired refresh token",
+      "AUTH_006": "Access token has expired",
+      "AUTH_007": "Invalid or expired verification token",
+      "AUTH_008": "User not found",
+      "AUTH_010": "Invalid or expired reset token",
+      "AUTH_011": "Rate limit exceeded, please try again later",
+      "GEN_999": "An unexpected error occurred",
+      "GEN_500": "Internal server error",
+      "FORBIDDEN": "You do not have permission to perform this action"
+   },
+   "Partner": {
+      "sidebar": {
+         "overview": "Overview",
+         "properties": "Properties",
+         "bookings": "Bookings",
+         "messages": "Messages",
+         "reports": "Reports",
+         "settings": "Settings",
+         "logout": "Logout"
+      },
+      "header": {
+         "searchPlaceholder": "Search properties, invoices...",
+         "bronzePartner": "Bronze Partner",
+         "silverPartner": "Silver Partner",
+         "goldPartner": "Gold Partner"
+      },
+      "dashboard": {
+         "title": "Partner Dashboard",
+         "welcome": "Welcome back! Here's your business overview",
+         "addNew": "Add new property",
+         "stats": {
+            "monthlyRevenue": "Monthly Revenue",
+            "totalBookings": "Total Bookings",
+            "newCustomers": "New Customers",
+            "ratingScore": "Rating Score"
+         },
+         "properties": {
+            "title": "Property List",
+            "subtitle": "Manage and update your property information",
+            "viewAll": "View all",
+            "noProperties": "No properties yet",
+            "noPropertiesDesc": "Start your business journey by registering your first property today",
+            "registerNow": "Register now",
+            "statusActive": "Active",
+            "statusInactive": "Inactive",
+            "inventory": "Inventory",
+            "rooms": "Rooms",
+            "details": "Details",
+            "showing": "Showing",
+            "of": "of",
+            "typeHOTEL": "Hotel",
+            "typeAPARTMENT": "Apartment",
+            "typeVILLA": "Villa",
+            "typeHOMESTAY": "Homestay",
+            "typeRESORT": "Resort",
+            "typeGUESTHOUSE": "Guesthouse"
+         }
+      },
+      "createProperty": {
+         "title": "Register your property",
+         "subtitle": "Complete the information below to introduce your property to millions of travelers worldwide",
+         "metaTitle": "Register New Property | OmniBooking Partner",
+         "metaDesc": "Join OmniBooking and start welcoming guests today"
+      },
+      "createPropertyForm": {
+         "step1": "Info",
+         "step2": "Location",
+         "step3": "Images",
+         "basicInfo": "Basic Information",
+         "propertyName": "Property Name",
+         "description": "Detailed Description",
+         "propertyType": "Property Type",
+         "locationRating": "Location & Rating",
+         "address": "Street Address",
+         "city": "City",
+         "country": "Country",
+         "timeTitle": "Check-in/Check-out Times",
+         "flexibleTime": "Flexible 24/7",
+         "checkIn": "Check-in",
+         "checkOut": "Check-out",
+         "imagesTitle": "Property Images",
+         "next": "Next",
+         "back": "Back",
+         "finish": "Finish & Register",
+         "processing": "Processing...",
+         "placeholders": {
+            "name": "e.g., Omni Luxury Hotel & Spa",
+            "description": "Tell us about the highlights of your property...",
+            "anytime": "Anytime"
+         },
+         "messages": {
+            "flexibleInfo": "24/7 mode enabled: Guests can check-in and check-out at any time of the day",
+            "imageUploadDesc": "Upload at least 1 image. The first one will be set as the main photo",
+            "success": "Property created successfully!",
+            "imageProcessing": "Image processing request has been sent to the system",
+            "error": "An error occurred while creating the property",
+            "validationError": "Please check your information again",
+            "stepError": "Please complete all information in this step",
+            "imageRequired": "Please upload at least one image for your property"
+         },
+         "propertyTypes": {
+            "HOTEL": {
+               "label": "Hotel",
+               "description": "For hotels, motels with 24/7 reception"
+            },
+            "APARTMENT": {
+               "label": "Apartment",
+               "description": "Fully equipped apartments or studios"
+            },
+            "VILLA": {
+               "label": "Villa",
+               "description": "Entire houses, private vacation villas"
+            },
+            "HOMESTAY": {
+               "label": "Homestay",
+               "description": "Local homes, authentic cultural experiences"
+            },
+            "RESORT": {
+               "label": "Resort",
+               "description": "High-end resorts, all-inclusive services"
+            }
+         }
+      },
+      "imageUpload": {
+         "clickToUpload": "Click to upload or drag and drop",
+         "acceptedFormats": "PNG, JPG or WEBP (Max 10MB/file)",
+         "uploading": "Uploading...",
+         "mainImage": "Main photo",
+         "invalidFile": "File {name} is not a valid image"
+      },
+      "authGuard": {
+         "denied": "Access Denied",
+         "noPermission": "You do not have permission to access this page!",
+         "verifying": "Verifying access permissions",
+         "waiting": "Please wait a moment..."
+      },
+      "validation": {
+         "nameMin": "Property name must be at least 5 characters",
+         "descMin": "Description must be at least 20 characters",
+         "addressRequired": "Address cannot be empty",
+         "cityRequired": "City cannot be empty",
+         "countryRequired": "Country cannot be empty"
+      }
    }
 }

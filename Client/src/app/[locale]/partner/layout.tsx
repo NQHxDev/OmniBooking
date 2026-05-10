@@ -6,7 +6,10 @@ import { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { useTranslations } from "next-intl";
+
 export default function PartnerLayout({ children }: { children: React.ReactNode }) {
+   const t = useTranslations("Partner.authGuard");
    const { user, isLoggedIn } = useAuthStore();
    const router = useRouter();
 
@@ -21,15 +24,15 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
       const timer = setTimeout(() => {
          // Nếu sau 3 giây mà vẫn chưa authorized thì mới đá đi
          if (!isAuthorized) {
-            toast.error("Truy cập bị từ chối", {
-               description: "Bạn không có quyền truy cập!",
+            toast.error(t("denied"), {
+               description: t("noPermission"),
             });
             router.push("/");
          }
       }, 3000);
 
       return () => clearTimeout(timer);
-   }, [isAuthorized, router]);
+   }, [isAuthorized, router, t]);
 
    if (!isAuthorized) {
       return (
@@ -39,8 +42,8 @@ export default function PartnerLayout({ children }: { children: React.ReactNode 
                   <Loader2 className="h-12 w-12 animate-spin text-[#006ce4]" />
                </div>
                <div>
-                  <p className="text-zinc-900 font-bold text-lg">Đang xác thực quyền truy cập</p>
-                  <p className="text-zinc-500 text-sm mt-1">Vui lòng đợi trong giây lát...</p>
+                  <p className="text-zinc-900 font-bold text-lg">{t("verifying")}</p>
+                  <p className="text-zinc-500 text-sm mt-1">{t("waiting")}</p>
                </div>
             </div>
          </div>

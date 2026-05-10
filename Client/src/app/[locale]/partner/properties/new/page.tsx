@@ -1,12 +1,18 @@
 import CreatePropertyForm from "@/components/partner/CreatePropertyForm";
 import { Building2 } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
-export const metadata = {
-   title: "Đăng ký chỗ nghỉ mới | OmniBooking Partner",
-   description: "Tham gia cùng OmniBooking và bắt đầu đón khách ngay hôm nay.",
-};
+export async function generateMetadata() {
+   const t = await getTranslations("Partner.createProperty");
+   return {
+      title: t("metaTitle"),
+      description: t("metaDesc"),
+   };
+}
 
-export default function NewPropertyPage() {
+export default async function NewPropertyPage() {
+   const t = await getTranslations("Partner.createProperty");
+
    return (
       <main className="min-h-screen bg-[#f5f5f5] pb-20">
          {/* Page Header (Server Rendered) */}
@@ -17,12 +23,9 @@ export default function NewPropertyPage() {
                      <Building2 className="h-8 w-8" />
                   </div>
                   <h1 className="text-3xl md:text-4xl font-extrabold text-zinc-900 tracking-tight mb-4">
-                     Đăng ký chỗ nghỉ của bạn
+                     {t("title")}
                   </h1>
-                  <p className="max-w-xl text-zinc-500 text-lg leading-relaxed">
-                     Hoàn thành các thông tin dưới đây để giới thiệu chỗ nghỉ của bạn với hàng triệu
-                     khách du lịch trên toàn thế giới.
-                  </p>
+                  <p className="max-w-xl text-zinc-500 text-lg leading-relaxed">{t("subtitle")}</p>
                </div>
             </div>
          </div>

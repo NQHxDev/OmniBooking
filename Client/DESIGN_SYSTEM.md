@@ -44,6 +44,7 @@ Tài liệu này quy định các tiêu chuẩn về giao diện (UI) và trải
 ### 4.1. Tuyệt đối không hardcode chuỗi văn bản
 
 - Mọi chuỗi ký tự hiển thị trên giao diện (labels, placeholders, buttons, messages) **PHẢI** được định nghĩa trong các tệp JSON tại thư mục `/messages`.
+- **Quy tắc về dấu câu**: Không sử dụng dấu chấm (`.`) ở cuối các câu trong file JSON để giữ giao diện sạch sẽ (trừ trường hợp dấu chấm than `!` hoặc ba chấm `...` để nhấn mạnh hoặc các trường hợp đặc biệt).
 - Sử dụng hook `useTranslations` từ `next-intl` để lấy chuỗi dịch.
 
 ```tsx

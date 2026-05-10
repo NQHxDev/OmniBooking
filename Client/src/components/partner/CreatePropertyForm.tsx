@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useForm, FieldErrors } from "react-hook-form";
+import { useState, useMemo } from "react";
+import { useForm, FieldErrors, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -22,55 +22,49 @@ import { propertyService } from "@/lib/api/propertyService";
 import { toast } from "sonner";
 import ImageUpload from "./ImageUpload";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
-const propertySchema = z.object({
-   name: z.string().min(5, "Tên chỗ nghỉ phải có ít nhất 5 ký tự"),
-   description: z.string().min(20, "Mô tả phải có ít nhất 20 ký tự"),
-   propertyType: z.enum(["HOTEL", "APARTMENT", "VILLA", "RESORT", "HOMESTAY", "GUESTHOUSE"]),
-   address: z.string().min(5, "Địa chỉ không được để trống"),
-   city: z.string().min(2, "Thành phố không được để trống"),
-   country: z.string().min(2, "Quốc gia không được để trống"),
-   starRating: z.number().min(0).max(5),
-   checkInTime: z.string(),
-   checkOutTime: z.string(),
-});
+type PropertyFormValues = z.infer<ReturnType<typeof getPropertySchema>>;
 
-type PropertyFormValues = z.infer<typeof propertySchema>;
+const getPropertySchema = (tv: (key: string) => string) =>
+   z.object({
+      name: z.string().min(5, tv("nameMin")),
+      description: z.string().min(20, tv("descMin")),
+      propertyType: z.enum(["HOTEL", "APARTMENT", "VILLA", "RESORT", "HOMESTAY", "GUESTHOUSE"]),
+      address: z.string().min(5, tv("addressRequired")),
+      city: z.string().min(2, tv("cityRequired")),
+      country: z.string().min(2, tv("countryRequired")),
+      starRating: z.number().min(0).max(5),
+      checkInTime: z.string(),
+      checkOutTime: z.string(),
+   });
 
 const PROPERTY_TYPES = [
    {
       id: "HOTEL",
-      label: "Khách sạn",
       icon: Hotel,
-      description: "Dành cho khách sạn, nhà nghỉ có lễ tân 24/7",
    },
    {
       id: "APARTMENT",
-      label: "Căn hộ",
       icon: Building,
-      description: "Căn hộ chung cư, studio đầy đủ tiện nghi",
    },
    {
       id: "VILLA",
-      label: "Biệt thự",
       icon: Home,
-      description: "Nhà nguyên căn, biệt thự nghỉ dưỡng riêng tư",
    },
    {
       id: "HOMESTAY",
-      label: "Homestay",
       icon: Palmtree,
-      description: "Nhà dân, trải nghiệm văn hóa địa phương",
    },
    {
       id: "RESORT",
-      label: "Resort",
       icon: Building2,
-      description: "Khu nghỉ dưỡng cao cấp, dịch vụ trọn gói",
    },
 ];
 
 export default function CreatePropertyForm() {
+   const t = useTranslations("Partner.createPropertyForm");
+   const tv = useTranslations("Partner.validation");
    const [step, setStep] = useState(1);
    const [isSubmitting, setIsSubmitting] = useState(false);
    const [images, setImages] = useState<{ file: File; preview: string; isUploading: boolean }[]>(
@@ -79,11 +73,13 @@ export default function CreatePropertyForm() {
    const [isFlexibleTime, setIsFlexibleTime] = useState(false);
    const router = useRouter();
 
+   const propertySchema = useMemo(() => getPropertySchema(tv), [tv]);
+
    const {
       register,
       handleSubmit,
       setValue,
-      watch,
+      control,
       trigger,
       formState: { errors },
    } = useForm<PropertyFormValues>({
@@ -96,7 +92,10 @@ export default function CreatePropertyForm() {
       },
    });
 
-   const selectedType = watch("propertyType");
+   const selectedType = useWatch({
+      control,
+      name: "propertyType",
+   });
 
    const handleImageUpload = (file: File) => {
       const preview = URL.createObjectURL(file);
@@ -114,7 +113,7 @@ export default function CreatePropertyForm() {
 
    const onSubmit = async (data: PropertyFormValues) => {
       if (images.length === 0) {
-         toast.error("Vui lòng tải lên ít nhất một ảnh cho chỗ nghỉ");
+         toast.error(t("messages.imageRequired"));
          return;
       }
 
@@ -122,7 +121,7 @@ export default function CreatePropertyForm() {
       try {
          // 1. Create Property
          const property = await propertyService.createProperty(data);
-         toast.success("Đã tạo chỗ nghỉ thành công!");
+         toast.success(t("messages.success"));
 
          // 2. Upload Images in Background
          setImages((prev) => prev.map((img) => ({ ...img, isUploading: true })));
@@ -132,12 +131,12 @@ export default function CreatePropertyForm() {
          );
 
          await Promise.all(uploadPromises);
-         toast.success("Đã gửi yêu cầu xử lý ảnh lên hệ thống");
+         toast.success(t("messages.imageProcessing"));
 
          router.push("/partner/dashboard");
       } catch (error: unknown) {
          const apiError = error as { response?: { data?: { message?: string } } };
-         toast.error(apiError.response?.data?.message || "Đã xảy ra lỗi khi tạo chỗ nghỉ");
+         toast.error(apiError.response?.data?.message || t("messages.error"));
       } finally {
          setIsSubmitting(false);
       }
@@ -146,7 +145,7 @@ export default function CreatePropertyForm() {
    const onInvalid = (errors: FieldErrors<PropertyFormValues>) => {
       const firstError = Object.values(errors)[0];
       if (firstError?.message) {
-         toast.error("Vui lòng kiểm tra lại thông tin", {
+         toast.error(t("messages.validationError"), {
             description: firstError.message,
          });
       }
@@ -162,7 +161,7 @@ export default function CreatePropertyForm() {
       if (isValid) {
          setStep((s) => s + 1);
       } else {
-         toast.error("Vui lòng điền đầy đủ thông tin ở bước này");
+         toast.error(t("messages.stepError"));
       }
    };
 
@@ -188,7 +187,7 @@ export default function CreatePropertyForm() {
                      <span className="text-sm font-bold">{s}</span>
                   )}
                   <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">
-                     {s === 1 ? "Thông tin" : s === 2 ? "Vị trí" : "Hình ảnh"}
+                     {t(`step${s}`)}
                   </span>
                </div>
             ))}
@@ -205,17 +204,17 @@ export default function CreatePropertyForm() {
                      <section className="space-y-6">
                         <div className="flex items-center gap-3 mb-2">
                            <Building2 className="h-5 w-5 text-[#003580]" />
-                           <h2 className="text-xl font-bold text-zinc-900">Thông tin cơ bản</h2>
+                           <h2 className="text-xl font-bold text-zinc-900">{t("basicInfo")}</h2>
                         </div>
 
                         <div className="space-y-4">
                            <div>
                               <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                                 Tên chỗ nghỉ
+                                 {t("propertyName")}
                               </label>
                               <input
                                  {...register("name")}
-                                 placeholder="Ví dụ: Omni Luxury Hotel & Spa"
+                                 placeholder={t("placeholders.name")}
                                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:border-[#003580] focus:ring-4 focus:ring-blue-50 outline-none transition-all placeholder:text-zinc-300"
                               />
                               {errors.name && (
@@ -227,12 +226,12 @@ export default function CreatePropertyForm() {
 
                            <div>
                               <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                                 Mô tả chi tiết
+                                 {t("description")}
                               </label>
                               <textarea
                                  {...register("description")}
                                  rows={4}
-                                 placeholder="Hãy giới thiệu những điểm nổi bật nhất của chỗ nghỉ..."
+                                 placeholder={t("placeholders.description")}
                                  className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:border-[#003580] focus:ring-4 focus:ring-blue-50 outline-none transition-all placeholder:text-zinc-300 resize-none"
                               />
                               {errors.description && (
@@ -246,7 +245,7 @@ export default function CreatePropertyForm() {
 
                      <section className="space-y-6">
                         <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                           Loại hình chỗ nghỉ
+                           {t("propertyType")}
                         </label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            {PROPERTY_TYPES.map((type) => (
@@ -271,9 +270,11 @@ export default function CreatePropertyForm() {
                                     <type.icon className="h-6 w-6" />
                                  </div>
                                  <div>
-                                    <p className="font-bold text-zinc-900">{type.label}</p>
+                                    <p className="font-bold text-zinc-900">
+                                       {t(`propertyTypes.${type.id}.label`)}
+                                    </p>
                                     <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                                       {type.description}
+                                       {t(`propertyTypes.${type.id}.description`)}
                                     </p>
                                  </div>
                               </button>
@@ -287,7 +288,7 @@ export default function CreatePropertyForm() {
                            onClick={nextStep}
                            className="flex items-center gap-2 px-8 py-3.5 bg-[#003580] text-white rounded-xl font-bold hover:bg-[#002b66] transition-all active:scale-95 shadow-lg shadow-blue-200"
                         >
-                           Tiếp theo <ChevronRight className="h-5 w-5" />
+                           {t("next")} <ChevronRight className="h-5 w-5" />
                         </button>
                      </div>
                   </div>
@@ -299,13 +300,15 @@ export default function CreatePropertyForm() {
                      <section className="space-y-6">
                         <div className="flex items-center gap-3 mb-2">
                            <MapPin className="h-5 w-5 text-[#003580]" />
-                           <h2 className="text-xl font-bold text-zinc-900">Vị trí & Xếp hạng</h2>
+                           <h2 className="text-xl font-bold text-zinc-900">
+                              {t("locationRating")}
+                           </h2>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                            <div className="md:col-span-2">
                               <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                                 Địa chỉ cụ thể
+                                 {t("address")}
                               </label>
                               <input
                                  {...register("address")}
@@ -314,7 +317,7 @@ export default function CreatePropertyForm() {
                            </div>
                            <div>
                               <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                                 Thành phố
+                                 {t("city")}
                               </label>
                               <input
                                  {...register("city")}
@@ -323,7 +326,7 @@ export default function CreatePropertyForm() {
                            </div>
                            <div>
                               <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                                 Quốc gia
+                                 {t("country")}
                               </label>
                               <input
                                  {...register("country")}
@@ -337,13 +340,11 @@ export default function CreatePropertyForm() {
                         <div className="flex items-center justify-between">
                            <div className="flex items-center gap-3">
                               <Clock className="h-5 w-5 text-[#003580]" />
-                              <h2 className="text-xl font-bold text-zinc-900">
-                                 Thời gian Nhận/Trả phòng
-                              </h2>
+                              <h2 className="text-xl font-bold text-zinc-900">{t("timeTitle")}</h2>
                            </div>
                            <label className="flex items-center gap-3 cursor-pointer group">
                               <span className="text-[13px] font-bold text-zinc-500 group-hover:text-[#003580] transition-colors">
-                                 Linh hoạt 24/7
+                                 {t("flexibleTime")}
                               </span>
                               <div className="relative">
                                  <input
@@ -379,7 +380,7 @@ export default function CreatePropertyForm() {
                               <label
                                  className={`block text-[11px] font-bold mb-2 uppercase tracking-widest ${isFlexibleTime ? "text-zinc-400" : "text-zinc-500"}`}
                               >
-                                 Nhận phòng
+                                 {t("checkIn")}
                               </label>
                               <div className="relative">
                                  <input
@@ -390,7 +391,7 @@ export default function CreatePropertyForm() {
                                  />
                                  {isFlexibleTime && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-zinc-50/10 backdrop-blur-[1px] rounded-xl text-[10px] font-bold text-zinc-400 uppercase">
-                                       Anytime
+                                       {t("placeholders.anytime")}
                                     </div>
                                  )}
                               </div>
@@ -399,7 +400,7 @@ export default function CreatePropertyForm() {
                               <label
                                  className={`block text-[11px] font-bold mb-2 uppercase tracking-widest ${isFlexibleTime ? "text-zinc-400" : "text-zinc-500"}`}
                               >
-                                 Trả phòng
+                                 {t("checkOut")}
                               </label>
                               <div className="relative">
                                  <input
@@ -410,7 +411,7 @@ export default function CreatePropertyForm() {
                                  />
                                  {isFlexibleTime && (
                                     <div className="absolute inset-0 flex items-center justify-center bg-zinc-50/10 backdrop-blur-[1px] rounded-xl text-[10px] font-bold text-zinc-400 uppercase">
-                                       Anytime
+                                       {t("placeholders.anytime")}
                                     </div>
                                  )}
                               </div>
@@ -421,8 +422,7 @@ export default function CreatePropertyForm() {
                            <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-100 animate-in fade-in zoom-in-95 duration-300">
                               <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
                               <p className="text-[12px] font-medium text-[#003580]">
-                                 Chế độ 24/7 đang bật: Khách có thể nhận và trả phòng vào bất kỳ lúc
-                                 nào trong ngày.
+                                 {t("messages.flexibleInfo")}
                               </p>
                            </div>
                         )}
@@ -434,14 +434,14 @@ export default function CreatePropertyForm() {
                            onClick={prevStep}
                            className="flex items-center gap-2 px-8 py-3.5 bg-zinc-100 text-zinc-700 rounded-xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
                         >
-                           <ChevronLeft className="h-5 w-5" /> Quay lại
+                           <ChevronLeft className="h-5 w-5" /> {t("back")}
                         </button>
                         <button
                            type="button"
                            onClick={nextStep}
                            className="flex items-center gap-2 px-8 py-3.5 bg-[#003580] text-white rounded-xl font-bold hover:bg-[#002b66] transition-all active:scale-95 shadow-lg shadow-blue-200"
                         >
-                           Tiếp theo <ChevronRight className="h-5 w-5" />
+                           {t("next")} <ChevronRight className="h-5 w-5" />
                         </button>
                      </div>
                   </div>
@@ -453,11 +453,9 @@ export default function CreatePropertyForm() {
                      <section className="space-y-6">
                         <div className="flex items-center gap-3 mb-2">
                            <ImageIcon className="h-5 w-5 text-[#003580]" />
-                           <h2 className="text-xl font-bold text-zinc-900">Hình ảnh chỗ nghỉ</h2>
+                           <h2 className="text-xl font-bold text-zinc-900">{t("imagesTitle")}</h2>
                         </div>
-                        <p className="text-sm text-zinc-500">
-                           Tải lên ít nhất 1 ảnh. Ảnh đầu tiên sẽ được chọn làm ảnh đại diện.
-                        </p>
+                        <p className="text-sm text-zinc-500">{t("messages.imageUploadDesc")}</p>
 
                         <ImageUpload
                            images={images}
@@ -474,7 +472,7 @@ export default function CreatePropertyForm() {
                            disabled={isSubmitting}
                            className="flex items-center gap-2 px-8 py-3.5 bg-zinc-100 text-zinc-700 rounded-xl font-bold hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50"
                         >
-                           <ChevronLeft className="h-5 w-5" /> Quay lại
+                           <ChevronLeft className="h-5 w-5" /> {t("back")}
                         </button>
                         <button
                            type="submit"
@@ -483,10 +481,10 @@ export default function CreatePropertyForm() {
                         >
                            {isSubmitting ? (
                               <>
-                                 <Loader2 className="h-5 w-5 animate-spin" /> Đang xử lý...
+                                 <Loader2 className="h-5 w-5 animate-spin" /> {t("processing")}
                               </>
                            ) : (
-                              "Hoàn tất & Đăng ký"
+                              t("finish")
                            )}
                         </button>
                      </div>

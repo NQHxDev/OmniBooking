@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
    LayoutDashboard,
@@ -8,17 +10,22 @@ import {
    Settings,
    LogOut,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { usePathname } from "next/navigation";
 
 const MENU_ITEMS = [
-   { icon: LayoutDashboard, label: "Tổng quan", href: "/partner/dashboard", active: true },
-   { icon: Building2, label: "Chỗ nghỉ", href: "/partner/properties" },
-   { icon: CalendarDays, label: "Đặt phòng", href: "/partner/bookings" },
-   { icon: MessageSquare, label: "Tin nhắn", href: "/partner/messages" },
-   { icon: BarChart3, label: "Báo cáo", href: "/partner/reports" },
-   { icon: Settings, label: "Cài đặt", href: "/partner/settings" },
+   { icon: LayoutDashboard, labelKey: "overview", href: "/partner/dashboard" },
+   { icon: Building2, labelKey: "properties", href: "/partner/properties" },
+   { icon: CalendarDays, labelKey: "bookings", href: "/partner/bookings" },
+   { icon: MessageSquare, labelKey: "messages", href: "/partner/messages" },
+   { icon: BarChart3, labelKey: "reports", href: "/partner/reports" },
+   { icon: Settings, labelKey: "settings", href: "/partner/settings" },
 ];
 
 export default function DashboardSidebar() {
+   const t = useTranslations("Partner.sidebar");
+   const pathname = usePathname();
+
    return (
       <aside className="fixed left-0 top-0 hidden h-screen w-64 border-r border-zinc-200 bg-white lg:block z-20">
          <div className="flex h-full flex-col p-6">
@@ -32,28 +39,31 @@ export default function DashboardSidebar() {
             </div>
 
             <nav className="flex-1 space-y-1">
-               {MENU_ITEMS.map((item) => (
-                  <Link
-                     key={item.label}
-                     href={item.href}
-                     className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition-all ${
-                        item.active
-                           ? "bg-blue-50 text-[#006ce4]"
-                           : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
-                     }`}
-                  >
-                     <item.icon
-                        className={`h-5 w-5 ${item.active ? "text-[#006ce4]" : "text-zinc-400"}`}
-                     />
-                     {item.label}
-                  </Link>
-               ))}
+               {MENU_ITEMS.map((item) => {
+                  const isActive = pathname.endsWith(item.href);
+                  return (
+                     <Link
+                        key={item.labelKey}
+                        href={item.href}
+                        className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition-all ${
+                           isActive
+                              ? "bg-blue-50 text-[#006ce4]"
+                              : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                        }`}
+                     >
+                        <item.icon
+                           className={`h-5 w-5 ${isActive ? "text-[#006ce4]" : "text-zinc-400"}`}
+                        />
+                        {t(item.labelKey)}
+                     </Link>
+                  );
+               })}
             </nav>
 
             <div className="mt-auto border-t border-zinc-100 pt-6">
                <button className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-all">
                   <LogOut className="h-5 w-5" />
-                  Đăng xuất
+                  {t("logout")}
                </button>
             </div>
          </div>
