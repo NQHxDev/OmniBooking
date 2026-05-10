@@ -135,8 +135,15 @@ public class AuthServiceImpl implements AuthService {
    @Override
    public AuthResponse refresh(String sessionId, String refreshToken, String ip, String userAgent,
          HttpServletResponse response) {
-      UUID sId = UUID.fromString(sessionId);
-      UUID rToken = UUID.fromString(refreshToken);
+      UUID sId;
+      UUID rToken;
+      try {
+         sId = UUID.fromString(sessionId);
+         rToken = UUID.fromString(refreshToken);
+      } catch (IllegalArgumentException e) {
+         log.error("Invalid UUID format for session or refresh token: session={}, refresh={}", sessionId, refreshToken);
+         throw new AppException(ErrorCode.INVALID_SESSION);
+      }
 
       // LOCKING: Ngăn chặn race condition khi nhiều request refresh cùng lúc cho 1 sessionId
       String lockKey = "lock:refresh:" + sId;

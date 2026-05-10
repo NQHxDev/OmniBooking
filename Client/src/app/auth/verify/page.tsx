@@ -47,7 +47,7 @@ function VerifyContent() {
       };
 
       verifyEmail();
-   }, [token]);
+   }, [token, user, setAuth]);
 
    return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#f8fafc] px-4 font-sans">

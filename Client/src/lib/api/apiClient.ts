@@ -2,14 +2,13 @@ import axios from "axios";
 import { v7 as uuidv7 } from "uuid";
 import { env } from "@/env";
 import { toast } from "sonner";
+import { getBaseURL } from "./config";
 
-export const getBaseURL = () => {
-   const url = env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1/";
-   return url.endsWith("/api/v1/") ? url : `${url.replace(/\/$/, "")}/api/v1/`;
-};
+// Remove useAuthStore to avoid circular dependency
 
 const apiClient = axios.create({
    baseURL: getBaseURL(),
+   timeout: 15000,
    withCredentials: true,
    headers: {
       "Content-Type": "application/json",
@@ -42,12 +41,7 @@ apiClient.interceptors.response.use(
 
       const errorCode = error.response?.data?.errorCode;
 
-      // If error is 401 and errorCode is TOKEN_EXPIRED (AUTH_006) or INVALID_CREDENTIALS (AUTH_003)
-      if (
-         status === 401 &&
-         (errorCode === "AUTH_006" || errorCode === "AUTH_003") &&
-         !originalRequest._retry
-      ) {
+      if (status === 401 && errorCode === "AUTH_006" && !originalRequest._retry) {
          originalRequest._retry = true;
 
          try {
@@ -58,15 +52,25 @@ apiClient.interceptors.response.use(
             console.log("Refresh successful, retrying original request...");
             // Retry the original request
             return apiClient(originalRequest);
-         } catch (refreshError) {
+         } catch (refreshError: unknown) {
             console.error("Refresh failed, logging out...", refreshError);
-            // If refresh fails, we could redirect to login or clear state
-            // window.location.href = "/auth/login";
+            if (typeof window !== "undefined") {
+               localStorage.removeItem("auth-storage");
+               window.location.href = "/auth/login";
+            }
             return Promise.reject(refreshError);
          }
       }
 
       // Only show global toast if not explicitly skipped
+      if (status === 401 && (errorCode === "AUTH_005" || errorCode === "AUTH_007")) {
+         if (typeof window !== "undefined") {
+            localStorage.removeItem("auth-storage");
+            window.location.href = "/auth/login";
+         }
+         return Promise.reject(error);
+      }
+
       if (!error.config?._skipToast) {
          toast.error(message);
       }

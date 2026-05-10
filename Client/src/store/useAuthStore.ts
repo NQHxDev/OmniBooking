@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import apiClient from "@/lib/api/apiClient";
+import axios from "axios";
+import { getBaseURL } from "@/lib/api/config";
 
 export interface User {
    id: string;
@@ -30,7 +31,7 @@ export const useAuthStore = create<AuthState>()(
          setAuth: (user) => set({ user, isLoggedIn: true }),
          logout: async () => {
             try {
-               await apiClient.post("auth/logout", {}, { withCredentials: true });
+               await axios.post(`${getBaseURL()}auth/logout`, {}, { withCredentials: true });
             } catch (error) {
                console.error("Logout failed:", error);
             } finally {

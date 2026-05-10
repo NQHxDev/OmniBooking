@@ -6,6 +6,8 @@ import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -22,13 +24,14 @@ public class BloomFilterService {
     */
    public void createFilter(String filterName, double errorRate, long capacity) {
       try {
-         redisTemplate.execute((RedisCallback<Object>) (connection) -> {
-            connection.execute("BF.RESERVE",
-                  filterName.getBytes(),
-                  String.valueOf(errorRate).getBytes(),
-                  String.valueOf(capacity).getBytes());
-            return null;
-         });
+         org.springframework.data.redis.core.script.RedisScript<String> script = new org.springframework.data.redis.core.script.DefaultRedisScript<>(
+               "return redis.call('BF.RESERVE', KEYS[1], ARGV[1], ARGV[2])", String.class);
+
+         redisTemplate.execute(script,
+               Collections.singletonList(filterName),
+               String.valueOf(errorRate),
+               String.valueOf(capacity));
+
          log.info("Created Bloom Filter: {}", filterName);
       } catch (Exception e) {
          log.debug("Bloom Filter {} might already exist: {}", filterName, e.getMessage());
@@ -36,27 +39,31 @@ public class BloomFilterService {
    }
 
    public void add(String value) {
+      if (value == null)
+         return;
       try {
-         redisTemplate.execute((RedisCallback<Object>) (connection) -> {
-            connection.execute("BF.ADD", EMAIL_FILTER.getBytes(), value.getBytes());
-            return null;
-         });
+         org.springframework.data.redis.core.script.RedisScript<Long> script = new org.springframework.data.redis.core.script.DefaultRedisScript<>(
+               "return redis.call('BF.ADD', KEYS[1], ARGV[1])", Long.class);
+
+         redisTemplate.execute(script, Collections.singletonList(EMAIL_FILTER), value);
       } catch (Exception e) {
          log.error("Failed to add value to Bloom Filter: {}", value, e);
       }
    }
 
    public boolean mightContain(String value) {
+      if (value == null)
+         return false;
       try {
-         Boolean exists = redisTemplate.execute((RedisCallback<Boolean>) (connection) -> {
-            Object result = connection.execute("BF.EXISTS", EMAIL_FILTER.getBytes(), value.getBytes());
-            // RedisBloom trả về 1 nếu tồn tại, 0 nếu không
-            return result != null && (Long) result == 1L;
-         });
-         return exists != null && exists;
+         org.springframework.data.redis.core.script.RedisScript<Long> script = new org.springframework.data.redis.core.script.DefaultRedisScript<>(
+               "return redis.call('BF.EXISTS', KEYS[1], ARGV[1])", Long.class);
+
+         Long result = redisTemplate.execute(script, Collections.singletonList(EMAIL_FILTER), value);
+
+         return result != null && result == 1L;
       } catch (Exception e) {
-         log.error("Error checking Bloom Filter for: {}", value, e);
-         return true; // Fallback an toàn
+         log.error("Error checking Bloom Filter (failing open): {}", e.getMessage());
+         return true; // Fail open to allow database check if Redis/Bloom is down
       }
    }
 

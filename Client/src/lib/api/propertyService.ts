@@ -1,4 +1,5 @@
-import apiClient, { getBaseURL } from "./apiClient";
+import apiClient from "./apiClient";
+import { getBaseURL } from "./config";
 import { ApiResponse } from "./services/authService";
 
 export interface PropertyRequest {

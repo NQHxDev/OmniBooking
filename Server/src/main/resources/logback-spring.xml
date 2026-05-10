@@ -32,7 +32,9 @@
       <appender-ref ref="FILE" />
    </root>
 
-   <!-- Spring Framework logging -->
+   <!-- Kafka silencing -->
+   <logger name="org.apache.kafka" level="ERROR" />
+
    <logger name="org.springframework" level="INFO" />
    <logger name="com.omnibooking" level="DEBUG" />
 

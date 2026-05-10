@@ -2,13 +2,18 @@
 
 import NextLink from "next/link";
 import Image from "next/image";
-import Navbar from "@/components/Navbar";
 import { ArrowLeft, Home } from "lucide-react";
 
 export default function NotFound() {
    return (
       <div className="flex min-h-screen flex-col bg-white font-sans">
-         <Navbar />
+         <header className="bg-[#003580] text-white py-4 px-6 sticky top-0 z-50 shadow-md">
+            <div className="mx-auto max-w-7xl">
+               <NextLink href="/" className="text-2xl font-bold tracking-tight">
+                  OmniBooking.com
+               </NextLink>
+            </div>
+         </header>
 
          <main className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
             <div className="relative mb-8 h-64 w-64 sm:h-80 sm:w-80 animate-in fade-in zoom-in duration-700">
