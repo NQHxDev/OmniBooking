@@ -29,7 +29,7 @@ export default function NotFound() {
             <div className="max-w-md animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-200">
                <h1 className="text-4xl font-black tracking-tighter text-[#1a1a1a] sm:text-6xl mb-6 leading-[1.1]">
                   Ui chao! <br />
-                  <span className="bg-gradient-to-r from-[#006ce4] to-[#003580] bg-clip-text text-transparent">
+                  <span className="bg-linear-to-r from-[#006ce4] to-[#003580] bg-clip-text text-transparent">
                      Bạn bị lạc rồi...
                   </span>
                </h1>

@@ -17,12 +17,12 @@ Tài liệu này quy định các tiêu chuẩn về giao diện (UI) và trải
 
 ## 2. Typo (Typography)
 
-- **Font Family**: Hệ thống Font Stack cao cấp.
-  `"Avenir Next", BlinkMacSystemFont, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`
+- **Font Family**: Primary: `Be Vietnam Pro` (optimized for Vietnamese).
+  Fallbacks: `Inter`, `BlinkMacSystemFont`, `-apple-system`, `Segoe UI`, `Roboto`, `Helvetica`, `Arial`, sans-serif.
 - **Quy tắc**:
-   - Headings: Bold (700), tracking-tight.
-   - Body: Normal (400), leading-normal.
-   - Buttons: Bold (700).
+   - Headings: Bold (700-900), tracking-tighter.
+   - Body: Normal (400), leading-relaxed.
+   - UI Elements: Medium (500) for labels and buttons.
 
 ## 3. Thành phần UI (Components)
 
@@ -160,7 +160,33 @@ Giao diện dành cho đối tác cần sự chuyên nghiệp, sạch sẽ nhưn
 - Nếu URL có tiền tố ngôn ngữ (ví dụ: `/vi/auth/login`), file cần sửa chắc chắn nằm trong `src/app/[locale]/auth/[mode]/page.tsx`.
 - Xóa bỏ ngay các file "bóng ma" (ghost files) ở thư mục root nếu chúng không còn mục đích sử dụng để tránh gây lúng túng cho team.
 
-### 11.3. UX Pointer & Interaction
+### 11.4. Quy tắc phân cấp Layout (Layout Hierarchy)
+
+Để tối ưu hóa hiệu suất và tránh lỗi runtime "Missing html/body tags", dự án áp dụng quy tắc phân tầng layout như sau:
+
+- **Root Layout (`src/app/layout.tsx`)**:
+   - Đóng vai trò là "Vỏ bọc tối cao" (Master Shell).
+   - Chứa các thẻ `<html>`, `<body>`, import `globals.css` và cấu hình Font chính (`Be_Vietnam_Pro`).
+   - Giúp đảm bảo các trang lỗi hệ thống (404, 500) nằm ngoài `[locale]` vẫn có đầy đủ style và không bị crash.
+- **Locale Layout (`src/app/[locale]/layout.tsx`)**:
+   - Là layout lồng nhau (Nested Layout), **không** được chứa thẻ `<html>` và `<body>` để tránh lỗi nested tags.
+   - Chứa các Provider đặc thù cho ngôn ngữ (`NextIntlClientProvider`) và các thành phần UI toàn cục như `Toaster`.
+
+### 11.5. Xử lý trang lỗi (Error & Not Found Handling)
+
+- **Trang 404 toàn cục (`src/app/not-found.tsx`)**: Dùng cho các lỗi xảy ra khi Next.js không thể xác định được locale hoặc path nằm ngoài matcher của middleware. Phải đảm bảo trang này tự thân đầy đủ style (thừa hưởng từ Root Layout).
+- **Trang 404 theo vùng (`src/app/[locale]/not-found.tsx`)**: Dùng khi user truy cập sai path bên trong một ngôn ngữ cụ thể. Trang này có quyền sử dụng các hook đa ngôn ngữ (`useTranslations`).
+
+### 11.6. Danh sách các Folder đã chuẩn hóa
+
+Các tính năng sau đã được chuyển hoàn toàn vào trong `src/app/[locale]/` để hỗ trợ đa ngôn ngữ và bảo mật:
+
+- `become-a-host`: Trang đăng ký đối tác mới.
+- `partner`: Dashboard và quản lý tài sản của đối tác.
+- `profile`: Thông tin cá nhân người dùng.
+- `auth/verify`: Trang xác thực email/tài khoản.
+
+### 11.7. UX Pointer & Interaction
 
 - Tất cả các thành phần tương tác được (Buttons, Links, Labels liên kết với Input) **PHẢI** có class `cursor-pointer`.
 - Sử dụng `htmlFor` cho nhãn (Label) và `id` cho ô nhập liệu (Input) để tối ưu hóa trải nghiệm click-to-focus.
