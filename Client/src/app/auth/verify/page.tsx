@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle, XCircle, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import apiClient from "@/lib/api/apiClient";
+import { toast } from "sonner";
+import { useAuthStore } from "@/store/useAuthStore";
 
 function VerifyContent() {
    const searchParams = useSearchParams();
@@ -12,6 +14,7 @@ function VerifyContent() {
 
    const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
    const [message, setMessage] = useState("");
+   const { user, setAuth } = useAuthStore();
 
    useEffect(() => {
       if (!token) {
@@ -25,6 +28,13 @@ function VerifyContent() {
       const verifyEmail = async () => {
          try {
             await apiClient.get(`/auth/verify?token=${token}`);
+
+            // Cập nhật trạng thái verified trong store nếu đang đăng nhập
+            if (user) {
+               setAuth({ ...user, isVerified: true });
+            }
+
+            toast.success("Xác thực tài khoản thành công!");
             setStatus("success");
             setMessage("Tài khoản của bạn đã được xác thực thành công!");
          } catch (err: unknown) {

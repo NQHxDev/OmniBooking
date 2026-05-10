@@ -70,6 +70,11 @@ public class SessionServiceImpl implements SessionService {
 
    @Override
    public void deleteSession(UUID sessionId) {
+      RedisSessionInfo info = getSession(sessionId);
+      if (info != null && info.getUserId() != null) {
+         String indexKey = "user_sessions:" + info.getUserId().toString();
+         redisTemplate.opsForZSet().remove(indexKey, sessionId.toString());
+      }
       redisTemplate.delete("refresh:" + sessionId);
    }
 

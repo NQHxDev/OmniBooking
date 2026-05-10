@@ -26,11 +26,11 @@ export default function Navbar() {
    const menuRef = useRef<HTMLDivElement>(null);
 
    const { user, isLoggedIn, setAuth, logout } = useAuthStore();
+   const prevIsLoggedIn = useRef(isLoggedIn);
 
-   // Đồng bộ session khi F5 hoặc mở tab mới
    useEffect(() => {
       const syncSession = async () => {
-         if (isLoggedIn) {
+         if (isLoggedIn && prevIsLoggedIn.current) {
             try {
                const freshUser = await authService.refresh();
                if (freshUser) setAuth(freshUser);
@@ -42,6 +42,7 @@ export default function Navbar() {
                }
             }
          }
+         prevIsLoggedIn.current = isLoggedIn;
       };
       syncSession();
    }, [isLoggedIn, setAuth]);

@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.UUID;
+import com.github.f4b6a3.uuid.UuidCreator;
 
 @RestController
 @RequestMapping("/media")
@@ -30,14 +30,14 @@ public class MediaController {
    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
    @PreAuthorize("hasAuthority(T(com.omnibooking.constant.SecurityConstants.Roles).PARTNER) and !hasAuthority(T(com.omnibooking.constant.SecurityConstants.Roles).ADMIN)")
    @Operation(summary = "Upload media for property (Partner Only)")
-   public ApiResponse<String> upload(@RequestParam("file") MultipartFile file, 
-                                     @RequestParam("entityId") String entityId,
-                                     @RequestParam("entityType") String entityType,
-                                     @RequestParam(value = "isMain", defaultValue = "false") boolean isMain) throws IOException {
-      String correlationId = UUID.randomUUID().toString();
-      
-      log.info("[Media Controller] Received upload request for entity: {} ({}). CorrelationId: {}", 
-               entityId, entityType, correlationId);
+   public ApiResponse<String> upload(@RequestParam("file") MultipartFile file,
+         @RequestParam("entityId") String entityId,
+         @RequestParam("entityType") String entityType,
+         @RequestParam(value = "isMain", defaultValue = "false") boolean isMain) throws IOException {
+      String correlationId = UuidCreator.getTimeOrderedEpoch().toString();
+
+      log.info("[Media Controller] Received upload request for entity: {} ({}). CorrelationId: {}",
+            entityId, entityType, correlationId);
 
       MediaUploadEvent event = MediaUploadEvent.builder()
             .correlationId(correlationId)

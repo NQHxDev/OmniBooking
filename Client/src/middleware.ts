@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server";
  * Middleware để kiểm tra quyền truy cập của người dùng dựa trên Cookies.
  * Chiến thuật:
  * - Guest Guard: Không cho người đã đăng nhập vào trang login/register.
- * - Partner Hub: Cho phép qua để Server Component tự xử lý (ổn định hơn cho F5).
+ * - Partner Hub: Để cho Page (Server Component) tự xử lý vì nó đọc cookie tốt hơn ở Edge Runtime
  * - Profile/Settings: Chặn trực tiếp ở đây.
  */
 export function middleware(request: NextRequest) {
@@ -17,17 +17,16 @@ export function middleware(request: NextRequest) {
 
    const hasSession = !!(sessionId || refreshToken);
 
-   // 1. GUEST GUARD: Nếu đã login thì không cho vào trang auth
-   if (pathname.startsWith("/auth/") && hasSession) {
+   // GUEST GUARD: Nếu đã login thì không cho vào trang auth (trừ trang verify)
+   if (pathname.startsWith("/auth/") && !pathname.startsWith("/auth/verify") && hasSession) {
       return NextResponse.redirect(new URL("/", request.url));
    }
 
-   // 2. PARTNER HUB: Để cho Page (Server Component) tự xử lý vì nó đọc cookie tốt hơn ở Edge Runtime
    if (pathname.startsWith("/partner")) {
       return NextResponse.next();
    }
 
-   // 3. AUTH GUARD: Bảo vệ các trang cá nhân
+   // AUTH GUARD: Bảo vệ các trang cá nhân
    const isProtected = ["/profile", "/settings", "/bookings"].some((route) =>
       pathname.startsWith(route)
    );

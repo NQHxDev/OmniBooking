@@ -18,6 +18,8 @@ export interface RegisterRequest {
    fullName: string;
 }
 
+let refreshPromise: Promise<User> | null = null;
+
 export const authService = {
    /**
     * Authenticates a user with email and password.
@@ -48,16 +50,27 @@ export const authService = {
 
    /**
     * Refreshes the current session and returns latest user data.
+    * Uses a promise cache to prevent parallel refresh requests.
     */
    refresh: async (): Promise<User> => {
-      const response = (await apiClient.post(
-         "/auth/refresh",
-         {},
-         {
-            withCredentials: true,
+      if (refreshPromise) return refreshPromise;
+
+      refreshPromise = (async () => {
+         try {
+            const response = (await apiClient.post(
+               "/auth/refresh",
+               {},
+               {
+                  withCredentials: true,
+               }
+            )) as unknown as ApiResponse<User>;
+            return response.data;
+         } finally {
+            refreshPromise = null;
          }
-      )) as unknown as ApiResponse<User>;
-      return response.data;
+      })();
+
+      return refreshPromise;
    },
 
    /**

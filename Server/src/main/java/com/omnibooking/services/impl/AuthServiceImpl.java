@@ -31,8 +31,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +49,7 @@ public class AuthServiceImpl implements AuthService {
    private final SessionService sessionService;
    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
    private final VerificationService verificationService;
+   private final StringRedisTemplate redisTemplate;
 
    @Value("${app.security.cookie-secure:false}")
    private boolean cookieSecure;
@@ -119,25 +122,41 @@ public class AuthServiceImpl implements AuthService {
       UUID sId = UUID.fromString(sessionId);
       UUID rToken = UUID.fromString(refreshToken);
 
-      if (!sessionService.isValidSession(sId, rToken)) {
+      // LOCKING: Ngăn chặn race condition khi nhiều request refresh cùng lúc cho 1 sessionId
+      String lockKey = "lock:refresh:" + sId;
+      Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "L", 5, TimeUnit.SECONDS);
+
+      if (Boolean.FALSE.equals(acquired)) {
+         log.warn("Refresh already in progress for session: {}", sId);
          throw new AppException(ErrorCode.INVALID_SESSION);
       }
 
-      RedisSessionInfo info = sessionService.getSession(sId);
+      try {
+         if (!sessionService.isValidSession(sId, rToken)) {
+            throw new AppException(ErrorCode.INVALID_SESSION);
+         }
 
-      // Fetch fresh user data from DB to ensure roles and profile are up to date
-      User user = userRepository.findById(Objects.requireNonNull(info.getUserId()))
-            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+         RedisSessionInfo info = sessionService.getSession(sId);
 
-      Set<String> roles = user.getRoles().stream()
-            .map(com.omnibooking.model.Role::getName)
-            .collect(java.util.stream.Collectors.toSet());
+         User user = userRepository.findById(Objects.requireNonNull(info.getUserId()))
+               .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-      UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
-      String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
-      String avatarUrl = profile != null ? profile.getAvatarUrl() : null;
+         Set<String> roles = user.getRoles().stream()
+               .map(com.omnibooking.model.Role::getName)
+               .collect(java.util.stream.Collectors.toSet());
 
-      return issueTokensAndBuildResponse(user, roles, fullName, avatarUrl, profile, ip, userAgent, response);
+         UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+         String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
+         String avatarUrl = profile != null ? profile.getAvatarUrl() : null;
+
+         // ROTATION: Thu hồi session cũ trước khi cấp mới
+         sessionService.deleteSession(sId);
+         log.info("Rotating session for user: {}", user.getEmail());
+
+         return issueTokensAndBuildResponse(user, roles, fullName, avatarUrl, profile, ip, userAgent, response);
+      } finally {
+         redisTemplate.delete(lockKey);
+      }
    }
 
    @Override
@@ -165,8 +184,8 @@ public class AuthServiceImpl implements AuthService {
     */
    private AuthResponse issueTokensAndBuildResponse(User user, Set<String> roles, String fullName,
          String avatarUrl, UserProfile profile, String ip, String userAgent, HttpServletResponse response) {
-      UUID sessionId = UUID.randomUUID();
-      UUID refreshToken = UUID.randomUUID();
+      UUID sessionId = UuidCreator.getTimeOrderedEpoch();
+      UUID refreshToken = UuidCreator.getTimeOrderedEpoch();
 
       // Fingerprinting
       String fingerprint = UuidCreator.getTimeOrderedEpoch().toString();
@@ -226,6 +245,11 @@ public class AuthServiceImpl implements AuthService {
       String avatarUrl = profile != null ? profile.getAvatarUrl() : null;
 
       // Issue new tokens with all current roles
+      // ROTATION: Thu hồi session cũ (nếu có trong context hoặc client gửi lên)
+      // Lưu ý: Ở đây ta chỉ tạo mới, nhưng để an toàn ta có thể thu hồi session hiện
+      // tại
+      // nếu frontend đang gọi endpoint này trong một session active.
+
       return issueTokensAndBuildResponse(user, roles, fullName, avatarUrl, profile, ip, userAgent, response);
    }
 
