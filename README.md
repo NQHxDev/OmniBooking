@@ -63,15 +63,22 @@ Dự án được tối ưu hóa với **Makefile** để bạn có thể khởi
 ### 1. Chuẩn bị
 
 - Đảm bảo máy tính đã cài đặt **Docker** và **Docker Compose**.
-- Java 21+ và Node.js 23+ (nếu muốn chạy local không qua Docker).
+- Java 21+ và Node.js 23+ **(Tùy chọn: Chạy local không qua Docker)**
+- Thiết lập file `.env` từ file `.env.example` của cả `Server` và `Client`.
 
-### 2. Triển khai hạ tầng (Database, Redis, Kafka)
+### 2. Cài đặt dependencies
 
 ```bash
-make infra
+make install
 ```
 
-### 3. Khởi chạy ứng dụng
+### 3. Triển khai hạ tầng (Database, Redis, Kafka)
+
+```bash
+make docker-infra
+```
+
+### 4. Khởi chạy ứng dụng
 
 ```bash
 # Chạy cả Client và Server ở chế độ Development
