@@ -35,6 +35,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.concurrent.TimeUnit;
+import com.omnibooking.services.BloomFilterService;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +51,7 @@ public class AuthServiceImpl implements AuthService {
    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
    private final VerificationService verificationService;
    private final StringRedisTemplate redisTemplate;
+   private final BloomFilterService bloomFilterService;
 
    @Value("${app.security.cookie-secure:false}")
    private boolean cookieSecure;
@@ -57,8 +59,12 @@ public class AuthServiceImpl implements AuthService {
    @Override
    @Transactional
    public AuthResponse register(RegisterRequest request, String ip, String userAgent, HttpServletResponse response) {
-      if (userRepository.existsByEmail(request.getEmail())) {
-         throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
+      // 1. Check Bloom Filter first (Fast pre-check)
+      if (bloomFilterService.mightContain(request.getEmail())) {
+         // Bloom filter nói có thể tồn tại, check kỹ lại DB để tránh False Positive (1%)
+         if (userRepository.existsByEmail(request.getEmail())) {
+            throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
+         }
       }
 
       Role userRole = roleRepository.findByName("ROLE_USER")
@@ -73,6 +79,9 @@ public class AuthServiceImpl implements AuthService {
             .build();
 
       User savedUser = userRepository.save(Objects.requireNonNull(user));
+
+      // 2. Add to Bloom Filter after successful DB save
+      bloomFilterService.add(savedUser.getEmail());
 
       // Create Profile
       String[] nameParts = request.getFullName().split(" ", 2);
@@ -98,6 +107,13 @@ public class AuthServiceImpl implements AuthService {
 
    @Override
    public AuthResponse login(LoginRequest request, String ip, String userAgent, HttpServletResponse response) {
+      // 1. Check Bloom Filter (Security & Performance layer)
+      // Nếu Bloom Filter nói không có, chắc chắn là không có -> Reject ngay
+      if (!bloomFilterService.mightContain(request.getEmail())) {
+         log.warn("Login attempt for non-existent email (blocked by Bloom): {}", request.getEmail());
+         throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+      }
+
       User user = userRepository.findByEmail(request.getEmail())
             .orElseThrow(() -> new AppException(ErrorCode.INVALID_CREDENTIALS));
 

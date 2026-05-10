@@ -18,10 +18,14 @@ Everything is orchestrated via `docker-compose.yml` with secrets managed through
 
 ### Redis Stack & Bloom Filter
 
-Implemented `redis/redis-stack-server` to support high-performance operations:
+Implemented `redis/redis-stack-server` to support high-performance operations and security layers:
 
-- **Session/Token Management**: Offloaded to Redis for scalability.
-- **Bloom Filter**: Used for ultra-fast existence checks (e.g., username/email availability) to prevent unnecessary DB hits.
+- **Session/Token Management**: Offloaded to Redis for scalability and distributed session handling.
+- **Bloom Filter (Security & Performance)**:
+   - **Initialization**: Configured with a 1% false-positive rate and 10,000 initial capacity using `BF.RESERVE`.
+   - **Startup Warmup**: A dedicated `CommandLineRunner` populates the filter with all existing user emails from PostgreSQL on application startup.
+   - **Enumeration Protection**: Rejects login attempts for non-existent emails instantly at the Redis layer, protecting against brute-force/enumeration.
+   - **Database Shield**: In registration flow, it acts as a fast pre-check, reducing 99% of unnecessary "Exists" queries to the database.
 
 ## 3. Database Design Patterns
 

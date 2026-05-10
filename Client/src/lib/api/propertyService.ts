@@ -64,7 +64,7 @@ export const propertyService = {
 
          const json: ApiResponse<PropertyResponse[]> = await res.json();
          return json.data || [];
-      } catch (_error) {
+      } catch {
          return null;
       }
    },

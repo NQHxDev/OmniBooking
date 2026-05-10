@@ -27,6 +27,8 @@ export const authService = {
    login: async (payload: LoginRequest): Promise<User> => {
       const response = (await apiClient.post("/auth/login", payload, {
          withCredentials: true,
+         // @ts-expect-error - Custom axios config flag for interceptor
+         _skipToast: true,
       })) as unknown as ApiResponse<User>;
       return response.data;
    },
@@ -37,6 +39,8 @@ export const authService = {
    register: async (payload: RegisterRequest): Promise<User> => {
       const response = (await apiClient.post("/auth/register", payload, {
          withCredentials: true,
+         // @ts-expect-error - Custom axios config flag for interceptor
+         _skipToast: true,
       })) as unknown as ApiResponse<User>;
       return response.data;
    },
@@ -62,6 +66,8 @@ export const authService = {
                {},
                {
                   withCredentials: true,
+                  // @ts-expect-error - Custom axios config flag for interceptor
+                  _skipToast: true,
                }
             )) as unknown as ApiResponse<User>;
             return response.data;

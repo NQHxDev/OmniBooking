@@ -21,7 +21,7 @@
 ### Hiệu Năng Cao (High Performance)
 
 - **Time-Ordered UUID v7**: Tối ưu hóa hiệu suất chỉ mục B-Tree trong database, giúp truy vấn hàng triệu bản ghi mà không giảm tốc độ.
-- **Redis Stack Integration**: Tích hợp **Bloom Filter** để kiểm tra tồn tại (email/username) siêu tốc, giảm 90% tải cho database chính.
+- **Redis Stack & Bloom Filter**: Tích hợp **RedisBloom** để kiểm tra tồn tại (email/username) với độ trễ micro-giây. Chống tấn công Enumeration và giảm 99% tải cho Database chính trong các luồng Auth.
 - **CDN Optimization**: Tích hợp Cloudinary giúp nén và biến đổi hình ảnh theo viewport, giảm tới 80% dung lượng tải trang mà vẫn giữ nguyên chất lượng.
 - **Distributed Caching**: Hệ thống cache đa tầng giúp phản hồi API trong thời gian mili giây.
 

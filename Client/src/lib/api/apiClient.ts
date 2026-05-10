@@ -66,8 +66,12 @@ apiClient.interceptors.response.use(
          }
       }
 
-      toast.error(message);
-      return Promise.reject(error.response?.data || error.message);
+      // Only show global toast if not explicitly skipped
+      if (!error.config?._skipToast) {
+         toast.error(message);
+      }
+
+      return Promise.reject(error.response?.data || { message: error.message });
    }
 );
 

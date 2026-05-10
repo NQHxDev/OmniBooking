@@ -35,6 +35,43 @@ Tài liệu này quy định các tiêu chuẩn về giao diện (UI) và trải
 ### Inputs
 
 - **Standard**: Border `#d9d9d9`, Text `#1a1a1a`, `rounded-sm`, hover/focus border `#006ce4`.
+- **Error**: Border `#d4111e`, Text `#d4111e`, bg `#fff8f8`.
+
+## 4. Chuẩn đa ngôn ngữ (i18n Standards)
+
+Để đảm bảo dự án OmniBooking hỗ trợ tốt đa ngôn ngữ (hiện tại là Tiếng Việt và Tiếng Anh), tất cả các thành phần code phải tuân thủ các quy tắc sau:
+
+### 4.1. Tuyệt đối không hardcode chuỗi văn bản
+
+- Mọi chuỗi ký tự hiển thị trên giao diện (labels, placeholders, buttons, messages) **PHẢI** được định nghĩa trong các tệp JSON tại thư mục `/messages`.
+- Sử dụng hook `useTranslations` từ `next-intl` để lấy chuỗi dịch.
+
+```tsx
+const t = useTranslations("Common");
+return <button>{t("login")}</button>;
+```
+
+### 4.2. Cấu trúc Key dịch thuật
+
+- Sử dụng kiểu **camelCase** cho các key (ví dụ: `searchPlaceholder`, `listProperty`).
+- Phân nhóm rõ ràng:
+   - `Common`: Các chuỗi dùng chung (Home, Login, Register...).
+   - `Auth`: Các chuỗi liên quan đến xác thực.
+   - `Errors`: Các thông báo lỗi (map theo `errorCode` từ Backend).
+
+### 4.3. Xử lý định dạng (Formatting)
+
+- **Ngày tháng**: Sử dụng thư viện `date-fns` kết hợp với `locale` từ `next-intl` để định dạng ngày tháng chuẩn theo quốc gia.
+- **Tiền tệ**: Sử dụng `Intl.NumberFormat` để hiển thị giá tiền (VNĐ cho Tiếng Việt, USD/Local cho các ngôn ngữ khác).
+
+### 4.4. Error Messages
+
+- Backend chỉ trả về `errorCode` (ví dụ: `AUTH_001`).
+- Frontend sử dụng `errorCode` này làm key để tra cứu trong bộ từ điển `Errors`. điều này giúp thay đổi thông báo lỗi mà không cần sửa code logic.
+
+---
+
+_Lưu ý: Bất kỳ Pull Request nào chứa chuỗi văn bản hardcode hoặc không tuân thủ cấu trúc i18n sẽ bị từ chối._
 
 ## 4. Kiến trúc dữ liệu (Data Architecture)
 

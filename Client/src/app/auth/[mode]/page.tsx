@@ -68,7 +68,10 @@ export default function AuthPage() {
             router.refresh();
          }
       } catch (err: unknown) {
-         const errorMessage = err instanceof Error ? err.message : "Đăng nhập thất bại";
+         // Lấy message từ backend nếu có, nếu không thì dùng mặc định
+         const error = err as { message?: string };
+         const errorMessage =
+            error?.message || (err instanceof Error ? err.message : "Đã có lỗi xảy ra");
          setError(errorMessage);
       } finally {
          setLoading(false);
