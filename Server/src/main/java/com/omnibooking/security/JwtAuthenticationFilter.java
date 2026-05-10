@@ -1,13 +1,13 @@
 package com.omnibooking.security;
 
 import com.omnibooking.services.JWTService;
+import com.omnibooking.util.CookieUtils;
+import com.omnibooking.util.SecurityUtils;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
+import io.jsonwebtoken.ExpiredJwtException;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -39,21 +40,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       }
 
       try {
-         String accessToken = getCookieValue(request, "access_token");
-         String sessionIdFromCookie = getCookieValue(request, "session_id");
+         String accessToken = CookieUtils.getCookieValue(request, CookieUtils.ACCESS_TOKEN);
+         String sessionIdFromCookie = CookieUtils.getCookieValue(request, CookieUtils.SESSION_ID);
 
          if (accessToken != null && sessionIdFromCookie != null) {
             UUID userId = jwtService.extractUserId(accessToken);
             UUID sessionIdFromJwt = jwtService.extractSessionId(accessToken);
+            String fgpHashFromJwt = jwtService.extractFingerprintHash(accessToken);
+            String fingerprintFromCookie = CookieUtils.getCookieValue(request, CookieUtils.FINGERPRINT);
+            if (fingerprintFromCookie == null) {
+               fingerprintFromCookie = request.getHeader("x-fgp");
+            }
 
             // 1. Verify SessionID consistency
-            if (!sessionIdFromJwt.toString().equals(sessionIdFromCookie)) {
+            if (sessionIdFromCookie == null || !sessionIdFromJwt.toString().equals(sessionIdFromCookie)) {
                log.warn("Session ID mismatch detected for user: {}", userId);
                filterChain.doFilter(request, response);
                return;
             }
 
-            // 2. Stateful Verification: Check Redis
+            // 2. Verify Fingerprint consistency
+            if (fingerprintFromCookie == null || fgpHashFromJwt == null ||
+                  !SecurityUtils.hashFingerprint(fingerprintFromCookie).equals(fgpHashFromJwt)) {
+               log.warn("Fingerprint mismatch or missing for user: {}. Possible token theft.", userId);
+               filterChain.doFilter(request, response);
+               return;
+            }
+
+            // 3. Stateful Verification: Check Redis
             String redisKey = "refresh:" + sessionIdFromJwt;
             if (Boolean.FALSE.equals(redisTemplate.hasKey(redisKey))) {
                log.warn("Session not found in Redis for sessionId: {}", sessionIdFromJwt);
@@ -61,7 +75,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                return;
             }
 
-            // 3. Set Authentication
+            // 4. Set Authentication
             if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                UserDetails userDetails = userDetailsService.loadUserById(userId.toString());
 
@@ -71,21 +85,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                SecurityContextHolder.getContext().setAuthentication(authentication);
             }
          }
+      } catch (ExpiredJwtException e) {
+         log.warn("JWT expired for request: {}", request.getRequestURI());
+         request.setAttribute("expired_token", "true");
       } catch (Exception e) {
          log.error("Cannot set user authentication: {}", e.getMessage());
       }
 
       filterChain.doFilter(request, response);
    }
-
-   private String getCookieValue(HttpServletRequest request, String name) {
-      if (request.getCookies() == null)
-         return null;
-      return Arrays.stream(request.getCookies())
-            .filter(cookie -> name.equals(cookie.getName()))
-            .map(Cookie::getValue)
-            .findFirst()
-            .orElse(null);
-   }
-
 }

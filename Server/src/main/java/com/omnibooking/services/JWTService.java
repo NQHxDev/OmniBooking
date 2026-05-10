@@ -13,10 +13,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class JWTService {
 
-   @Value("${jwt.secret}")
+   @Value("${app.security.jwt-secret}")
    private String secret;
-
-   @Value("${jwt.access-token-expiration-ms:900000}") // Default 15m
+ 
+   @Value("${app.security.jwt-expiration-ms:900000}") // Default 15m
    private long expiration;
 
    private SecretKey getSigningKey() {
@@ -26,11 +26,12 @@ public class JWTService {
    /**
     * Generate an Access Token with userId, roles, and sessionId.
     */
-   public String generateAccessToken(UUID userId, String role, UUID sessionId) {
+   public String generateAccessToken(UUID userId, java.util.Collection<String> roles, UUID sessionId, String fingerprintHash) {
       return Jwts.builder()
             .subject(userId.toString())
-            .claim("role", role)
+            .claim("roles", roles)
             .claim("sessionId", sessionId.toString())
+            .claim("fgh", fingerprintHash)
             .issuedAt(new Date())
             .expiration(new Date(System.currentTimeMillis() + expiration))
             .signWith(getSigningKey())
@@ -61,6 +62,13 @@ public class JWTService {
     */
    public UUID extractUserId(String token) {
       return UUID.fromString(extractAllClaims(token).getSubject());
+   }
+
+   /**
+    * Extract Fingerprint Hash from the token payload.
+    */
+   public String extractFingerprintHash(String token) {
+      return extractAllClaims(token).get("fgh", String.class);
    }
 
 }

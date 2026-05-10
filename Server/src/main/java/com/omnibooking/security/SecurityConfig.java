@@ -1,6 +1,5 @@
 package com.omnibooking.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.services.JWTService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -21,9 +20,13 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import java.util.List;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
+import com.omnibooking.dto.ApiResponse;
+import com.omnibooking.exception.ErrorCode;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
 @EnableWebSecurity
@@ -33,8 +36,6 @@ public class SecurityConfig {
    private final JWTService jwtService;
    private final CustomUserDetailsService userDetailsService;
    private final StringRedisTemplate redisTemplate;
-   private final ObjectMapper objectMapper;
-   private final RequestMappingHandlerMapping requestMappingHandlerMapping;
 
    @Bean
    public PasswordEncoder passwordEncoder() {
@@ -53,14 +54,14 @@ public class SecurityConfig {
       config.setAllowCredentials(true);
       config.setAllowedOrigins(List.of("http://localhost:3000"));
       config.setAllowedHeaders(List.of(
-            "Authorization", 
-            "Content-Type", 
-            "X-CSRF-Token", 
-            "X-Requested-With", 
+            "Authorization",
+            "Content-Type",
+            "X-CSRF-Token",
+            "X-Requested-With",
             "X-Request-ID",
-            "Accept", 
-            "Origin"
-      ));
+            "x-fgp",
+            "Accept",
+            "Origin"));
       config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
       config.setExposedHeaders(List.of("Set-Cookie"));
       config.setMaxAge(3600L);
@@ -71,7 +72,6 @@ public class SecurityConfig {
    @Bean
    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
       JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, userDetailsService, redisTemplate);
-      CustomCsrfFilter csrfFilter = new CustomCsrfFilter(objectMapper, requestMappingHandlerMapping);
 
       http
             .csrf(AbstractHttpConfigurer::disable)
@@ -80,12 +80,41 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                   .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                   .requestMatchers("/auth/**").permitAll()
+                  .requestMatchers("/partner/**").authenticated() // Explicitly require auth for partner
                   .requestMatchers("/health/**").permitAll()
                   .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                   .requestMatchers("/actuator/**").permitAll()
                   .anyRequest().authenticated())
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(csrfFilter, JwtAuthenticationFilter.class);
+            .exceptionHandling(exceptions -> exceptions
+                  .authenticationEntryPoint((request, response, authException) -> {
+                     String requestId = (String) request.getAttribute("requestId");
+                     boolean isExpired = "true".equals(request.getAttribute("expired_token"));
+                     ErrorCode errorCode = isExpired ? ErrorCode.TOKEN_EXPIRED : ErrorCode.INVALID_CREDENTIALS;
+
+                     response.setStatus(errorCode.getStatus().value());
+                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                     response.setCharacterEncoding("UTF-8");
+
+                     ApiResponse<Object> apiResponse = ApiResponse.error(
+                           errorCode.getMessage(),
+                           errorCode.getCode(),
+                           authException.getMessage(),
+                           requestId);
+                     response.getWriter().write(new ObjectMapper().writeValueAsString(apiResponse));
+                  })
+                  .accessDeniedHandler((request, response, accessDeniedException) -> {
+                     String requestId = (String) request.getAttribute("requestId");
+                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                     response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                     response.setCharacterEncoding("UTF-8");
+                     ApiResponse<Object> apiResponse = ApiResponse.error(
+                           "Bạn không có quyền thực hiện hành động này.",
+                           "FORBIDDEN",
+                           accessDeniedException.getMessage(),
+                           requestId);
+                     response.getWriter().write(new ObjectMapper().writeValueAsString(apiResponse));
+                  }))
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
       return http.build();
    }

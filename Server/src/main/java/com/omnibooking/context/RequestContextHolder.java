@@ -1,6 +1,7 @@
 package com.omnibooking.context;
 
 public class RequestContextHolder {
+
    private static final ThreadLocal<RequestContext> CONTEXT = new ThreadLocal<>();
 
    public static void setContext(RequestContext context) {

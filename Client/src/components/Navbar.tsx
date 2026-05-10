@@ -16,20 +16,42 @@ import {
    ShieldCheck,
    ChevronDown,
 } from "lucide-react";
+import Image from "next/image";
 import { useAuthStore } from "@/store/useAuthStore";
+import { authService } from "@/lib/api/services/authService";
 
 export default function Navbar() {
    const [mounted, setMounted] = useState(false);
    const [isMenuOpen, setIsMenuOpen] = useState(false);
    const menuRef = useRef<HTMLDivElement>(null);
 
-   const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
-   const user = useAuthStore((state) => state.user);
-   const logout = useAuthStore((state) => state.logout);
+   const { user, isLoggedIn, setAuth, logout } = useAuthStore();
+
+   // Đồng bộ session khi F5 hoặc mở tab mới
+   useEffect(() => {
+      const syncSession = async () => {
+         if (isLoggedIn) {
+            try {
+               const freshUser = await authService.refresh();
+               if (freshUser) setAuth(freshUser);
+            } catch (error: unknown) {
+               // Silence 401/403 sync errors as they are expected when session expires
+               const err = error as { status?: number; message?: string };
+               if (err?.status !== 401 && err?.status !== 403) {
+                  console.error("[Navbar] Session sync failed:", err.message || err);
+               }
+            }
+         }
+      };
+      syncSession();
+   }, [isLoggedIn, setAuth]);
+
+   // Tối ưu check partner để hỗ trợ cả data cũ và mới trong store
+   const isPartner = user?.roles?.includes("ROLE_PARTNER");
 
    useEffect(() => {
       const timer = setTimeout(() => setMounted(true), 0);
-      
+
       const handleClickOutside = (event: MouseEvent) => {
          if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
             setIsMenuOpen(false);
@@ -42,6 +64,14 @@ export default function Navbar() {
          document.removeEventListener("mousedown", handleClickOutside);
       };
    }, []);
+
+   // Xử lý lấy ký tự đầu cho Avatar
+   const getInitials = () => {
+      const name = user?.fullName || user?.username || user?.email || "?";
+      const parts = name.trim().split(/\s+/);
+      const lastPart = parts[parts.length - 1];
+      return lastPart.charAt(0).toUpperCase();
+   };
 
    return (
       <header className="bg-[#003580] text-white sticky top-0 z-50 shadow-md">
@@ -93,7 +123,14 @@ export default function Navbar() {
 
                <div className="flex items-center gap-4">
                   <button className="hidden lg:block text-[13px] font-semibold hover:bg-white/10 px-3 py-1.5 rounded-md transition-colors">
-                     <Link href="/become-a-host">Đăng chỗ nghỉ của Quý vị</Link>
+                     {isLoggedIn && isPartner ? (
+                        <Link href="/partner/dashboard" className="flex items-center gap-2">
+                           <ShieldCheck className="h-4 w-4 text-yellow-400" />
+                           Quản lý chỗ nghỉ
+                        </Link>
+                     ) : (
+                        <Link href="/become-a-host">Đăng chỗ nghỉ của Quý vị</Link>
+                     )}
                   </button>
 
                   {mounted && isLoggedIn ? (
@@ -103,14 +140,27 @@ export default function Navbar() {
                            className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 hover:bg-white/10 transition-all active:scale-95"
                         >
                            <div className="relative">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-blue-400 border-2 border-white shadow-sm overflow-hidden text-xs">
-                                 {user?.fullName?.charAt(0) || user?.username?.charAt(0)}
+                              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 border-2 border-white shadow-sm overflow-hidden">
+                                 {user?.avatarUrl ? (
+                                    <Image
+                                       src={user.avatarUrl}
+                                       alt={user?.fullName || "Avatar"}
+                                       width={36}
+                                       height={36}
+                                       className="h-full w-full object-cover"
+                                       unoptimized
+                                    />
+                                 ) : (
+                                    <span className="text-sm font-bold text-white uppercase">
+                                       {getInitials()}
+                                    </span>
+                                 )}
                               </div>
-                              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-yellow-400 border-2 border-[#003580] flex items-center justify-center">
-                                 <span className="text-[7px] font-bold text-[#003580]">G</span>
+                              <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-yellow-400 border-2 border-[#003580] flex items-center justify-center">
+                                 <span className="text-[8px] font-bold text-[#003580]">G</span>
                               </div>
                            </div>
-                           <div className="hidden md:flex flex-col items-start text-left">
+                           <div className="hidden md:flex flex-col items-start text-left ml-1">
                               <span className="text-[13px] font-bold leading-tight">
                                  {user?.fullName || user?.username}
                               </span>
@@ -119,7 +169,7 @@ export default function Navbar() {
                               </span>
                            </div>
                            <ChevronDown
-                              className={`h-3.5 w-3.5 transition-transform duration-300 ${isMenuOpen ? "rotate-180" : ""}`}
+                              className={`ml-1 h-3.5 w-3.5 transition-transform duration-300 ${isMenuOpen ? "rotate-180" : ""}`}
                            />
                         </button>
 

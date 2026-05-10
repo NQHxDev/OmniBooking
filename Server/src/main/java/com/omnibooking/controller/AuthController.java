@@ -83,13 +83,19 @@ public class AuthController {
    @Anonymous
    @PostMapping("/logout")
    public ResponseEntity<ApiResponse<Void>> logout(
-         @CookieValue(name = "session_id") String sessionId,
+         @CookieValue(name = "session_id", required = false) String sessionId,
          @AuthenticationPrincipal UserPrincipal principal,
          HttpServletRequest httpRequest,
          HttpServletResponse httpResponse) {
 
       String requestId = (String) httpRequest.getAttribute("requestId");
-      authService.logout(UUID.fromString(sessionId), principal.getId(), httpResponse);
+
+      if (principal != null && sessionId != null) {
+         authService.logout(UUID.fromString(sessionId), principal.getId(), httpResponse);
+      } else {
+         // Even if principal is null, we should try to clear cookies
+         authService.clearAllCookies(httpResponse);
+      }
 
       return ResponseEntity.ok(ApiResponse.success(null, "Logout successful", requestId));
    }

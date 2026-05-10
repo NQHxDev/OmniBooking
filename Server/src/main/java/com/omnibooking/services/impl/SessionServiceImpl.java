@@ -2,7 +2,6 @@ package com.omnibooking.services.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.security.RedisSessionInfo;
-import com.omnibooking.services.HashingService;
 import com.omnibooking.services.SessionService;
 import java.util.Objects;
 import java.util.UUID;
@@ -10,6 +9,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,13 +19,14 @@ public class SessionServiceImpl implements SessionService {
 
    private final StringRedisTemplate redisTemplate;
    private final ObjectMapper objectMapper;
-   private final HashingService hashingService;
+   private final PasswordEncoder passwordEncoder;
 
    private static final long REFRESH_TOKEN_EXPIRY_DAYS = 7;
    private static final long REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
    @Override
-   public void saveSession(UUID userId, String username, String email, String fullName, String role, UUID sessionId, UUID refreshToken,
+   public void saveSession(UUID userId, String username, String email, String fullName, java.util.Set<String> roles, UUID sessionId,
+         UUID refreshToken,
          String ip, String userAgent) {
       try {
          String redisKey = "refresh:" + sessionId;
@@ -34,8 +35,8 @@ public class SessionServiceImpl implements SessionService {
                .username(username)
                .email(email)
                .fullName(fullName)
-               .role(role)
-               .hashedRefreshToken(hashingService.hash(refreshToken.toString()))
+               .roles(roles)
+               .hashedRefreshToken(passwordEncoder.encode(refreshToken.toString()))
                .ip(ip)
                .userAgent(userAgent)
                .createdAt(System.currentTimeMillis())
@@ -86,6 +87,6 @@ public class SessionServiceImpl implements SessionService {
    @Override
    public boolean isValidSession(UUID sessionId, UUID refreshToken) {
       RedisSessionInfo info = getSession(sessionId);
-      return info != null && hashingService.verify(refreshToken.toString(), info.getHashedRefreshToken());
+      return info != null && passwordEncoder.matches(refreshToken.toString(), info.getHashedRefreshToken());
    }
 }

@@ -18,5 +18,9 @@ public interface AuthService {
    void logout(UUID sessionId, UUID userId, HttpServletResponse response);
 
    void verifyEmail(String token);
+ 
+   void clearAllCookies(HttpServletResponse response);
+
+   AuthResponse upgradeToPartner(UUID userId, String ip, String userAgent, HttpServletResponse response);
 
 }

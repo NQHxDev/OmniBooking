@@ -37,4 +37,23 @@ public class MailService {
 
       emailProducer.sendEmailEvent(emailEvent);
    }
+
+   public void sendPartnerOtpEmail(String toEmail, String userName, String otpCode) {
+      // Prepare template variables
+      Map<String, Object> variables = new HashMap<>();
+      variables.put("userName", userName);
+      variables.put("otpCode", otpCode);
+
+      // Render HTML content
+      String htmlContent = mailTemplateService.buildHtmlContent("partner-otp", variables);
+
+      // Send to Kafka
+      EmailEvent emailEvent = EmailEvent.builder()
+            .to(toEmail)
+            .subject("Mã xác thực đối tác OmniBooking")
+            .content(htmlContent)
+            .build();
+
+      emailProducer.sendEmailEvent(emailEvent);
+   }
 }

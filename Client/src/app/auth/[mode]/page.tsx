@@ -2,20 +2,22 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, User, ArrowRight, ChevronLeft } from "lucide-react";
 
 import { useState } from "react";
-import { useAuthStore, type User as AuthUser } from "@/store/useAuthStore";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Loader2 } from "lucide-react";
-import apiClient from "@/lib/api/apiClient";
+import { authService } from "@/lib/api/services/authService";
 import { toast } from "sonner";
 
 export default function AuthPage() {
    const params = useParams();
    const router = useRouter();
    const mode = params?.mode as string;
+   const searchParams = useSearchParams();
    const isLogin = mode === "login";
+   const callbackUrl = searchParams.get("callbackUrl");
 
    const setAuth = useAuthStore((state) => state.setAuth);
 
@@ -41,31 +43,28 @@ export default function AuthPage() {
       setLoading(true);
       setError("");
 
-      const endpoint = isLogin ? "auth/login" : "auth/register";
-      const payload = isLogin
-         ? { email: formData.email, password: formData.password }
-         : { email: formData.email, password: formData.password, fullName: formData.fullName };
-
       try {
-         interface AuthApiResponse {
-            status: string;
-            data: AuthUser;
-            message?: string;
-         }
+         const result = isLogin
+            ? await authService.login({ email: formData.email, password: formData.password })
+            : await authService.register({
+                 email: formData.email,
+                 password: formData.password,
+                 fullName: formData.fullName,
+              });
 
-         const result = (await apiClient.post(endpoint, payload, {
-            withCredentials: true,
-         })) as AuthApiResponse;
-
-         if (result.status === "success") {
-            setAuth(result.data);
+         // result is now the User object directly
+         if (result) {
+            setAuth(result);
             if (!isLogin) {
                toast.success("Đăng ký thành công!", {
                   description: "Vui lòng kiểm tra email để xác nhận tài khoản.",
                   duration: 6000,
                });
             }
-            router.push("/");
+
+            // Chuyển hướng về trang cũ nếu có callbackUrl, nếu không thì về trang chủ
+            const targetUrl = callbackUrl || "/";
+            router.push(targetUrl);
             router.refresh();
          }
       } catch (err: unknown) {

@@ -23,6 +23,7 @@ public class AppProperties {
 
    private final Security security = new Security();
    private final Mail mail = new Mail();
+   private final Cloudinary cloudinary = new Cloudinary();
 
    @Data
    public static class Security {
@@ -37,6 +38,16 @@ public class AppProperties {
       private String resendApiKey;
       @NotBlank
       private String fromEmail;
+   }
+
+   @Data
+   public static class Cloudinary {
+      @NotBlank
+      private String cloudName;
+      @NotBlank
+      private String apiKey;
+      @NotBlank
+      private String apiSecret;
    }
 
 }

@@ -9,47 +9,40 @@ import lombok.NoArgsConstructor;
 
 @Data
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
+    
+    private String message;
+    private String errorCode;
+    private T data;
+    private String requestId;
+    
+    @Builder.Default
+    private String timestamp = Instant.now().toString();
 
-   private String status;
+    public static <T> ApiResponse<T> success(T data) {
+        return ApiResponse.<T>builder()
+                .message("Success")
+                .data(data)
+                .build();
+    }
 
-   private String message;
+    public static <T> ApiResponse<T> success(T data, String message, String requestId) {
+        return ApiResponse.<T>builder()
+                .message(message)
+                .data(data)
+                .requestId(requestId)
+                .build();
+    }
 
-   private T data;
-
-   private Object errors;
-
-   private String errorCode;
-
-   private String requestId;
-
-   @Builder.Default
-   private Instant timestamp = Instant.now();
-
-   public static <T> ApiResponse<T> success(T data, String requestId) {
-      return success(data, "Success", requestId);
-   }
-
-   public static <T> ApiResponse<T> success(T data, String message, String requestId) {
-      return ApiResponse.<T>builder()
-            .status("success")
-            .message(message)
-            .data(data)
-            .requestId(requestId)
-            .build();
-   }
-
-   public static <T> ApiResponse<T> error(String message, String errorCode, Object errors, String requestId) {
-      return ApiResponse.<T>builder()
-            .status("error")
-            .message(message)
-            .errorCode(errorCode)
-            .errors(errors)
-            .requestId(requestId)
-            .build();
-   }
-
+    public static <T> ApiResponse<T> error(String message, String errorCode, T data, String requestId) {
+        return ApiResponse.<T>builder()
+                .message(message)
+                .errorCode(errorCode)
+                .data(data)
+                .requestId(requestId)
+                .build();
+    }
 }

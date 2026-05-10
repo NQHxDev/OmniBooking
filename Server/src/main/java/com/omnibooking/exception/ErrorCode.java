@@ -11,8 +11,9 @@ public enum ErrorCode {
    INVALID_CREDENTIALS("AUTH_003", "Invalid username or password", HttpStatus.UNAUTHORIZED),
    ROLE_NOT_FOUND("AUTH_004", "Required role not found", HttpStatus.NOT_FOUND),
    INVALID_SESSION("AUTH_005", "Invalid session or refresh token", HttpStatus.UNAUTHORIZED),
-   INVALID_TOKEN("AUTH_006", "Invalid or expired verification token", HttpStatus.BAD_REQUEST),
-   USER_NOT_FOUND("AUTH_007", "User not found", HttpStatus.NOT_FOUND),
+   TOKEN_EXPIRED("AUTH_006", "Access token has expired", HttpStatus.UNAUTHORIZED),
+   INVALID_TOKEN("AUTH_007", "Invalid or expired verification token", HttpStatus.BAD_REQUEST),
+   USER_NOT_FOUND("AUTH_008", "User not found", HttpStatus.NOT_FOUND),
 
    // General Errors
    UNCATEGORIZED_EXCEPTION("GEN_999", "Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR),
