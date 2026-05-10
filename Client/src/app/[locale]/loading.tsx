@@ -1,18 +1,13 @@
 "use client";
 
-import { motion } from "framer-motion";
+// import { motion } from "framer-motion";
 
 export default function Loading() {
    return (
       <div className="fixed inset-0 z-9999 flex flex-col bg-white overflow-hidden">
          {/* Top Brand Progress Bar */}
          <div className="fixed top-0 left-0 right-0 h-1 bg-zinc-50 overflow-hidden">
-            <motion.div
-               className="h-full bg-linear-to-r from-[#003580] via-[#006ce4] to-[#ffb700] w-1/2"
-               initial={{ x: "-100%" }}
-               animate={{ x: "200%" }}
-               transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-            />
+            <div className="h-full bg-linear-to-r from-[#003580] via-[#006ce4] to-[#ffb700] w-1/2 animate-shimmer" />
          </div>
 
          {/* Main Content Area: Mocking the Layout (Skeleton) */}
@@ -54,20 +49,11 @@ export default function Loading() {
          {/* Central Branding Overlay (Floats above skeleton) */}
          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="flex flex-col items-center">
-               <motion.div
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.5 }}
-                  className="bg-white/80 backdrop-blur-xl p-12 rounded-[3rem] border border-zinc-100 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.05)] flex flex-col items-center gap-6"
-               >
+               <div className="bg-white/80 backdrop-blur-xl p-12 rounded-[3rem] border border-zinc-100 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.05)] flex flex-col items-center gap-6">
                   {/* Animated Logo Mark */}
                   <div className="relative h-20 w-20 flex items-center justify-center">
                      <div className="absolute inset-0 border-4 border-[#006ce4]/10 rounded-full" />
-                     <motion.div
-                        className="absolute inset-0 border-4 border-[#006ce4] rounded-full border-t-transparent"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                     />
+                     <div className="absolute inset-0 border-4 border-[#006ce4] rounded-full border-t-transparent animate-spin" />
                      <span className="text-3xl font-black text-[#003580]">O</span>
                   </div>
 
@@ -79,7 +65,7 @@ export default function Loading() {
                         Travel redefined
                      </p>
                   </div>
-               </motion.div>
+               </div>
             </div>
          </div>
       </div>

@@ -22,5 +22,9 @@ public interface AuthService {
    void clearAllCookies(HttpServletResponse response);
 
    AuthResponse upgradeToPartner(UUID userId, String ip, String userAgent, HttpServletResponse response);
+   
+   void forgotPassword(String email);
+
+   void resetPassword(String token, String newPassword, boolean logoutAll);
 
 }

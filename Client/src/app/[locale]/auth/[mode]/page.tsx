@@ -1,20 +1,30 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
+import { Link } from "@/i18n/routing";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Mail, Lock, User, ArrowRight, ChevronLeft, Apple } from "lucide-react";
+import {
+   Mail,
+   Lock,
+   User,
+   ArrowRight,
+   ChevronLeft,
+   Apple,
+   Loader2,
+   Eye,
+   EyeOff,
+} from "lucide-react";
 
 import { useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
-import { Loader2 } from "lucide-react";
 import { authService } from "@/lib/api/services/authService";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import AuthBranding from "@/components/AuthBranding";
 
 export default function AuthPage() {
    const t = useTranslations("Auth");
    const tc = useTranslations("Common");
+   const te = useTranslations("Errors");
    const params = useParams();
    const router = useRouter();
    const mode = params?.mode as string;
@@ -30,6 +40,7 @@ export default function AuthPage() {
       fullName: "",
    });
    const [loading, setLoading] = useState(false);
+   const [showPassword, setShowPassword] = useState(false);
    const [error, setError] = useState("");
 
    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,9 +80,13 @@ export default function AuthPage() {
             router.refresh();
          }
       } catch (err: unknown) {
-         const error = err as { message?: string };
-         const errorMessage =
-            error?.message || (err instanceof Error ? err.message : "Đã có lỗi xảy ra");
+         const error = err as { message?: string; errorCode?: string };
+         let errorMessage = error?.message || "Đã có lỗi xảy ra";
+
+         if (error?.errorCode) {
+            errorMessage = te(error.errorCode as string);
+         }
+
          setError(errorMessage);
       } finally {
          setLoading(false);
@@ -80,49 +95,7 @@ export default function AuthPage() {
 
    return (
       <div className="flex min-h-screen bg-white font-sans text-[#1a1a1a]">
-         {/* Left Side: Branding */}
-         <div className="relative hidden w-1/2 overflow-hidden lg:block">
-            <Image
-               src="/images/hero_banner.png"
-               alt="Auth Background"
-               fill
-               className="object-cover transition-transform duration-10000 hover:scale-110"
-               priority
-            />
-            <div className="absolute inset-0 bg-gradient-to-br from-[#003580]/80 via-[#003580]/40 to-transparent" />
-
-            <div className="absolute inset-0 flex flex-col justify-between p-16 text-white">
-               <Link
-                  href="/"
-                  className="flex items-center gap-2 text-2xl font-black tracking-tighter"
-               >
-                  <span className="tracking-tight">
-                     OmniBooking<span className="text-blue-400">.</span>
-                  </span>
-               </Link>
-
-               <div className="max-w-xl">
-                  <div className="mb-6 inline-flex items-center rounded-full bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-widest backdrop-blur-md border border-white/10">
-                     {t("heroBadge")}
-                  </div>
-                  <h2 className="text-5xl font-extrabold leading-[1.1] tracking-tight">
-                     {t.rich("heroTitle", {
-                        highlight: (chunks) => <span className="text-blue-400">{chunks}</span>,
-                        br: () => <br />,
-                     })}
-                  </h2>
-                  <p className="mt-6 text-lg text-white/70 leading-relaxed">{t("heroSub")}</p>
-               </div>
-
-               <div className="flex items-center gap-6 text-xs font-medium text-white/40">
-                  <span>© 2026 OmniBooking™</span>
-                  <div className="h-1 w-1 rounded-full bg-white/20" />
-                  <span>{tc("privacy")}</span>
-                  <div className="h-1 w-1 rounded-full bg-white/20" />
-                  <span>{tc("terms")}</span>
-               </div>
-            </div>
-         </div>
+         <AuthBranding />
 
          {/* Right Side: Auth Form */}
          <div className="flex w-full flex-col lg:w-1/2 h-screen overflow-y-auto custom-scrollbar bg-white">
@@ -221,12 +194,15 @@ export default function AuthPage() {
                               {t("passwordLabel")}
                            </label>
                            {isLogin && (
-                              <button
-                                 type="button"
+                              <Link
+                                 href={{
+                                    pathname: "/auth/forgot-password",
+                                    query: { email: formData.email },
+                                 }}
                                  className="text-[11px] font-bold uppercase tracking-wider text-[#006ce4] hover:text-[#0057b7] cursor-pointer"
                               >
                                  {t("forgotPassword")}
-                              </button>
+                              </Link>
                            )}
                         </div>
                         <div className="relative">
@@ -234,20 +210,31 @@ export default function AuthPage() {
                            <input
                               id="password"
                               name="password"
-                              type="password"
+                              type={showPassword ? "text" : "password"}
                               required
                               placeholder="••••••••"
                               value={formData.password}
                               onChange={handleChange}
                               className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
                            />
+                           <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors cursor-pointer"
+                           >
+                              {showPassword ? (
+                                 <EyeOff className="h-4 w-4" />
+                              ) : (
+                                 <Eye className="h-4 w-4" />
+                              )}
+                           </button>
                         </div>
                      </div>
 
                      <button
                         type="submit"
                         disabled={loading}
-                        className="group flex w-full items-center justify-center gap-2 rounded-xl bg-[#006ce4] py-4 text-sm font-bold text-white shadow-xl shadow-blue-200 transition-all hover:bg-[#0057b7] active:scale-[0.98] disabled:opacity-70"
+                        className="group flex w-full items-center justify-center gap-2 rounded-xl bg-[#006ce4] py-4 text-sm font-bold text-white shadow-xl shadow-blue-200 transition-all hover:bg-[#0057b7] active:scale-[0.98] disabled:opacity-70 cursor-pointer"
                      >
                         {loading ? (
                            <Loader2 className="h-5 w-5 animate-spin" />
@@ -270,14 +257,14 @@ export default function AuthPage() {
                   <div className="grid grid-cols-2 gap-4">
                      <button
                         type="button"
-                        className="flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white py-3.5 text-sm font-bold shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-[0.98]"
+                        className="flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white py-3.5 text-sm font-bold shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-[0.98] cursor-pointer"
                      >
                         <GoogleIcon className="h-5 w-5" />
                         Google
                      </button>
                      <button
                         type="button"
-                        className="flex items-center justify-center gap-2 rounded-xl bg-black py-3.5 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 transition-all active:scale-[0.98]"
+                        className="flex items-center justify-center gap-2 rounded-xl bg-black py-3.5 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 transition-all active:scale-[0.98] cursor-pointer"
                      >
                         <Apple className="h-5 w-5" />
                         Apple

@@ -178,6 +178,26 @@ To prevent bottlenecks during heavy media operations:
 - **Async Workflow**: For non-critical updates (e.g., bulk property image sync), the backend publishes a `MediaProcessedEvent` to Kafka.
 - **Decoupled Processing**: Worker services consume these events to perform secondary tasks like generating search indices or updating social metadata without blocking the user request.
 
+## 13. Security & Password Recovery Flow
+
+The system implements a multi-layered security approach for sensitive operations like password resets:
+
+### Password Recovery Lifecycle
+
+1. **Request Phase**:
+   - **Enumeration Protection**: The system always returns a success message regardless of whether the email exists in the database.
+   - **Rate Limiting**: Implemented a sliding window limit (3 requests per 1 minute) via Redis `INCR` to prevent mail server abuse.
+2. **Verification Phase**:
+   - **Short-lived Tokens**: Reset tokens are stored in Redis with a strict 15-minute expiration.
+   - **One-time Use**: Tokens are immediately invalidated after a successful reset.
+3. **Session Invalidation**:
+   - **Global Logout**: Users have the option to "Sign out from all other devices" during reset. This triggers `SessionService.revokeAllUserSessions()`, which clears all related session keys in Redis.
+
+### Security Best Practices
+
+- **Vietnamese Typography**: Shared `AuthBranding` component uses optimized `leading-tight` and `font-weight` to prevent character clipping for accented Vietnamese text.
+- **Error Obfuscation**: Client-side mappings convert technical `errorCodes` into user-friendly localized messages without leaking backend implementation details.
+
 ---
 
 _Last Updated: 2026-05-10_

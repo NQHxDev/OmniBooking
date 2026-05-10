@@ -14,6 +14,7 @@ import com.omnibooking.repository.UserRepository;
 import com.omnibooking.security.RedisSessionInfo;
 import com.omnibooking.services.AuthService;
 import com.omnibooking.services.JWTService;
+import com.omnibooking.services.MailService;
 import com.omnibooking.services.SessionService;
 import com.omnibooking.services.VerificationService;
 import com.omnibooking.util.CookieUtils;
@@ -53,6 +54,7 @@ public class AuthServiceImpl implements AuthService {
    private final StringRedisTemplate redisTemplate;
    private final BloomFilterService bloomFilterService;
    private final UserMapper userMapper;
+   private final MailService mailService;
 
    @Value("${app.security.cookie-secure:false}")
    private boolean cookieSecure;
@@ -241,6 +243,66 @@ public class AuthServiceImpl implements AuthService {
             .collect(Collectors.toSet());
 
       return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response);
+   }
+
+   @Override
+   public void forgotPassword(String email) {
+      // 1. Rate Limiting check (3 requests per 1 minute)
+      String rateLimitKey = "rate_limit:forgot_password:" + email;
+      Long count = redisTemplate.opsForValue().increment(rateLimitKey);
+      
+      if (count != null && count == 1) {
+         redisTemplate.expire(rateLimitKey, 1, TimeUnit.MINUTES);
+      }
+      
+      if (count != null && count > 3) {
+         log.warn("Forgot password rate limit exceeded for email: {}", email);
+         throw new AppException(ErrorCode.RATE_LIMIT_EXCEEDED);
+      }
+
+      // 2. Security: Always return success even if user doesn't exist
+      // But we still need to fetch user to get name and send email
+      userRepository.findByEmail(email).ifPresent(user -> {
+         String token = UUID.randomUUID().toString();
+         String redisKey = "reset_token:" + token;
+
+         // Save to Redis (15 minutes)
+         redisTemplate.opsForValue().set(redisKey, Objects.requireNonNull(email), 15, TimeUnit.MINUTES);
+
+         UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+         String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
+
+         log.info("Sending forgot password email to: {}", email);
+         mailService.sendForgotPasswordEmail(email, fullName, token);
+      });
+   }
+
+   @Override
+   @Transactional
+   public void resetPassword(String token, String newPassword, boolean logoutAll) {
+      String redisKey = "reset_token:" + token;
+      String email = redisTemplate.opsForValue().get(redisKey);
+
+      if (email == null) {
+         log.warn("Invalid or expired reset token attempt: {}", token);
+         throw new AppException(ErrorCode.INVALID_RESET_TOKEN);
+      }
+
+      User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+      user.setPassword(passwordEncoder.encode(newPassword));
+      userRepository.save(user);
+
+      // 1. If requested, logout from all devices
+      if (logoutAll) {
+         log.info("Revoking all sessions for user: {} due to password reset", email);
+         sessionService.revokeAllUserSessions(user.getId());
+      }
+
+      // 2. Invalidate token after use
+      redisTemplate.delete(redisKey);
+      log.info("Password reset successfully for user: {}", email);
    }
 
 }

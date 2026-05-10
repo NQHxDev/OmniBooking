@@ -1,5 +1,7 @@
 package com.omnibooking.services.impl;
 
+import com.omnibooking.services.MailService;
+
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.dto.RegisterRequest;
@@ -35,11 +37,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -70,6 +75,8 @@ class AuthServiceImplTest {
    private HttpServletResponse response;
    @Mock
    private UserMapper userMapper;
+   @Mock
+   private MailService mailService;
 
    @InjectMocks
    private AuthServiceImpl authService;
@@ -81,10 +88,12 @@ class AuthServiceImplTest {
 
    @Nested
    @DisplayName("Registration Tests")
+   @SuppressWarnings("all")
    class RegistrationTests {
 
       @Test
       @DisplayName("Should register successfully when data is valid")
+      @SuppressWarnings("all")
       void shouldRegister_Success() {
          // Arrange
          RegisterRequest request = RegisterRequest.builder()
@@ -104,8 +113,8 @@ class AuthServiceImplTest {
          when(roleRepository.findByName("ROLE_USER")).thenReturn(Optional.of(userRole));
          when(passwordEncoder.encode(anyString())).thenReturn("hashed_password");
          when(userMapper.toUser(any())).thenReturn(user);
-         when(userRepository.save(Objects.requireNonNull(any(User.class)))).thenReturn(user);
-         when(userProfileRepository.save(Objects.requireNonNull(any(UserProfile.class)))).thenReturn(new UserProfile());
+         when(userRepository.save(any(User.class))).thenReturn(user);
+         when(userProfileRepository.save(any(UserProfile.class))).thenReturn(new UserProfile());
          when(jwtService.generateAccessToken(any(), any(), any(), any())).thenReturn("access_token");
          when(userMapper.toAuthResponse(any(), any(), any())).thenReturn(AuthResponse.builder()
                .email(request.getEmail())
@@ -117,14 +126,15 @@ class AuthServiceImplTest {
          // Assert
          assertThat(result).isNotNull();
          assertThat(result.getEmail()).isEqualTo(request.getEmail());
-         verify(userRepository, times(1)).save(Objects.requireNonNull(any(User.class)));
+         verify(userRepository, times(1)).save((User) any());
          verify(bloomFilterService, times(1)).add(request.getEmail());
-         verify(eventPublisher, times(1)).publishEvent(Objects.requireNonNull(any()));
+         verify(eventPublisher, times(1)).publishEvent(any());
          verify(sessionService, times(1)).saveSession(any(), any(), any(), any(), any(), any(), any(), any(), any());
       }
 
       @Test
       @DisplayName("Should throw exception when email already exists (Bloom Filter hit)")
+      @SuppressWarnings("all")
       void shouldThrowException_WhenEmailExists() {
          // Arrange
          RegisterRequest request = RegisterRequest.builder()
@@ -144,6 +154,7 @@ class AuthServiceImplTest {
 
    @Nested
    @DisplayName("Login Tests")
+   @SuppressWarnings("all")
    class LoginTests {
 
       @Test
@@ -206,6 +217,136 @@ class AuthServiceImplTest {
          assertThatThrownBy(() -> authService.login(request, "ip", "ua", response))
                .isInstanceOf(AppException.class)
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.INVALID_CREDENTIALS);
+      }
+   }
+
+   @Nested
+   @DisplayName("Forgot Password Tests")
+   @SuppressWarnings("all")
+   class ForgotPasswordTests {
+
+      @Test
+      @DisplayName("Should send forgot password email and set token in redis")
+      @SuppressWarnings("all")
+      void shouldForgotPassword_Success() {
+         // Arrange
+         String email = "test@example.com";
+         User user = User.builder().id(UUID.randomUUID()).email(email).username(email).build();
+
+         lenient().when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(user));
+
+         // Mock ValueOperations for set
+         @SuppressWarnings("unchecked")
+         org.springframework.data.redis.core.ValueOperations<String, String> valueOps = mock(
+               org.springframework.data.redis.core.ValueOperations.class);
+         when(redisTemplate.opsForValue()).thenReturn(valueOps);
+         when(valueOps.increment(anyString())).thenReturn(1L);
+
+         // Act
+         authService.forgotPassword(email);
+
+         // Assert
+         verify(mailService, times(1)).sendForgotPasswordEmail(eq(email), anyString(), anyString());
+         // Verify rate limit incremented
+         verify(valueOps, times(1)).increment(startsWith("rate_limit:"));
+         // Verify reset token set
+         verify(valueOps, times(1)).set(startsWith("reset_token:"), eq(email), eq(15L), any(TimeUnit.class));
+      }
+
+      @Test
+      @DisplayName("Should throw RATE_LIMIT_EXCEEDED when request is too frequent")
+      void shouldThrow_WhenRateLimitExceeded() {
+         // Arrange
+         String email = "spam@example.com";
+         @SuppressWarnings("unchecked")
+         org.springframework.data.redis.core.ValueOperations<String, String> valueOps = mock(
+               org.springframework.data.redis.core.ValueOperations.class);
+         when(redisTemplate.opsForValue()).thenReturn(valueOps);
+         when(valueOps.increment("rate_limit:forgot_password:" + email)).thenReturn(4L);
+
+         // Act & Assert
+         assertThatThrownBy(() -> authService.forgotPassword(email))
+               .isInstanceOf(AppException.class)
+               .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.RATE_LIMIT_EXCEEDED);
+
+         verify(userRepository, never()).findByEmail(anyString());
+      }
+   }
+
+   @Nested
+   @DisplayName("Reset Password Tests")
+   @SuppressWarnings("all")
+   class ResetPasswordTests {
+
+      @Test
+      @DisplayName("Should update password and invalidate token on success")
+      @SuppressWarnings("all")
+      void shouldResetPassword_Success() {
+         // Arrange
+         String token = "valid_token";
+         String email = "test@example.com";
+         String newPassword = "new_password_123";
+         User user = User.builder().email(email).build();
+
+         @SuppressWarnings("unchecked")
+         org.springframework.data.redis.core.ValueOperations<String, String> valueOps = mock(
+               org.springframework.data.redis.core.ValueOperations.class);
+         when(redisTemplate.opsForValue()).thenReturn(valueOps);
+         when(valueOps.get("reset_token:" + token)).thenReturn(email);
+         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+         when(passwordEncoder.encode(newPassword)).thenReturn("hashed_new_password");
+
+         // Act
+         authService.resetPassword(token, newPassword, false);
+
+         // Assert
+         verify(userRepository).save(Objects.requireNonNull(user));
+         assertThat(user.getPassword()).isEqualTo("hashed_new_password");
+         verify(redisTemplate).delete("reset_token:" + token);
+      }
+
+      @Test
+      @DisplayName("Should revoke all sessions when logoutAll is true")
+      @SuppressWarnings("all")
+      void shouldRevokeSessions_WhenLogoutAllIsTrue() {
+         // Arrange
+         String token = "valid_token";
+         String email = "test@example.com";
+         String newPassword = "new_password_123";
+         User user = User.builder().id(UUID.randomUUID()).email(email).build();
+
+         @SuppressWarnings("unchecked")
+         org.springframework.data.redis.core.ValueOperations<String, String> valueOps = mock(
+               org.springframework.data.redis.core.ValueOperations.class);
+         when(redisTemplate.opsForValue()).thenReturn(valueOps);
+         when(valueOps.get("reset_token:" + token)).thenReturn(email);
+         when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+         when(passwordEncoder.encode(newPassword)).thenReturn("hashed_new_password");
+
+         // Act
+         authService.resetPassword(token, newPassword, true);
+
+         // Assert
+         verify(sessionService).revokeAllUserSessions(user.getId());
+         verify(userRepository).save((User) any());
+      }
+
+      @Test
+      @DisplayName("Should throw INVALID_RESET_TOKEN for invalid/expired token")
+      @SuppressWarnings("all")
+      void shouldThrow_WhenTokenInvalid() {
+         // Arrange
+         String token = "invalid_token";
+         @SuppressWarnings("unchecked")
+         org.springframework.data.redis.core.ValueOperations<String, String> valueOps = mock(
+               org.springframework.data.redis.core.ValueOperations.class);
+         when(redisTemplate.opsForValue()).thenReturn(valueOps);
+         when(valueOps.get((Object) any())).thenReturn(null);
+
+         // Act & Assert
+         assertThatThrownBy(() -> authService.resetPassword(token, "pass", false))
+               .isInstanceOf(AppException.class)
+               .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.INVALID_RESET_TOKEN);
       }
    }
 }

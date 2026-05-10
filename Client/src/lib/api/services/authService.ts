@@ -85,4 +85,18 @@ export const authService = {
    logout: async () => {
       return apiClient.post<ApiResponse<void>>("/auth/logout", {}, { withCredentials: true });
    },
+
+   /**
+    * Requests a password reset email.
+    */
+   forgotPassword: async (email: string) => {
+      return apiClient.post<ApiResponse<void>>("/auth/forgot-password", { email });
+   },
+
+   /**
+    * Resets the password using a token.
+    */
+   resetPassword: async (payload: { token: string; newPassword: string; logoutAll?: boolean }) => {
+      return apiClient.post<ApiResponse<void>>("/auth/reset-password", payload);
+   },
 };

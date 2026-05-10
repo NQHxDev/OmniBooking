@@ -6,6 +6,8 @@ import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.security.Anonymous;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.dto.RegisterRequest;
+import com.omnibooking.dto.ForgotPasswordRequest;
+import com.omnibooking.dto.ResetPasswordRequest;
 import com.omnibooking.services.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -109,6 +111,28 @@ public class AuthController {
       String requestId = (String) httpRequest.getAttribute("requestId");
       authService.verifyEmail(token);
       return ResponseEntity.ok(ApiResponse.success(null, "Email verified successfully", requestId));
+   }
+
+   @Anonymous
+   @PostMapping("/forgot-password")
+   public ResponseEntity<ApiResponse<Void>> forgotPassword(
+         @Valid @RequestBody ForgotPasswordRequest request,
+         HttpServletRequest httpRequest) {
+
+      String requestId = (String) httpRequest.getAttribute("requestId");
+      authService.forgotPassword(request.getEmail());
+      return ResponseEntity.ok(ApiResponse.success(null, "If an account exists, a reset link has been sent", requestId));
+   }
+
+   @Anonymous
+   @PostMapping("/reset-password")
+   public ResponseEntity<ApiResponse<Void>> resetPassword(
+         @Valid @RequestBody ResetPasswordRequest request,
+         HttpServletRequest httpRequest) {
+
+      String requestId = (String) httpRequest.getAttribute("requestId");
+      authService.resetPassword(request.getToken(), request.getNewPassword(), request.isLogoutAll());
+      return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully", requestId));
    }
 
    private String getClientIp(HttpServletRequest request) {
