@@ -18,10 +18,10 @@ import com.omnibooking.services.SessionService;
 import com.omnibooking.services.VerificationService;
 import com.omnibooking.util.CookieUtils;
 import com.omnibooking.util.SecurityUtils;
+import com.omnibooking.mapper.UserMapper;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.servlet.http.HttpServletResponse;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.Set;
@@ -52,6 +52,7 @@ public class AuthServiceImpl implements AuthService {
    private final VerificationService verificationService;
    private final StringRedisTemplate redisTemplate;
    private final BloomFilterService bloomFilterService;
+   private final UserMapper userMapper;
 
    @Value("${app.security.cookie-secure:false}")
    private boolean cookieSecure;
@@ -61,7 +62,6 @@ public class AuthServiceImpl implements AuthService {
    public AuthResponse register(RegisterRequest request, String ip, String userAgent, HttpServletResponse response) {
       // 1. Check Bloom Filter first (Fast pre-check)
       if (bloomFilterService.mightContain(request.getEmail())) {
-         // Bloom filter nói có thể tồn tại, check kỹ lại DB để tránh False Positive (1%)
          if (userRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
          }
@@ -70,13 +70,9 @@ public class AuthServiceImpl implements AuthService {
       Role userRole = roleRepository.findByName("ROLE_USER")
             .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
 
-      User user = User.builder()
-            .username(request.getEmail())
-            .email(request.getEmail())
-            .password(passwordEncoder.encode(request.getPassword()))
-            .isActive(true)
-            .roles(Collections.singleton(userRole))
-            .build();
+      User user = userMapper.toUser(request);
+      user.setPassword(passwordEncoder.encode(request.getPassword()));
+      user.setRoles(Collections.singleton(userRole));
 
       User savedUser = userRepository.save(Objects.requireNonNull(user));
 
@@ -85,13 +81,10 @@ public class AuthServiceImpl implements AuthService {
 
       // Create Profile
       String[] nameParts = request.getFullName().split(" ", 2);
-      String firstName = nameParts[0];
-      String lastName = nameParts.length > 1 ? nameParts[1] : "";
-
       UserProfile profile = UserProfile.builder()
             .user(savedUser)
-            .firstName(firstName)
-            .lastName(lastName)
+            .firstName(nameParts[0])
+            .lastName(nameParts.length > 1 ? nameParts[1] : "")
             .build();
       userProfileRepository.save(Objects.requireNonNull(profile));
 
@@ -101,8 +94,7 @@ public class AuthServiceImpl implements AuthService {
 
       // Automatic Login
       Set<String> roles = Collections.singleton(userRole.getName());
-      return issueTokensAndBuildResponse(savedUser, roles, request.getFullName(), null, profile, ip, userAgent,
-            response);
+      return issueTokensAndBuildResponse(savedUser, roles, profile, ip, userAgent, response);
    }
 
    @Override
@@ -126,10 +118,7 @@ public class AuthServiceImpl implements AuthService {
             .collect(java.util.stream.Collectors.toSet());
 
       UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
-      String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
-      String avatarUrl = profile != null ? profile.getAvatarUrl() : null;
-
-      return issueTokensAndBuildResponse(user, roles, fullName, avatarUrl, profile, ip, userAgent, response);
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response);
    }
 
    @Override
@@ -145,7 +134,8 @@ public class AuthServiceImpl implements AuthService {
          throw new AppException(ErrorCode.INVALID_SESSION);
       }
 
-      // LOCKING: Ngăn chặn race condition khi nhiều request refresh cùng lúc cho 1 sessionId
+      // LOCKING: Ngăn chặn race condition khi nhiều request refresh cùng lúc cho 1
+      // sessionId
       String lockKey = "lock:refresh:" + sId;
       Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "L", 5, TimeUnit.SECONDS);
 
@@ -169,14 +159,12 @@ public class AuthServiceImpl implements AuthService {
                .collect(java.util.stream.Collectors.toSet());
 
          UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
-         String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
-         String avatarUrl = profile != null ? profile.getAvatarUrl() : null;
 
          // ROTATION: Thu hồi session cũ trước khi cấp mới
          sessionService.deleteSession(sId);
          log.info("Rotating session for user: {}", user.getEmail());
 
-         return issueTokensAndBuildResponse(user, roles, fullName, avatarUrl, profile, ip, userAgent, response);
+         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response);
       } finally {
          redisTemplate.delete(lockKey);
       }
@@ -205,37 +193,25 @@ public class AuthServiceImpl implements AuthService {
    /**
     * Centralized logic to issue tokens, save sessions, and set cookies.
     */
-   private AuthResponse issueTokensAndBuildResponse(User user, Set<String> roles, String fullName,
-         String avatarUrl, UserProfile profile, String ip, String userAgent, HttpServletResponse response) {
+   private AuthResponse issueTokensAndBuildResponse(User user, Set<String> roles, UserProfile profile,
+         String ip, String userAgent, HttpServletResponse response) {
       UUID sessionId = UuidCreator.getTimeOrderedEpoch();
       UUID refreshToken = UuidCreator.getTimeOrderedEpoch();
 
-      // Fingerprinting
       String fingerprint = UuidCreator.getTimeOrderedEpoch().toString();
       String fgpHash = SecurityUtils.hashFingerprint(fingerprint);
 
       String accessToken = jwtService.generateAccessToken(user.getId(), roles, sessionId, fgpHash);
 
-      // Save to Redis
+      String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
+
       sessionService.saveSession(user.getId(), user.getUsername(), user.getEmail(), fullName, roles,
             sessionId, refreshToken, ip, userAgent);
 
-      // Set Cookies
       CookieUtils.setAuthCookies(response, accessToken, sessionId.toString(), refreshToken.toString(), fingerprint,
             cookieSecure);
 
-      return AuthResponse.builder()
-            .id(user.getId())
-            .username(user.getUsername())
-            .email(user.getEmail())
-            .fullName(fullName)
-            .avatarUrl(avatarUrl)
-            .roles(new ArrayList<>(roles))
-            .reputationScore(profile != null ? profile.getReputationScore() : 100.0)
-            .isVerified(profile != null ? profile.getIsVerified() : false)
-            .rankName(profile != null && profile.getRank() != null ? profile.getRank().getName() : "Bronze")
-            .partnerBio(profile != null ? profile.getPartnerBio() : null)
-            .build();
+      return userMapper.toAuthResponse(user, profile, roles);
    }
 
    @Override
@@ -257,23 +233,14 @@ public class AuthServiceImpl implements AuthService {
       userRepository.save(user);
 
       UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
-      String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
 
       log.info("Upgrading user {} to ROLE_PARTNER", user.getEmail());
 
       Set<String> roles = user.getRoles().stream()
-            .map(com.omnibooking.model.Role::getName)
+            .map(Role::getName)
             .collect(Collectors.toSet());
 
-      String avatarUrl = profile != null ? profile.getAvatarUrl() : null;
-
-      // Issue new tokens with all current roles
-      // ROTATION: Thu hồi session cũ (nếu có trong context hoặc client gửi lên)
-      // Lưu ý: Ở đây ta chỉ tạo mới, nhưng để an toàn ta có thể thu hồi session hiện
-      // tại
-      // nếu frontend đang gọi endpoint này trong một session active.
-
-      return issueTokensAndBuildResponse(user, roles, fullName, avatarUrl, profile, ip, userAgent, response);
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response);
    }
 
 }

@@ -35,31 +35,31 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 - **Soft Delete**: All major tables include `deleted_at` for data recovery and auditing.
 - **Optimistic Locking**: Implementation of `version` columns to prevent data overwriting in concurrent environments.
 
+- **JPA Specification & Search Criteria**: Implementation of `GenericSpecification` for dynamic, multi-criteria filtering (e.g., `?price_gt=100&city=Hanoi`) without writing redundant repository methods.
+- **UUID v7 Primary Keys**: Time-ordered UUIDs for optimal B-Tree index performance.
+
 ### Business Modules
 
-- **Account/Profile Separation**: Decoupling authentication data (`users`) from metadata (`user_profiles`) for security and flexibility.
-- **RBAC (Role-Based Access Control)**: Comprehensive system with `roles`, `permissions`, and junction tables.
-- **Loyalty Rank System**: Multi-tier ranking (`ranks`) based on points to drive customer engagement.
-
-## 4. Backend Core Patterns
+...
 
 ### API Standardization
 
-- **API Versioning**: Global prefix `/api/v1/` implemented for future-proof service evolution.
-- **Standardized Response**: All APIs return a consistent `ApiResponse<T>` structure.
-- **Global Error Handling**: Centralized `GlobalExceptionHandler` ensures professional error messages without leaking system internals.
-- **Pagination**: Standardized `PageResponse` supporting "Lazy Loading" style data delivery.
+...
 
 ### Performance & Scalability
 
 - **Distributed Caching**: Integrated Spring Cache with Redis to reduce DB load and improve response times.
+- **MapStruct for DTO Mapping**: Automated DTO-Entity conversion using MapStruct to reduce boilerplate, improve type safety, and maintain a clean Service layer.
+- **Idempotency Framework (X-Idempotency-Key)**: Custom `@Idempotent` annotation and AOP-based interceptor using Redis to prevent duplicate request processing (Double-submit) for critical operations.
+- **Resilience Layer (Fault Tolerance)**: Integration of **Resilience4j** implementing Circuit Breaker and Retry patterns for third-party service calls (Cloudinary, Resend) to prevent cascading failures.
 - **Stateless Architecture**: Secured for future JWT integration with stateless session management.
 
 ### Observability & Traceability
 
 - **Request Tracing**: `RequestIdFilter` generates a unique `X-Request-ID` for every request.
-- **Professional Logging**:
+- **Professional & Structured Logging**:
    - **AOP Logging**: Automatic logging of method entry/exit for all controllers.
+   - **JSON Logging (Production)**: Uses `Logstash Logback Encoder` to output logs in structured JSON format for easy ingestion into ELK/CloudWatch (enabled via `prod` profile).
    - **MDC Integration**: Trace ID is automatically injected into every log line.
    - **Log Rotation**: Automated daily log compression and 30-day retention.
 
@@ -180,4 +180,4 @@ To prevent bottlenecks during heavy media operations:
 
 ---
 
-_Last Updated: 2026-05-09_
+_Last Updated: 2026-05-10_

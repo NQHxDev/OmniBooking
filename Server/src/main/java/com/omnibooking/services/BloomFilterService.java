@@ -2,11 +2,11 @@ package com.omnibooking.services;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
+import java.util.Objects;
 
 @Service
 @Slf4j
@@ -28,7 +28,7 @@ public class BloomFilterService {
                "return redis.call('BF.RESERVE', KEYS[1], ARGV[1], ARGV[2])", String.class);
 
          redisTemplate.execute(script,
-               Collections.singletonList(filterName),
+               Objects.requireNonNull(Collections.singletonList(filterName)),
                String.valueOf(errorRate),
                String.valueOf(capacity));
 
@@ -45,7 +45,7 @@ public class BloomFilterService {
          org.springframework.data.redis.core.script.RedisScript<Long> script = new org.springframework.data.redis.core.script.DefaultRedisScript<>(
                "return redis.call('BF.ADD', KEYS[1], ARGV[1])", Long.class);
 
-         redisTemplate.execute(script, Collections.singletonList(EMAIL_FILTER), value);
+         redisTemplate.execute(script, Objects.requireNonNull(Collections.singletonList(EMAIL_FILTER)), value);
       } catch (Exception e) {
          log.error("Failed to add value to Bloom Filter: {}", value, e);
       }
@@ -58,7 +58,8 @@ public class BloomFilterService {
          org.springframework.data.redis.core.script.RedisScript<Long> script = new org.springframework.data.redis.core.script.DefaultRedisScript<>(
                "return redis.call('BF.EXISTS', KEYS[1], ARGV[1])", Long.class);
 
-         Long result = redisTemplate.execute(script, Collections.singletonList(EMAIL_FILTER), value);
+         Long result = redisTemplate.execute(script, Objects.requireNonNull(Collections.singletonList(EMAIL_FILTER)),
+               value);
 
          return result != null && result == 1L;
       } catch (Exception e) {

@@ -5,6 +5,8 @@ import com.cloudinary.utils.ObjectUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.dto.CloudinaryResponse;
 import com.omnibooking.services.CloudinaryService;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,8 @@ public class CloudinaryServiceImpl implements CloudinaryService {
    }
 
    @Override
+   @CircuitBreaker(name = "externalService")
+   @Retry(name = "externalService")
    public CloudinaryResponse upload(byte[] fileBytes, String folder) throws IOException {
       log.info("Uploading bytes to Cloudinary folder: {}", folder);
       Map<?, ?> rawResult = cloudinary.uploader().upload(fileBytes, ObjectUtils.asMap(
@@ -37,9 +41,10 @@ public class CloudinaryServiceImpl implements CloudinaryService {
 
    @Override
    @SuppressWarnings("unchecked")
+   @CircuitBreaker(name = "externalService")
+   @Retry(name = "externalService")
    public Map<String, Object> delete(String publicId) throws IOException {
       log.info("Deleting file from Cloudinary: {}", publicId);
       return (Map<String, Object>) cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
    }
-
 }

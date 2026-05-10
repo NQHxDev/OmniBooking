@@ -40,12 +40,14 @@ public class GlobalExceptionHandler {
 
    @ExceptionHandler(org.springframework.web.bind.MissingRequestCookieException.class)
    public ResponseEntity<ApiResponse<Object>> handleMissingCookieException(
-         org.springframework.web.bind.MissingRequestCookieException ex, jakarta.servlet.http.HttpServletRequest request) {
+         org.springframework.web.bind.MissingRequestCookieException ex,
+         jakarta.servlet.http.HttpServletRequest request) {
 
       String requestId = (String) request.getAttribute("requestId");
       ErrorCode error = ErrorCode.INVALID_SESSION;
-      return ResponseEntity.status(error.getStatus())
-            .body(ApiResponse.error("Session expired or invalid. Please login again.", error.getCode(), null, requestId));
+      return ResponseEntity.status(Objects.requireNonNull(error.getStatus()))
+            .body(ApiResponse.error("Session expired or invalid. Please login again.", error.getCode(), null,
+                  requestId));
    }
 
    @ExceptionHandler(Exception.class)

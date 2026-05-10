@@ -57,7 +57,16 @@
       "orContinueWith": "Hoặc đăng nhập với",
       "backToHome": "Quay lại trang chủ",
       "successRegister": "Đăng ký thành công!",
-      "successRegisterDesc": "Vui lòng kiểm tra email để xác nhận tài khoản."
+      "successRegisterDesc": "Vui lòng kiểm tra email để xác nhận tài khoản.",
+      "heroBadge": "Trải nghiệm du lịch thoải mái",
+      "heroTitle": "Khám phá <highlight>thế giới</highlight><br/>theo cách của riêng bạn",
+      "heroTitleHighlight": "thế giới",
+      "heroSub": "Tham gia cùng hơn 10 triệu du khách để nhận được các ưu đãi độc quyền và hỗ trợ 24/7 trên mọi hành trình.",
+      "quickBooking": "Đặt phòng nhanh",
+      "quickBookingSub": "Xác nhận ngay trong 30 giây",
+      "securePayment": "Bảo mật tuyệt đối",
+      "securePaymentSub": "Thanh toán an toàn 100%",
+      "fullNamePlaceholder": "Nguyễn Văn A"
    },
    "Errors": {
       "AUTH_001": "Tên đăng nhập đã tồn tại.",

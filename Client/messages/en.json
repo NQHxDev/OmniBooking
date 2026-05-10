@@ -57,7 +57,16 @@
       "orContinueWith": "Or continue with",
       "backToHome": "Back to Home",
       "successRegister": "Registration successful!",
-      "successRegisterDesc": "Please check your email to confirm your account."
+      "successRegisterDesc": "Please check your email to confirm your account.",
+      "heroBadge": "Travel with comfort",
+      "heroTitle": "Discover the <highlight>world</highlight><br/>your own way",
+      "heroTitleHighlight": "world",
+      "heroSub": "Join over 10 million travelers to receive exclusive offers and 24/7 support on every journey.",
+      "quickBooking": "Fast booking",
+      "quickBookingSub": "Confirm in 30 seconds",
+      "securePayment": "Absolute security",
+      "securePaymentSub": "100% safe payment",
+      "fullNamePlaceholder": "John Doe"
    },
    "Errors": {
       "AUTH_001": "Username already exists.",

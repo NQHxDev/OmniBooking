@@ -80,21 +80,23 @@ _Lưu ý: Bất kỳ Pull Request nào chứa chuỗi văn bản hardcode hoặc
 - **Client**: Luôn sử dụng `apiClient` từ `@/lib/api/apiClient`.
 - **Nguyên tắc**:
    - KHÔNG sử dụng `fetch` hoặc `axios` trực tiếp trong components.
-   - Sử dụng `withCredentials: true` cho các yêu cầu cần session.
+   - **Idempotency**: Mọi request quan trọng (POST/PUT/PATCH) PHẢI gửi kèm `X-Idempotency-Key` để bảo vệ dữ liệu.
    - Xử lý lỗi tập trung qua Interceptors (đã có Toast thông báo).
 
-### State Management
+### Global Feedback States (Trạng thái phản hồi toàn cục)
 
-- **Zustand**: Sử dụng `useAuthStore` để quản lý trạng thái đăng nhập.
-- **Persistence**: Token và thông tin user được lưu vào `localStorage` qua middleware `persist`.
-- **Hydration Safety**: Luôn sử dụng trạng thái `mounted` (với `useEffect` và `setTimeout`) để ngăn chặn lỗi mismatch giữa Server và Client khi truy cập dữ liệu từ Store trong quá trình hydration.
+- **Loading States**: Sử dụng màn hình loading toàn trang (`loading.tsx`) với 3D Illustration cao cấp và hiệu ứng `animate-bounce` để mang lại trải nghiệm mượt mà khi chuyển trang.
+- **Error Boundaries**: Triển khai `error.tsx` chuyên nghiệp. Thông báo lỗi phải thân thiện, có nút "Thử lại" hoặc "Về trang chủ", tuyệt đối không hiển thị lỗi code thô cho người dùng cuối.
 
-## 5. Cấu trúc thư mục (Folder Structure)
+## 5. Cấu trúc thư mục (Folder Structure - Feature-based)
 
-- `src/components`: UI components dùng chung.
+Dự án chuyển dịch sang cấu trúc dựa trên Tính năng (Features) để tăng khả năng mở rộng:
+
+- `src/features`: Chứa các module nghiệp vụ (auth, properties, bookings...). Mỗi module có components, hooks, services riêng.
+- `src/components/ui`: Các UI components nguyên tử (Shadcn/ui).
 - `src/store`: Quản lý trạng thái toàn cục (Zustand).
-- `src/lib/api`: Cấu hình API Client.
-- `src/app`: Routes và Pages (Next.js App Router).
+- `src/lib`: Cấu hình thư viện dùng chung (apiClient, utils...).
+- `src/app`: Routes và Layouts (Next.js App Router).
 
 ## 6. Nguyên tắc thiết kế (Design Principles)
 
@@ -139,3 +141,30 @@ Giao diện dành cho đối tác cần sự chuyên nghiệp, sạch sẽ nhưn
 - **Placeholder**: Sử dụng màu nền hoặc Skeleton trong lúc tải ảnh.
 - **Preview**: Đối với ảnh vừa upload, sử dụng `URL.createObjectURL` để hiển thị preview tức thì và đừng quên cleanup URL sau khi component unmount.
 - **Optimization**: Thiết lập thuộc tính `sizes` phù hợp để Next.js tự động tối ưu hóa kích thước ảnh theo viewport.
+
+## 11. Cấu trúc Routing & Đa ngôn ngữ (Routing & i18n Folder Structure)
+
+Để tránh nhầm lẫn trong quá trình phát triển (như việc sửa nhầm file clone), dự án quy định nghiêm ngặt về cấu trúc thư mục App Router khi kết hợp với `next-intl`:
+
+### 11.1. Bẫy Routing kép (The Dual Routing Trap)
+
+- **Vấn đề**: Khi sử dụng `middleware` để tự động chuyển hướng ngôn ngữ (ví dụ: `/auth` -> `/vi/auth`), có thể tồn tại 2 file `page.tsx` ở `app/auth/page.tsx` và `app/[locale]/auth/page.tsx`.
+- **Quy định**:
+   - **Tuyệt đối KHÔNG** duy trì 2 file `page.tsx` có cùng chức năng ở cả root `/app` và thư mục `/[locale]`.
+   - Mọi Logic hiển thị (UI/UX) phải nằm tập trung tại thư mục **`src/app/[locale]/...`**.
+   - Các folder ở root `/app` chỉ nên chứa các file mang tính chất điều hướng (redirect) hoặc các API Route (`route.ts`).
+
+### 11.2. Source of Truth (Nguồn sự thật duy nhất)
+
+- Khi cần chỉnh sửa giao diện một trang (ví dụ trang Auth), lập trình viên **PHẢI** kiểm tra URL đang chạy trên trình duyệt.
+- Nếu URL có tiền tố ngôn ngữ (ví dụ: `/vi/auth/login`), file cần sửa chắc chắn nằm trong `src/app/[locale]/auth/[mode]/page.tsx`.
+- Xóa bỏ ngay các file "bóng ma" (ghost files) ở thư mục root nếu chúng không còn mục đích sử dụng để tránh gây lúng túng cho team.
+
+### 11.3. UX Pointer & Interaction
+
+- Tất cả các thành phần tương tác được (Buttons, Links, Labels liên kết với Input) **PHẢI** có class `cursor-pointer`.
+- Sử dụng `htmlFor` cho nhãn (Label) và `id` cho ô nhập liệu (Input) để tối ưu hóa trải nghiệm click-to-focus.
+
+---
+
+_Lưu ý: Sự minh bạch trong cấu trúc thư mục quan trọng tương đương với chất lượng mã nguồn._

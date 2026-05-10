@@ -3,16 +3,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Mail, Lock, User, ArrowRight, ChevronLeft, Loader2 } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, ChevronLeft, Apple } from "lucide-react";
+
 import { useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
+import { Loader2 } from "lucide-react";
 import { authService } from "@/lib/api/services/authService";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 
 export default function AuthPage() {
    const t = useTranslations("Auth");
-   const te = useTranslations("Errors");
+   const tc = useTranslations("Common");
    const params = useParams();
    const router = useRouter();
    const mode = params?.mode as string;
@@ -67,10 +69,9 @@ export default function AuthPage() {
             router.refresh();
          }
       } catch (err: unknown) {
-         // Map backend error code to translation key
-         const error = err as { errorCode?: string };
-         const errorCode = error?.errorCode || "GEN_999";
-         const errorMessage = te(errorCode) || t("uncategorizedError");
+         const error = err as { message?: string };
+         const errorMessage =
+            error?.message || (err instanceof Error ? err.message : "Đã có lỗi xảy ra");
          setError(errorMessage);
       } finally {
          setLoading(false);
@@ -101,21 +102,31 @@ export default function AuthPage() {
                </Link>
 
                <div className="max-w-xl">
+                  <div className="mb-6 inline-flex items-center rounded-full bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-widest backdrop-blur-md border border-white/10">
+                     {t("heroBadge")}
+                  </div>
                   <h2 className="text-5xl font-extrabold leading-[1.1] tracking-tight">
-                     {t("loginTitle")}
+                     {t.rich("heroTitle", {
+                        highlight: (chunks) => <span className="text-blue-400">{chunks}</span>,
+                        br: () => <br />,
+                     })}
                   </h2>
-                  <p className="mt-6 text-lg text-white/70 leading-relaxed">{t("loginSub")}</p>
+                  <p className="mt-6 text-lg text-white/70 leading-relaxed">{t("heroSub")}</p>
                </div>
 
                <div className="flex items-center gap-6 text-xs font-medium text-white/40">
                   <span>© 2026 OmniBooking™</span>
+                  <div className="h-1 w-1 rounded-full bg-white/20" />
+                  <span>{tc("privacy")}</span>
+                  <div className="h-1 w-1 rounded-full bg-white/20" />
+                  <span>{tc("terms")}</span>
                </div>
             </div>
          </div>
 
-         {/* Right Side: Form */}
-         <div className="flex w-full flex-col lg:w-1/2">
-            <div className="flex flex-1 items-center justify-center px-8 py-12">
+         {/* Right Side: Auth Form */}
+         <div className="flex w-full flex-col lg:w-1/2 h-screen overflow-y-auto custom-scrollbar bg-white">
+            <div className="flex flex-1 flex-col items-center px-8 py-12 lg:py-20">
                <div className="w-full max-w-[420px]">
                   <Link
                      href="/"
@@ -127,15 +138,15 @@ export default function AuthPage() {
                   <div className="mb-10 flex p-1 bg-zinc-100 rounded-xl">
                      <button
                         onClick={() => handleToggle(true)}
-                        className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${isLogin ? "bg-white text-[#006ce4] shadow-sm" : "text-zinc-500"}`}
+                        className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all duration-300 ${isLogin ? "bg-white text-[#006ce4] shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
                      >
-                        {t("loginButton")}
+                        {tc("login")}
                      </button>
                      <button
                         onClick={() => handleToggle(false)}
-                        className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${!isLogin ? "bg-white text-[#006ce4] shadow-sm" : "text-zinc-500"}`}
+                        className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all duration-300 ${!isLogin ? "bg-white text-[#006ce4] shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
                      >
-                        {t("registerButton")}
+                        {tc("register")}
                      </button>
                   </div>
 
@@ -143,10 +154,13 @@ export default function AuthPage() {
                      <h1 className="text-3xl font-bold tracking-tight">
                         {isLogin ? t("loginTitle") : t("registerTitle")}
                      </h1>
+                     <p className="mt-2 text-zinc-500">
+                        {isLogin ? t("loginSub") : t("registerSub")}
+                     </p>
                   </div>
 
                   {error && (
-                     <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm animate-in fade-in slide-in-from-top-1">
+                     <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm">
                         {error}
                      </div>
                   )}
@@ -154,58 +168,78 @@ export default function AuthPage() {
                   <form onSubmit={handleSubmit} className="space-y-5">
                      {!isLogin && (
                         <div>
-                           <label className="mb-1.5 block text-sm font-semibold text-zinc-700">
+                           <label
+                              htmlFor="fullName"
+                              className="mb-1.5 block text-sm font-semibold text-zinc-700 cursor-pointer"
+                           >
                               {t("fullNameLabel")}
                            </label>
                            <div className="relative">
                               <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                               <input
+                                 id="fullName"
                                  name="fullName"
                                  type="text"
                                  required
-                                 placeholder="Nguyễn Văn A"
+                                 placeholder={t("fullNamePlaceholder")}
                                  value={formData.fullName}
                                  onChange={handleChange}
-                                 className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4]"
+                                 className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
                               />
                            </div>
                         </div>
                      )}
 
                      <div>
-                        <label className="mb-1.5 block text-sm font-semibold text-zinc-700">
+                        <label
+                           htmlFor="email"
+                           className="mb-1.5 block text-sm font-semibold text-zinc-700 cursor-pointer"
+                        >
                            {t("emailLabel")}
                         </label>
                         <div className="relative">
                            <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                            <input
+                              id="email"
                               name="email"
                               type="email"
                               required
                               placeholder="name@company.com"
                               value={formData.email}
                               onChange={handleChange}
-                              className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4]"
+                              className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
                            />
                         </div>
                      </div>
 
                      <div>
-                        <div className="flex justify-between items-center mb-1.5">
-                           <label className="text-sm font-semibold text-zinc-700">
+                        <div className="flex justify-between items-end mb-1.5">
+                           <label
+                              htmlFor="password"
+                              className="text-sm font-bold text-zinc-700 cursor-pointer"
+                           >
                               {t("passwordLabel")}
                            </label>
+                           {isLogin && (
+                              <button
+                                 type="button"
+                                 className="text-[11px] font-bold uppercase tracking-wider text-[#006ce4] hover:text-[#0057b7] cursor-pointer"
+                              >
+                                 {t("forgotPassword")}
+                              </button>
+                           )}
                         </div>
                         <div className="relative">
                            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                            <input
+                              id="password"
                               name="password"
                               type="password"
                               required
                               placeholder="••••••••"
                               value={formData.password}
                               onChange={handleChange}
-                              className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4]"
+                              className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
                            />
                         </div>
                      </div>
@@ -213,7 +247,7 @@ export default function AuthPage() {
                      <button
                         type="submit"
                         disabled={loading}
-                        className="group flex w-full items-center justify-center gap-2 rounded-xl bg-[#006ce4] py-4 text-sm font-bold text-white shadow-xl shadow-blue-200 transition-all hover:bg-[#0057b7]"
+                        className="group flex w-full items-center justify-center gap-2 rounded-xl bg-[#006ce4] py-4 text-sm font-bold text-white shadow-xl shadow-blue-200 transition-all hover:bg-[#0057b7] active:scale-[0.98] disabled:opacity-70"
                      >
                         {loading ? (
                            <Loader2 className="h-5 w-5 animate-spin" />
@@ -225,9 +259,56 @@ export default function AuthPage() {
                         )}
                      </button>
                   </form>
+
+                  <div className="relative my-8 text-center">
+                     <span className="relative z-10 bg-white px-4 text-xs font-bold uppercase tracking-widest text-zinc-400">
+                        {t("orContinueWith")}
+                     </span>
+                     <div className="absolute inset-0 top-1/2 border-t border-zinc-100"></div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                     <button
+                        type="button"
+                        className="flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white py-3.5 text-sm font-bold shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-[0.98]"
+                     >
+                        <GoogleIcon className="h-5 w-5" />
+                        Google
+                     </button>
+                     <button
+                        type="button"
+                        className="flex items-center justify-center gap-2 rounded-xl bg-black py-3.5 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 transition-all active:scale-[0.98]"
+                     >
+                        <Apple className="h-5 w-5" />
+                        Apple
+                     </button>
+                  </div>
                </div>
             </div>
          </div>
       </div>
+   );
+}
+
+function GoogleIcon({ className }: { className?: string }) {
+   return (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className={className}>
+         <path
+            fill="#FFC107"
+            d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+         />
+         <path
+            fill="#FF3D00"
+            d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+         />
+         <path
+            fill="#4CAF50"
+            d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
+         />
+         <path
+            fill="#1976D2"
+            d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+         />
+      </svg>
    );
 }

@@ -11,7 +11,28 @@
       </encoder>
    </appender>
 
-   <!-- Rolling File Appender -->
+   <!-- Rolling File Appender (JSON for Production) -->
+   <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <file>${LOG_PATH}/${LOG_FILE}-json.log</file>
+      <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+         <fileNamePattern>${LOG_PATH}/${LOG_FILE}-json.%d{yyyy-MM-dd}.gz</fileNamePattern>
+         <maxHistory>30</maxHistory>
+         <totalSizeCap>1GB</totalSizeCap>
+      </rollingPolicy>
+      <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+         <providers>
+            <timestamp/>
+            <version/>
+            <message/>
+            <loggerName/>
+            <threadName/>
+            <logLevel/>
+            <mdc/> <!-- Includes requestId -->
+            <stackTrace/>
+         </providers>
+      </encoder>
+   </appender>
+
    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
       <file>${LOG_PATH}/${LOG_FILE}.log</file>
       <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
@@ -29,7 +50,12 @@
    <!-- Logging levels -->
    <root level="INFO">
       <appender-ref ref="CONSOLE" />
-      <appender-ref ref="FILE" />
+      <springProfile name="dev">
+         <appender-ref ref="FILE" />
+      </springProfile>
+      <springProfile name="prod">
+         <appender-ref ref="JSON_FILE" />
+      </springProfile>
    </root>
 
    <!-- Kafka silencing -->

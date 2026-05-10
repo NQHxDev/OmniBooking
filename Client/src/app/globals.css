@@ -121,14 +121,58 @@
 
 @layer base {
    * {
-      @apply border-border outline-ring/50;
+      border-color: var(--border);
+      outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
    }
 
    body {
-      @apply bg-background text-foreground;
+      background-color: var(--background);
+      color: var(--foreground);
    }
 
    html {
-      @apply font-sans;
+      font-family: var(--font-sans);
+   }
+
+   .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+   }
+
+   .custom-scrollbar::-webkit-scrollbar-track {
+      background-color: transparent;
+   }
+
+   .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: var(--color-zinc-200);
+      border-radius: 9999px;
+      transition-property:
+         color, background-color, border-color, text-decoration-color, fill, stroke;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+      transition-duration: 150ms;
+   }
+
+   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background-color: var(--color-zinc-300);
+   }
+
+   @keyframes loading {
+      0% {
+         transform: translateX(-100%) scaleX(0.5);
+      }
+      50% {
+         transform: translateX(0%) scaleX(1);
+      }
+      100% {
+         transform: translateX(100%) scaleX(0.5);
+      }
+   }
+
+   @keyframes shimmer {
+      from {
+         transform: translateX(-100%);
+      }
+      to {
+         transform: translateX(100%);
+      }
    }
 }

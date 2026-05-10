@@ -21,7 +21,11 @@ public enum ErrorCode {
    UNAUTHORIZED("GEN_002", "You do not have permission", HttpStatus.FORBIDDEN),
    NOT_FOUND("GEN_003", "Resource not found", HttpStatus.NOT_FOUND),
    INTERNAL_SERVER_ERROR("GEN_500", "Internal server error", HttpStatus.INTERNAL_SERVER_ERROR),
-   CSRF_TOKEN_INVALID("SEC_001", "CSRF token mismatch or missing", HttpStatus.FORBIDDEN);
+   CSRF_TOKEN_INVALID("SEC_001", "CSRF token mismatch or missing", HttpStatus.FORBIDDEN),
+
+   // Idempotency Errors
+   IDEMPOTENCY_KEY_REQUIRED("IDEM_001", "X-Idempotency-Key header is required", HttpStatus.BAD_REQUEST),
+   IDEMPOTENCY_KEY_PROCESSING("IDEM_002", "Request is already being processed", HttpStatus.CONFLICT);
 
    private final String code;
    private final String message;
