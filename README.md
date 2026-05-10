@@ -1,81 +1,98 @@
-# 🏨 OmniBooking Monorepo
+# OmniBooking: The Enterprise Booking Ecosystem
 
-[![CI Pipeline](https://github.com/anhjkr/OmniBooking/actions/workflows/ci.yml/badge.svg)](https://github.com/anhjkr/OmniBooking/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Java Version](https://img.shields.io/badge/Java-21-blue.svg)](https://www.oracle.com/java/technologies/javase/jdk21-archive-downloads.html)
-[![Next.js Version](https://img.shields.io/badge/Next.js-15+-black.svg)](https://nextjs.org/)
-
-**OmniBooking** is a high-performance, enterprise-grade booking management ecosystem. Designed with a modern micro-monorepo architecture, it provides a robust foundation for scalable reservation services, featuring advanced security patterns and high-concurrency optimizations.
-
----
-
-## 🚀 Key Highlights
-
-- **Professional DB Schema**: Implements **UUID v7** (time-ordered) for optimal B-Tree performance, **Soft Delete**, and **Optimistic Locking**.
-- **Security-First**: Built-in **RBAC** (Role-Based Access Control) with Account/Profile separation and Argon2 hashing.
-- **High Performance**: Integrated **Redis Stack** with **Bloom Filter** for ultra-fast existence checks and distributed caching.
-- **Full Observability**: Centralized logging via **AOP**, **MDC** Request Tracing (X-Request-ID), and Spring Boot Actuator monitoring.
-- **Enterprise Standards**: Standardized `ApiResponse`, global exception handling, and API versioning (`/api/v1`).
+<div align="center">
+  <img src="https://img.shields.io/badge/Spring%20Boot-3.4+-6DB33F?style=for-the-badge&logo=springboot&logoColor=white" alt="Spring Boot" />
+  <img src="https://img.shields.io/badge/Next.js-15+-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/Redis-Stack-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" />
+  <img src="https://img.shields.io/badge/Apache%20Kafka-Latest-231F20?style=for-the-badge&logo=apachekafka&logoColor=white" alt="Kafka" />
+</div>
 
 ---
 
-## 🛠 Tech Stack
+**OmniBooking** là một hệ sinh thái quản lý đặt phòng (booking) hiệu năng cao, được thiết kế theo tiêu chuẩn doanh nghiệp. Dự án kết hợp sức mạnh của **Spring Boot 3.4** (Backend) và **Next.js 15** (Frontend) trong một cấu trúc **Micro-Monorepo** hiện đại, sẵn sàng cho việc mở rộng quy mô lớn và xử lý đồng thời cực cao.
 
-| Layer        | Technologies                                                                 |
-| :----------- | :--------------------------------------------------------------------------- |
-| **Backend**  | Spring Boot 3.4, Spring Security, Spring Data JPA, Flyway, Hibernate         |
-| **Frontend** | Next.js 15 (App Router), TypeScript, Tailwind CSS 4, Shadcn/ui, Lucide Icons |
-| **Database** | PostgreSQL 16, Redis Stack (RedisBloom, RedisJSON)                           |
-| **DevOps**   | Docker, Docker Compose, GitHub Actions, Husky, Make                          |
+[**Khám phá Kiến trúc System**](./ARCHITECTURE.md) • [**Tài liệu Thiết kế (UI/UX)**](./Client/DESIGN_SYSTEM.md)
 
 ---
 
-## 📦 Getting Started
+## Những Đặc Điểm Nổi Bật (Key Pillars)
 
-### 1. Prerequisites
+### Hiệu Năng Cao (High Performance)
 
-- **Docker & Docker Compose** (Highly Recommended)
-- **Java 21** & **Node.js 23+** (For local development)
+- **Time-Ordered UUID v7**: Tối ưu hóa hiệu suất chỉ mục B-Tree trong database, giúp truy vấn hàng triệu bản ghi mà không giảm tốc độ.
+- **Redis Stack Integration**: Tích hợp **Bloom Filter** để kiểm tra tồn tại (email/username) siêu tốc, giảm 90% tải cho database chính.
+- **CDN Optimization**: Tích hợp Cloudinary giúp nén và biến đổi hình ảnh theo viewport, giảm tới 80% dung lượng tải trang mà vẫn giữ nguyên chất lượng.
+- **Distributed Caching**: Hệ thống cache đa tầng giúp phản hồi API trong thời gian mili giây.
 
-### 2. Fast Infrastructure Setup
+### Bảo Mật Đa Lớp (Advanced Security)
 
-The most professional way to start is using our specialized **Makefile**:
+- **Fingerprinting & JWT**: Cơ chế xác thực Dual-key kết hợp HttpOnly Cookie và Fingerprinting chống lại các cuộc tấn công XSS và Session Hijacking.
+- **RBAC (Role-Based Access Control)**: Phân quyền tinh vi dựa trên quyền hạn (Permissions) thay vì chỉ dừng lại ở vai trò (Roles).
+- **Idempotency Ready**: Đảm bảo an toàn cho các giao dịch đặt phòng và thanh toán, ngăn chặn dữ liệu trùng lặp.
+
+### Trải Nghiệm Người Dùng (Premium UI/UX)
+
+- **Modern Tech Stack**: Xây dựng trên **Tailwind CSS 4** và **Shadcn/UI** với triết lý thiết kế tối giản nhưng sang trọng.
+- **Micro-animations**: Hiệu ứng chuyển động mượt mà với Framer Motion, mang lại cảm giác sống động và phản hồi tức thì.
+- **Cloudinary CDN**: Hình ảnh được tối ưu hóa tự động theo thiết bị người dùng, đảm bảo tốc độ tải trang (LCP) cực nhanh.
+
+### Khả Năng Quan Sát & Vận Hành (Observability)
+
+- **MDC Request Tracing**: Mỗi yêu cầu được gắn một `X-Request-ID` duy nhất xuyên suốt từ Client đến Server, giúp việc debug trở nên dễ dàng.
+- **AOP Logging**: Tự động ghi lại nhật ký hệ thống một cách chuyên nghiệp mà không làm bẩn logic nghiệp vụ.
+- **Health Monitoring**: Theo dõi trạng thái sức khỏe hệ thống thời gian thực qua Spring Boot Actuator.
+
+---
+
+## Công Nghệ Cốt Lõi
+
+| Layer              | Technologies                                                             |
+| :----------------- | :----------------------------------------------------------------------- |
+| **Backend**        | Java 21, Spring Boot 3.4, Spring Security, JPA/Hibernate, Flyway         |
+| **Frontend**       | Next.js 15 (App Router), TypeScript, Tailwind 4, Zustand, TanStack Query |
+| **Data & Media**   | PostgreSQL 16, Redis Stack, Cloudinary CDN, Apache Kafka, Resend SDK     |
+| **Infrastructure** | Docker, Makefile, GitHub Actions CI/CD                                   |
+
+---
+
+## Bắt Đầu Nhanh
+
+Dự án được tối ưu hóa với **Makefile** để bạn có thể khởi chạy toàn bộ hệ thống chỉ với vài câu lệnh.
+
+### 1. Chuẩn bị
+
+- Đảm bảo máy tính đã cài đặt **Docker** và **Docker Compose**.
+- Java 21+ và Node.js 23+ (nếu muốn chạy local không qua Docker).
+
+### 2. Triển khai hạ tầng (Database, Redis, Kafka)
 
 ```bash
-# 1. Setup your environment
-cp .env.example .env
-
-# 2. Launch Infrastructure (DB & Redis)
 make infra
+```
 
-# 3. Run Application locally (with Hot-Reload)
+### 3. Khởi chạy ứng dụng
+
+```bash
+# Chạy cả Client và Server ở chế độ Development
 make dev
 ```
 
-### 3. Service Access Points
+---
 
-- **Frontend**: [http://localhost:3000](http://localhost:3000)
-- **Backend API**: [http://localhost:8080/api/v1](http://localhost:8080/api/v1)
-- **API Documentation**: [http://localhost:8080/api/v1/swagger-ui.html](http://localhost:8080/api/v1/swagger-ui.html)
-- **System Health**: [http://localhost:8080/api/v1/actuator/health](http://localhost:8080/api/v1/actuator/health)
+## Sơ đồ Cấu trúc Dự án
+
+```text
+OmniBooking/
+├── Client/             # Next.js 15 Frontend (App Router)
+├── Server/             # Spring Boot 3.4 Backend
+├── docker-compose.yml  # Cấu hình hạ tầng container
+├── Makefile            # Công cụ quản lý dự án tập trung
+└── ARCHITECTURE.md     # Tài liệu kỹ thuật chi tiết
+```
 
 ---
 
-## 🏗 Architecture Documentation
-
-For a deep dive into our design decisions, implementation patterns, and infrastructure strategy, please refer to our comprehensive:
-
-👉 [**ARCHITECTURE.MD**](./ARCHITECTURE.md)
-
----
-
-## 🛠 Development Workflow
-
-- `make up` - Start everything in Docker.
-- `make restart` - Force rebuild and restart all services.
-- `make logs` - Follow logs from all containers.
-- `make clean` - Clean up build artifacts.
-
----
-
-© 2026 OmniBooking Team. Built with Passion & Precision.
+<div align="center">
+  <sub>Built with Precision by OmniBooking Team © 2026</sub>
+</div>

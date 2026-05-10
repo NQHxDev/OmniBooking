@@ -21,6 +21,12 @@ jobs:
 
       - name: Build Server
         run: cd Server && mvn clean package -DskipTests
+        env:
+          JWT_SECRET: dummy_jwt_secret_for_ci_validation
+          RESEND_API_KEY: re_dummy_key
+          CLOUDINARY_CLOUD_NAME: dummy_cloud
+          CLOUDINARY_API_KEY: dummy_api_key
+          CLOUDINARY_API_SECRET: dummy_api_secret
 
   build-client:
     runs-on: ubuntu-latest
@@ -40,6 +46,6 @@ jobs:
       - name: Build Client
         run: npm run build --prefix Client
         env:
-          # Dummy env for Zod validation during CI build
-          NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+          NEXT_PUBLIC_API_URL: "http://localhost:8080/api/v1/"
           NODE_ENV: production
+          CI: true
