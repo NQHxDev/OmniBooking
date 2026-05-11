@@ -19,32 +19,49 @@ import {
 import Image from "next/image";
 import { useAuthStore } from "@/store/useAuthStore";
 import { authService } from "@/lib/api/services/authService";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useTranslations } from "next-intl";
 
 export default function Navbar() {
+   const t = useTranslations("Common");
+
    const [mounted, setMounted] = useState(false);
    const [isMenuOpen, setIsMenuOpen] = useState(false);
    const menuRef = useRef<HTMLDivElement>(null);
 
    const { user, isLoggedIn, setAuth, logout } = useAuthStore();
+   const prevIsLoggedIn = useRef(isLoggedIn);
 
-   // Đồng bộ session khi F5 hoặc mở tab mới
    useEffect(() => {
       const syncSession = async () => {
+         // Nếu đã đăng nhập, thực hiện refresh ngầm để đồng bộ dữ liệu mới nhất
          if (isLoggedIn) {
             try {
                const freshUser = await authService.refresh();
                if (freshUser) setAuth(freshUser);
             } catch (error: unknown) {
-               // Silence 401/403 sync errors as they are expected when session expires
                const err = error as { status?: number; message?: string };
-               if (err?.status !== 401 && err?.status !== 403) {
-                  console.error("[Navbar] Session sync failed:", err.message || err);
+               if (err?.status === 401 || err?.status === 403) {
+                  // Session hết hạn
+                  logout();
                }
             }
          }
+         // Nếu chưa đăng nhập trong store nhưng đã mount, thử refresh xem có session cookie không
+         else if (mounted) {
+            try {
+               const freshUser = await authService.refresh();
+               if (freshUser) setAuth(freshUser);
+            } catch (e) {
+               // Không có session, bỏ qua
+            }
+         }
       };
-      syncSession();
-   }, [isLoggedIn, setAuth]);
+
+      if (mounted) {
+         syncSession();
+      }
+   }, [isLoggedIn, mounted, setAuth, logout]);
 
    // Tối ưu check partner để hỗ trợ cả data cũ và mới trong store
    const isPartner = user?.roles?.includes("ROLE_PARTNER");
@@ -89,27 +106,28 @@ export default function Navbar() {
                      className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 hover:bg-white/20 transition-all"
                   >
                      <BedDouble className="h-4 w-4" />
-                     Lưu trú
+                     {t("stays") || "Lưu trú"}
                   </a>
                   <a
                      href="#"
                      className="flex items-center gap-2 px-4 py-1.5 hover:bg-white/10 rounded-full transition-all"
                   >
                      <Globe className="h-4 w-4" />
-                     Chuyến bay
+                     {t("flights") || "Chuyến bay"}
                   </a>
                   <a
                      href="#"
                      className="flex items-center gap-2 px-4 py-1.5 hover:bg-white/10 rounded-full transition-all"
                   >
                      <Calendar className="h-4 w-4" />
-                     Thuê xe
+                     {t("carRentals") || "Thuê xe"}
                   </a>
                </nav>
             </div>
 
             <div className="flex items-center gap-2">
                <div className="flex items-center gap-0.5">
+                  <LanguageSwitcher />
                   <button className="rounded-full p-2 hover:bg-white/10 transition-colors relative">
                      <Bell className="h-5 w-5" />
                      <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-[#003580]"></span>
@@ -126,10 +144,12 @@ export default function Navbar() {
                      {isLoggedIn && isPartner ? (
                         <Link href="/partner/dashboard" className="flex items-center gap-2">
                            <ShieldCheck className="h-4 w-4 text-yellow-400" />
-                           Quản lý chỗ nghỉ
+                           {t("manageProperty") || "Quản lý chỗ nghỉ"}
                         </Link>
                      ) : (
-                        <Link href="/become-a-host">Đăng chỗ nghỉ của Quý vị</Link>
+                        <Link href="/become-a-host">
+                           {t("listProperty") || "Đăng chỗ nghỉ của Quý vị"}
+                        </Link>
                      )}
                   </button>
 
@@ -140,7 +160,7 @@ export default function Navbar() {
                            className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 hover:bg-white/10 transition-all active:scale-95"
                         >
                            <div className="relative">
-                              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 border-2 border-white shadow-sm overflow-hidden">
+                              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-linear-to-tr from-blue-600 to-indigo-500 border-2 border-white shadow-sm overflow-hidden">
                                  {user?.avatarUrl ? (
                                     <Image
                                        src={user.avatarUrl}
@@ -230,13 +250,13 @@ export default function Navbar() {
                            href="/auth/register"
                            className="rounded-md bg-white px-4 py-1.5 text-[13px] font-bold text-[#003580] hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
                         >
-                           Đăng ký
+                           {t("register") || "Đăng ký"}
                         </Link>
                         <Link
                            href="/auth/login"
                            className="rounded-md bg-white px-4 py-1.5 text-[13px] font-bold text-[#003580] hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
                         >
-                           Đăng nhập
+                           {t("login") || "Đăng nhập"}
                         </Link>
                      </div>
                   )}

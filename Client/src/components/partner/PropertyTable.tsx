@@ -5,6 +5,7 @@ import { PropertyResponse } from "@/lib/api/propertyService";
 import { MapPin, Hotel, ChevronLeft, ChevronRight, Eye, Edit3, Trash2, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 interface PropertyTableProps {
    properties: PropertyResponse[];
@@ -14,6 +15,7 @@ const ITEMS_PER_PAGE = 4;
 
 export default function PropertyTable({ properties }: PropertyTableProps) {
    const [currentPage, setCurrentPage] = useState(1);
+   const t = useTranslations("Partner.dashboard.properties");
 
    // Pagination logic
    const totalPages = Math.ceil(properties.length / ITEMS_PER_PAGE);
@@ -26,16 +28,13 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-50 text-[#006ce4]">
                <Hotel className="h-10 w-10" />
             </div>
-            <h3 className="mt-6 text-xl font-bold text-zinc-900">Chưa có chỗ nghỉ nào</h3>
-            <p className="mt-2 max-w-xs text-zinc-500 font-medium">
-               Bắt đầu hành trình kinh doanh của bạn bằng cách đăng ký chỗ nghỉ đầu tiên ngay hôm
-               nay.
-            </p>
+            <h3 className="mt-6 text-xl font-bold text-zinc-900">{t("noProperties")}</h3>
+            <p className="mt-2 max-w-xs text-zinc-500 font-medium">{t("noPropertiesDesc")}</p>
             <Link
                href="/partner/properties/new"
                className="mt-8 rounded-2xl bg-[#006ce4] px-8 py-3 text-sm font-bold text-white shadow-lg shadow-blue-100 hover:bg-[#0057b7] transition-all"
             >
-               Đăng ký ngay
+               {t("registerNow")}
             </Link>
          </div>
       );
@@ -63,14 +62,14 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
                         className="object-cover transition-transform duration-700 group-hover:scale-110"
                         unoptimized={!property.imageUrl}
                      />
-                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                     <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
                      {/* Badge Status - Smaller */}
                      <div className="absolute left-4 top-4">
                         <div className="flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1 backdrop-blur-md shadow-sm">
                            <div className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
                            <span className="text-[10px] font-bold text-zinc-900 uppercase tracking-wider">
-                              Active
+                              {t("statusActive")}
                            </span>
                         </div>
                      </div>
@@ -92,7 +91,7 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
                         <div className="flex-1 min-w-0">
                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#006ce4] uppercase tracking-widest mb-1.5">
                               <Hotel className="h-3 w-3" />
-                              {property.propertyType}
+                              {t(`type${property.propertyType}`)}
                            </div>
                            <h3 className="text-lg font-black text-zinc-900 group-hover:text-[#006ce4] transition-colors leading-tight truncate">
                               {property.name}
@@ -116,13 +115,13 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
                      <div className="mt-6 flex items-center justify-between border-t border-zinc-50 pt-5">
                         <div className="flex flex-col">
                            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                              Inventory
+                              {t("inventory")}
                            </span>
-                           <span className="text-sm font-black text-zinc-900">12 Rooms</span>
+                           <span className="text-sm font-black text-zinc-900">12 {t("rooms")}</span>
                         </div>
                         <button className="flex items-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-zinc-800 transition-all shadow-md shadow-zinc-100 active:scale-[0.98]">
                            <Eye className="h-3.5 w-3.5" />
-                           Chi tiết
+                           {t("details")}
                         </button>
                      </div>
                   </div>
@@ -134,13 +133,13 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
          {totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-zinc-100 pt-8">
                <div className="text-sm font-medium text-zinc-500">
-                  Hiển thị{" "}
+                  {t("showing")}{" "}
                   <span className="font-bold text-zinc-900">
                      {startIndex + 1}-
                      {Math.min(startIndex + visibleProperties.length, properties.length)}
                   </span>{" "}
-                  trên tổng số <span className="font-bold text-zinc-900">{properties.length}</span>{" "}
-                  chỗ nghỉ
+                  {t("of")} <span className="font-bold text-zinc-900">{properties.length}</span>{" "}
+                  {t("title").toLowerCase()}
                </div>
                <div className="flex items-center gap-2">
                   <button

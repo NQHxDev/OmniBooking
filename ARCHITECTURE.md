@@ -18,10 +18,14 @@ Everything is orchestrated via `docker-compose.yml` with secrets managed through
 
 ### Redis Stack & Bloom Filter
 
-Implemented `redis/redis-stack-server` to support high-performance operations:
+Implemented `redis/redis-stack-server` to support high-performance operations and security layers:
 
-- **Session/Token Management**: Offloaded to Redis for scalability.
-- **Bloom Filter**: Used for ultra-fast existence checks (e.g., username/email availability) to prevent unnecessary DB hits.
+- **Session/Token Management**: Offloaded to Redis for scalability and distributed session handling.
+- **Bloom Filter (Security & Performance)**:
+   - **Initialization**: Configured with a 1% false-positive rate and 10,000 initial capacity using `BF.RESERVE`.
+   - **Startup Warmup**: A dedicated `CommandLineRunner` populates the filter with all existing user emails from PostgreSQL on application startup.
+   - **Enumeration Protection**: Rejects login attempts for non-existent emails instantly at the Redis layer, protecting against brute-force/enumeration.
+   - **Database Shield**: In registration flow, it acts as a fast pre-check, reducing 99% of unnecessary "Exists" queries to the database.
 
 ## 3. Database Design Patterns
 
@@ -31,31 +35,31 @@ Implemented `redis/redis-stack-server` to support high-performance operations:
 - **Soft Delete**: All major tables include `deleted_at` for data recovery and auditing.
 - **Optimistic Locking**: Implementation of `version` columns to prevent data overwriting in concurrent environments.
 
+- **JPA Specification & Search Criteria**: Implementation of `GenericSpecification` for dynamic, multi-criteria filtering (e.g., `?price_gt=100&city=Hanoi`) without writing redundant repository methods.
+- **UUID v7 Primary Keys**: Time-ordered UUIDs for optimal B-Tree index performance.
+
 ### Business Modules
 
-- **Account/Profile Separation**: Decoupling authentication data (`users`) from metadata (`user_profiles`) for security and flexibility.
-- **RBAC (Role-Based Access Control)**: Comprehensive system with `roles`, `permissions`, and junction tables.
-- **Loyalty Rank System**: Multi-tier ranking (`ranks`) based on points to drive customer engagement.
-
-## 4. Backend Core Patterns
+...
 
 ### API Standardization
 
-- **API Versioning**: Global prefix `/api/v1/` implemented for future-proof service evolution.
-- **Standardized Response**: All APIs return a consistent `ApiResponse<T>` structure.
-- **Global Error Handling**: Centralized `GlobalExceptionHandler` ensures professional error messages without leaking system internals.
-- **Pagination**: Standardized `PageResponse` supporting "Lazy Loading" style data delivery.
+...
 
 ### Performance & Scalability
 
 - **Distributed Caching**: Integrated Spring Cache with Redis to reduce DB load and improve response times.
+- **MapStruct for DTO Mapping**: Automated DTO-Entity conversion using MapStruct to reduce boilerplate, improve type safety, and maintain a clean Service layer.
+- **Idempotency Framework (X-Idempotency-Key)**: Custom `@Idempotent` annotation and AOP-based interceptor using Redis to prevent duplicate request processing (Double-submit) for critical operations.
+- **Resilience Layer (Fault Tolerance)**: Integration of **Resilience4j** implementing Circuit Breaker and Retry patterns for third-party service calls (Cloudinary, Resend) to prevent cascading failures.
 - **Stateless Architecture**: Secured for future JWT integration with stateless session management.
 
 ### Observability & Traceability
 
 - **Request Tracing**: `RequestIdFilter` generates a unique `X-Request-ID` for every request.
-- **Professional Logging**:
+- **Professional & Structured Logging**:
    - **AOP Logging**: Automatic logging of method entry/exit for all controllers.
+   - **JSON Logging (Production)**: Uses `Logstash Logback Encoder` to output logs in structured JSON format for easy ingestion into ELK/CloudWatch (enabled via `prod` profile).
    - **MDC Integration**: Trace ID is automatically injected into every log line.
    - **Log Rotation**: Automated daily log compression and 30-day retention.
 
@@ -174,6 +178,61 @@ To prevent bottlenecks during heavy media operations:
 - **Async Workflow**: For non-critical updates (e.g., bulk property image sync), the backend publishes a `MediaProcessedEvent` to Kafka.
 - **Decoupled Processing**: Worker services consume these events to perform secondary tasks like generating search indices or updating social metadata without blocking the user request.
 
+## 13. Security & Password Recovery Flow
+
+The system implements a multi-layered security approach for sensitive operations like password resets:
+
+### Password Recovery Lifecycle
+
+1. **Request Phase**:
+   - **Enumeration Protection**: The system always returns a success message regardless of whether the email exists in the database.
+   - **Rate Limiting**: Implemented a sliding window limit (3 requests per 1 minute) via Redis `INCR` to prevent mail server abuse.
+2. **Verification Phase**:
+   - **Short-lived Tokens**: Reset tokens are stored in Redis with a strict 15-minute expiration.
+   - **One-time Use**: Tokens are immediately invalidated after a successful reset.
+3. **Session Invalidation**:
+   - **Global Logout**: Users have the option to "Sign out from all other devices" during reset. This triggers `SessionService.revokeAllUserSessions()`, which clears all related session keys in Redis.
+
+### Security Best Practices
+
+- **Vietnamese Typography**: Shared `AuthBranding` component uses optimized `leading-tight` and `font-weight` to prevent character clipping for accented Vietnamese text.
+- **Error Obfuscation**: Client-side mappings convert technical `errorCodes` into user-friendly localized messages without leaking backend implementation details.
+
+## 14. OAuth2 & Social Authentication Architecture
+
+Hệ thống triển khai một kiến trúc linh hoạt cho phép tích hợp không giới hạn các nhà cung cấp định danh (Social Providers):
+
+### OAuth2 Strategy & Factory Pattern
+
+- **OAuth2ProviderService (Strategy)**: Interface định nghĩa các phương thức chung cho mọi nhà cung cấp (generate URL, exchange code).
+- **OAuth2ServiceFactory (Factory)**: Tự động phát hiện và cung cấp Service tương ứng dựa trên provider name (`google`, `apple`...).
+- **Unified Controller**: Mọi provider đều dùng chung các endpoint động `/auth/{provider}/url` và `/auth/{provider}/callback`.
+
+### Smart Data Synchronization
+
+- **Smart Name Splitting**: Triển khai thuật toán tách tên dựa trên logic văn hóa (Last word = Tên, Rest = Họ và Đệm) để đảm bảo dữ liệu trong `UserProfile` luôn chuẩn xác và không bị trùng lặp khi lấy từ các API xã hội.
+- **Avatar Protection Policy**: Hệ thống chỉ tự động cập nhật ảnh đại diện từ mạng xã hội nếu người dùng chưa có ảnh hoặc đang sử dụng ảnh cũ của mạng xã hội đó. Nếu người dùng đã tự upload ảnh cá nhân, hệ thống sẽ tôn trọng và bảo vệ lựa chọn đó.
+
+## 15. Smart Search & Real-time Indexing Architecture
+
+Kiến trúc tìm kiếm của OmniBooking được thiết kế để xử lý hàng triệu bản ghi với tốc độ mili giây, kết hợp sức mạnh của Elasticsearch và luồng dữ liệu thời gian thực của Kafka:
+
+### Elasticsearch Search Engine
+
+- **Full-text Search**: Sử dụng Elasticsearch 8.x để tìm kiếm không dấu/có dấu, tìm kiếm gần đúng (Fuzzy Search) cho các địa danh.
+- **Criteria-based Filtering**: Triển khai `CriteriaQuery` để xử lý các bộ lọc phức tạp (Giá, Loại hình chỗ nghỉ, Tiện ích, Điểm đánh giá) một cách linh hoạt mà không làm giảm hiệu năng.
+- **Geo-spatial Search**: Lưu trữ tọa độ (`GeoPoint`) để hỗ trợ tìm kiếm theo bán kính và hiển thị bản đồ.
+
+### Real-time Data Synchronization (Kafka Pipeline)
+
+- **CDC-like Pattern**: Mọi thay đổi về thông tin khách sạn hoặc giá phòng ở PostgreSQL đều kích hoạt một sự kiện (Event) đẩy vào Kafka.
+- **Search Indexer**: Một Service chuyên biệt lắng nghe Kafka và cập nhật ngay lập tức vào Elasticsearch Index, đảm bảo dữ liệu tìm kiếm luôn đồng bộ với Database chính.
+
+### Interactive Map Engine (Leaflet)
+
+- **Client-side Rendering**: Sử dụng Leaflet với cơ chế **Dynamic Import** để tối ưu hóa SEO và tốc độ tải trang (LCP).
+- **Price-tag Markers**: Custom Markers hiển thị trực tiếp giá tiền trên bản đồ, giúp người dùng có trải nghiệm tương tác trực quan như các nền tảng OTA hàng đầu thế giới.
+
 ---
 
-_Last Updated: 2026-05-09_
+_Last Updated: 2026-05-11_

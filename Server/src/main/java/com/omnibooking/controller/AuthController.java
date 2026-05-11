@@ -6,11 +6,17 @@ import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.security.Anonymous;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.dto.RegisterRequest;
+import com.omnibooking.dto.ForgotPasswordRequest;
+import com.omnibooking.dto.ResetPasswordRequest;
+import com.omnibooking.dto.oauth.OAuth2UserInfo;
 import com.omnibooking.services.AuthService;
+import com.omnibooking.services.OAuth2ServiceFactory;
+import com.omnibooking.config.AppProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.UUID;
 
@@ -29,9 +35,12 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
    private final AuthService authService;
+   private final OAuth2ServiceFactory oAuth2ServiceFactory;
+   private final AppProperties appProperties;
 
    @Anonymous
    @PostMapping("/register")
@@ -109,6 +118,63 @@ public class AuthController {
       String requestId = (String) httpRequest.getAttribute("requestId");
       authService.verifyEmail(token);
       return ResponseEntity.ok(ApiResponse.success(null, "Email verified successfully", requestId));
+   }
+
+   @Anonymous
+   @PostMapping("/forgot-password")
+   public ResponseEntity<ApiResponse<Void>> forgotPassword(
+         @Valid @RequestBody ForgotPasswordRequest request,
+         HttpServletRequest httpRequest) {
+
+      String requestId = (String) httpRequest.getAttribute("requestId");
+      authService.forgotPassword(request.getEmail());
+      return ResponseEntity.ok(ApiResponse.success(null, "If an account exists, a reset link has been sent", requestId));
+   }
+
+   @Anonymous
+   @PostMapping("/reset-password")
+   public ResponseEntity<ApiResponse<Void>> resetPassword(
+         @Valid @RequestBody ResetPasswordRequest request,
+         HttpServletRequest httpRequest) {
+
+      String requestId = (String) httpRequest.getAttribute("requestId");
+      authService.resetPassword(request.getToken(), request.getNewPassword(), request.isLogoutAll());
+      return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully", requestId));
+   }
+
+   @Anonymous
+   @org.springframework.web.bind.annotation.GetMapping("/{provider}/url")
+   public ResponseEntity<ApiResponse<String>> getOAuthUrl(
+         @org.springframework.web.bind.annotation.PathVariable String provider,
+         HttpServletRequest httpRequest) {
+      String requestId = (String) httpRequest.getAttribute("requestId");
+      String url = oAuth2ServiceFactory.getService(provider).generateAuthUrl();
+      return ResponseEntity.ok(ApiResponse.success(url, provider + " auth URL generated", requestId));
+   }
+
+   @Anonymous
+   @org.springframework.web.bind.annotation.GetMapping("/{provider}/callback")
+   public void oauthCallback(
+         @org.springframework.web.bind.annotation.PathVariable String provider,
+         @org.springframework.web.bind.annotation.RequestParam String code,
+         @org.springframework.web.bind.annotation.RequestParam String state,
+         HttpServletRequest httpRequest,
+         HttpServletResponse httpResponse) throws java.io.IOException {
+
+      try {
+         OAuth2UserInfo userInfo = oAuth2ServiceFactory.getService(provider).exchangeCodeForUserInfo(code, state);
+         String ip = getClientIp(httpRequest);
+         String userAgent = httpRequest.getHeader("User-Agent");
+
+         authService.loginWithOAuth2(provider, userInfo, ip, userAgent, httpResponse);
+
+         // Redirect to frontend
+         httpResponse.sendRedirect(appProperties.getOauth2().getGoogle().getFrontendCallbackUrl());
+      } catch (Exception e) {
+         log.error(provider + " login failed", e);
+         // Redirect to frontend with error
+         httpResponse.sendRedirect(appProperties.getOauth2().getGoogle().getFrontendCallbackUrl() + "?error=auth_failed");
+      }
    }
 
    private String getClientIp(HttpServletRequest request) {

@@ -80,6 +80,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                   .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                   .requestMatchers("/auth/**").permitAll()
+                  .requestMatchers("/search/**").permitAll() // Allow public search
                   .requestMatchers("/partner/**").authenticated() // Explicitly require auth for partner
                   .requestMatchers("/health/**").permitAll()
                   .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()

@@ -4,7 +4,7 @@ ifneq ($(iffile),)
   export $(shell sed 's/=.*//' .env)
 endif
 
-.PHONY: install dev dev-server dev-client build clean up down docker-stop logs restart infra help
+.PHONY: dev dev-server dev-client docker-infra docker-up docker-down docker-stop logs install restart build clean help
 
 .DEFAULT_GOAL := help
 
@@ -23,18 +23,18 @@ dev-client:
 	@echo "Starting Next.js Client..."
 	@npm run dev --prefix Client
 
-# Infrastructure Commands
-infra:
+# Docker Infrastructure Commands
+docker-infra:
 	@echo "Starting infrastructure..."
-	@docker-compose up -d db redis kafka kafdrop
-	@echo "Infrastructure is Ready..."
+	@docker-compose up -d db redis kafka kafdrop elasticsearch kibana
+	@echo "Infrastructure (DB, Redis, Kafka, ES) is Ready..."
 
 # Docker Full Stack Commands
-up:
+docker-up:
 	@echo "Starting all services in Docker (detached)..."
 	@docker-compose up -d
 
-down:
+docker-down:
 	@echo "Stopping all Docker services..."
 	@docker-compose down -v
 
@@ -45,10 +45,6 @@ docker-stop:
 logs:
 	@docker-compose logs -f
 
-restart:
-	@echo "Rebuilding and restarting all Docker services..."
-	@docker-compose up -d --build
-
 # Install dependencies for both projects
 install:
 	@echo "Installing Root dependencies..."
@@ -57,6 +53,10 @@ install:
 	@cd Server && ./mvnw dependency:resolve
 	@echo "Installing Client dependencies..."
 	@npm install --prefix Client
+
+restart:
+	@echo "Rebuilding and restarting all Docker services..."
+	@docker-compose up -d --build
 
 # Build projects for production
 build:
@@ -76,15 +76,16 @@ clean:
 help:
 	@echo "OmniBooking Monorepo Management:"
 	@echo "  Development Flow:"
-	@echo "    make infra     - Start DB and Redis in Docker"
-	@echo "    make dev       - Run Server and Client locally (Fast hot-reload)"
+	@echo "    make docker-infra  - Start DB and Redis in Docker"
+	@echo "    make dev           - Run Server and Client locally (Fast hot-reload)"
 	@echo ""
 	@echo "  Docker Full Stack:"
-	@echo "    make up           - Start everything in Docker"
-	@echo "    make down         - Stop everything"
-	@echo "    make restart      - Rebuild and restart Docker containers"
+	@echo "    make docker-up     - Start everything in Docker"
+	@echo "    make docker-down   - Stop everything"
+	@echo "    make docker-stop   - Stop Docker containers"
+	@echo "    make restart       - Rebuild and restart Docker containers"
 	@echo ""
 	@echo "  Maintenance:"
-	@echo "    make install      - Install all dependencies"
-	@echo "    make clean        - Remove build artifacts"
-	@echo "    make logs         - Tail Docker logs"
+	@echo "    make install       - Install all dependencies"
+	@echo "    make clean         - Remove build artifacts"
+	@echo "    make logs          - Tail Docker logs"

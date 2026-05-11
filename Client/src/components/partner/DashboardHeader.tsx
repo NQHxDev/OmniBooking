@@ -2,15 +2,23 @@
 
 import { Bell, Search, CheckCircle, Star } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useTranslations } from "next-intl";
 
 export default function DashboardHeader() {
    const { user } = useAuthStore();
+   const t = useTranslations("Partner.header");
 
    const getInitials = () => {
       const name = user?.fullName || user?.username || user?.email || "?";
       const parts = name.trim().split(/\s+/);
       const lastPart = parts[parts.length - 1];
       return lastPart.charAt(0).toUpperCase();
+   };
+
+   const getRankLabel = (rank?: string) => {
+      if (rank?.includes("Silver")) return t("silverPartner");
+      if (rank?.includes("Gold")) return t("goldPartner");
+      return t("bronzePartner");
    };
 
    return (
@@ -20,7 +28,7 @@ export default function DashboardHeader() {
                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
                <input
                   type="text"
-                  placeholder="Tìm kiếm chỗ nghỉ, hóa đơn..."
+                  placeholder={t("searchPlaceholder")}
                   className="w-full rounded-xl border border-zinc-100 bg-zinc-50/50 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50 transition-all"
                />
             </div>
@@ -44,7 +52,7 @@ export default function DashboardHeader() {
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 justify-end">
                      <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
-                        {user?.rankName || "Bronze Partner"}
+                        {getRankLabel(user?.rankName)}
                      </span>
                      <div className="flex items-center gap-0.5 text-zinc-500">
                         <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
@@ -54,7 +62,7 @@ export default function DashboardHeader() {
                      </div>
                   </div>
                </div>
-               <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-[#003580] to-blue-500 border-2 border-white shadow-sm flex items-center justify-center">
+               <div className="h-10 w-10 rounded-full bg-linear-to-tr from-[#003580] to-blue-500 border-2 border-white shadow-sm flex items-center justify-center">
                   <span className="text-white font-black text-sm">{getInitials()}</span>
                </div>
             </div>

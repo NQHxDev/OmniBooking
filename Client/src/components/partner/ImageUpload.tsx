@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 interface ImageUploadProps {
    onUploadSuccess: (file: File) => void;
@@ -18,6 +19,7 @@ export default function ImageUpload({
    onReorder,
    images,
 }: ImageUploadProps) {
+   const t = useTranslations("Partner.imageUpload");
    const [isDragging, setIsDragging] = useState(false);
    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -28,7 +30,7 @@ export default function ImageUpload({
             if (file.type.startsWith("image/")) {
                onUploadSuccess(file);
             } else {
-               toast.error(`File ${file.name} không phải là ảnh hợp lệ`);
+               toast.error(t("invalidFile", { name: file.name }));
             }
          });
       }
@@ -108,8 +110,8 @@ export default function ImageUpload({
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm border border-zinc-100 mb-4">
                <Upload className="h-6 w-6 text-zinc-600" />
             </div>
-            <p className="text-sm font-semibold text-zinc-900">Nhấn để tải lên hoặc kéo thả</p>
-            <p className="text-xs text-zinc-500 mt-1">PNG, JPG hoặc WEBP (Tối đa 10MB/file)</p>
+            <p className="text-sm font-semibold text-zinc-900">{t("clickToUpload")}</p>
+            <p className="text-xs text-zinc-500 mt-1">{t("acceptedFormats")}</p>
          </div>
 
          {images.length > 0 && (
@@ -149,7 +151,7 @@ export default function ImageUpload({
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] text-white">
                            <Loader2 className="h-6 w-6 animate-spin mb-2" />
                            <span className="text-[10px] font-bold tracking-wider uppercase">
-                              Đang tải...
+                              {t("uploading")}
                            </span>
                         </div>
                      )}
@@ -157,7 +159,7 @@ export default function ImageUpload({
                      {index === 0 ? (
                         <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-[#003580] text-[10px] font-bold text-white shadow-sm flex items-center gap-1">
                            <ImageIcon className="h-3 w-3" />
-                           Ảnh chính
+                           {t("mainImage")}
                         </div>
                      ) : (
                         <div className="absolute top-2 left-2 h-6 w-6 flex items-center justify-center rounded-md bg-black/40 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">

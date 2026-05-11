@@ -2,13 +2,18 @@
 
 import NextLink from "next/link";
 import Image from "next/image";
-import Navbar from "@/components/Navbar";
 import { ArrowLeft, Home } from "lucide-react";
 
 export default function NotFound() {
    return (
       <div className="flex min-h-screen flex-col bg-white font-sans">
-         <Navbar />
+         <header className="bg-[#003580] text-white py-4 px-6 sticky top-0 z-50 shadow-md">
+            <div className="mx-auto max-w-7xl">
+               <NextLink href="/" className="text-2xl font-bold tracking-tight">
+                  OmniBooking.com
+               </NextLink>
+            </div>
+         </header>
 
          <main className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
             <div className="relative mb-8 h-64 w-64 sm:h-80 sm:w-80 animate-in fade-in zoom-in duration-700">
@@ -24,7 +29,7 @@ export default function NotFound() {
             <div className="max-w-md animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-200">
                <h1 className="text-4xl font-black tracking-tighter text-[#1a1a1a] sm:text-6xl mb-6 leading-[1.1]">
                   Ui chao! <br />
-                  <span className="bg-gradient-to-r from-[#006ce4] to-[#003580] bg-clip-text text-transparent">
+                  <span className="bg-linear-to-r from-[#006ce4] to-[#003580] bg-clip-text text-transparent">
                      Bạn bị lạc rồi...
                   </span>
                </h1>

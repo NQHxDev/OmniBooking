@@ -6,6 +6,8 @@
   <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL" />
   <img src="https://img.shields.io/badge/Redis-Stack-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" />
   <img src="https://img.shields.io/badge/Apache%20Kafka-Latest-231F20?style=for-the-badge&logo=apachekafka&logoColor=white" alt="Kafka" />
+  <img src="https://img.shields.io/badge/Elasticsearch-8.x-005571?style=for-the-badge&logo=elasticsearch&logoColor=white" alt="Elasticsearch" />
+  <img src="https://img.shields.io/badge/Leaflet-1.9+-199900?style=for-the-badge&logo=leaflet&logoColor=white" alt="Leaflet" />
 </div>
 
 ---
@@ -21,9 +23,11 @@
 ### Hiệu Năng Cao (High Performance)
 
 - **Time-Ordered UUID v7**: Tối ưu hóa hiệu suất chỉ mục B-Tree trong database, giúp truy vấn hàng triệu bản ghi mà không giảm tốc độ.
-- **Redis Stack Integration**: Tích hợp **Bloom Filter** để kiểm tra tồn tại (email/username) siêu tốc, giảm 90% tải cho database chính.
+- **Redis Stack & Bloom Filter**: Tích hợp **RedisBloom** để kiểm tra tồn tại (email/username) với độ trễ micro-giây. Chống tấn công Enumeration và giảm 99% tải cho Database chính trong các luồng Auth.
 - **CDN Optimization**: Tích hợp Cloudinary giúp nén và biến đổi hình ảnh theo viewport, giảm tới 80% dung lượng tải trang mà vẫn giữ nguyên chất lượng.
 - **Distributed Caching**: Hệ thống cache đa tầng giúp phản hồi API trong thời gian mili giây.
+- **Elasticsearch Engine**: Công cụ tìm kiếm văn bản đầy đủ (Full-text search) và lọc đa tiêu chí cực nhanh, hỗ trợ tìm kiếm Geo-spatial theo vị trí thực tế.
+- **Real-time Sync (Kafka)**: Đồng bộ hóa dữ liệu tức thì từ Database chính sang Search Index thông qua luồng sự kiện (Event-driven), đảm bảo tính nhất quán của giá phòng và tình trạng trống.
 
 ### Bảo Mật Đa Lớp (Advanced Security)
 
@@ -36,6 +40,7 @@
 - **Modern Tech Stack**: Xây dựng trên **Tailwind CSS 4** và **Shadcn/UI** với triết lý thiết kế tối giản nhưng sang trọng.
 - **Micro-animations**: Hiệu ứng chuyển động mượt mà với Framer Motion, mang lại cảm giác sống động và phản hồi tức thì.
 - **Cloudinary CDN**: Hình ảnh được tối ưu hóa tự động theo thiết bị người dùng, đảm bảo tốc độ tải trang (LCP) cực nhanh.
+- **Interactive Map Search**: Trải nghiệm tìm kiếm trên bản đồ trực quan với các Price-markers hiển thị giá trực tiếp, cho phép người dùng so sánh vị trí và giá cả một cách dễ dàng.
 
 ### Khả Năng Quan Sát & Vận Hành (Observability)
 
@@ -47,12 +52,12 @@
 
 ## Công Nghệ Cốt Lõi
 
-| Layer              | Technologies                                                             |
-| :----------------- | :----------------------------------------------------------------------- |
-| **Backend**        | Java 21, Spring Boot 3.4, Spring Security, JPA/Hibernate, Flyway         |
-| **Frontend**       | Next.js 15 (App Router), TypeScript, Tailwind 4, Zustand, TanStack Query |
-| **Data & Media**   | PostgreSQL 16, Redis Stack, Cloudinary CDN, Apache Kafka, Resend SDK     |
-| **Infrastructure** | Docker, Makefile, GitHub Actions CI/CD                                   |
+| Layer              | Technologies                                                                        |
+| :----------------- | :---------------------------------------------------------------------------------- |
+| **Backend**        | Java 21, Spring Boot 3.4, Spring Security, JPA/Hibernate, Flyway                    |
+| **Frontend**       | Next.js 15 (App Router), TypeScript, Tailwind 4, Zustand, TanStack Query            |
+| **Data & Media**   | PostgreSQL 16, Redis Stack, Cloudinary CDN, Apache Kafka, Elasticsearch, Resend SDK |
+| **Infrastructure** | Docker, Makefile, GitHub Actions CI/CD                                              |
 
 ---
 
@@ -63,15 +68,22 @@ Dự án được tối ưu hóa với **Makefile** để bạn có thể khởi
 ### 1. Chuẩn bị
 
 - Đảm bảo máy tính đã cài đặt **Docker** và **Docker Compose**.
-- Java 21+ và Node.js 23+ (nếu muốn chạy local không qua Docker).
+- Java 21+ và Node.js 23+ **(Tùy chọn: Chạy local không qua Docker)**
+- Thiết lập file `.env` từ file `.env.example` của cả `Server` và `Client`.
 
-### 2. Triển khai hạ tầng (Database, Redis, Kafka)
+### 2. Cài đặt dependencies
 
 ```bash
-make infra
+make install
 ```
 
-### 3. Khởi chạy ứng dụng
+### 3. Triển khai hạ tầng (Database, Redis, Kafka)
+
+```bash
+make docker-infra
+```
+
+### 4. Khởi chạy ứng dụng
 
 ```bash
 # Chạy cả Client và Server ở chế độ Development

@@ -14,6 +14,9 @@ public enum ErrorCode {
    TOKEN_EXPIRED("AUTH_006", "Access token has expired", HttpStatus.UNAUTHORIZED),
    INVALID_TOKEN("AUTH_007", "Invalid or expired verification token", HttpStatus.BAD_REQUEST),
    USER_NOT_FOUND("AUTH_008", "User not found", HttpStatus.NOT_FOUND),
+   INVALID_RESET_TOKEN("AUTH_010", "Invalid or expired reset token", HttpStatus.BAD_REQUEST),
+   RATE_LIMIT_EXCEEDED("AUTH_011", "Rate limit exceeded, please try again later", HttpStatus.TOO_MANY_REQUESTS),
+   OAUTH2_AUTHENTICATION_FAILED("AUTH_012", "OAuth2 authentication failed", HttpStatus.BAD_REQUEST),
 
    // General Errors
    UNCATEGORIZED_EXCEPTION("GEN_999", "Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR),
@@ -21,7 +24,11 @@ public enum ErrorCode {
    UNAUTHORIZED("GEN_002", "You do not have permission", HttpStatus.FORBIDDEN),
    NOT_FOUND("GEN_003", "Resource not found", HttpStatus.NOT_FOUND),
    INTERNAL_SERVER_ERROR("GEN_500", "Internal server error", HttpStatus.INTERNAL_SERVER_ERROR),
-   CSRF_TOKEN_INVALID("SEC_001", "CSRF token mismatch or missing", HttpStatus.FORBIDDEN);
+   CSRF_TOKEN_INVALID("SEC_001", "CSRF token mismatch or missing", HttpStatus.FORBIDDEN),
+
+   // Idempotency Errors
+   IDEMPOTENCY_KEY_REQUIRED("IDEM_001", "X-Idempotency-Key header is required", HttpStatus.BAD_REQUEST),
+   IDEMPOTENCY_KEY_PROCESSING("IDEM_002", "Request is already being processed", HttpStatus.CONFLICT);
 
    private final String code;
    private final String message;

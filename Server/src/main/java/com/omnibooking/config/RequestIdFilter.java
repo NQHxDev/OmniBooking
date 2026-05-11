@@ -10,7 +10,7 @@ import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.UUID;
+import com.github.f4b6a3.uuid.UuidCreator;
 import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -33,7 +33,7 @@ public class RequestIdFilter implements Filter {
       // Get from header or generate new one
       String requestId = httpRequest.getHeader(REQUEST_ID_HEADER);
       if (requestId == null || requestId.isEmpty()) {
-         requestId = UUID.randomUUID().toString();
+         requestId = UuidCreator.getTimeOrderedEpoch().toString();
       }
 
       // Add to MDC for logging

@@ -18,6 +18,8 @@ export interface RegisterRequest {
    fullName: string;
 }
 
+let refreshPromise: Promise<User> | null = null;
+
 export const authService = {
    /**
     * Authenticates a user with email and password.
@@ -25,6 +27,8 @@ export const authService = {
    login: async (payload: LoginRequest): Promise<User> => {
       const response = (await apiClient.post("/auth/login", payload, {
          withCredentials: true,
+         // @ts-expect-error - Custom axios config flag for interceptor
+         _skipToast: true,
       })) as unknown as ApiResponse<User>;
       return response.data;
    },
@@ -35,6 +39,8 @@ export const authService = {
    register: async (payload: RegisterRequest): Promise<User> => {
       const response = (await apiClient.post("/auth/register", payload, {
          withCredentials: true,
+         // @ts-expect-error - Custom axios config flag for interceptor
+         _skipToast: true,
       })) as unknown as ApiResponse<User>;
       return response.data;
    },
@@ -48,16 +54,30 @@ export const authService = {
 
    /**
     * Refreshes the current session and returns latest user data.
+    * Uses a promise cache to prevent parallel refresh requests.
     */
    refresh: async (): Promise<User> => {
-      const response = (await apiClient.post(
-         "/auth/refresh",
-         {},
-         {
-            withCredentials: true,
+      if (refreshPromise) return refreshPromise;
+
+      refreshPromise = (async () => {
+         try {
+            const response = (await apiClient.post(
+               "/auth/refresh",
+               {},
+               {
+                  withCredentials: true,
+                  // @ts-expect-error - Custom axios config flag for interceptor
+                  _skipToast: true,
+                  _skipRedirect: true,
+               }
+            )) as unknown as ApiResponse<User>;
+            return response.data;
+         } finally {
+            refreshPromise = null;
          }
-      )) as unknown as ApiResponse<User>;
-      return response.data;
+      })();
+
+      return refreshPromise;
    },
 
    /**
@@ -65,5 +85,29 @@ export const authService = {
     */
    logout: async () => {
       return apiClient.post<ApiResponse<void>>("/auth/logout", {}, { withCredentials: true });
+   },
+
+   /**
+    * Requests a password reset email.
+    */
+   forgotPassword: async (email: string) => {
+      return apiClient.post<ApiResponse<void>>("/auth/forgot-password", { email });
+   },
+
+   /**
+    * Resets the password using a token.
+    */
+   resetPassword: async (payload: { token: string; newPassword: string; logoutAll?: boolean }) => {
+      return apiClient.post<ApiResponse<void>>("/auth/reset-password", payload);
+   },
+
+   /**
+    * Gets the OAuth2 Auth URL for a specific provider.
+    */
+   getOAuth2Url: async (provider: string): Promise<ApiResponse<string>> => {
+      const response = (await apiClient.get(`/auth/${provider}/url`, {
+         withCredentials: true,
+      })) as unknown as ApiResponse<string>;
+      return response;
    },
 };

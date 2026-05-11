@@ -56,4 +56,26 @@ public class MailService {
 
       emailProducer.sendEmailEvent(emailEvent);
    }
+
+   public void sendForgotPasswordEmail(String toEmail, String userName, String token) {
+      // Construct the reset link (pointing to Frontend)
+      String resetLink = appProperties.getClientUrl() + "/auth/reset-password?token=" + token;
+
+      // Prepare template variables
+      Map<String, Object> variables = new HashMap<>();
+      variables.put("userName", userName);
+      variables.put("resetLink", resetLink);
+
+      // Render HTML content
+      String htmlContent = mailTemplateService.buildHtmlContent("reset-password", variables);
+
+      // Send to Kafka
+      EmailEvent emailEvent = EmailEvent.builder()
+            .to(toEmail)
+            .subject("Đặt lại mật khẩu OmniBooking")
+            .content(htmlContent)
+            .build();
+
+      emailProducer.sendEmailEvent(emailEvent);
+   }
 }

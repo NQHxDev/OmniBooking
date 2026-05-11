@@ -1,4 +1,5 @@
-import apiClient, { getBaseURL } from "./apiClient";
+import apiClient from "./apiClient";
+import { getBaseURL } from "./config";
 import { ApiResponse } from "./services/authService";
 
 export interface PropertyRequest {
@@ -64,7 +65,7 @@ export const propertyService = {
 
          const json: ApiResponse<PropertyResponse[]> = await res.json();
          return json.data || [];
-      } catch (_error) {
+      } catch {
          return null;
       }
    },

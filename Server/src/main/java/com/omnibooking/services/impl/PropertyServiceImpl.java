@@ -23,6 +23,7 @@ public class PropertyServiceImpl implements PropertyService {
    private final PropertyRepository propertyRepository;
    private final com.omnibooking.repository.UserRepository userRepository;
    private final MediaRepository mediaRepository;
+   private final com.omnibooking.services.PropertySyncProducer propertySyncProducer;
 
    @Override
    @Transactional
@@ -49,6 +50,12 @@ public class PropertyServiceImpl implements PropertyService {
             .build();
 
       Property saved = propertyRepository.save(Objects.requireNonNull(property));
+
+      // Sync to Elasticsearch via Kafka
+      propertySyncProducer.sendSyncEvent(com.omnibooking.dto.event.PropertySyncEvent.builder()
+            .propertyId(saved.getId())
+            .operation("CREATE")
+            .build());
 
       return PropertyResponse.builder()
             .id(saved.getId())
