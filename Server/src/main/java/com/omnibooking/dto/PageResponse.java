@@ -13,10 +13,15 @@ import lombok.NoArgsConstructor;
 public class PageResponse<T> {
 
    private List<T> items;
+
    private int currentPage;
+
    private int totalPages;
+
    private long totalElements;
+
    private boolean hasNext;
+
    private boolean hasPrevious;
 
    public static <T> PageResponse<T> of(List<T> items, int currentPage, int totalPages, long totalElements) {
@@ -29,4 +34,5 @@ public class PageResponse<T> {
             .hasPrevious(currentPage > 0)
             .build();
    }
+
 }

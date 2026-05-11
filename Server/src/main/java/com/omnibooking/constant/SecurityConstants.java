@@ -60,4 +60,5 @@ public final class SecurityConstants {
       public static final String VEHICLE_WRITE = "vehicle:write";
       public static final String VEHICLE_DELETE = "vehicle:delete";
    }
+
 }

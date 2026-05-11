@@ -5,8 +5,11 @@ import PaymentFeatures from "@/components/become-a-host/PaymentFeatures";
 import WhyJoinUs from "@/components/become-a-host/WhyJoinUs";
 import StepByStep from "@/components/become-a-host/StepByStep";
 import HostFooter from "@/components/become-a-host/HostFooter";
+import { useTranslations } from "next-intl";
 
 export default function BecomeAHostPage() {
+   const t = useTranslations("BecomeAHost");
+
    return (
       <div className="min-h-screen bg-white font-sans selection:bg-blue-100 selection:text-blue-900">
          <PartnerNavbar />
@@ -18,12 +21,12 @@ export default function BecomeAHostPage() {
                   {/* Left Column: Headline */}
                   <div className="lg:col-span-7">
                      <h1 className="text-3xl font-black leading-[1.4] tracking-tighter sm:text-4xl">
-                        Đăng ký <span className="text-blue-400">chỗ nghỉ</span> của Quý vị trên
-                        OmniBooking.com
+                        {t.rich("heroTitle", {
+                           highlight: (chunks) => <span className="text-blue-400">{chunks}</span>,
+                        })}
                      </h1>
                      <p className="mt-8 text-lg text-blue-100 leading-relaxed max-w-2xl">
-                        Quý vị có một căn hộ cho thuê hay một khách sạn sang trọng, chúng tôi luôn
-                        có những công cụ tốt nhất để giúp Quý vị kinh doanh thành công.
+                        {t("heroSub")}
                      </p>
                   </div>
 

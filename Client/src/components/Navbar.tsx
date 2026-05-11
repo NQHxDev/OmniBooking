@@ -24,6 +24,7 @@ import { useTranslations } from "next-intl";
 
 export default function Navbar() {
    const t = useTranslations("Common");
+   const tProfile = useTranslations("Profile");
 
    const [mounted, setMounted] = useState(false);
    const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -106,21 +107,21 @@ export default function Navbar() {
                      className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 hover:bg-white/20 transition-all"
                   >
                      <BedDouble className="h-4 w-4" />
-                     {t("stays") || "Lưu trú"}
+                     {t("stays")}
                   </a>
                   <a
                      href="#"
                      className="flex items-center gap-2 px-4 py-1.5 hover:bg-white/10 rounded-full transition-all"
                   >
                      <Globe className="h-4 w-4" />
-                     {t("flights") || "Chuyến bay"}
+                     {t("flights")}
                   </a>
                   <a
                      href="#"
                      className="flex items-center gap-2 px-4 py-1.5 hover:bg-white/10 rounded-full transition-all"
                   >
                      <Calendar className="h-4 w-4" />
-                     {t("carRentals") || "Thuê xe"}
+                     {t("carRentals")}
                   </a>
                </nav>
             </div>
@@ -144,12 +145,10 @@ export default function Navbar() {
                      {isLoggedIn && isPartner ? (
                         <Link href="/partner/dashboard" className="flex items-center gap-2">
                            <ShieldCheck className="h-4 w-4 text-yellow-400" />
-                           {t("manageProperty") || "Quản lý chỗ nghỉ"}
+                           {t("manageProperty")}
                         </Link>
                      ) : (
-                        <Link href="/become-a-host">
-                           {t("listProperty") || "Đăng chỗ nghỉ của Quý vị"}
-                        </Link>
+                        <Link href="/become-a-host">{t("listProperty")}</Link>
                      )}
                   </button>
 
@@ -182,10 +181,10 @@ export default function Navbar() {
                            </div>
                            <div className="hidden md:flex flex-col items-start text-left ml-1">
                               <span className="text-[13px] font-bold leading-tight">
-                                 {user?.fullName || user?.username}
+                                 {user?.fullName || user?.username || ""}
                               </span>
                               <span className="text-[11px] font-semibold text-yellow-400">
-                                 Genius Cấp 1
+                                 {tProfile("level1")}
                               </span>
                            </div>
                            <ChevronDown
@@ -199,32 +198,32 @@ export default function Navbar() {
                               <div className="py-1.5">
                                  <DropdownItem
                                     icon={<UserIcon className="h-[18px] w-[18px]" />}
-                                    label="Quản lý tài khoản"
+                                    label={tProfile("items.personalInfo")}
                                     href="/profile"
                                  />
                                  <DropdownItem
                                     icon={<Briefcase className="h-[18px] w-[18px]" />}
-                                    label="Đặt chỗ & Chuyến đi"
+                                    label={tProfile("items.bookings")}
                                     href="/bookings"
                                  />
                                  <DropdownItem
                                     icon={<ShieldCheck className="h-[18px] w-[18px]" />}
-                                    label="Chương trình Genius"
+                                    label={tProfile("items.geniusProgram")}
                                     href="/genius"
                                  />
                                  <DropdownItem
                                     icon={<Wallet className="h-[18px] w-[18px]" />}
-                                    label="Tặng thưởng & Ví"
+                                    label={tProfile("items.wallet")}
                                     href="/wallet"
                                  />
                                  <DropdownItem
                                     icon={<Star className="h-[18px] w-[18px]" />}
-                                    label="Đánh giá"
+                                    label={tProfile("items.reviews")}
                                     href="/reviews"
                                  />
                                  <DropdownItem
                                     icon={<Heart className="h-[18px] w-[18px]" />}
-                                    label="Đã lưu"
+                                    label={tProfile("items.wishlist")}
                                     href="/wishlist"
                                  />
                               </div>
@@ -238,7 +237,7 @@ export default function Navbar() {
                                     className="flex w-full items-center gap-3 px-4 py-2.5 text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors"
                                  >
                                     <LogOut className="h-[18px] w-[18px]" />
-                                    Đăng xuất
+                                    {t("logout")}
                                  </button>
                               </div>
                            </div>
@@ -250,13 +249,13 @@ export default function Navbar() {
                            href="/auth/register"
                            className="rounded-md bg-white px-4 py-1.5 text-[13px] font-bold text-[#003580] hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
                         >
-                           {t("register") || "Đăng ký"}
+                           {t("register")}
                         </Link>
                         <Link
                            href="/auth/login"
                            className="rounded-md bg-white px-4 py-1.5 text-[13px] font-bold text-[#003580] hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
                         >
-                           {t("login") || "Đăng nhập"}
+                           {t("login")}
                         </Link>
                      </div>
                   )}

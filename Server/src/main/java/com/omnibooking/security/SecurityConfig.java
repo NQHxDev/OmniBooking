@@ -34,7 +34,9 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
    private final JWTService jwtService;
+
    private final CustomUserDetailsService userDetailsService;
+
    private final StringRedisTemplate redisTemplate;
 
    @Bean

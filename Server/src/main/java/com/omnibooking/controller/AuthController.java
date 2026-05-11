@@ -39,7 +39,9 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 public class AuthController {
 
    private final AuthService authService;
+
    private final OAuth2ServiceFactory oAuth2ServiceFactory;
+
    private final AppProperties appProperties;
 
    @Anonymous
@@ -128,7 +130,8 @@ public class AuthController {
 
       String requestId = (String) httpRequest.getAttribute("requestId");
       authService.forgotPassword(request.getEmail());
-      return ResponseEntity.ok(ApiResponse.success(null, "If an account exists, a reset link has been sent", requestId));
+      return ResponseEntity
+            .ok(ApiResponse.success(null, "If an account exists, a reset link has been sent", requestId));
    }
 
    @Anonymous
@@ -173,7 +176,8 @@ public class AuthController {
       } catch (Exception e) {
          log.error(provider + " login failed", e);
          // Redirect to frontend with error
-         httpResponse.sendRedirect(appProperties.getOauth2().getGoogle().getFrontendCallbackUrl() + "?error=auth_failed");
+         httpResponse
+               .sendRedirect(appProperties.getOauth2().getGoogle().getFrontendCallbackUrl() + "?error=auth_failed");
       }
    }
 
@@ -184,4 +188,5 @@ public class AuthController {
       }
       return request.getRemoteAddr();
    }
+
 }

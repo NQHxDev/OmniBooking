@@ -6,8 +6,11 @@ import lombok.Data;
 public class ZaloUserInfo implements OAuth2UserInfo {
 
    private String id;
+
    private String name;
+
    private String email;
+
    private Picture picture;
 
    @Data
@@ -36,4 +39,5 @@ public class ZaloUserInfo implements OAuth2UserInfo {
    public String getPicture() {
       return (picture != null && picture.getData() != null) ? picture.getData().getUrl() : null;
    }
+
 }

@@ -2,16 +2,18 @@
    "Common": {
       "welcome": "Welcome to OmniBooking",
       "home": "Home",
-      "login": "Login",
+      "login": "Sign in",
       "register": "Register",
-      "logout": "Logout",
-      "search": "Search",
       "stays": "Stays",
       "flights": "Flights",
-      "carRentals": "Car Rentals",
-      "selectLanguage": "Select language",
+      "carRentals": "Car rentals",
+      "attractions": "Attractions",
+      "airportTaxis": "Airport taxis",
+      "manageProperty": "Manage property",
       "listProperty": "List your property",
-      "manageProperty": "Manage your property",
+      "logout": "Sign out",
+      "search": "Search",
+      "selectLanguage": "Select language",
       "searchPlaceholder": "Where are you going?",
       "destination": "Destination",
       "checkInDate": "Check-in date",
@@ -102,7 +104,12 @@
       "AUTH_012": "Google authentication failed or was cancelled",
       "GEN_999": "An unexpected error occurred",
       "GEN_500": "Internal server error",
-      "FORBIDDEN": "You do not have permission to perform this action"
+      "FORBIDDEN": "You do not have permission to perform this action",
+      "somethingWentWrong": "Something went wrong!",
+      "description": "We apologize for the inconvenience. The system has logged the error and it is being processed.",
+      "tryAgain": "Try again",
+      "goHome": "Go home",
+      "devDetails": "[Dev Error Details]:"
    },
    "Partner": {
       "sidebar": {
@@ -272,5 +279,165 @@
          "restaurant": "Restaurant",
          "spa": "Spa"
       }
+   },
+   "Home": {
+      "trendingDestinations": "Trending destinations",
+      "trendingSub": "Most popular choices for travelers from Vietnam",
+      "dalat": "Da Lat",
+      "hanoi": "Hanoi",
+      "quangninh": "Quang Ninh"
+   },
+   "Genius": {
+      "welcomeBack": "Welcome back, {name}!",
+      "memberStatus": "You are a",
+      "level1": "Genius Level 1",
+      "keepBooking": "member. Keep booking to unlock more rewards.",
+      "tenPercentDiscount": "10% discount on every booking",
+      "viewDetails": "View reward details →",
+      "saveTenPercent": "Save at least 10% with Genius",
+      "geniusDescription": "Simply sign in to your OmniBooking.com account and look for the blue Genius logo to start saving today.",
+      "login": "Sign in",
+      "register": "Create account"
+   },
+   "BecomeAHost": {
+      "heroTitle": "Register <highlight>your property</highlight> on OmniBooking.com",
+      "heroSub": "Whether you have a vacation home or a luxury hotel, we always have the best tools to help your business succeed.",
+      "cta": {
+         "title": "Register your property",
+         "subtitle": "Join us and start welcoming guests today",
+         "benefit1": "Save up to 20% with deals for new hosts",
+         "benefit2": "Quick and easy registration",
+         "benefit3": "We don't charge fees until you get your first booking",
+         "startButton": "Start now",
+         "footerText": "OmniBooking is excited to partner with you!"
+      },
+      "propertyTypes": {
+         "title": "Register any type of property",
+         "apartment": "Apartment",
+         "apartmentDesc": "Self-catering accommodation, usually in a building.",
+         "hotel": "Hotel",
+         "hotelDesc": "Accommodation with professional amenities and services.",
+         "guesthouse": "Guesthouse",
+         "guesthouseDesc": "Cozy, family-run accommodation.",
+         "unique": "Unique stays",
+         "uniqueDesc": "Boats, tents, treehouses, and more."
+      },
+      "whyJoin": {
+         "title": "Host with peace of mind - We have your back",
+         "subtitle": "All the tools and support you need for business success",
+         "safetyTitle": "Absolute safety",
+         "safety1": "Strict guest verification",
+         "safety2": "Host protection policies",
+         "safety3": "Dispute resolution support",
+         "reachTitle": "Global reach",
+         "reach1": "Displayed in 43 languages",
+         "reach2": "Reach 28 million guests",
+         "reach3": "Promote on Google and Facebook",
+         "manageTitle": "Smart management",
+         "manage1": "Convenient Pulse app",
+         "manage2": "Automatic calendar sync",
+         "manage3": "Detailed revenue reports"
+      },
+      "payments": {
+         "title": "Simple and transparent payments",
+         "subtitle": "You choose how to receive payments from guests, we handle the rest.",
+         "feature1Title": "Payment automation",
+         "feature1Desc": "We handle guest payments on your behalf, resolving credit card and fraud issues.",
+         "feature2Title": "Daily payouts",
+         "feature2Desc": "Get paid faster! We send your money 24 hours after guest checkout.",
+         "feature3Title": "Guaranteed revenue",
+         "feature3Desc": "Whenever a guest pays online for a prepaid booking, you are guaranteed to receive the money.",
+         "feature4Title": "Comprehensive solution",
+         "feature4Desc": "Save financial management time with group invoicing and reconciliation features.",
+         "feature5Title": "Cash flow control",
+         "feature5Desc": "Choose your payout method and timing based on available regional options",
+         "feature6Title": "Risk mitigation",
+         "feature6Desc": "We help you comply with regulatory changes and minimize fraud risk.",
+         "ctaButton": "Start earning today"
+      },
+      "steps": {
+         "title": "How property registration works",
+         "step1Title": "Create an account",
+         "step1Desc": "It only takes 15 minutes to complete your property profile.",
+         "step2Title": "Upload information",
+         "step2Desc": "Add photos, prices, and availability so guests can book instantly.",
+         "step3Title": "Start hosting",
+         "step3Desc": "Receive your first booking and manage it through our app."
+      },
+      "footer": {
+         "about": "About us",
+         "terms": "Terms & Conditions",
+         "privacy": "Privacy Policy",
+         "help": "Help",
+         "copyright": "© 1996-2026 OmniBooking.com™. All rights reserved."
+      }
+   },
+   "Profile": {
+      "greeting": "Hello: {name}",
+      "level1": "Genius Level 1",
+      "level2": "Genius Level 2",
+      "geniusRewards": {
+         "title": "You have {count} Genius rewards",
+         "subtitle": "Enjoy rewards and discounts on select stays and car rentals worldwide.",
+         "reward1": "10% stay discount",
+         "reward2": "10% car rental discount",
+         "reward3": "Flight price alerts",
+         "rewardLocked": "10-15% stay discount",
+         "learnMore": "Learn more about rewards"
+      },
+      "flightAlert": {
+         "title": "Flight price alerts",
+         "desc": "Track prices for your preferred routes and dates on the OmniBooking.com app.",
+         "download": "Download the app"
+      },
+      "progress": {
+         "needed": "You're {count} bookings away from Genius Level 2",
+         "check": "Check your progress"
+      },
+      "credits": {
+         "empty": "No credits or vouchers yet",
+         "viewDetails": "View details"
+      },
+      "sections": {
+         "payment": "Payment info",
+         "account": "Account management",
+         "settings": "Settings",
+         "travel": "Travel activity",
+         "help": "Help",
+         "legal": "Legal and privacy",
+         "host": "For property owners"
+      },
+      "items": {
+         "wallet": "Rewards & Wallet",
+         "paymentMethods": "Payment methods",
+         "transactions": "Transactions",
+         "personalInfo": "Personal info",
+         "security": "Security settings",
+         "guests": "Travelers",
+         "general": "General settings",
+         "email": "Email settings",
+         "bookings": "Trips and bookings",
+         "wishlist": "Saved lists",
+         "reviews": "My reviews",
+         "customerService": "Contact Customer Service",
+         "safetyCenter": "Safety Resource Center",
+         "disputes": "Dispute resolution",
+         "privacy": "Privacy management",
+         "guidelines": "Content guidelines",
+         "becomeHost": "List your property",
+         "geniusProgram": "Genius loyalty program",
+         "logout": "Sign out"
+      },
+      "footer": {
+         "customerService": "Contact Customer Service",
+         "privacyPolicy": "Privacy Policy",
+         "humanRights": "Human Rights Statement",
+         "terms": "Terms of Service"
+      }
+   },
+   "NotFound": {
+      "title": "Oops!<newline></newline><gradient>You've wandered off...</gradient>",
+      "description": "Looks like you're lost? The page you're looking for doesn't exist or has been moved to another journey.",
+      "goBack": "Go back"
    }
 }

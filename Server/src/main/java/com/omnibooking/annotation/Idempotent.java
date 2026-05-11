@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Idempotent {
+
    /**
     * Expiration time for the idempotency key in Redis.
     */
@@ -22,4 +23,5 @@ public @interface Idempotent {
     * Time unit for expiration.
     */
    TimeUnit timeUnit() default TimeUnit.HOURS;
+
 }

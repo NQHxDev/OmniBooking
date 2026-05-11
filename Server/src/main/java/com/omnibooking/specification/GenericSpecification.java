@@ -16,7 +16,8 @@ public class GenericSpecification<T> implements Specification<T> {
    private final SearchCriteria criteria;
 
    @Override
-   public Predicate toPredicate(@NonNull Root<T> root, @Nullable CriteriaQuery<?> query, @NonNull CriteriaBuilder builder) {
+   public Predicate toPredicate(@NonNull Root<T> root, @Nullable CriteriaQuery<?> query,
+         @NonNull CriteriaBuilder builder) {
       if (criteria.getOperation().equalsIgnoreCase(">")) {
          return builder.greaterThanOrEqualTo(
                root.get(criteria.getKey()), criteria.getValue().toString());
@@ -33,4 +34,5 @@ public class GenericSpecification<T> implements Specification<T> {
       }
       return null;
    }
+
 }

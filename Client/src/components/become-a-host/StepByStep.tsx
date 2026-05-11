@@ -1,34 +1,23 @@
 import { Smartphone } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function StepByStep() {
+   const t = useTranslations("BecomeAHost.steps");
+
    return (
       <section className="py-16 bg-white border-t border-zinc-100">
          <div className="mx-auto max-w-[1100px] px-4">
             <div className="flex flex-col lg:flex-row items-center gap-16">
                <div className="flex-1">
-                  <h2 className="text-4xl font-bold text-[#1a1a1a] leading-tight">
-                     Cách hoạt động của việc đăng ký chỗ nghỉ
-                  </h2>
+                  <h2 className="text-4xl font-bold text-[#1a1a1a] leading-tight">{t("title")}</h2>
                   <div className="mt-12 space-y-10">
-                     <StepItem
-                        num="1"
-                        title="Đăng ký tài khoản"
-                        desc="Chỉ mất 15 phút để hoàn tất hồ sơ chỗ nghỉ của bạn."
-                     />
-                     <StepItem
-                        num="2"
-                        title="Tải lên thông tin"
-                        desc="Thêm hình ảnh, giá và ngày còn trống để khách có thể đặt ngay."
-                     />
-                     <StepItem
-                        num="3"
-                        title="Bắt đầu đón khách"
-                        desc="Nhận đơn đặt đầu tiên và quản lý thông qua ứng dụng của chúng tôi."
-                     />
+                     <StepItem num="1" title={t("step1Title")} desc={t("step1Desc")} />
+                     <StepItem num="2" title={t("step2Title")} desc={t("step2Desc")} />
+                     <StepItem num="3" title={t("step3Title")} desc={t("step3Desc")} />
                   </div>
                </div>
                <div className="flex-1 w-full max-w-md lg:max-w-none">
-                  <div className="aspect-[4/3] rounded-3xl bg-blue-50 flex items-center justify-center border border-blue-100 shadow-inner relative overflow-hidden">
+                  <div className="aspect-4/3 rounded-3xl bg-blue-50 flex items-center justify-center border border-blue-100 shadow-inner relative overflow-hidden">
                      <div className="absolute top-0 right-0 p-8">
                         <div className="h-32 w-32 bg-blue-200/50 rounded-full blur-3xl animate-pulse"></div>
                      </div>

@@ -4,14 +4,16 @@
       "home": "Trang chủ",
       "login": "Đăng nhập",
       "register": "Đăng ký",
-      "logout": "Đăng xuất",
-      "search": "Tìm kiếm",
       "stays": "Lưu trú",
       "flights": "Chuyến bay",
       "carRentals": "Thuê xe",
+      "attractions": "Địa điểm tham quan",
+      "airportTaxis": "Taxi sân bay",
       "selectLanguage": "Chọn ngôn ngữ",
       "listProperty": "Đăng chỗ nghỉ của Quý vị",
       "manageProperty": "Quản lý chỗ nghỉ",
+      "geniusProgram": "Chương trình Genius",
+      "logout": "Đăng xuất",
       "searchPlaceholder": "Bạn muốn đến đâu?",
       "destination": "Địa điểm",
       "checkInDate": "Ngày nhận phòng",
@@ -102,7 +104,12 @@
       "AUTH_012": "Xác thực với Google thất bại hoặc bị hủy",
       "GEN_999": "Đã có lỗi xảy ra, vui lòng thử lại sau",
       "GEN_500": "Lỗi hệ thống server",
-      "FORBIDDEN": "Bạn không có quyền thực hiện hành động này"
+      "FORBIDDEN": "Bạn không có quyền thực hiện hành động này",
+      "somethingWentWrong": "Đã có lỗi xảy ra!",
+      "description": "Chúng tôi rất tiếc vì sự gián đoạn này. Hệ thống đã ghi nhận lỗi và đang được xử lý.",
+      "tryAgain": "Thử lại",
+      "goHome": "Về trang chủ",
+      "devDetails": "[Chi tiết lỗi (Dev)]:"
    },
    "Partner": {
       "sidebar": {
@@ -272,5 +279,165 @@
          "restaurant": "Nhà hàng",
          "spa": "Spa"
       }
+   },
+   "Home": {
+      "trendingDestinations": "Điểm đến đang thịnh hành",
+      "trendingSub": "Các lựa chọn phổ biến nhất cho du khách từ Việt Nam",
+      "dalat": "Đà Lạt",
+      "hanoi": "Hà Nội",
+      "quangninh": "Quảng Ninh"
+   },
+   "Genius": {
+      "welcomeBack": "Chào mừng trở lại, {name}!",
+      "memberStatus": "Bạn đang là thành viên",
+      "level1": "Genius Cấp 1",
+      "keepBooking": "Hãy tiếp tục đặt phòng để nhận thêm nhiều ưu đãi.",
+      "tenPercentDiscount": "Giảm 10% cho mọi đơn phòng",
+      "viewDetails": "Xem chi tiết ưu đãi →",
+      "saveTenPercent": "Tiết kiệm ít nhất 10% với Genius",
+      "geniusDescription": "Bạn chỉ cần đăng nhập vào tài khoản OmniBooking.com và tìm logo Genius màu xanh dương để bắt đầu tiết kiệm ngay hôm nay.",
+      "login": "Đăng nhập",
+      "register": "Tạo tài khoản"
+   },
+   "BecomeAHost": {
+      "heroTitle": "Đăng ký <highlight>chỗ nghỉ</highlight> của Quý vị trên OmniBooking.com",
+      "heroSub": "Quý vị có một căn hộ cho thuê hay một khách sạn sang trọng, chúng tôi luôn có những công cụ tốt nhất để giúp Quý vị kinh doanh thành công.",
+      "cta": {
+         "title": "Đăng ký chỗ nghỉ của bạn",
+         "subtitle": "Tham gia cùng chúng tôi và bắt đầu đón khách ngay hôm nay",
+         "benefit1": "Tiết kiệm đến 20% với các ưu đãi dành cho chủ nhà mới",
+         "benefit2": "Đăng ký nhanh chóng và dễ dàng",
+         "benefit3": "Chúng tôi không thu phí khi bạn chưa có đơn đặt phòng",
+         "startButton": "Bắt đầu ngay",
+         "footerText": "OmniBooking rất vui được hợp tác với bạn!"
+      },
+      "propertyTypes": {
+         "title": "Đăng ký mọi loại hình chỗ nghỉ",
+         "apartment": "Căn hộ",
+         "apartmentDesc": "Chỗ nghỉ tự phục vụ, thường nằm trong tòa nhà.",
+         "hotel": "Khách sạn",
+         "hotelDesc": "Chỗ nghỉ có các tiện nghi và dịch vụ chuyên nghiệp.",
+         "guesthouse": "Nhà nghỉ",
+         "guesthouseDesc": "Chỗ nghỉ gia đình, ấm cúng và gần gũi.",
+         "unique": "Chỗ nghỉ độc đáo",
+         "uniqueDesc": "Thuyền, lều, nhà trên cây và nhiều hơn nữa."
+      },
+      "whyJoin": {
+         "title": "Host an tâm đón khách - Đã có chúng tôi hỗ trợ",
+         "subtitle": "Mọi công cụ và sự hỗ trợ bạn cần để kinh doanh thành công",
+         "safetyTitle": "An toàn tuyệt đối",
+         "safety1": "Xác thực khách hàng nghiêm ngặt",
+         "safety2": "Chính sách bảo vệ chủ nhà",
+         "safety3": "Hỗ trợ giải quyết khiếu nại",
+         "reachTitle": "Tiếp cận toàn cầu",
+         "reach1": "Hiển thị trên 43 ngôn ngữ",
+         "reach2": "Tiếp cận 28 triệu lượt khách",
+         "reach3": "Quảng bá trên Google và Facebook",
+         "manageTitle": "Quản lý thông minh",
+         "manage1": "Ứng dụng Pulse tiện lợi",
+         "manage2": "Đồng bộ lịch tự động",
+         "manage3": "Báo cáo doanh thu chi tiết"
+      },
+      "payments": {
+         "title": "Thanh toán đơn giản và minh bạch",
+         "subtitle": "Quý vị chọn cách nhận thanh toán từ khách, chúng tôi sẽ xử lý phần còn lại.",
+         "feature1Title": "Tự động hóa thanh toán",
+         "feature1Desc": "Chúng tôi thay Quý vị xử lý thanh toán của khách, giải quyết các rắc rối về thẻ tín dụng và gian lận.",
+         "feature2Title": "Thanh toán hằng ngày",
+         "feature2Desc": "Nhận thanh toán nhanh hơn! Chúng tôi sẽ gửi tiền cho Quý vị 24 giờ sau khi khách trả phòng.",
+         "feature3Title": "Doanh thu được đảm bảo",
+         "feature3Desc": "Bất cứ khi nào khách thanh toán online cho đặt phòng yêu cầu trả trước, Quý vị chắc chắn sẽ nhận được tiền.",
+         "feature4Title": "Giải pháp toàn diện",
+         "feature4Desc": "Tiết kiệm thời gian quản lý tài chính với tính năng hóa đơn theo nhóm và rà soát đối chiếu.",
+         "feature5Title": "Kiểm soát dòng tiền",
+         "feature5Desc": "Chọn phương thức và thời gian nhận thanh toán dựa trên các lựa chọn hiện có theo khu vực",
+         "feature6Title": "Giảm thiểu rủi ro",
+         "feature6Desc": "Chúng tôi giúp Quý vị tuân thủ các thay đổi liên quan đến quy định pháp luật, giảm thiểu rủi ro gian lận.",
+         "ctaButton": "Kiếm thêm thu nhập ngay hôm nay"
+      },
+      "steps": {
+         "title": "Cách hoạt động của việc đăng ký chỗ nghỉ",
+         "step1Title": "Đăng ký tài khoản",
+         "step1Desc": "Chỉ mất 15 phút để hoàn tất hồ sơ chỗ nghỉ của bạn.",
+         "step2Title": "Tải lên thông tin",
+         "step2Desc": "Thêm hình ảnh, giá và ngày còn trống để khách có thể đặt ngay.",
+         "step3Title": "Bắt đầu đón khách",
+         "step3Desc": "Nhận đơn đặt đầu tiên và quản lý thông qua ứng dụng của chúng tôi."
+      },
+      "footer": {
+         "about": "Về chúng tôi",
+         "terms": "Điều khoản & Điều kiện",
+         "privacy": "Chính sách bảo mật",
+         "help": "Trợ giúp",
+         "copyright": "© 1996-2026 OmniBooking.com™. Bảo lưu mọi quyền."
+      }
+   },
+   "Profile": {
+      "greeting": "Xin chào: {name}",
+      "level1": "Genius Cấp 1",
+      "level2": "Genius Cấp 2",
+      "geniusRewards": {
+         "title": "Bạn có {count} tặng thưởng Genius",
+         "subtitle": "Tận hưởng tặng thưởng và giảm giá cho một số chỗ nghỉ và xe thuê trên toàn cầu.",
+         "reward1": "Giảm 10% khi lưu trú",
+         "reward2": "Giảm giá 10% cho xe thuê",
+         "reward3": "Thông báo giá vé máy bay",
+         "rewardLocked": "Giảm 10-15% khi lưu trú",
+         "learnMore": "Tìm hiểu thêm về tặng thưởng"
+      },
+      "flightAlert": {
+         "title": "Thông báo giá vé máy bay",
+         "desc": "Theo dõi giá cho đường bay và ngày mong muốn trên ứng dụng OmniBooking.com.",
+         "download": "Tải ứng dụng"
+      },
+      "progress": {
+         "needed": "Bạn còn {count} đơn đặt nữa để lên Genius Cấp 2",
+         "check": "Kiểm tra tiến độ của bạn"
+      },
+      "credits": {
+         "empty": "Chưa có Tín dụng hay voucher",
+         "viewDetails": "Xem chi tiết"
+      },
+      "sections": {
+         "payment": "Thông tin thanh toán",
+         "account": "Quản lý tài khoản",
+         "settings": "Cài đặt",
+         "travel": "Hoạt động du lịch",
+         "help": "Trợ giúp",
+         "legal": "Pháp lý và quyền riêng tư",
+         "host": "Dành cho chủ chỗ nghỉ"
+      },
+      "items": {
+         "wallet": "Tặng thưởng & Ví",
+         "paymentMethods": "Phương thức thanh toán",
+         "transactions": "Giao dịch",
+         "personalInfo": "Thông tin cá nhân",
+         "security": "Cài đặt bảo mật",
+         "guests": "Người đi cùng",
+         "general": "Cài đặt chung",
+         "email": "Cài đặt email",
+         "bookings": "Chuyến đi và đơn đặt",
+         "wishlist": "Danh sách đã lưu",
+         "reviews": "Đánh giá của tôi",
+         "customerService": "Liên hệ dịch vụ khách hàng",
+         "safetyCenter": "Trung tâm thông tin bảo mật",
+         "disputes": "Giải quyết khiếu nại",
+         "privacy": "Quản lý quyền riêng tư",
+         "guidelines": "Hướng dẫn nội dung",
+         "becomeHost": "Đăng chỗ nghỉ",
+         "geniusProgram": "Chương trình Genius",
+         "logout": "Đăng xuất"
+      },
+      "footer": {
+         "customerService": "Liên hệ Dịch vụ Khách hàng",
+         "privacyPolicy": "Chính sách Bảo mật",
+         "humanRights": "Chính sách về Quyền con người",
+         "terms": "Điều khoản dịch vụ"
+      }
+   },
+   "NotFound": {
+      "title": "Ui chao!<newline></newline><gradient>Bạn bị lạc rồi...</gradient>",
+      "description": "Có vẻ như địa chỉ bạn đang tìm kiếm không tồn tại hoặc đã được di chuyển sang một hành trình khác.",
+      "goBack": "Quay lại"
    }
 }

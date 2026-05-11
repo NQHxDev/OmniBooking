@@ -28,8 +28,11 @@ import java.util.concurrent.TimeUnit;
 public class PartnerController {
 
    private final MailService mailService;
+
    private final StringRedisTemplate redisTemplate;
+
    private final UserProfileRepository userProfileRepository;
+
    private final AuthService authService;
 
    @PostMapping("/send-otp")
@@ -138,4 +141,5 @@ public class PartnerController {
             digits.charAt(random.nextInt(digits.length())) +
             digits.charAt(random.nextInt(digits.length()));
    }
+
 }

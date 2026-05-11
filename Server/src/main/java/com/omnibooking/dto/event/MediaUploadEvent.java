@@ -12,13 +12,20 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MediaUploadEvent implements Serializable {
+
    private String correlationId;
+
    private byte[] fileBytes;
+
    private String folder;
+
    private String fileName;
-   
+
    // Target entity info
    private String entityId;
+
    private String entityType;
+
    private boolean isMain;
+
 }

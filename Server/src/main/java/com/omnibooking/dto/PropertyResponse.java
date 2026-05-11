@@ -12,10 +12,17 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PropertyResponse {
+
    private UUID id;
+
    private String name;
+
    private String propertyType;
+
    private String city;
+
    private String country;
+
    private String imageUrl;
+
 }

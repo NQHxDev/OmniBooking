@@ -40,4 +40,5 @@ public class GoogleUserInfo implements OAuth2UserInfo {
    public String getPicture() {
       return picture;
    }
+
 }
