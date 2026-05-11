@@ -237,5 +237,40 @@
          "cityRequired": "Thành phố không được để trống",
          "countryRequired": "Quốc gia không được để trống"
       }
+   },
+   "Search": {
+      "resultsFor": "{destination}: Tìm thấy {count} chỗ nghỉ",
+      "sortBy": "Sắp xếp theo:",
+      "filterBy": "Chọn lọc theo:",
+      "budget": "Ngân sách của bạn (mỗi đêm)",
+      "stars": "Hạng sao",
+      "popular": "Phổ biến nhất",
+      "searching": "Đang tìm phòng trống...",
+      "noResults": "Không tìm thấy kết quả",
+      "noResultsDesc": "Rất tiếc, chúng tôi không tìm thấy chỗ nghỉ nào phù hợp với lựa chọn của bạn. Hãy thử thay đổi bộ lọc hoặc ngày tháng.",
+      "changeSearch": "Thay đổi tìm kiếm",
+      "allProperties": "Tất cả chỗ nghỉ",
+      "night": "đêm",
+      "taxesIncluded": "Đã bao gồm thuế và phí",
+      "viewAvailability": "Xem chỗ trống",
+      "rating": {
+         "exceptional": "Xuất sắc",
+         "excellent": "Rất tốt",
+         "good": "Tốt",
+         "reviews": "đánh giá"
+      },
+      "distanceFromCenter": "Cách trung tâm {distance}",
+      "viewOnMap": "Xem trên bản đồ",
+      "propertyTypeLabel": "Loại hình chỗ nghỉ",
+      "popularAmenities": "Tiện ích phổ biến",
+      "reviewScore": "Điểm đánh giá",
+      "excellentPlus": "{score}+ (Trên cả tuyệt vời)",
+      "amenitiesList": {
+         "wifi": "Wifi miễn phí",
+         "pool": "Hồ bơi",
+         "parking": "Chỗ đậu xe",
+         "restaurant": "Nhà hàng",
+         "spa": "Spa"
+      }
    }
 }

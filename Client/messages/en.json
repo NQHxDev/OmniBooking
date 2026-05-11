@@ -237,5 +237,40 @@
          "cityRequired": "City cannot be empty",
          "countryRequired": "Country cannot be empty"
       }
+   },
+   "Search": {
+      "resultsFor": "{destination}: {count} properties found",
+      "sortBy": "Sort by:",
+      "filterBy": "Filter by:",
+      "budget": "Your budget (per night)",
+      "stars": "Star rating",
+      "popular": "Popular",
+      "searching": "Searching for availability...",
+      "noResults": "No results found",
+      "noResultsDesc": "Unfortunately, we couldn't find any properties matching your selection. Try changing your filters or dates.",
+      "changeSearch": "Change search",
+      "allProperties": "All properties",
+      "night": "night",
+      "taxesIncluded": "Taxes and charges included",
+      "viewAvailability": "See availability",
+      "rating": {
+         "exceptional": "Exceptional",
+         "excellent": "Excellent",
+         "good": "Good",
+         "reviews": "reviews"
+      },
+      "distanceFromCenter": "{distance} from center",
+      "viewOnMap": "View on map",
+      "propertyTypeLabel": "Property Type",
+      "popularAmenities": "Popular Amenities",
+      "reviewScore": "Review Score",
+      "excellentPlus": "{score}+ (Exceptional)",
+      "amenitiesList": {
+         "wifi": "Free WiFi",
+         "pool": "Swimming pool",
+         "parking": "Parking",
+         "restaurant": "Restaurant",
+         "spa": "Spa"
+      }
    }
 }

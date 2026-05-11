@@ -17,6 +17,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
    };
 }
 
+import QueryProvider from "@/providers/QueryProvider";
+
 export default async function LocaleLayout({
    children,
    params,
@@ -37,8 +39,10 @@ export default async function LocaleLayout({
 
    return (
       <NextIntlClientProvider messages={messages}>
-         {children}
-         <Toaster position="bottom-right" richColors closeButton />
+         <QueryProvider>
+            {children}
+            <Toaster position="bottom-right" richColors closeButton />
+         </QueryProvider>
       </NextIntlClientProvider>
    );
 }

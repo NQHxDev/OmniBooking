@@ -17,12 +17,14 @@ import { format } from "date-fns";
 import { vi, enUS } from "date-fns/locale";
 import DateRangePicker from "./DateRangePicker";
 import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 
 const LOCATIONS = ["TP. Hồ Chí Minh", "Hà Nội", "Quảng Ninh", "Đà Nẵng"];
 
 export default function SearchBar() {
    const t = useTranslations("Common");
    const locale = useLocale();
+   const router = useRouter();
    const dateLocale = locale === "vi" ? vi : enUS;
 
    // Location State
@@ -45,6 +47,18 @@ export default function SearchBar() {
    const guestRef = useRef<HTMLDivElement>(null);
    const [isWorkTrip, setIsWorkTrip] = useState(false);
    const [isPets, setIsPets] = useState(false);
+
+   const handleSearch = () => {
+      const params = new URLSearchParams();
+      if (destination) params.set("ss", destination);
+      if (date?.from) params.set("checkin", format(date.from, "yyyy-MM-dd"));
+      if (date?.to) params.set("checkout", format(date.to, "yyyy-MM-dd"));
+      params.set("group_adults", guests.adults.toString());
+      params.set("group_children", guests.children.toString());
+      params.set("no_rooms", guests.rooms.toString());
+
+      router.push(`/${locale}/search?${params.toString()}`);
+   };
 
    // Close dropdowns when clicking outside
    useEffect(() => {
@@ -363,7 +377,10 @@ export default function SearchBar() {
             </div>
 
             {/* Search Button */}
-            <button className="bg-[#006ce4] hover:bg-[#0057b7] text-white rounded-full px-8 py-3 flex items-center justify-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-[0.95] group ml-1">
+            <button
+               onClick={handleSearch}
+               className="bg-[#006ce4] hover:bg-[#0057b7] text-white rounded-full px-8 py-3 flex items-center justify-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-[0.95] group ml-1"
+            >
                <span className="font-bold text-sm">{t("searchButton") || "Tìm kiếm"}</span>
                <div className="bg-white/20 p-1 rounded-full group-hover:translate-x-1 transition-transform">
                   <Search className="h-3.5 w-3.5" />

@@ -213,6 +213,26 @@ Hệ thống triển khai một kiến trúc linh hoạt cho phép tích hợp k
 - **Smart Name Splitting**: Triển khai thuật toán tách tên dựa trên logic văn hóa (Last word = Tên, Rest = Họ và Đệm) để đảm bảo dữ liệu trong `UserProfile` luôn chuẩn xác và không bị trùng lặp khi lấy từ các API xã hội.
 - **Avatar Protection Policy**: Hệ thống chỉ tự động cập nhật ảnh đại diện từ mạng xã hội nếu người dùng chưa có ảnh hoặc đang sử dụng ảnh cũ của mạng xã hội đó. Nếu người dùng đã tự upload ảnh cá nhân, hệ thống sẽ tôn trọng và bảo vệ lựa chọn đó.
 
+## 15. Smart Search & Real-time Indexing Architecture
+
+Kiến trúc tìm kiếm của OmniBooking được thiết kế để xử lý hàng triệu bản ghi với tốc độ mili giây, kết hợp sức mạnh của Elasticsearch và luồng dữ liệu thời gian thực của Kafka:
+
+### Elasticsearch Search Engine
+
+- **Full-text Search**: Sử dụng Elasticsearch 8.x để tìm kiếm không dấu/có dấu, tìm kiếm gần đúng (Fuzzy Search) cho các địa danh.
+- **Criteria-based Filtering**: Triển khai `CriteriaQuery` để xử lý các bộ lọc phức tạp (Giá, Loại hình chỗ nghỉ, Tiện ích, Điểm đánh giá) một cách linh hoạt mà không làm giảm hiệu năng.
+- **Geo-spatial Search**: Lưu trữ tọa độ (`GeoPoint`) để hỗ trợ tìm kiếm theo bán kính và hiển thị bản đồ.
+
+### Real-time Data Synchronization (Kafka Pipeline)
+
+- **CDC-like Pattern**: Mọi thay đổi về thông tin khách sạn hoặc giá phòng ở PostgreSQL đều kích hoạt một sự kiện (Event) đẩy vào Kafka.
+- **Search Indexer**: Một Service chuyên biệt lắng nghe Kafka và cập nhật ngay lập tức vào Elasticsearch Index, đảm bảo dữ liệu tìm kiếm luôn đồng bộ với Database chính.
+
+### Interactive Map Engine (Leaflet)
+
+- **Client-side Rendering**: Sử dụng Leaflet với cơ chế **Dynamic Import** để tối ưu hóa SEO và tốc độ tải trang (LCP).
+- **Price-tag Markers**: Custom Markers hiển thị trực tiếp giá tiền trên bản đồ, giúp người dùng có trải nghiệm tương tác trực quan như các nền tảng OTA hàng đầu thế giới.
+
 ---
 
 _Last Updated: 2026-05-11_

@@ -26,8 +26,8 @@ dev-client:
 # Docker Infrastructure Commands
 docker-infra:
 	@echo "Starting infrastructure..."
-	@docker-compose up -d db redis kafka kafdrop
-	@echo "Infrastructure is Ready..."
+	@docker-compose up -d db redis kafka kafdrop elasticsearch kibana
+	@echo "Infrastructure (DB, Redis, Kafka, ES) is Ready..."
 
 # Docker Full Stack Commands
 docker-up:
