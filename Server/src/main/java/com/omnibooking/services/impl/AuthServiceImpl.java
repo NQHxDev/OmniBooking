@@ -15,6 +15,7 @@ import com.omnibooking.security.RedisSessionInfo;
 import com.omnibooking.services.AuthService;
 import com.omnibooking.services.JWTService;
 import com.omnibooking.services.MailService;
+import com.omnibooking.services.OutboxService;
 import com.omnibooking.services.SessionService;
 import com.omnibooking.services.VerificationService;
 import com.omnibooking.util.CookieUtils;
@@ -53,12 +54,12 @@ public class AuthServiceImpl implements AuthService {
    private final PasswordEncoder passwordEncoder;
    private final JWTService jwtService;
    private final SessionService sessionService;
-   private final org.springframework.context.ApplicationEventPublisher eventPublisher;
    private final VerificationService verificationService;
    private final StringRedisTemplate redisTemplate;
    private final BloomFilterService bloomFilterService;
    private final UserMapper userMapper;
    private final MailService mailService;
+   private final OutboxService outboxService;
    private final SocialAccountRepository socialAccountRepository;
 
    @Value("${app.security.cookie-secure:false}")
@@ -95,9 +96,20 @@ public class AuthServiceImpl implements AuthService {
             .build();
       userProfileRepository.save(Objects.requireNonNull(profile));
 
-      // Publish Event
-      eventPublisher
-            .publishEvent(new com.omnibooking.event.UserRegisteredEvent(this, savedUser, request.getFullName()));
+      // 3. Reliable Email Delivery via Outbox
+      String token = verificationService.createVerificationToken(savedUser.getId());
+
+      // We use MailService to build the DTO but NOT send it to Kafka yet
+      com.omnibooking.dto.event.EmailEvent emailEvent = mailService.buildVerificationEmailEvent(
+            savedUser.getEmail(),
+            request.getFullName(),
+            token);
+
+      outboxService.saveEvent(
+            savedUser.getId(),
+            "USER",
+            "USER_REGISTERED",
+            emailEvent);
 
       // Automatic Login
       Set<String> roles = Collections.singleton(userRole.getName());
@@ -317,8 +329,12 @@ public class AuthServiceImpl implements AuthService {
             fullName = user.getUsername();
          }
 
-         log.info("Sending forgot password email to: {}", email);
-         mailService.sendForgotPasswordEmail(email, fullName, token);
+         log.info("Recording forgot password outbox event for: {}", email);
+         outboxService.saveEvent(
+               user.getId(),
+               "USER",
+               "FORGOT_PASSWORD",
+               mailService.buildForgotPasswordEmailEvent(email, fullName, token));
       });
    }
 

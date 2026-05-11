@@ -116,7 +116,7 @@ The system implements a robust, secure authentication mechanism designed for pro
 
 To maintain platform quality, the partner registration is a multi-stage verified process:
 
-1. **OTP Verification**: Async delivery of one-time passwords via Kafka to ensure email ownership.
+1. **OTP Verification**: Quy trình xác thực email/OTP được thực hiện tin cậy thông qua **Transactional Outbox Pattern**, đảm bảo mã xác thực luôn được ghi nhận và gửi đến người dùng kể cả khi có sự cố mạng.
 2. **Role Upgrade**: Upon verification, the user's role is upgraded to `ROLE_PARTNER` via a specialized backend endpoint.
 3. **Session Re-authentication**: After upgrade, a new JWT containing the updated roles is issued to ensure immediate access to partner-specific features.
 
@@ -125,10 +125,10 @@ To maintain platform quality, the partner registration is a multi-stage verified
 To ensure high performance and non-blocking operations, the system implements an asynchronous messaging pipeline:
 
 - **Kafka Integration**: Used as the primary message broker for cross-service communication and background tasks.
-- **Background Email System**:
-   - **Producer**: `EmailProducer` pushes events to `omnibooking-mail-topic`.
-   - **Consumer**: `EmailConsumer` listens to the topic and processes emails.
-   - **Delivery**: Integrated with **Resend SDK** for professional email delivery.
+- **Reliable Email System**:
+   - **Persistence**: Các sự kiện email được lưu vào bảng `outbox_events` ngay trong cùng transaction nghiệp vụ.
+   - **Worker**: `OutboxWorker` quét bảng và đẩy dữ liệu sang Kafka topic `omnibooking-mail-topic`.
+   - **Delivery**: Consumer nghe topic và gọi **Resend SDK** để gửi email thực tế.
 - **Template Engine**: Uses **Thymeleaf** to render premium HTML email templates with dynamic data injection.
 
 ## 10. Configuration Management (NestJS Style)
@@ -232,6 +232,18 @@ Kiến trúc tìm kiếm của OmniBooking được thiết kế để xử lý 
 
 - **Client-side Rendering**: Sử dụng Leaflet với cơ chế **Dynamic Import** để tối ưu hóa SEO và tốc độ tải trang (LCP).
 - **Price-tag Markers**: Custom Markers hiển thị trực tiếp giá tiền trên bản đồ, giúp người dùng có trải nghiệm tương tác trực quan như các nền tảng OTA hàng đầu thế giới.
+
+## 16. Reliable Messaging (Transactional Outbox Pattern)
+
+Để đảm bảo tính nhất quán tuyệt đối giữa Database và Message Broker (Kafka), hệ thống triển khai Transactional Outbox Pattern:
+
+- **Atomic Operations**: Các sự kiện (như Register, Forgot Password) không bắn trực tiếp vào Kafka. Thay vào đó, chúng được lưu vào bảng `outbox_events` trong cùng một Transaction với dữ liệu nghiệp vụ.
+- **Guaranteed Delivery**: Một `OutboxWorker` (Scheduled Task) định kỳ quét các sự kiện chưa xử lý và đẩy chúng vào Kafka. Điều này đảm bảo hễ User được tạo thành công thì chắc chắn Email sẽ được gửi, kể cả khi Kafka tạm thời bị sập.
+- **Hybrid Wake-Up Mechanism**: Để tối ưu độ trễ, hệ thống sử dụng cơ chế "đánh thức" tức thì. Ngay sau khi Transaction nghiệp vụ commit thành công, một tín hiệu sẽ kích hoạt Worker xử lý ngay mà không đợi đến chu kỳ quét tiếp theo.
+- **Concurrency & Safety**:
+   - **Instance Level**: Sử dụng `AtomicBoolean` để đảm bảo trong cùng một máy chủ, chỉ có duy nhất một luồng xử lý Outbox tại một thời điểm, tránh lãng phí tài nguyên.
+   - **Cluster Level**: Sử dụng câu lệnh SQL `FOR UPDATE SKIP LOCKED` giúp nhiều instance có thể chạy song song mà không tranh chấp hoặc xử lý trùng lặp dữ liệu.
+- **Data Integrity**: Payload của sự kiện được lưu trữ dưới dạng JSON kèm theo thông tin `payload_class` để đảm bảo việc giải mã chính xác tại worker trước khi gửi đi.
 
 ---
 
