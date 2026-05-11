@@ -93,6 +93,24 @@ export default function AuthPage() {
       }
    };
 
+   const handleOAuthLogin = async (provider: string) => {
+      setLoading(true);
+      try {
+         const response = await authService.getOAuth2Url(provider);
+         if (response && response.data) {
+            window.location.href = response.data;
+         }
+      } catch (err) {
+         const error = err as { message?: string; errorCode?: string };
+         let errorMessage = error?.message || `${provider} login failed`;
+         if (error?.errorCode) {
+            errorMessage = te(error.errorCode);
+         }
+         toast.error(errorMessage);
+         setLoading(false);
+      }
+   };
+
    return (
       <div className="flex min-h-screen bg-white font-sans text-[#1a1a1a]">
          <AuthBranding />
@@ -257,17 +275,33 @@ export default function AuthPage() {
                   <div className="grid grid-cols-2 gap-4">
                      <button
                         type="button"
-                        className="flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white py-3.5 text-sm font-bold shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-[0.98] cursor-pointer"
+                        onClick={() => handleOAuthLogin("google")}
+                        disabled={loading}
+                        className="flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white py-3.5 text-sm font-bold shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-[0.98] disabled:opacity-70 cursor-pointer"
                      >
-                        <GoogleIcon className="h-5 w-5" />
-                        Google
+                        {loading ? (
+                           <Loader2 className="h-5 w-5 animate-spin text-[#006ce4]" />
+                        ) : (
+                           <>
+                              <GoogleIcon className="h-5 w-5" />
+                              Google
+                           </>
+                        )}
                      </button>
                      <button
                         type="button"
-                        className="flex items-center justify-center gap-2 rounded-xl bg-black py-3.5 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 transition-all active:scale-[0.98] cursor-pointer"
+                        onClick={() => handleOAuthLogin("apple")}
+                        disabled={loading}
+                        className="flex items-center justify-center gap-2 rounded-xl bg-black py-3.5 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 transition-all active:scale-[0.98] disabled:opacity-70 cursor-pointer"
                      >
-                        <Apple className="h-5 w-5" />
-                        Apple
+                        {loading ? (
+                           <Loader2 className="h-5 w-5 animate-spin text-white" />
+                        ) : (
+                           <>
+                              <Apple className="h-5 w-5" />
+                              Apple
+                           </>
+                        )}
                      </button>
                   </div>
                </div>

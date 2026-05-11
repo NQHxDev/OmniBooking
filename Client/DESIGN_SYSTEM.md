@@ -195,3 +195,19 @@ Các tính năng sau đã được chuyển hoàn toàn vào trong `src/app/[loc
 ---
 
 _Lưu ý: Sự minh bạch trong cấu trúc thư mục quan trọng tương đương với chất lượng mã nguồn._
+
+## 12. Social Authentication UI Standards (Tiêu chuẩn Social Login)
+
+Để đảm bảo tính nhất quán và chuyên nghiệp khi người dùng đăng nhập bằng mạng xã hội:
+
+- **Button Design**:
+   - Google: Nền trắng, Border `#d9d9d9`, Logo Google chuẩn, Text "Tiếp tục với Google".
+   - Apple: Nền đen, Text trắng, Logo Apple trắng.
+- **Interactions**:
+   - Khi click vào nút Social, bắt buộc phải hiển thị **Loading Spinner** (ví dụ: `Lucide Loader2`) ngay bên trong nút để thông báo hệ thống đang chuyển hướng, tránh việc người dùng click nhiều lần.
+- **Callback UX**: Trang `/auth/callback` phải có hiệu ứng **Skeleton** hoặc **Pulse Animation** đẹp mắt trong khi chờ Backend xử lý trao đổi token.
+- **Consistent Branding**: Mọi nút Social Login phải có cùng kích thước (`h-11` hoặc `h-12`) và độ bo góc (`rounded-sm`) tương đương với các nút Primary khác.
+
+---
+
+_Last Updated: 2026-05-11_

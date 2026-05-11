@@ -80,7 +80,13 @@
       "successResetDesc": "Bạn có thể dùng mật khẩu mới để đăng nhập ngay bây giờ",
       "successForgot": "Kiểm tra Email của bạn",
       "successForgotDesc": "Chúng tôi đã gửi một liên kết đặt lại mật khẩu đến email của bạn. Vui lòng kiểm tra hộp thư (bao gồm cả thư rác)",
-      "logoutAllDevices": "Đăng xuất khỏi tất cả các thiết bị khác"
+      "logoutAllDevices": "Đăng xuất khỏi tất cả các thiết bị khác",
+      "verifyingLogin": "Đang xác thực đăng nhập",
+      "callbackSubtext": "Vui lòng đợi trong giây lát, chúng tôi đang chuẩn bị dữ liệu cho bạn",
+      "loginFailed": "Đăng nhập thất bại",
+      "redirectingToLogin": "Đang quay lại trang đăng nhập...",
+      "loginSuccess": "Đăng nhập thành công!",
+      "googleLoginError": "Không thể kết nối với Google. Vui lòng thử lại sau!"
    },
    "Errors": {
       "AUTH_001": "Tên đăng nhập đã tồn tại",
@@ -93,6 +99,7 @@
       "AUTH_008": "Không tìm thấy người dùng",
       "AUTH_010": "Mã reset không hợp lệ hoặc đã hết hạn",
       "AUTH_011": "Bạn đang thao tác quá nhanh, vui lòng thử lại sau ít phút",
+      "AUTH_012": "Xác thực với Google thất bại hoặc bị hủy",
       "GEN_999": "Đã có lỗi xảy ra, vui lòng thử lại sau",
       "GEN_500": "Lỗi hệ thống server",
       "FORBIDDEN": "Bạn không có quyền thực hiện hành động này"

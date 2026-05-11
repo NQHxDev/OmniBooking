@@ -16,6 +16,7 @@ public enum ErrorCode {
    USER_NOT_FOUND("AUTH_008", "User not found", HttpStatus.NOT_FOUND),
    INVALID_RESET_TOKEN("AUTH_010", "Invalid or expired reset token", HttpStatus.BAD_REQUEST),
    RATE_LIMIT_EXCEEDED("AUTH_011", "Rate limit exceeded, please try again later", HttpStatus.TOO_MANY_REQUESTS),
+   OAUTH2_AUTHENTICATION_FAILED("AUTH_012", "OAuth2 authentication failed", HttpStatus.BAD_REQUEST),
 
    // General Errors
    UNCATEGORIZED_EXCEPTION("GEN_999", "Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR),

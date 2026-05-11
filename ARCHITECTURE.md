@@ -198,6 +198,21 @@ The system implements a multi-layered security approach for sensitive operations
 - **Vietnamese Typography**: Shared `AuthBranding` component uses optimized `leading-tight` and `font-weight` to prevent character clipping for accented Vietnamese text.
 - **Error Obfuscation**: Client-side mappings convert technical `errorCodes` into user-friendly localized messages without leaking backend implementation details.
 
+## 14. OAuth2 & Social Authentication Architecture
+
+Hệ thống triển khai một kiến trúc linh hoạt cho phép tích hợp không giới hạn các nhà cung cấp định danh (Social Providers):
+
+### OAuth2 Strategy & Factory Pattern
+
+- **OAuth2ProviderService (Strategy)**: Interface định nghĩa các phương thức chung cho mọi nhà cung cấp (generate URL, exchange code).
+- **OAuth2ServiceFactory (Factory)**: Tự động phát hiện và cung cấp Service tương ứng dựa trên provider name (`google`, `apple`...).
+- **Unified Controller**: Mọi provider đều dùng chung các endpoint động `/auth/{provider}/url` và `/auth/{provider}/callback`.
+
+### Smart Data Synchronization
+
+- **Smart Name Splitting**: Triển khai thuật toán tách tên dựa trên logic văn hóa (Last word = Tên, Rest = Họ và Đệm) để đảm bảo dữ liệu trong `UserProfile` luôn chuẩn xác và không bị trùng lặp khi lấy từ các API xã hội.
+- **Avatar Protection Policy**: Hệ thống chỉ tự động cập nhật ảnh đại diện từ mạng xã hội nếu người dùng chưa có ảnh hoặc đang sử dụng ảnh cũ của mạng xã hội đó. Nếu người dùng đã tự upload ảnh cá nhân, hệ thống sẽ tôn trọng và bảo vệ lựa chọn đó.
+
 ---
 
-_Last Updated: 2026-05-10_
+_Last Updated: 2026-05-11_

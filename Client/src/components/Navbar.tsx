@@ -34,22 +34,34 @@ export default function Navbar() {
 
    useEffect(() => {
       const syncSession = async () => {
-         if (isLoggedIn && prevIsLoggedIn.current) {
+         // Nếu đã đăng nhập, thực hiện refresh ngầm để đồng bộ dữ liệu mới nhất
+         if (isLoggedIn) {
             try {
                const freshUser = await authService.refresh();
                if (freshUser) setAuth(freshUser);
             } catch (error: unknown) {
-               // Silence 401/403 sync errors as they are expected when session expires
                const err = error as { status?: number; message?: string };
-               if (err?.status !== 401 && err?.status !== 403) {
-                  console.error("[Navbar] Session sync failed:", err.message || err);
+               if (err?.status === 401 || err?.status === 403) {
+                  // Session hết hạn
+                  logout();
                }
             }
          }
-         prevIsLoggedIn.current = isLoggedIn;
+         // Nếu chưa đăng nhập trong store nhưng đã mount, thử refresh xem có session cookie không
+         else if (mounted) {
+            try {
+               const freshUser = await authService.refresh();
+               if (freshUser) setAuth(freshUser);
+            } catch (e) {
+               // Không có session, bỏ qua
+            }
+         }
       };
-      syncSession();
-   }, [isLoggedIn, setAuth]);
+
+      if (mounted) {
+         syncSession();
+      }
+   }, [isLoggedIn, mounted, setAuth, logout]);
 
    // Tối ưu check partner để hỗ trợ cả data cũ và mới trong store
    const isPartner = user?.roles?.includes("ROLE_PARTNER");
@@ -148,7 +160,7 @@ export default function Navbar() {
                            className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 hover:bg-white/10 transition-all active:scale-95"
                         >
                            <div className="relative">
-                              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 border-2 border-white shadow-sm overflow-hidden">
+                              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-linear-to-tr from-blue-600 to-indigo-500 border-2 border-white shadow-sm overflow-hidden">
                                  {user?.avatarUrl ? (
                                     <Image
                                        src={user.avatarUrl}

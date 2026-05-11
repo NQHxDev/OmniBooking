@@ -68,6 +68,7 @@ export const authService = {
                   withCredentials: true,
                   // @ts-expect-error - Custom axios config flag for interceptor
                   _skipToast: true,
+                  _skipRedirect: true,
                }
             )) as unknown as ApiResponse<User>;
             return response.data;
@@ -98,5 +99,15 @@ export const authService = {
     */
    resetPassword: async (payload: { token: string; newPassword: string; logoutAll?: boolean }) => {
       return apiClient.post<ApiResponse<void>>("/auth/reset-password", payload);
+   },
+
+   /**
+    * Gets the OAuth2 Auth URL for a specific provider.
+    */
+   getOAuth2Url: async (provider: string): Promise<ApiResponse<string>> => {
+      const response = (await apiClient.get(`/auth/${provider}/url`, {
+         withCredentials: true,
+      })) as unknown as ApiResponse<string>;
+      return response;
    },
 };

@@ -80,7 +80,13 @@
       "successResetDesc": "You can now use your new password to login",
       "successForgot": "Check your Email",
       "successForgotDesc": "We have sent a password reset link to your email. Please check your inbox (including spam)",
-      "logoutAllDevices": "Sign out from all other devices"
+      "logoutAllDevices": "Sign out from all other devices",
+      "verifyingLogin": "Verifying your login",
+      "callbackSubtext": "Please wait a moment while we prepare your session",
+      "loginFailed": "Login Failed",
+      "redirectingToLogin": "Redirecting to login page...",
+      "loginSuccess": "Login Successful!",
+      "googleLoginError": "Could not connect to Google. Please try again later!"
    },
    "Errors": {
       "AUTH_001": "Username already exists",
@@ -93,6 +99,7 @@
       "AUTH_008": "User not found",
       "AUTH_010": "Invalid or expired reset token",
       "AUTH_011": "Rate limit exceeded, please try again later",
+      "AUTH_012": "Google authentication failed or was cancelled",
       "GEN_999": "An unexpected error occurred",
       "GEN_500": "Internal server error",
       "FORBIDDEN": "You do not have permission to perform this action"

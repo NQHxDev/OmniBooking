@@ -24,6 +24,24 @@ public class AppProperties {
    private final Security security = new Security();
    private final Mail mail = new Mail();
    private final Cloudinary cloudinary = new Cloudinary();
+   private final Oauth2 oauth2 = new Oauth2();
+
+   @Data
+   public static class Oauth2 {
+      private final Google google = new Google();
+
+      @Data
+      public static class Google {
+         @NotBlank
+         private String clientId;
+         @NotBlank
+         private String clientSecret;
+         @NotBlank
+         private String redirectUri;
+         @NotBlank
+         private String frontendCallbackUrl;
+      }
+   }
 
    @Data
    public static class Security {

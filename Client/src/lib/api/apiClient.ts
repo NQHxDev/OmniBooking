@@ -64,7 +64,7 @@ apiClient.interceptors.response.use(
 
       // Only show global toast if not explicitly skipped
       if (status === 401 && (errorCode === "AUTH_005" || errorCode === "AUTH_007")) {
-         if (typeof window !== "undefined") {
+         if (typeof window !== "undefined" && !originalRequest?._skipRedirect) {
             localStorage.removeItem("auth-storage");
             window.location.href = "/auth/login";
          }

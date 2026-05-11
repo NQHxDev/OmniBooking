@@ -20,10 +20,14 @@ import com.omnibooking.services.VerificationService;
 import com.omnibooking.util.CookieUtils;
 import com.omnibooking.util.SecurityUtils;
 import com.omnibooking.mapper.UserMapper;
+import com.omnibooking.model.SocialAccount;
+import com.omnibooking.repository.SocialAccountRepository;
+import com.omnibooking.dto.oauth.OAuth2UserInfo;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +59,7 @@ public class AuthServiceImpl implements AuthService {
    private final BloomFilterService bloomFilterService;
    private final UserMapper userMapper;
    private final MailService mailService;
+   private final SocialAccountRepository socialAccountRepository;
 
    @Value("${app.security.cookie-secure:false}")
    private boolean cookieSecure;
@@ -82,11 +87,11 @@ public class AuthServiceImpl implements AuthService {
       bloomFilterService.add(savedUser.getEmail());
 
       // Create Profile
-      String[] nameParts = request.getFullName().split(" ", 2);
+      String[] nameParts = splitFullName(request.getFullName());
       UserProfile profile = UserProfile.builder()
             .user(savedUser)
             .firstName(nameParts[0])
-            .lastName(nameParts.length > 1 ? nameParts[1] : "")
+            .lastName(nameParts[1])
             .build();
       userProfileRepository.save(Objects.requireNonNull(profile));
 
@@ -190,6 +195,12 @@ public class AuthServiceImpl implements AuthService {
 
       user.setIsActive(true);
       userRepository.save(user);
+
+      // Update Profile verification status
+      userProfileRepository.findByUserId(userId).ifPresent(p -> {
+         p.setIsVerified(true);
+         userProfileRepository.save(p);
+      });
    }
 
    /**
@@ -205,7 +216,24 @@ public class AuthServiceImpl implements AuthService {
 
       String accessToken = jwtService.generateAccessToken(user.getId(), roles, sessionId, fgpHash);
 
-      String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
+      String fullName;
+      if (profile != null) {
+         String first = profile.getFirstName() != null ? profile.getFirstName().trim() : "";
+         String last = profile.getLastName() != null ? profile.getLastName().trim() : "";
+
+         if (first.isEmpty())
+            fullName = last;
+         else if (last.isEmpty())
+            fullName = first;
+         else if (first.toLowerCase().contains(last.toLowerCase()))
+            fullName = first;
+         else if (last.toLowerCase().contains(first.toLowerCase()))
+            fullName = last;
+         else
+            fullName = first + " " + last;
+      } else {
+         fullName = user.getUsername();
+      }
 
       sessionService.saveSession(user.getId(), user.getUsername(), user.getEmail(), fullName, roles,
             sessionId, refreshToken, ip, userAgent);
@@ -250,11 +278,11 @@ public class AuthServiceImpl implements AuthService {
       // 1. Rate Limiting check (3 requests per 1 minute)
       String rateLimitKey = "rate_limit:forgot_password:" + email;
       Long count = redisTemplate.opsForValue().increment(rateLimitKey);
-      
+
       if (count != null && count == 1) {
          redisTemplate.expire(rateLimitKey, 1, TimeUnit.MINUTES);
       }
-      
+
       if (count != null && count > 3) {
          log.warn("Forgot password rate limit exceeded for email: {}", email);
          throw new AppException(ErrorCode.RATE_LIMIT_EXCEEDED);
@@ -270,7 +298,24 @@ public class AuthServiceImpl implements AuthService {
          redisTemplate.opsForValue().set(redisKey, Objects.requireNonNull(email), 15, TimeUnit.MINUTES);
 
          UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
-         String fullName = profile != null ? profile.getFirstName() + " " + profile.getLastName() : user.getUsername();
+         String fullName;
+         if (profile != null) {
+            String first = profile.getFirstName() != null ? profile.getFirstName().trim() : "";
+            String last = profile.getLastName() != null ? profile.getLastName().trim() : "";
+
+            if (first.isEmpty())
+               fullName = last;
+            else if (last.isEmpty())
+               fullName = first;
+            else if (first.toLowerCase().contains(last.toLowerCase()))
+               fullName = first;
+            else if (last.toLowerCase().contains(first.toLowerCase()))
+               fullName = last;
+            else
+               fullName = first + " " + last;
+         } else {
+            fullName = user.getUsername();
+         }
 
          log.info("Sending forgot password email to: {}", email);
          mailService.sendForgotPasswordEmail(email, fullName, token);
@@ -305,4 +350,116 @@ public class AuthServiceImpl implements AuthService {
       log.info("Password reset successfully for user: {}", email);
    }
 
+   @Override
+   @Transactional
+   public AuthResponse loginWithOAuth2(String provider, OAuth2UserInfo userInfo, String ip, String userAgent,
+         HttpServletResponse response) {
+      // 1. Check if social account already exists
+      String providerUpper = provider.toUpperCase();
+      SocialAccount socialAccount = socialAccountRepository.findByProviderAndProviderId(providerUpper, userInfo.getId())
+            .orElse(null);
+
+      User user;
+      UserProfile profile = null;
+      Set<String> roles;
+
+      if (socialAccount != null) {
+         // User already exists, fetch them
+         user = socialAccount.getUser();
+         roles = user.getRoles().stream().map(Role::getName).collect(Collectors.toSet());
+         profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+
+         // Sync profile info if changed
+         if (profile != null) {
+            boolean changed = false;
+            String[] nameParts = splitFullName(userInfo.getName());
+            String targetFirst = nameParts[0];
+            String targetLast = nameParts[1];
+
+            if (userInfo.getPicture() != null && !userInfo.getPicture().equals(profile.getAvatarUrl())) {
+               if (profile.getAvatarUrl() == null || profile.getAvatarUrl().contains("googleusercontent.com")) {
+                  profile.setAvatarUrl(userInfo.getPicture());
+                  changed = true;
+               }
+            }
+            if (!targetFirst.isEmpty() && !targetFirst.equals(profile.getFirstName())) {
+               profile.setFirstName(targetFirst);
+               changed = true;
+            }
+            if (!targetLast.isEmpty() && !targetLast.equals(profile.getLastName())) {
+               profile.setLastName(targetLast);
+               changed = true;
+            }
+            // Google users are always verified
+            if (Boolean.FALSE.equals(profile.getIsVerified())) {
+               profile.setIsVerified(true);
+               changed = true;
+            }
+            if (changed) {
+               profile = userProfileRepository.save(Objects.requireNonNull(profile));
+            }
+         }
+      } else {
+         // Check if user with this email already exists
+         user = userRepository.findByEmail(userInfo.getEmail()).orElse(null);
+
+         if (user == null) {
+            // New User
+            Role userRole = roleRepository.findByName("ROLE_USER")
+                  .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+
+            user = User.builder()
+                  .username(userInfo.getEmail()) // Use email as default username
+                  .email(userInfo.getEmail())
+                  .isActive(true)
+                  .roles(new HashSet<>(Collections.singleton(userRole)))
+                  .build();
+            user = userRepository.save(Objects.requireNonNull(user));
+
+            // Update Bloom Filter
+            bloomFilterService.add(user.getEmail());
+
+            // Create Profile
+            String[] nameParts = splitFullName(userInfo.getName());
+            profile = UserProfile.builder()
+                  .user(user)
+                  .firstName(nameParts[0])
+                  .lastName(nameParts[1])
+                  .avatarUrl(userInfo.getPicture())
+                  .isVerified(true)
+                  .build();
+            profile = userProfileRepository.save(Objects.requireNonNull(profile));
+         } else {
+            // Existing user, just link social account
+            profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+         }
+
+         // 4. Link social account
+         SocialAccount newSocialAccount = SocialAccount.builder()
+               .user(user)
+               .provider(providerUpper)
+               .providerId(userInfo.getId())
+               .build();
+         socialAccountRepository.save(Objects.requireNonNull(newSocialAccount));
+
+         roles = user.getRoles().stream().map(Role::getName).collect(Collectors.toSet());
+      }
+
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response);
+   }
+
+   private String[] splitFullName(String fullName) {
+      if (fullName == null || fullName.isBlank()) {
+         return new String[] { "", "" };
+      }
+      String trimmed = fullName.trim();
+      int lastSpaceIndex = trimmed.lastIndexOf(' ');
+      if (lastSpaceIndex == -1) {
+         return new String[] { trimmed, "" };
+      }
+      return new String[] {
+            trimmed.substring(0, lastSpaceIndex).trim(),
+            trimmed.substring(lastSpaceIndex + 1).trim()
+      };
+   }
 }
