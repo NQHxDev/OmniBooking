@@ -41,6 +41,20 @@ public class AppProperties {
          @NotBlank
          private String frontendCallbackUrl;
       }
+
+      private final Zalo zalo = new Zalo();
+
+      @Data
+      public static class Zalo {
+         @NotBlank
+         private String clientId;
+         @NotBlank
+         private String clientSecret;
+         @NotBlank
+         private String redirectUri;
+         @NotBlank
+         private String frontendCallbackUrl;
+      }
    }
 
    @Data

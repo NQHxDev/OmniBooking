@@ -37,7 +37,7 @@ export default function Home() {
                      fill
                      className="object-cover opacity-80 group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent" />
                   <div className="absolute bottom-6 left-6 text-white">
                      <h3 className="text-2xl font-bold">Giảm giá cho kỳ nghỉ hè</h3>
                      <p className="mt-2 text-sm">
@@ -55,7 +55,7 @@ export default function Home() {
                      fill
                      className="object-cover opacity-80 group-hover:scale-105 transition-transform duration-500"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent" />
                   <div className="absolute bottom-6 left-6 text-white">
                      <h3 className="text-2xl font-bold">Khám phá Hà Nội</h3>
                      <p className="mt-2 text-sm">
@@ -115,7 +115,7 @@ export default function Home() {
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
                      />
                      <div className="absolute top-4 left-4 flex items-center gap-2 text-white drop-shadow-md">
-                        <span className="text-xl font-bold">Đà Nẵng</span>
+                        <span className="text-xl font-bold">Quảng Ninh</span>
                         <Image
                            src="https://flagcdn.com/vn.svg"
                            alt="VN Flag"

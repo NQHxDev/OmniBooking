@@ -2,17 +2,7 @@
 
 import { Link } from "@/i18n/routing";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import {
-   Mail,
-   Lock,
-   User,
-   ArrowRight,
-   ChevronLeft,
-   Apple,
-   Loader2,
-   Eye,
-   EyeOff,
-} from "lucide-react";
+import { Mail, Lock, User, ArrowRight, ChevronLeft, Loader2, Eye, EyeOff } from "lucide-react";
 
 import { useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -290,16 +280,16 @@ export default function AuthPage() {
                      </button>
                      <button
                         type="button"
-                        onClick={() => handleOAuthLogin("apple")}
+                        onClick={() => handleOAuthLogin("zalo")}
                         disabled={loading}
-                        className="flex items-center justify-center gap-2 rounded-xl bg-black py-3.5 text-sm font-bold text-white shadow-sm hover:bg-zinc-800 transition-all active:scale-[0.98] disabled:opacity-70 cursor-pointer"
+                        className="flex items-center justify-center gap-2 rounded-xl bg-[#0068ff] py-3.5 text-sm font-bold text-white shadow-sm hover:bg-[#0055d4] transition-all active:scale-[0.98] disabled:opacity-70 cursor-pointer"
                      >
                         {loading ? (
                            <Loader2 className="h-5 w-5 animate-spin text-white" />
                         ) : (
                            <>
-                              <Apple className="h-5 w-5" />
-                              Apple
+                              <ZaloIcon className="h-5 w-5" />
+                              Zalo
                            </>
                         )}
                      </button>
@@ -308,6 +298,17 @@ export default function AuthPage() {
             </div>
          </div>
       </div>
+   );
+}
+
+function ZaloIcon({ className }: { className?: string }) {
+   return (
+      <svg viewBox="0 0 48 48" className={className} xmlns="http://www.w3.org/2000/svg">
+         <path
+            fill="currentColor"
+            d="M38.86 21c-2.3-5.2-12.86-9-14.86-9S9.26 15.8 7 21a11.16 11.16 0 0 0 0 8c2.26 5.2 12.86 9 14.86 9a38.42 38.42 0 0 0 6.64-.6A22.5 22.5 0 0 1 31.83 40c2.8 1.44 5 .51 5-2a13.31 13.31 0 0 0-1.28-4.63A14 14 0 0 0 38.86 29a11.16 11.16 0 0 0 0-8Zm-15 10a7.07 7.07 0 0 1-5.1-2.14 7.21 7.21 0 0 1-2.12-5.11A7.23 7.23 0 0 1 23.86 16.5a7.22 7.22 0 0 1 7.22 7.25 7.24 7.24 0 0 1-7.22 7.25Z"
+         />
+      </svg>
    );
 }
 
