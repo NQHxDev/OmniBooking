@@ -47,6 +47,14 @@ export const propertyService = {
          "/properties/search",
          { params }
       );
-      return response.data.data;
+      return (
+         response.data.data || {
+            content: [],
+            totalElements: 0,
+            totalPages: 0,
+            size: 10,
+            number: 0,
+         }
+      );
    },
 };

@@ -25,6 +25,13 @@ public class AppProperties {
    private final Mail mail = new Mail();
    private final Cloudinary cloudinary = new Cloudinary();
    private final Oauth2 oauth2 = new Oauth2();
+   private final Geo geo = new Geo();
+
+   @Data
+   public static class Geo {
+      private String dbPath = "geo/GeoLite2-City.mmdb";
+      private String defaultCountry = "VN";
+   }
 
    @Data
    public static class Oauth2 {

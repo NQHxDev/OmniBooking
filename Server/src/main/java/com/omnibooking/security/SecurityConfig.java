@@ -77,17 +77,20 @@ public class SecurityConfig {
 
       http
             .csrf(AbstractHttpConfigurer::disable)
-            .cors(Customizer.withDefaults()) // Uses corsConfigurationSource bean
+            .cors(Customizer.withDefaults())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                   .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                   .requestMatchers("/auth/**").permitAll()
-                  .requestMatchers("/search/**").permitAll() // Allow public search
-                  .requestMatchers("/partner/**").authenticated() // Explicitly require auth for partner
+                  .requestMatchers("/properties/search", "/properties/search/**").permitAll()
+                  .requestMatchers("/destinations", "/destinations/**").permitAll()
                   .requestMatchers("/health/**").permitAll()
                   .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                   .requestMatchers("/actuator/**").permitAll()
+                  // Allow public property details view if needed
+                  .requestMatchers(HttpMethod.GET, "/properties/**").permitAll() 
                   .anyRequest().authenticated())
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(exceptions -> exceptions
                   .authenticationEntryPoint((request, response, authException) -> {
                      String requestId = (String) request.getAttribute("requestId");

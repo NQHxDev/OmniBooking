@@ -203,6 +203,13 @@
 			<artifactId>logstash-logback-encoder</artifactId>
 			<version>8.0</version>
 		</dependency>
+
+		<!-- GeoIP2 for Location Detection -->
+		<dependency>
+			<groupId>com.maxmind.geoip2</groupId>
+			<artifactId>geoip2</artifactId>
+			<version>4.2.1</version>
+		</dependency>
 	</dependencies>
 
 	<build>

@@ -245,6 +245,27 @@ Kiến trúc tìm kiếm của OmniBooking được thiết kế để xử lý 
    - **Cluster Level**: Sử dụng câu lệnh SQL `FOR UPDATE SKIP LOCKED` giúp nhiều instance có thể chạy song song mà không tranh chấp hoặc xử lý trùng lặp dữ liệu.
 - **Data Integrity**: Payload của sự kiện được lưu trữ dưới dạng JSON kèm theo thông tin `payload_class` để đảm bảo việc giải mã chính xác tại worker trước khi gửi đi.
 
+## 17. Global Search & Discovery Engine
+
+Hệ thống tìm kiếm của OmniBooking được thiết kế để mang lại trải nghiệm nhanh chóng, chính xác và mang tính khám phá cao, tương đương với các tiêu chuẩn của Airbnb hay Booking.com.
+
+### 17.1. Hybrid Search Architecture (Elasticsearch + Postgres)
+
+- **Search Index (Elasticsearch)**: Toàn bộ dữ liệu về địa danh (Cities, Regions, Hotels, Landmarks) được đánh chỉ mục vào Elasticsearch.
+- **Full-text & Fuzzy Matching**: Sử dụng cơ chế `bool query` kết hợp `match_phrase_prefix` và `fuzzy` để xử lý các tìm kiếm có dấu, không dấu, hoặc gõ sai chính tả của người dùng.
+- **Unified DTO Mapping**: Backend trả về một cấu trúc `DestinationSuggestionResponse` nhất quán, hỗ trợ i18n đa ngôn ngữ cho các loại địa danh (ví dụ: City -> Thành phố, Hotel -> Khách sạn).
+
+### 17.2. Search Analytics & Discovery (Trending Logic)
+
+- **Search Logging**: Mọi hành vi tìm kiếm của người dùng đều được ghi lại vào bảng `search_logs` thông qua `SearchLogService`. Dữ liệu bao gồm: từ khóa, mã quốc gia (dựa trên IP), và tọa độ địa lý.
+- **Trending Algorithm**: Danh sách "Trending Now" được tính toán dựa trên tần suất xuất hiện của từ khóa trong 7 ngày gần nhất.
+- **Manual Boosting**: Hệ thống hỗ trợ cờ `is_boosted` trong Database để quản trị viên có thể đẩy các địa danh chiến dịch (Promotion) lên vị trí đầu tiên của danh sách gợi ý.
+
+### 17.3. Internationalization (i18n) Strategy
+
+- **Dynamic Labels**: Các loại địa danh (Type Labels) được dịch động tại Frontend dựa trên namespace `Common.Search` trong các tệp `vi.json` và `en.json`.
+- **Locale-aware Search**: Elasticsearch được cấu hình để ưu tiên các kết quả phù hợp với ngôn ngữ hiện tại của người dùng, đảm bảo trải nghiệm bản địa hóa hoàn toàn.
+
 ---
 
-_Last Updated: 2026-05-11_
+_Last Updated: 2026-05-12_
