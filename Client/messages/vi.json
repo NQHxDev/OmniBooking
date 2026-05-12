@@ -294,7 +294,10 @@
       "trendingSub": "Các lựa chọn phổ biến nhất cho du khách từ Việt Nam",
       "dalat": "Đà Lạt",
       "hanoi": "Hà Nội",
-      "quangninh": "Quảng Ninh"
+      "quangninh": "Quảng Ninh",
+      "featuredProperties": "Chỗ nghỉ nổi bật",
+      "featuredSub": "Khám phá những lựa chọn tuyệt vời nhất cho chuyến đi của bạn",
+      "noFeaturedProperties": "Hiện chưa có chỗ nghỉ nổi bật nào tại khu vực này!"
    },
    "Genius": {
       "welcomeBack": "Chào mừng trở lại, {name}!",

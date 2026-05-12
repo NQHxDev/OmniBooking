@@ -17,6 +17,7 @@ import com.omnibooking.services.BloomFilterService;
 import com.omnibooking.services.JWTService;
 import com.omnibooking.services.SessionService;
 import com.omnibooking.services.VerificationService;
+import com.omnibooking.services.OutboxService;
 import com.omnibooking.mapper.UserMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,6 +78,8 @@ class AuthServiceImplTest {
    private UserMapper userMapper;
    @Mock
    private MailService mailService;
+   @Mock
+   private OutboxService outboxService;
 
    @InjectMocks
    private AuthServiceImpl authService;
@@ -128,8 +131,8 @@ class AuthServiceImplTest {
          assertThat(result.getEmail()).isEqualTo(request.getEmail());
          verify(userRepository, times(1)).save((User) any());
          verify(bloomFilterService, times(1)).add(request.getEmail());
-         verify(eventPublisher, times(1)).publishEvent(any());
          verify(sessionService, times(1)).saveSession(any(), any(), any(), any(), any(), any(), any(), any(), any());
+         verify(outboxService, times(1)).saveEvent(any(), eq("USER"), eq("USER_REGISTERED"), any());
       }
 
       @Test
@@ -246,11 +249,12 @@ class AuthServiceImplTest {
          authService.forgotPassword(email);
 
          // Assert
-         verify(mailService, times(1)).sendForgotPasswordEmail(eq(email), anyString(), anyString());
          // Verify rate limit incremented
          verify(valueOps, times(1)).increment(startsWith("rate_limit:"));
          // Verify reset token set
          verify(valueOps, times(1)).set(startsWith("reset_token:"), eq(email), eq(15L), any(TimeUnit.class));
+         // Verify outbox event recorded
+         verify(outboxService, times(1)).saveEvent(any(), eq("USER"), eq("FORGOT_PASSWORD"), any());
       }
 
       @Test

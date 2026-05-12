@@ -8,6 +8,7 @@ import com.omnibooking.repository.PropertyRepository;
 import com.omnibooking.services.PropertyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,9 +85,29 @@ public class PropertyServiceImpl implements PropertyService {
             .toList();
    }
 
+   @Override
+   @Cacheable(value = "properties", key = "'featured:' + #limit")
+   public List<PropertyResponse> getFeaturedProperties(int limit) {
+      log.info("Fetching {} featured properties", limit);
+      List<Property> properties = propertyRepository
+            .findFeaturedProperties(org.springframework.data.domain.PageRequest.of(0, limit));
+
+      return properties.stream()
+            .map(p -> PropertyResponse.builder()
+                  .id(p.getId())
+                  .name(p.getName())
+                  .propertyType(p.getPropertyType().name())
+                  .city(p.getCity())
+                  .country(p.getCountry())
+                  .imageUrl(getMainImageUrl(p.getId()))
+                  .build())
+            .toList();
+   }
+
    private String getMainImageUrl(UUID propertyId) {
       return mediaRepository.findFirstByEntityIdAndEntityTypeAndIsMainTrue(propertyId, "PROPERTY")
             .map(com.omnibooking.model.Media::getUrl)
             .orElse(null);
    }
+
 }

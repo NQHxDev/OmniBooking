@@ -1,6 +1,7 @@
 import Navbar from "@/components/Navbar";
 import GeniusBanner from "@/components/GeniusBanner";
 import SearchBar from "@/components/SearchBar";
+import FeaturedProperties from "@/components/FeaturedProperties";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 
@@ -131,6 +132,9 @@ export default function Home() {
                   </div>
                </div>
             </div>
+
+            {/* Featured Properties from DB */}
+            <FeaturedProperties />
 
             {/* Loyalty/Genius Section */}
             <GeniusBanner />

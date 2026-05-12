@@ -36,20 +36,16 @@ public class DestinationServiceImpl implements DestinationService {
 
    @Override
    public List<DestinationSuggestionResponse> getTrending(String countryCode) {
-      List<String> trendingQueries = trendingService.getTrendingDestinations(countryCode, 10);
+      List<String> trendingQueries = trendingService.getTrendingDestinations(countryCode, 8);
 
-      // For each trending query, find the best match and ensure uniqueness by ID
       return trendingQueries.stream()
             .map(query -> destinationRepository.searchByName(query))
             .filter(docs -> !docs.isEmpty())
             .map(docs -> docs.get(0))
-            .collect(Collectors.toMap(
-                  DestinationDocument::getId,
-                  doc -> doc,
-                  (existing, replacement) -> existing // Keep the first one found
-            ))
+            .collect(Collectors.toMap(DestinationDocument::getId, doc -> doc, (existing, replacement) -> existing))
             .values()
             .stream()
+            .limit(5)
             .map(this::mapToResponse)
             .collect(Collectors.toList());
    }

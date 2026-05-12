@@ -294,7 +294,10 @@
       "trendingSub": "Most popular choices for travelers from Vietnam",
       "dalat": "Da Lat",
       "hanoi": "Hanoi",
-      "quangninh": "Quang Ninh"
+      "quangninh": "Quang Ninh",
+      "featuredProperties": "Featured Properties",
+      "featuredSub": "Discover the best options for your next trip",
+      "noFeaturedProperties": "No featured properties available at the moment!"
    },
    "Genius": {
       "welcomeBack": "Welcome back, {name}!",

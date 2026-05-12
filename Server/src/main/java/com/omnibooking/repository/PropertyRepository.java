@@ -13,4 +13,7 @@ public interface PropertyRepository extends JpaRepository<Property, UUID>, JpaSp
 
    List<Property> findByOwnerId(UUID ownerId);
 
+   @org.springframework.data.jpa.repository.Query("SELECT p FROM Property p WHERE p.isActive = true ORDER BY p.createdAt DESC")
+   List<Property> findFeaturedProperties(org.springframework.data.domain.Pageable pageable);
+
 }
