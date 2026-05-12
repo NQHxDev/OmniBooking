@@ -2,66 +2,107 @@
 <configuration>
 
    <property name="LOG_PATH" value="logs" />
-   <property name="LOG_FILE" value="omnibooking-server" />
+   <property name="ARCHIVE_PATH" value="${LOG_PATH}/archive" />
+
+   <!-- Color patterns for console -->
+   <conversionRule conversionWord="clr" converterClass="org.springframework.boot.logging.logback.ColorConverter" />
+   <conversionRule conversionWord="wex" converterClass="org.springframework.boot.logging.logback.WhitespaceThrowableProxyConverter" />
+   <conversionRule conversionWord="wEx" converterClass="org.springframework.boot.logging.logback.ExtendedWhitespaceThrowableProxyConverter" />
+
+   <property name="CONSOLE_LOG_PATTERN" value="${CONSOLE_LOG_PATTERN:-%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"/>
+   <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId}] %-5level [%thread] %logger{36} - %m%n" />
 
    <!-- Console Appender -->
    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
       <encoder>
-         <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId}] %-5level [%thread] %logger{36} - %msg%n</pattern>
+         <pattern>${CONSOLE_LOG_PATTERN}</pattern>
       </encoder>
    </appender>
 
-   <!-- Rolling File Appender (JSON for Production) -->
-   <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-      <file>${LOG_PATH}/${LOG_FILE}-json.log</file>
+   <!-- System Log (Framework & General App) -->
+   <appender name="SYSTEM_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <file>${LOG_PATH}/system.log</file>
       <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-         <fileNamePattern>${LOG_PATH}/${LOG_FILE}-json.%d{yyyy-MM-dd}.gz</fileNamePattern>
+         <!-- Move to archive folder and compress daily -->
+         <fileNamePattern>${ARCHIVE_PATH}/%d{yyyy-MM, aux}/%d{yyyy-MM-dd, aux}/system.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
          <maxHistory>30</maxHistory>
-         <totalSizeCap>1GB</totalSizeCap>
-      </rollingPolicy>
-      <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-         <providers>
-            <timestamp/>
-            <version/>
-            <message/>
-            <loggerName/>
-            <threadName/>
-            <logLevel/>
-            <mdc/> <!-- Includes requestId -->
-            <stackTrace/>
-         </providers>
-      </encoder>
-   </appender>
-
-   <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-      <file>${LOG_PATH}/${LOG_FILE}.log</file>
-      <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-         <!-- Daily rollover -->
-         <fileNamePattern>${LOG_PATH}/${LOG_FILE}.%d{yyyy-MM-dd}.gz</fileNamePattern>
-         <!-- Keep 30 days' worth of history -->
-         <maxHistory>30</maxHistory>
-         <totalSizeCap>1GB</totalSizeCap>
       </rollingPolicy>
       <encoder>
-         <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId}] %-5level [%thread] %logger{36} - %msg%n</pattern>
+         <pattern>${FILE_LOG_PATTERN}</pattern>
       </encoder>
    </appender>
 
-   <!-- Logging levels -->
+   <!-- Request Success Log (2xx/3xx) -->
+   <appender name="REQUEST_SUCCESS_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <file>${LOG_PATH}/request_success.log</file>
+      <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+         <fileNamePattern>${ARCHIVE_PATH}/%d{yyyy-MM, aux}/%d{yyyy-MM-dd, aux}/request_success.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+         <maxHistory>30</maxHistory>
+      </rollingPolicy>
+      <encoder>
+         <pattern>${FILE_LOG_PATTERN}</pattern>
+      </encoder>
+   </appender>
+
+   <!-- Request Error Log (4xx) -->
+   <appender name="REQUEST_ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <file>${LOG_PATH}/request_error.log</file>
+      <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+         <fileNamePattern>${ARCHIVE_PATH}/%d{yyyy-MM, aux}/%d{yyyy-MM-dd, aux}/request_error.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+         <maxHistory>30</maxHistory>
+      </rollingPolicy>
+      <encoder>
+         <pattern>${FILE_LOG_PATTERN}</pattern>
+      </encoder>
+   </appender>
+
+   <!-- System Error Log (5xx & Exceptions) -->
+   <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+      <file>${LOG_PATH}/error.log</file>
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+         <level>ERROR</level>
+      </filter>
+      <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+         <fileNamePattern>${ARCHIVE_PATH}/%d{yyyy-MM, aux}/%d{yyyy-MM-dd, aux}/error.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+         <maxHistory>90</maxHistory>
+      </rollingPolicy>
+      <encoder>
+         <pattern>${FILE_LOG_PATTERN}</pattern>
+      </encoder>
+   </appender>
+
+   <!-- Loggers -->
+
+   <!-- Request Success Logger -->
+   <logger name="com.omnibooking.request.success" level="INFO" additivity="false">
+      <appender-ref ref="REQUEST_SUCCESS_FILE" />
+      <appender-ref ref="CONSOLE" />
+   </logger>
+
+   <!-- Request Error Logger -->
+   <logger name="com.omnibooking.request.error" level="INFO" additivity="false">
+      <appender-ref ref="REQUEST_ERROR_FILE" />
+      <appender-ref ref="ERROR_FILE" />
+      <appender-ref ref="CONSOLE" />
+   </logger>
+
+   <!-- App Logic Logger (com.omnibooking) -->
+   <logger name="com.omnibooking" level="DEBUG" additivity="false">
+      <appender-ref ref="SYSTEM_FILE" />
+      <appender-ref ref="ERROR_FILE" />
+      <appender-ref ref="CONSOLE" />
+   </logger>
+
+   <!-- Root Logger (Spring, Hibernate, etc) -->
    <root level="INFO">
       <appender-ref ref="CONSOLE" />
-      <springProfile name="dev">
-         <appender-ref ref="FILE" />
-      </springProfile>
-      <springProfile name="prod">
-         <appender-ref ref="JSON_FILE" />
-      </springProfile>
+      <appender-ref ref="SYSTEM_FILE" />
+      <appender-ref ref="ERROR_FILE" />
    </root>
 
-   <!-- Kafka silencing -->
+   <!-- Silence noisy libraries -->
    <logger name="org.apache.kafka" level="ERROR" />
-
-   <logger name="org.springframework" level="INFO" />
-   <logger name="com.omnibooking" level="DEBUG" />
+   <logger name="org.hibernate" level="WARN" />
+   <logger name="org.springframework.web" level="INFO" />
 
 </configuration>

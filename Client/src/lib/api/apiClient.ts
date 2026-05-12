@@ -1,10 +1,7 @@
 import axios from "axios";
 import { v7 as uuidv7 } from "uuid";
-import { env } from "@/env";
 import { toast } from "sonner";
 import { getBaseURL } from "./config";
-
-// Remove useAuthStore to avoid circular dependency
 
 const apiClient = axios.create({
    baseURL: getBaseURL(),
@@ -15,24 +12,39 @@ const apiClient = axios.create({
    },
 });
 
-// Request Interceptor
 apiClient.interceptors.request.use(
    (config) => {
-      // Inject Request ID
+      // Inject Request ID for distributed tracing
       config.headers["X-Request-ID"] = uuidv7();
-
-      // Add Auth Token if available (to be implemented with Zustand)
-      // const token = useAuthStore.getState().token;
-      // if (token) config.headers.Authorization = `Bearer ${token}`;
 
       return config;
    },
    (error) => Promise.reject(error)
 );
 
+// Global variables for synchronized refresh
+interface PromiseHandlers {
+   resolve: (value?: unknown) => void;
+   reject: (reason?: unknown) => void;
+}
+
+let isRefreshing = false;
+let failedQueue: PromiseHandlers[] = [];
+
+const processQueue = (error: unknown, token: string | null = null) => {
+   failedQueue.forEach((prom) => {
+      if (error) {
+         prom.reject(error);
+      } else {
+         prom.resolve(token);
+      }
+   });
+   failedQueue = [];
+};
+
 // Response Interceptor
 apiClient.interceptors.response.use(
-   (response) => response.data, // Return only the data (ApiResponse structure)
+   (response) => response.data,
    async (error) => {
       const originalRequest = error.config;
       const status = error.response ? error.response.status : null;
@@ -41,25 +53,43 @@ apiClient.interceptors.response.use(
 
       const errorCode = error.response?.data?.errorCode;
 
+      // Handle Token Expired (AUTH_006)
       if (status === 401 && errorCode === "AUTH_006" && !originalRequest._retry) {
-         originalRequest._retry = true;
-
-         try {
-            console.log("Token expired, attempting refresh...");
-            // Call refresh endpoint (cookies are handled by browser)
-            await axios.post(`${getBaseURL()}auth/refresh`, {}, { withCredentials: true });
-
-            console.log("Refresh successful, retrying original request...");
-            // Retry the original request
-            return apiClient(originalRequest);
-         } catch (refreshError: unknown) {
-            console.error("Refresh failed, logging out...", refreshError);
-            if (typeof window !== "undefined") {
-               localStorage.removeItem("auth-storage");
-               window.location.href = "/auth/login";
-            }
-            return Promise.reject(refreshError);
+         if (isRefreshing) {
+            // If refresh is already in progress, add this request to the queue
+            return new Promise((resolve, reject) => {
+               failedQueue.push({ resolve, reject });
+            })
+               .then(() => {
+                  return apiClient(originalRequest);
+               })
+               .catch((err) => {
+                  return Promise.reject(err);
+               });
          }
+
+         originalRequest._retry = true;
+         isRefreshing = true;
+
+         return new Promise((resolve, reject) => {
+            axios
+               .post(`${getBaseURL()}auth/refresh`, {}, { withCredentials: true })
+               .then(() => {
+                  processQueue(null);
+                  resolve(apiClient(originalRequest));
+               })
+               .catch((refreshError) => {
+                  processQueue(refreshError);
+                  if (typeof window !== "undefined") {
+                     localStorage.removeItem("auth-storage");
+                     window.location.href = "/auth/login";
+                  }
+                  reject(refreshError);
+               })
+               .finally(() => {
+                  isRefreshing = false;
+               });
+         });
       }
 
       // Only show global toast if not explicitly skipped

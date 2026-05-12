@@ -57,11 +57,14 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 ### Observability & Traceability
 
 - **Request Tracing**: `RequestIdFilter` generates a unique `X-Request-ID` for every request.
-- **Professional & Structured Logging**:
-   - **AOP Logging**: Automatic logging of method entry/exit for all controllers.
-   - **JSON Logging (Production)**: Uses `Logstash Logback Encoder` to output logs in structured JSON format for easy ingestion into ELK/CloudWatch (enabled via `prod` profile).
-   - **MDC Integration**: Trace ID is automatically injected into every log line.
-   - **Log Rotation**: Automated daily log compression and 30-day retention.
+   - **4-Layer Split Logging**: Hệ thống phân tách log thành 4 luồng riêng biệt để tối ưu giám sát:
+      - `system.log`: Hoạt động chung của hệ thống.
+      - `request_success.log`: Toàn bộ request thành công (2xx) kèm theo thời gian xử lý (`execution time`).
+      - `request_error.log`: Các lỗi nghiệp vụ và client (4xx, Validation).
+      - `error.log`: Các lỗi nghiêm trọng (5xx) và Exceptions.
+   - **Hierarchical Archiving**: Log cũ được nén `.gz` và lưu trữ theo cấu trúc thư mục `logs/archive/YYYY-MM/YYYY-MM-DD/` để quản lý gọn gàng và dễ dàng truy xuất theo thời gian.
+   - **Execution Time Tracking**: Sử dụng AOP (`LoggingAspect`) để đo lường và ghi nhận độ trễ (latency) của từng request ngay trong log.
+   - **MDC Integration**: Trace ID (`requestId`) được tự động tiêm vào mọi dòng log để liên kết dữ liệu giữa 4 file log khác nhau.
 
 - **Health Monitoring**: Integrated Spring Boot Actuator for real-time system monitoring.
 - **Request Context**: `RequestContextHolder` (ThreadLocal) provides global access to request-scoped data (Trace ID, User ID), similar to NestJS ExecutionContext.
@@ -71,9 +74,9 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 ### API Architecture
 
 - **Axios Client**: Centralized `apiClient` with interceptors for:
-   - Automatic `X-Request-ID` generation for cross-system traceability.
-   - Global error handling and response normalization.
-   - Environment-based `BASE_URL` configuration.
+   - **Cross-system Traceability**: Tự động tạo và đính kèm `X-Request-ID`.
+   - **Synchronized Refresh Queue**: Cơ chế hàng đợi thông minh giúp chặn đứng việc gọi `refresh` token trùng lặp. Khi có nhiều request cùng bị lỗi 401, chỉ có duy nhất 1 request `refresh` được gửi đi, các request còn lại sẽ nằm trong hàng đợi và tự động thực hiện lại sau khi có session mới.
+   - **Global Error Normalization**: Chuyển đổi mã lỗi backend thành thông báo thân thiện cho người dùng.
 
 ### State Management
 

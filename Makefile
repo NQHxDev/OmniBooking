@@ -1,10 +1,9 @@
-iffile := $(wildcard .env)
-ifneq ($(iffile),)
-  include .env
-  export $(shell sed 's/=.*//' .env)
+ifneq (,$(wildcard .env))
+	include .env
+	export
 endif
 
-.PHONY: dev dev-server dev-client docker-infra docker-up docker-down docker-stop logs install restart build clean help
+.PHONY: dev dev-server dev-client docker-infra docker-up docker-down docker-stop logs install restart build clean clear-logs help
 
 .DEFAULT_GOAL := help
 
@@ -16,7 +15,7 @@ dev:
 # Run Backend only
 dev-server:
 	@echo "Starting Spring Boot Server..."
-	@cd Server && ./mvnw spring-boot:run
+	@make clear-logs && cd Server && ./mvnw spring-boot:run
 
 # Run Frontend only
 dev-client:
@@ -71,6 +70,11 @@ clean:
 	@cd Server && ./mvnw clean
 	@echo "Cleaning Client build directory..."
 	@rm -rf Client/.next Client/out Client/node_modules
+
+# Clean logs
+clear-logs:
+	@rm -rf Server/logs/*
+	@echo "Logs cleaned..."
 
 # Display help information
 help:
