@@ -2,7 +2,6 @@
 
 import NextLink from "next/link";
 import Image from "next/image";
-import Navbar from "@/components/Navbar";
 import { ArrowLeft, Home } from "lucide-react";
 import { useTranslations } from "next-intl";
 

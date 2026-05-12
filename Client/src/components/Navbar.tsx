@@ -31,7 +31,6 @@ export default function Navbar() {
    const menuRef = useRef<HTMLDivElement>(null);
 
    const { user, isLoggedIn, setAuth, logout } = useAuthStore();
-   const prevIsLoggedIn = useRef(isLoggedIn);
 
    useEffect(() => {
       const syncSession = async () => {
@@ -53,7 +52,7 @@ export default function Navbar() {
             try {
                const freshUser = await authService.refresh();
                if (freshUser) setAuth(freshUser);
-            } catch (e) {
+            } catch {
                // Không có session, bỏ qua
             }
          }

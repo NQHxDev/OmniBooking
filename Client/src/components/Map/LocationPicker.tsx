@@ -2,8 +2,10 @@
 
 import { useState, useCallback, useRef } from "react";
 import { GoogleMap, useJsApiLoader, MarkerF, Autocomplete } from "@react-google-maps/api";
-import { MapPin, Search, Info, X, ChevronLeft, Loader2 } from "lucide-react";
+import { Search, Info, X, ChevronLeft, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { env } from "@/env";
+import Image from "next/image";
 
 const containerStyle = {
    width: "100%",
@@ -40,7 +42,7 @@ export default function LocationPicker({
 }: LocationPickerProps) {
    const { isLoaded } = useJsApiLoader({
       id: "google-map-script",
-      googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+      googleMapsApiKey: env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
       libraries: ["places"],
    });
 
@@ -48,7 +50,6 @@ export default function LocationPicker({
    const [address, setAddress] = useState("151 Bến Vân Đồn");
    const [city, setCity] = useState("Thành phố Hồ Chí Minh");
    const [zipCode, setZipCode] = useState("700000");
-   const [country, setCountry] = useState("Việt Nam");
    const [autoUpdate, setAutoUpdate] = useState(true);
    const [showHint, setShowHint] = useState(true);
 
@@ -242,10 +243,12 @@ export default function LocationPicker({
 
          {/* Google Badge */}
          <div className="absolute bottom-6 right-6 z-10 bg-white px-3 py-1.5 rounded-full shadow-lg border border-gray-200 flex items-center gap-2">
-            <img
+            <Image
                src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_Maps_icon_%282020%29.svg/1024px-Google_Maps_icon_%282020%29.svg.png"
                className="w-4 h-4"
                alt="Google Maps"
+               width={16}
+               height={16}
             />
             <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                Powered by Google

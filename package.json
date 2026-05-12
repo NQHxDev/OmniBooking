@@ -6,8 +6,8 @@
    "scripts": {
       "prepare": "husky",
       "lint:client": "npm run lint --prefix Client",
-      "lint:server": "cd Server && ./mvnw checkstyle:check",
-      "test:server": "cd Server && ./mvnw test",
+      "lint:server": "cd Server && (mvnw checkstyle:check || ./mvnw checkstyle:check)",
+      "test:server": "cd Server && (mvnw test || ./mvnw test)",
       "build:client": "npm run build --prefix Client",
       "check:all": "npm run lint:client && npm run test:server && npm run build:client",
       "format": "prettier --write ."

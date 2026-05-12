@@ -2,18 +2,14 @@
 
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindow } from "@react-google-maps/api";
 import { PropertyDocument } from "@/lib/api/services/propertyService";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
+import { env } from "@/env";
 
 const containerStyle = {
    width: "100%",
    height: "100%",
-};
-
-const defaultCenter = {
-   lat: 10.762622,
-   lng: 106.660172,
 };
 
 interface MapViewProps {
@@ -31,7 +27,7 @@ export default function MapView({
 }: MapViewProps) {
    const { isLoaded } = useJsApiLoader({
       id: "google-map-script",
-      googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+      googleMapsApiKey: env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
    });
 
    const [selectedProperty, setSelectedProperty] = useState<PropertyDocument | null>(null);
