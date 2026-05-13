@@ -58,7 +58,7 @@ public class AuthController {
       String userAgent = httpRequest.getHeader("User-Agent");
       String requestId = (String) httpRequest.getAttribute("requestId");
 
-      AuthResponse response = authService.register(request, ip, userAgent, httpResponse);
+      AuthResponse response = authService.register(request, ip, userAgent, httpResponse, request.isRememberMe());
       return ResponseEntity.status(HttpStatus.CREATED)
             .body(ApiResponse.success(response, "User registered successfully", requestId));
    }
@@ -81,14 +81,20 @@ public class AuthController {
    @Anonymous
    @PostMapping("/refresh")
    public ResponseEntity<ApiResponse<AuthResponse>> refresh(
-         @CookieValue(name = "session_id") String sessionId,
-         @CookieValue(name = "refresh_token") String refreshToken,
+         @CookieValue(name = "session_id", required = false) String sessionId,
+         @CookieValue(name = "refresh_token", required = false) String refreshToken,
          HttpServletRequest httpRequest,
          HttpServletResponse httpResponse) {
 
       String ip = getClientIp(httpRequest);
       String userAgent = httpRequest.getHeader("User-Agent");
       String requestId = (String) httpRequest.getAttribute("requestId");
+
+      if (sessionId == null || refreshToken == null) {
+         log.warn("Missing session_id or refresh_token in cookies for refresh request");
+         authService.clearAllCookies(httpResponse);
+         throw new com.omnibooking.exception.AppException(com.omnibooking.exception.ErrorCode.INVALID_SESSION);
+      }
 
       AuthResponse authResponse = authService.refresh(sessionId, refreshToken, ip, userAgent, httpResponse);
       return ResponseEntity.ok(ApiResponse.success(authResponse, "Token refreshed successfully", requestId));
@@ -182,7 +188,7 @@ public class AuthController {
          String ip = getClientIp(httpRequest);
          String userAgent = httpRequest.getHeader("User-Agent");
 
-         authService.loginWithOAuth2(provider, userInfo, ip, userAgent, httpResponse);
+         authService.loginWithOAuth2(provider, userInfo, ip, userAgent, httpResponse, false);
 
          // Redirect to frontend
          httpResponse.sendRedirect(appProperties.getOauth2().getGoogle().getFrontendCallbackUrl());

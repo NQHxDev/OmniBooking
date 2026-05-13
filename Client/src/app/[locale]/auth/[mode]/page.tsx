@@ -28,13 +28,18 @@ export default function AuthPage() {
       email: "",
       password: "",
       fullName: "",
+      rememberMe: false,
    });
    const [loading, setLoading] = useState(false);
    const [showPassword, setShowPassword] = useState(false);
    const [error, setError] = useState("");
 
    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData({ ...formData, [e.target.name]: e.target.value });
+      const { name, value, type, checked } = e.target;
+      setFormData({
+         ...formData,
+         [name]: type === "checkbox" ? checked : value,
+      });
    };
 
    const handleToggle = (login: boolean) => {
@@ -49,11 +54,16 @@ export default function AuthPage() {
 
       try {
          const result = isLogin
-            ? await authService.login({ email: formData.email, password: formData.password })
+            ? await authService.login({
+                 email: formData.email,
+                 password: formData.password,
+                 rememberMe: formData.rememberMe,
+              })
             : await authService.register({
                  email: formData.email,
                  password: formData.password,
                  fullName: formData.fullName,
+                 rememberMe: formData.rememberMe,
               });
 
          if (result) {
@@ -237,6 +247,24 @@ export default function AuthPage() {
                               )}
                            </button>
                         </div>
+                     </div>
+
+                     <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 cursor-pointer group">
+                           <div className="relative flex items-center justify-center h-4.5 w-4.5 rounded border border-zinc-300 bg-zinc-50 transition-all group-hover:border-[#006ce4]">
+                              <input
+                                 type="checkbox"
+                                 name="rememberMe"
+                                 checked={formData.rememberMe}
+                                 onChange={handleChange}
+                                 className="peer absolute inset-0 opacity-0 cursor-pointer"
+                              />
+                              <div className="h-2.5 w-2.5 rounded-[1px] bg-[#006ce4] opacity-0 transition-opacity peer-checked:opacity-100" />
+                           </div>
+                           <span className="text-sm font-medium text-zinc-600 group-hover:text-zinc-900 transition-colors">
+                              {t("rememberMe")}
+                           </span>
+                        </label>
                      </div>
 
                      <button

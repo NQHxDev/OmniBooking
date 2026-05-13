@@ -66,6 +66,7 @@
       "emailLabel": "Địa chỉ Email",
       "passwordLabel": "Mật khẩu",
       "fullNameLabel": "Họ và tên",
+      "rememberMe": "Ghi nhớ đăng nhập",
       "forgotPassword": "Quên mật khẩu?",
       "loginButton": "Đăng nhập ngay",
       "registerButton": "Tạo tài khoản ngay",

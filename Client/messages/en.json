@@ -66,6 +66,7 @@
       "emailLabel": "Email Address",
       "passwordLabel": "Password",
       "fullNameLabel": "Full Name",
+      "rememberMe": "Remember me",
       "forgotPassword": "Forgot password?",
       "loginButton": "Login Now",
       "registerButton": "Create Account",

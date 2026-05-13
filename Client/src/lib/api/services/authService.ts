@@ -10,12 +10,14 @@ export interface ApiResponse<T> {
 export interface LoginRequest {
    email: string;
    password: string;
+   rememberMe?: boolean;
 }
 
 export interface RegisterRequest {
    email: string;
    password: string;
    fullName: string;
+   rememberMe?: boolean;
 }
 
 let refreshPromise: Promise<User> | null = null;

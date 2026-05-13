@@ -26,7 +26,12 @@ dev-client:
 docker-infra:
 	@echo "Starting infrastructure..."
 	@docker-compose up -d db redis kafka kafdrop elasticsearch kibana
-	@echo "Infrastructure (DB, Redis, Kafka, ES) is Ready..."
+	@echo "Waiting for Elasticsearch to be ready..."
+	@until [ "$$(docker inspect --format='{{.State.Health.Status}}' omnibooking-elastic)" = "healthy" ]; do \
+		printf '.'; \
+		sleep 2; \
+	done
+	@echo "\nInfrastructure (DB, Redis, Kafka, ES) is Ready..."
 
 # Docker Full Stack Commands
 docker-up:

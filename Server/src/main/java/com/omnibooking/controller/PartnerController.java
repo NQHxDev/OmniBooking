@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -125,6 +126,7 @@ public class PartnerController {
    @PostMapping("/complete")
    public ResponseEntity<ApiResponse<AuthResponse>> completeRegistration(
          @AuthenticationPrincipal UserPrincipal principal,
+         @CookieValue(name = "session_id", required = false) String sessionId,
          HttpServletRequest request,
          HttpServletResponse response) {
 
@@ -134,7 +136,20 @@ public class PartnerController {
       String ip = request.getRemoteAddr();
       String userAgent = request.getHeader("User-Agent");
 
-      AuthResponse authResponse = authService.upgradeToPartner(principal.getId(), ip, userAgent, response);
+      // Inherit rememberMe from current session if possible
+      boolean rememberMe = false;
+      if (sessionId != null) {
+         try {
+            com.omnibooking.security.RedisSessionInfo sessionInfo = authService.getSessionInfo(sessionId);
+            if (sessionInfo != null) {
+               rememberMe = sessionInfo.isRememberMe();
+            }
+         } catch (Exception e) {
+            log.warn("Failed to fetch session info for rememberMe inheritance: {}", e.getMessage());
+         }
+      }
+
+      AuthResponse authResponse = authService.upgradeToPartner(principal.getId(), ip, userAgent, response, rememberMe);
 
       log.info("User {} upgraded to partner (RequestId: {})", principal.getId(), requestId);
 

@@ -124,14 +124,14 @@ class AuthServiceImplTest {
                .build());
 
          // Act
-         AuthResponse result = authService.register(request, "127.0.0.1", "agent", response);
+         AuthResponse result = authService.register(request, "127.0.0.1", "agent", response, false);
 
          // Assert
          assertThat(result).isNotNull();
          assertThat(result.getEmail()).isEqualTo(request.getEmail());
          verify(userRepository, times(1)).save((User) any());
          verify(bloomFilterService, times(1)).add(request.getEmail());
-         verify(sessionService, times(1)).saveSession(any(), any(), any(), any(), any(), any(), any(), any(), any());
+         verify(sessionService, times(1)).saveSession(any(), any(), anyLong());
          verify(outboxService, times(1)).saveEvent(any(), eq("USER"), eq("USER_REGISTERED"), any());
       }
 
@@ -149,7 +149,7 @@ class AuthServiceImplTest {
          when(userRepository.existsByEmail(request.getEmail())).thenReturn(true);
 
          // Act & Assert
-         assertThatThrownBy(() -> authService.register(request, "ip", "ua", response))
+         assertThatThrownBy(() -> authService.register(request, "ip", "ua", response, false))
                .isInstanceOf(AppException.class)
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.EMAIL_ALREADY_EXISTS);
       }
@@ -164,7 +164,11 @@ class AuthServiceImplTest {
       @DisplayName("Should login successfully with valid credentials")
       void shouldLogin_Success() {
          // Arrange
-         LoginRequest request = new LoginRequest("test@example.com", "password123");
+      LoginRequest request = LoginRequest.builder()
+            .email("test@example.com")
+            .password("password123")
+            .rememberMe(false)
+            .build();
          Role role = Role.builder().name("ROLE_USER").build();
          User user = User.builder()
                .id(UUID.randomUUID())
@@ -187,14 +191,17 @@ class AuthServiceImplTest {
          // Assert
          assertThat(result).isNotNull();
          assertThat(result.getEmail()).isEqualTo(request.getEmail());
-         verify(sessionService).saveSession(any(), any(), any(), any(), any(), any(), any(), any(), any());
+         verify(sessionService).saveSession(any(), any(), anyLong());
       }
 
       @Test
       @DisplayName("Should reject login immediately if email not in Bloom Filter")
       void shouldReject_WhenEmailNotInBloomFilter() {
          // Arrange
-         LoginRequest request = new LoginRequest("nonexistent@example.com", "password");
+         LoginRequest request = LoginRequest.builder()
+               .email("nonexistent@example.com")
+               .password("password")
+               .build();
          when(bloomFilterService.mightContain(request.getEmail())).thenReturn(false);
 
          // Act & Assert
@@ -209,7 +216,10 @@ class AuthServiceImplTest {
       @DisplayName("Should throw exception for invalid password")
       void shouldThrow_WhenPasswordInvalid() {
          // Arrange
-         LoginRequest request = new LoginRequest("test@example.com", "wrong_pass");
+         LoginRequest request = LoginRequest.builder()
+               .email("test@example.com")
+               .password("wrong_pass")
+               .build();
          User user = User.builder().email(request.getEmail()).password("hashed").build();
 
          when(bloomFilterService.mightContain(request.getEmail())).thenReturn(true);
