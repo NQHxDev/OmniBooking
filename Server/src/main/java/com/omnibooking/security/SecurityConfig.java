@@ -81,7 +81,10 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                   .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                  .requestMatchers("/auth/**").permitAll()
+                  .requestMatchers("/auth/passkey/**").authenticated()
+                  .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh",
+                        "/auth/forgot-password", "/auth/reset-password", "/auth/google/**")
+                  .permitAll()
                   .requestMatchers("/properties/search", "/properties/search/**").permitAll()
                   .requestMatchers("/destinations", "/destinations/**").permitAll()
                   .requestMatchers("/health/**").permitAll()
@@ -96,8 +99,11 @@ public class SecurityConfig {
             .exceptionHandling(exceptions -> exceptions
                   .authenticationEntryPoint((request, response, authException) -> {
                      String requestId = (String) request.getAttribute("requestId");
-                     boolean isExpired = "true".equals(request.getAttribute("expired_token"));
-                     ErrorCode errorCode = isExpired ? ErrorCode.TOKEN_EXPIRED : ErrorCode.INVALID_CREDENTIALS;
+                     ErrorCode errorCode = (ErrorCode) request.getAttribute("error_code");
+
+                     if (errorCode == null) {
+                        errorCode = ErrorCode.TOKEN_EXPIRED;
+                     }
 
                      response.setStatus(errorCode.getStatus().value());
                      response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -121,8 +127,7 @@ public class SecurityConfig {
                            accessDeniedException.getMessage(),
                            requestId);
                      response.getWriter().write(new ObjectMapper().writeValueAsString(apiResponse));
-                  }))
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                  }));
 
       return http.build();
    }

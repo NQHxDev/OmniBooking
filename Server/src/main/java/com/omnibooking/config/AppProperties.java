@@ -28,6 +28,17 @@ public class AppProperties {
    private final Oauth2 oauth2 = new Oauth2();
    private final Geo geo = new Geo();
    private final Currency currency = new Currency();
+   private final Webauthn webauthn = new Webauthn();
+
+   @Data
+   public static class Webauthn {
+      @NotBlank
+      private String rpId;
+      @NotBlank
+      private String rpName;
+      @NotBlank
+      private String origin;
+   }
 
    @Data
    public static class Currency {

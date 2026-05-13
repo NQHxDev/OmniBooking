@@ -205,7 +205,7 @@ export default function ProfilePage() {
                   <SectionItem
                      icon={<Lock className="h-5 w-5" />}
                      label={t("items.security")}
-                     href="/security"
+                     href="/profile/security"
                   />
                   <SectionItem
                      icon={<Users className="h-5 w-5" />}

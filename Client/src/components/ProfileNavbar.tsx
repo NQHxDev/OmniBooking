@@ -18,19 +18,15 @@ import { useAuthStore } from "@/store/useAuthStore";
 import LanguageSwitcher from "./LanguageSwitcher";
 import CurrencySwitcher from "./CurrencySwitcher";
 import { useTranslations } from "next-intl";
+import { usePathname } from "next/navigation";
 
 export default function ProfileNavbar() {
    const t = useTranslations("Common");
    const tProfile = useTranslations("Profile");
-   const [mounted, setMounted] = useState(false);
+   const pathname = usePathname();
    const [isMenuOpen, setIsMenuOpen] = useState(false);
    const menuRef = useRef<HTMLDivElement>(null);
    const { user, isLoggedIn, logout } = useAuthStore();
-
-   useEffect(() => {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMounted(true);
-   }, []);
 
    useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -47,8 +43,6 @@ export default function ProfileNavbar() {
       const parts = name.trim().split(/\s+/);
       return parts[parts.length - 1].charAt(0).toUpperCase();
    };
-
-   if (!mounted) return null;
 
    return (
       <header className="sticky top-0 z-50 shadow-md">
@@ -176,7 +170,11 @@ export default function ProfileNavbar() {
                      Tài khoản
                   </Link>
                   <ChevronRight className="h-3.5 w-3.5 text-white/60" />
-                  <span className="font-medium">Thông tin cá nhân</span>
+                  <span className="font-medium">
+                     {pathname.includes("/security")
+                        ? tProfile("Security.title")
+                        : tProfile("details.title")}
+                  </span>
                </nav>
             </div>
          </div>

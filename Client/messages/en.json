@@ -484,6 +484,49 @@
             "FEMALE": "Female",
             "OTHER": "Other"
          }
+      },
+      "Security": {
+         "title": "Security settings",
+         "subtitle": "Change your security settings, set up additional authentication, or delete your account.",
+         "passkey": {
+            "title": "Passkey",
+            "desc": "Access your account easily and securely without having to remember your old password.",
+            "setup": "Setup",
+            "manage": "Manage"
+         },
+         "twoFactor": {
+            "title": "Two-factor authentication",
+            "desc": "Increase your account security by setting up two-factor authentication.",
+            "setup": "Setup"
+         },
+         "sessions": {
+            "title": "Active sessions",
+            "desc": "When you select \"Sign out\", you will be signed out of all devices except this one and it may take up to 10 minutes.",
+            "logout": "Sign out"
+         },
+         "deleteAccount": {
+            "title": "Delete account",
+            "desc": "Permanently delete your OmniBooking.com account",
+            "action": "Delete account"
+         },
+         "password": {
+            "title": "Password",
+            "desc": "Change your password regularly to keep your account secure.",
+            "action": "Change"
+         },
+         "manager": {
+            "registeredDevices": "Registered devices",
+            "unknownDevice": "Unknown device",
+            "lastUsed": "Last used",
+            "neverUsed": "Never used",
+            "deleteSuccess": "Passkey deleted successfully",
+            "addNewDevice": "Add new device"
+         },
+         "messages": {
+            "setupSuccess": "Passkey set up successfully!",
+            "setupError": "An error occurred while setting up Passkey",
+            "unsupported": "Your browser does not support Passkeys"
+         }
       }
    },
    "NotFound": {

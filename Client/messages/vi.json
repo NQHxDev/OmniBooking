@@ -484,6 +484,49 @@
             "FEMALE": "Nữ",
             "OTHER": "Khác"
          }
+      },
+      "Security": {
+         "title": "Cài đặt bảo mật",
+         "subtitle": "Thay đổi thiết lập bảo mật, cài đặt xác thực bổ sung hoặc xóa tài khoản của bạn.",
+         "passkey": {
+            "title": "Passkey",
+            "desc": "Truy cập tài khoản dễ dàng và an toàn mà không cần nhớ mật khẩu cũ.",
+            "setup": "Thiết lập",
+            "manage": "Quản lý"
+         },
+         "twoFactor": {
+            "title": "Xác thực 2 yếu tố",
+            "desc": "Tăng độ bảo mật cho tài khoản bằng cách thiết lập xác thực 2 yếu tố.",
+            "setup": "Thiết lập"
+         },
+         "sessions": {
+            "title": "Các phiên truy cập đang có hiệu lực",
+            "desc": "Khi chọn \"Đăng xuất\", bạn sẽ đăng xuất khỏi tất cả các thiết bị trừ thiết bị này và có thể mất đến 10 phút.",
+            "logout": "Đăng xuất"
+         },
+         "deleteAccount": {
+            "title": "Xóa tài khoản",
+            "desc": "Xóa tài khoản OmniBooking.com vĩnh viễn",
+            "action": "Xóa tài khoản"
+         },
+         "password": {
+            "title": "Mật khẩu",
+            "desc": "Thay đổi mật khẩu đăng nhập của bạn thường xuyên để bảo mật.",
+            "action": "Thay đổi"
+         },
+         "manager": {
+            "registeredDevices": "Thiết bị đã đăng ký",
+            "unknownDevice": "Thiết bị không tên",
+            "lastUsed": "Lần sử dụng cuối",
+            "neverUsed": "Chưa sử dụng",
+            "deleteSuccess": "Xóa Passkey thành công",
+            "addNewDevice": "Thêm thiết bị mới"
+         },
+         "messages": {
+            "setupSuccess": "Thiết lập Passkey thành công!",
+            "setupError": "Đã có lỗi xảy ra khi thiết lập Passkey",
+            "unsupported": "Trình duyệt của bạn chưa hỗ trợ Passkey"
+         }
       }
    },
    "NotFound": {

@@ -204,6 +204,13 @@
 			<version>8.0</version>
 		</dependency>
 
+		<!-- WebAuthn (Passkey) Support -->
+		<dependency>
+			<groupId>com.webauthn4j</groupId>
+			<artifactId>webauthn4j-core</artifactId>
+			<version>0.24.0.RELEASE</version>
+		</dependency>
+
 		<!-- GeoIP2 for Location Detection -->
 		<dependency>
 			<groupId>com.maxmind.geoip2</groupId>

@@ -158,7 +158,13 @@ export default function Navbar() {
                      )}
                   </button>
 
-                  {mounted && isLoggedIn ? (
+                  {!mounted ? (
+                     // Skeleton giữ chỗ khi đang Hydration để tránh giật Navbar
+                     <div className="flex items-center gap-3">
+                        <div className="h-8 w-20 rounded bg-white/10 animate-pulse hidden md:block"></div>
+                        <div className="h-9 w-9 rounded-full bg-white/10 animate-pulse"></div>
+                     </div>
+                  ) : isLoggedIn ? (
                      <div className="relative" ref={menuRef}>
                         <button
                            onClick={() => setIsMenuOpen(!isMenuOpen)}
