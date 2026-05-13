@@ -67,8 +67,11 @@ public class Booking extends BaseEntity {
    @Column(name = "guest_email", nullable = false, length = 100)
    private String guestEmail;
 
-   @Column(name = "guest_phone", nullable = false, length = 20)
-   private String guestPhone;
+   @Column(name = "guest_phone_encrypted", length = 255)
+   private String guestPhoneEncrypted;
+
+   @Column(name = "guest_phone_search_hash", length = 64)
+   private String guestPhoneSearchHash;
 
    @Column(name = "special_requests", columnDefinition = "TEXT")
    private String specialRequests;

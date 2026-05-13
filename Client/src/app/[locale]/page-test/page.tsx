@@ -3,6 +3,7 @@
 import { LocationPicker } from "@/components/Map";
 import Navbar from "@/components/Navbar";
 import PriceDisplay from "@/components/PriceDisplay";
+import apiClient from "@/lib/api/apiClient";
 
 export default function DemoMapPage() {
    return (
@@ -73,6 +74,55 @@ export default function DemoMapPage() {
                         </span>
                      </div>
                   ))}
+               </div>
+            </div>
+            <div className="mt-12 bg-white rounded-2xl shadow-sm p-8 border border-gray-100">
+               <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Demo: Searchable Encryption</h2>
+                  <p className="text-gray-600 mt-1">
+                     Thử nghiệm tìm kiếm chính xác số điện thoại đã được mã hóa trong Database bằng
+                     Blind Index.
+                  </p>
+               </div>
+
+               <div className="max-w-xl">
+                  <div className="flex gap-3">
+                     <input
+                        id="phone-search-input"
+                        type="text"
+                        placeholder="Nhập số điện thoại cần tìm..."
+                        className="flex-1 px-4 py-2 rounded-lg border border-gray-200 focus:border-[#006ce4] focus:outline-none"
+                     />
+                     <button
+                        onClick={async () => {
+                           const phone = (
+                              document.getElementById("phone-search-input") as HTMLInputElement
+                           ).value;
+                           if (!phone) return alert("Vui lòng nhập số điện thoại");
+
+                           try {
+                              const result = await apiClient.get(
+                                 `/test/search-phone?phone=${phone}`
+                              );
+                              const output = document.getElementById("search-result");
+                              if (output) {
+                                 output.textContent = JSON.stringify(result, null, 2);
+                              }
+                           } catch (err) {
+                              alert("Lỗi khi tìm kiếm");
+                           }
+                        }}
+                        className="px-6 py-2 bg-[#006ce4] text-white font-bold rounded-lg hover:bg-[#004b9e] transition-colors"
+                     >
+                        Tìm kiếm
+                     </button>
+                  </div>
+
+                  <div className="mt-4 p-4 bg-gray-900 rounded-lg overflow-x-auto">
+                     <pre id="search-result" className="text-green-400 text-sm font-mono">
+                        Kết quả tìm kiếm sẽ hiển thị tại đây...
+                     </pre>
+                  </div>
                </div>
             </div>
          </div>

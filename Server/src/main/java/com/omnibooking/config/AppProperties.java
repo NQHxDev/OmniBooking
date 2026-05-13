@@ -78,6 +78,10 @@ public class AppProperties {
       @NotBlank
       private String jwtSecret;
       private long jwtExpirationMs;
+      @NotBlank
+      private String encryptionSecret;
+      @NotBlank
+      private String hashPepper;
    }
 
    @Data

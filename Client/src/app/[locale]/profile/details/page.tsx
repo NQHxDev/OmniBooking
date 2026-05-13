@@ -306,6 +306,25 @@ export default function PersonalDetailsPage() {
                                     </p>
                                  </div>
                               }
+                              isEditing={editingField === "phoneNumber"}
+                              onSave={handleUpdateField}
+                              onCancel={() => setEditingField(null)}
+                              onStartEdit={() =>
+                                 startEditing("phoneNumber", profileData?.phoneNumber || "")
+                              }
+                              isSaving={isSaving}
+                              saveLabel={tDetails("save")}
+                              cancelLabel={tDetails("cancel")}
+                              editLabel={tDetails("edit")}
+                              renderEditField={() => (
+                                 <input
+                                    type="text"
+                                    value={editValue}
+                                    onChange={(e) => setEditValue(e.target.value)}
+                                    className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-[#006ce4] focus:outline-none text-[14px]"
+                                    autoFocus
+                                 />
+                              )}
                            />
                            <InfoRow
                               icon={<Calendar className="h-5 w-5 text-zinc-400" />}

@@ -87,9 +87,10 @@ public class SecurityConfig {
                   .requestMatchers("/health/**").permitAll()
                   .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                   .requestMatchers("/currencies/**").permitAll()
+                  .requestMatchers("/test/**").permitAll()
                   .requestMatchers("/actuator/**").permitAll()
                   // Allow public property details view if needed
-                  .requestMatchers(HttpMethod.GET, "/properties/**").permitAll() 
+                  .requestMatchers(HttpMethod.GET, "/properties/**").permitAll()
                   .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(exceptions -> exceptions

@@ -6,6 +6,7 @@ import com.omnibooking.exception.AppException;
 import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.UserProfile;
 import com.omnibooking.repository.UserProfileRepository;
+import com.omnibooking.services.EncryptionService;
 import com.omnibooking.services.UserProfileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import java.util.UUID;
 public class UserProfileServiceImpl implements UserProfileService {
 
    private final UserProfileRepository userProfileRepository;
+   private final EncryptionService encryptionService;
 
    @Override
    public UserProfileResponse getProfile(UUID userId) {
@@ -47,6 +49,11 @@ public class UserProfileServiceImpl implements UserProfileService {
          profile.setNationality(request.getNationality());
       if (request.getAvatarUrl() != null)
          profile.setAvatarUrl(request.getAvatarUrl());
+      
+      if (request.getPhoneNumber() != null) {
+         profile.setPhoneEncrypted(encryptionService.encrypt(request.getPhoneNumber()));
+         profile.setPhoneSearchHash(encryptionService.createBlindIndex(request.getPhoneNumber()));
+      }
 
       UserProfile savedProfile = userProfileRepository.saveAndFlush(profile);
       log.info("Updated profile for user: {}", userId);
@@ -62,7 +69,7 @@ public class UserProfileServiceImpl implements UserProfileService {
             .gender(profile.getGender())
             .address(profile.getAddress())
             .nationality(profile.getNationality())
-            .phoneNumber(profile.getPhoneNumber())
+            .phoneNumber(encryptionService.decrypt(profile.getPhoneEncrypted()))
             .avatarUrl(profile.getAvatarUrl())
             .isVerified(Boolean.TRUE.equals(profile.getIsVerified()))
             .points(profile.getPoints())
