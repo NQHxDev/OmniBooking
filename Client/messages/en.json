@@ -112,9 +112,12 @@
       "AUTH_006": "Access token has expired",
       "AUTH_007": "Invalid or expired verification token",
       "AUTH_008": "User not found",
+      "AUTH_009": "Enhanced security verification required",
       "AUTH_010": "Invalid or expired reset token",
       "AUTH_011": "Rate limit exceeded, please try again later",
       "AUTH_012": "Google authentication failed or was cancelled",
+      "AUTH_013": "Invalid or expired OTP",
+      "AUTH_014": "Passkey not found",
       "GEN_999": "An unexpected error occurred",
       "GEN_500": "Internal server error",
       "FORBIDDEN": "You do not have permission to perform this action",
@@ -123,6 +126,17 @@
       "tryAgain": "Try again",
       "goHome": "Go home",
       "devDetails": "[Dev Error Details]:"
+   },
+   "SecurityOTPModal": {
+      "title": "Security Verification",
+      "description": "To ensure your account's safety, please enter the 6-character verification code sent to your email.",
+      "verifyButton": "Verify Identity",
+      "resendWait": "You can request a new code in {timer}s",
+      "resendLink": "Resend verification code",
+      "successResend": "New verification code has been sent",
+      "errorResend": "Could not resend code. Please try again later.",
+      "invalidOTP": "Incorrect verification code",
+      "bottomNote": "Trusted sessions will be maintained for 30 minutes after successful verification."
    },
    "Partner": {
       "sidebar": {
@@ -492,7 +506,8 @@
             "title": "Passkey",
             "desc": "Access your account easily and securely without having to remember your old password.",
             "setup": "Setup",
-            "manage": "Manage"
+            "manage": "Manage",
+            "deleteError": "An error occurred while deleting the passkey"
          },
          "twoFactor": {
             "title": "Two-factor authentication",

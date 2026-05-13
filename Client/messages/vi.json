@@ -112,9 +112,12 @@
       "AUTH_006": "Token truy cập hết hạn",
       "AUTH_007": "Mã xác thực không hợp lệ hoặc hết hạn",
       "AUTH_008": "Không tìm thấy người dùng",
+      "AUTH_009": "Yêu cầu xác thực bảo mật nâng cao",
       "AUTH_010": "Mã reset không hợp lệ hoặc đã hết hạn",
       "AUTH_011": "Bạn đang thao tác quá nhanh, vui lòng thử lại sau ít phút",
       "AUTH_012": "Xác thực với Google thất bại hoặc bị hủy",
+      "AUTH_013": "Mã xác thực OTP không chính xác hoặc đã hết hạn",
+      "AUTH_014": "Không tìm thấy thông tin Passkey",
       "GEN_999": "Đã có lỗi xảy ra, vui lòng thử lại sau",
       "GEN_500": "Lỗi hệ thống server",
       "FORBIDDEN": "Bạn không có quyền thực hiện hành động này",
@@ -123,6 +126,17 @@
       "tryAgain": "Thử lại",
       "goHome": "Về trang chủ",
       "devDetails": "[Chi tiết lỗi (Dev)]:"
+   },
+   "SecurityOTPModal": {
+      "title": "Xác thực bảo mật",
+      "description": "Để đảm bảo an toàn cho tài khoản, vui lòng nhập mã xác thực gồm 6 ký tự đã được gửi tới email của Quý khách.",
+      "verifyButton": "Xác nhận danh tính",
+      "resendWait": "Quý khách có thể yêu cầu mã mới sau {timer}s",
+      "resendLink": "Gửi lại mã xác thực",
+      "successResend": "Mã xác thực mới đã được gửi",
+      "errorResend": "Không thể gửi lại mã. Vui lòng thử lại sau.",
+      "invalidOTP": "Mã xác thực không chính xác",
+      "bottomNote": "Phiên làm việc tin cậy sẽ được duy trì trong 30 phút sau khi xác thực thành công."
    },
    "Partner": {
       "sidebar": {
@@ -492,7 +506,8 @@
             "title": "Passkey",
             "desc": "Truy cập tài khoản dễ dàng và an toàn mà không cần nhớ mật khẩu cũ.",
             "setup": "Thiết lập",
-            "manage": "Quản lý"
+            "manage": "Quản lý",
+            "deleteError": "Đã có lỗi xảy ra khi xóa Passkey"
          },
          "twoFactor": {
             "title": "Xác thực 2 yếu tố",

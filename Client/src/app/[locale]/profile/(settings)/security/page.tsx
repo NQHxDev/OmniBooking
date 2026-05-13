@@ -8,6 +8,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { startRegistration } from "@simplewebauthn/browser";
 import { toast } from "sonner";
 import { useLocale } from "next-intl";
+import { securityService } from "@/lib/api/services/securityService";
+import SecurityOTPModal from "@/components/SecurityOTPModal";
 
 export default function SecurityPage() {
    const [isRegistering, setIsRegistering] = useState(false);
@@ -16,8 +18,16 @@ export default function SecurityPage() {
    const [passkeys, setPasskeys] = useState<Passkey[]>([]);
    const [showPasskeyManager, setShowPasskeyManager] = useState(false);
 
+   // Trạng thái cho Security Step-up
+   const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+   const [pendingAction, setPendingAction] = useState<{
+      type: "register" | "delete";
+      data?: string;
+   } | null>(null);
+
    const t = useTranslations("Profile.Security");
    const tDetails = useTranslations("Profile.details");
+   const tErrors = useTranslations("Errors");
    const locale = useLocale();
 
    const fetchPasskeyData = async () => {
@@ -29,6 +39,9 @@ export default function SecurityPage() {
          if (status) {
             const passkeyData = await passkeyService.listPasskeys();
             setPasskeys(passkeyData);
+         } else {
+            setPasskeys([]);
+            setShowPasskeyManager(false);
          }
       } catch (err) {
          console.error("Failed to fetch passkey data:", err);
@@ -59,6 +72,17 @@ export default function SecurityPage() {
       else if (ua.includes("Linux")) os = "Linux";
 
       return `${browser} ${os}`;
+   };
+
+   const handleSecurityStepUp = async (action: "register" | "delete", data?: string) => {
+      try {
+         // Yêu cầu gửi OTP trước khi hiện Modal
+         await securityService.requestOTP();
+         setPendingAction({ type: action, data });
+         setIsOtpModalOpen(true);
+      } catch (_error) {
+         toast.error("Không thể khởi tạo xác thực bảo mật. Vui lòng thử lại.");
+      }
    };
 
    const handleRegisterPasskey = async () => {
@@ -95,8 +119,19 @@ export default function SecurityPage() {
          toast.success(t("messages.setupSuccess"));
          fetchPasskeyData();
       } catch (err: unknown) {
-         if (err instanceof Error && err.name === "NotAllowedError") return;
-         toast.error(t("passkey.setupError"));
+         const apiError = err as { errorCode?: string; name?: string };
+         // Nếu lỗi do yêu cầu xác thực bảo mật (AUTH_009)
+         if (apiError.errorCode === "AUTH_009") {
+            handleSecurityStepUp("register");
+            return;
+         }
+
+         if (apiError.name === "NotAllowedError") return;
+
+         const errorMessage = apiError.errorCode
+            ? tErrors(apiError.errorCode)
+            : t("passkey.setupError");
+         toast.error(errorMessage);
       } finally {
          setIsRegistering(false);
       }
@@ -105,11 +140,42 @@ export default function SecurityPage() {
    const handleDeletePasskey = async (id: string) => {
       try {
          await passkeyService.deletePasskey(id);
+
+         // Cập nhật State ngay lập tức để UX mượt mà
+         const updatedPasskeys = passkeys.filter((pk) => pk.id !== id);
+         setPasskeys(updatedPasskeys);
+
+         if (updatedPasskeys.length === 0) {
+            setHasPasskey(false);
+            setShowPasskeyManager(false);
+         }
+
          toast.success(t("manager.deleteSuccess"));
+         // Fetch lại để đồng bộ hoàn toàn với Server
          fetchPasskeyData();
-      } catch {
-         toast.error(t("passkey.deleteError"));
+      } catch (err: unknown) {
+         const apiError = err as { errorCode?: string };
+         if (apiError.errorCode === "AUTH_009") {
+            handleSecurityStepUp("delete", id);
+            return;
+         }
+
+         const errorMessage = apiError.errorCode
+            ? tErrors(apiError.errorCode)
+            : t("passkey.deleteError");
+         toast.error(errorMessage);
       }
+   };
+
+   const handleOtpSuccess = () => {
+      setIsOtpModalOpen(false);
+      // Thực hiện lại hành động đang chờ
+      if (pendingAction?.type === "register") {
+         handleRegisterPasskey();
+      } else if (pendingAction?.type === "delete" && pendingAction.data) {
+         handleDeletePasskey(pendingAction.data);
+      }
+      setPendingAction(null);
    };
 
    return (
@@ -253,6 +319,15 @@ export default function SecurityPage() {
                }
             />
          </div>
+
+         <SecurityOTPModal
+            isOpen={isOtpModalOpen}
+            onClose={() => {
+               setIsOtpModalOpen(false);
+               setPendingAction(null);
+            }}
+            onSuccess={handleOtpSuccess}
+         />
       </div>
    );
 }

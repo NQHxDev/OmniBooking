@@ -101,7 +101,11 @@ apiClient.interceptors.response.use(
          return Promise.reject(error);
       }
 
-      if (!error.config?._skipToast) {
+      if (errorCode === "AUTH_009" || errorCode === "AUTH_013") {
+         return Promise.reject(error.response?.data || { message: error.message });
+      }
+
+      if (!error.config?._skipToast && !errorCode) {
          toast.error(message);
       }
 

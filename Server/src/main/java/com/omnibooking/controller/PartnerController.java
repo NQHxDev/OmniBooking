@@ -3,21 +3,26 @@ package com.omnibooking.controller;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.services.MailService;
+import com.omnibooking.services.OutboxService;
 import com.omnibooking.repository.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.omnibooking.services.AuthService;
 import com.omnibooking.dto.AuthResponse;
+import com.omnibooking.util.OtpUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Objects;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -35,6 +40,9 @@ public class PartnerController {
 
    private final AuthService authService;
 
+   private final OutboxService outboxService;
+
+   @Transactional
    @PostMapping("/send-otp")
    public ResponseEntity<ApiResponse<Void>> sendOtp(
          @AuthenticationPrincipal UserPrincipal principal,
@@ -61,7 +69,7 @@ public class PartnerController {
       }
 
       // Generate Alphanumeric OTP (A0A000 pattern)
-      String otpCode = generateAlphanumericOtp();
+      String otpCode = OtpUtils.generateAlphanumericOtp();
 
       // Store in Redis (valid for 10 minutes)
       String redisKey = "otp:partner:" + userId;
@@ -75,10 +83,15 @@ public class PartnerController {
       // Set cooldown lock (30 seconds)
       redisTemplate.opsForValue().set(lockKey, "locked", 30, TimeUnit.SECONDS);
 
-      // Send email via Kafka
-      mailService.sendPartnerOtpEmail(email, fullName, otpCode);
+      // Record in Outbox instead of sending directly
+      com.omnibooking.dto.event.EmailEvent emailEvent = mailService.buildPartnerOtpEmailEvent(email, fullName, otpCode);
+      outboxService.saveEvent(
+            userId,
+            "PARTNER",
+            "PARTNER_OTP_SEND",
+            emailEvent);
 
-      log.info("Partner OTP sent to email: {} (RequestId: {})", email, requestId);
+      log.info("Partner OTP recorded in outbox for email: {} (RequestId: {})", email, requestId);
 
       return ResponseEntity.ok(ApiResponse.success(null, "Mã xác thực đã được gửi đến email của bạn", requestId));
    }
@@ -127,19 +140,6 @@ public class PartnerController {
 
       return ResponseEntity
             .ok(ApiResponse.success(authResponse, "Chúc mừng! Bạn đã trở thành đối tác của OmniBooking", requestId));
-   }
-
-   private String generateAlphanumericOtp() {
-      Random random = new Random();
-      String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      String digits = "0123456789";
-
-      return String.valueOf(chars.charAt(random.nextInt(chars.length()))) +
-            digits.charAt(random.nextInt(digits.length())) +
-            chars.charAt(random.nextInt(chars.length())) +
-            digits.charAt(random.nextInt(digits.length())) +
-            digits.charAt(random.nextInt(digits.length())) +
-            digits.charAt(random.nextInt(digits.length()));
    }
 
 }

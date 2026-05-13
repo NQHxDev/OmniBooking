@@ -12,7 +12,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MailService {
 
-   private final EmailProducer emailProducer;
    private final MailTemplateService mailTemplateService;
    private final AppProperties appProperties;
 
@@ -30,27 +29,18 @@ public class MailService {
             .build();
    }
 
-   public void sendVerificationEmail(String toEmail, String userName, String token) {
-      emailProducer.sendEmailEvent(buildVerificationEmailEvent(toEmail, userName, token));
-   }
-
-   public void sendPartnerOtpEmail(String toEmail, String userName, String otpCode) {
-      // Prepare template variables
+   public EmailEvent buildPartnerOtpEmailEvent(String toEmail, String userName, String otpCode) {
       Map<String, Object> variables = new HashMap<>();
       variables.put("userName", userName);
       variables.put("otpCode", otpCode);
 
-      // Render HTML content
       String htmlContent = mailTemplateService.buildHtmlContent("partner-otp", variables);
 
-      // Send to Kafka
-      EmailEvent emailEvent = EmailEvent.builder()
+      return EmailEvent.builder()
             .to(toEmail)
             .subject("Mã xác thực đối tác OmniBooking")
             .content(htmlContent)
             .build();
-
-      emailProducer.sendEmailEvent(emailEvent);
    }
 
    public EmailEvent buildForgotPasswordEmailEvent(String toEmail, String userName, String token) {
@@ -67,8 +57,16 @@ public class MailService {
             .build();
    }
 
-   public void sendForgotPasswordEmail(String toEmail, String userName, String token) {
-      emailProducer.sendEmailEvent(buildForgotPasswordEmailEvent(toEmail, userName, token));
-   }
+   public EmailEvent buildSecurityOtpEmailEvent(String toEmail, String userName, String otpCode) {
+      Map<String, Object> variables = new HashMap<>();
+      variables.put("userName", userName);
+      variables.put("otpCode", otpCode);
+      String htmlContent = mailTemplateService.buildHtmlContent("security-otp", variables);
 
+      return EmailEvent.builder()
+            .to(toEmail)
+            .subject("Mã xác thực hành động bảo mật OmniBooking")
+            .content(htmlContent)
+            .build();
+   }
 }

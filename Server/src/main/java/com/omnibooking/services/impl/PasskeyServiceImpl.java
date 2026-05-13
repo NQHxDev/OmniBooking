@@ -4,6 +4,8 @@ import com.omnibooking.config.AppProperties;
 import com.omnibooking.dto.auth.passkey.PasskeyRegistrationOptionsResponse;
 import com.omnibooking.dto.auth.passkey.PasskeyRegistrationVerifyRequest;
 import com.omnibooking.dto.auth.passkey.PasskeyResponse;
+import com.omnibooking.exception.AppException;
+import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserPasskey;
 import com.omnibooking.repository.UserRepository;
@@ -20,7 +22,6 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +40,7 @@ public class PasskeyServiceImpl implements PasskeyService {
    @Override
    public PasskeyRegistrationOptionsResponse generateRegistrationOptions(UUID userId) {
       User user = userRepository.findById(userId)
-            .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
       Challenge challenge = new DefaultChallenge();
       String challengeBase64 = Base64.getEncoder().encodeToString(challenge.getValue());
@@ -61,11 +62,11 @@ public class PasskeyServiceImpl implements PasskeyService {
    @Transactional
    public void verifyRegistration(UUID userId, PasskeyRegistrationVerifyRequest request) {
       User user = userRepository.findById(userId)
-            .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
       String storedChallenge = redisTemplate.opsForValue().get(CHALLENGE_PREFIX + userId);
       if (storedChallenge == null) {
-         throw new RuntimeException("Challenge expired or not found");
+         throw new AppException(ErrorCode.INVALID_TOKEN);
       }
 
       redisTemplate.delete(CHALLENGE_PREFIX + userId);
@@ -104,10 +105,10 @@ public class PasskeyServiceImpl implements PasskeyService {
    @Transactional
    public void deletePasskey(UUID userId, UUID passkeyId) {
       UserPasskey passkey = userPasskeyRepository.findById(passkeyId)
-            .orElseThrow(() -> new RuntimeException("Passkey not found"));
+            .orElseThrow(() -> new AppException(ErrorCode.PASSKEY_NOT_FOUND));
 
       if (!passkey.getUser().getId().equals(userId)) {
-         throw new RuntimeException("Unauthorized");
+         throw new AppException(ErrorCode.UNAUTHORIZED);
       }
 
       userPasskeyRepository.delete(passkey);

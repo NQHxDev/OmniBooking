@@ -131,7 +131,8 @@ public class OutboxServiceImpl implements OutboxService {
 
    private String getTopicForEvent(String eventType) {
       if (eventType.contains("MAIL") || eventType.contains("REGISTERED") || 
-          eventType.contains("PASSWORD") || eventType.contains("VERIFICATION")) {
+          eventType.contains("PASSWORD") || eventType.contains("VERIFICATION") ||
+          eventType.contains("OTP")) {
          return KafkaConfig.MAIL_TOPIC;
       }
       if (eventType.contains("MEDIA")) {
