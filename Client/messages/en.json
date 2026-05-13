@@ -449,6 +449,41 @@
          "privacyPolicy": "Privacy Policy",
          "humanRights": "Human Rights Statement",
          "terms": "Terms of Service"
+      },
+      "details": {
+         "title": "Personal details",
+         "subtitle": "Update your info and find out how it's used.",
+         "edit": "Edit",
+         "add": "Add",
+         "verified": "Verified",
+         "name": "Name",
+         "displayName": "Display name",
+         "email": "Email address",
+         "emailDesc": "This is the email address you use to sign in. It's also where we send your booking confirmations.",
+         "phoneNumber": "Phone number",
+         "phoneDesc": "Your phone number is used to contact you about your bookings or attractions.",
+         "dateOfBirth": "Date of birth",
+         "nationality": "Nationality",
+         "gender": "Gender",
+         "address": "Address",
+         "passport": "Passport details",
+         "notProvided": "Not provided",
+         "chooseDisplayName": "Choose a display name",
+         "enterDob": "Enter your date of birth",
+         "selectNationality": "Select your country/region",
+         "selectGender": "Select your gender",
+         "enterAddress": "Enter your address",
+         "verifyNow": "Verify now",
+         "verificationSent": "Verification request sent! Please check your email",
+         "resendIn": "Resend in",
+         "rateLimitError": "Please wait 30 seconds before requesting again",
+         "save": "Save",
+         "cancel": "Cancel",
+         "genderOptions": {
+            "MALE": "Male",
+            "FEMALE": "Female",
+            "OTHER": "Other"
+         }
       }
    },
    "NotFound": {

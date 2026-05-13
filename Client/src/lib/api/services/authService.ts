@@ -53,6 +53,13 @@ export const authService = {
    },
 
    /**
+    * Resends the verification email to the logged-in user.
+    */
+   resendVerification: async () => {
+      return apiClient.post<ApiResponse<void>>("/auth/resend-verification");
+   },
+
+   /**
     * Refreshes the current session and returns latest user data.
     * Uses a promise cache to prevent parallel refresh requests.
     */

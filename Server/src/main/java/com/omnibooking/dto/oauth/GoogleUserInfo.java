@@ -27,16 +27,6 @@ public class GoogleUserInfo implements OAuth2UserInfo {
    private String locale;
 
    @Override
-   public String getFirstName() {
-      return givenName;
-   }
-
-   @Override
-   public String getLastName() {
-      return familyName;
-   }
-
-   @Override
    public String getPicture() {
       return picture;
    }

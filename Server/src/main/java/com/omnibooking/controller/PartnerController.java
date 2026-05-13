@@ -48,7 +48,7 @@ public class PartnerController {
 
       // Fetch full name from profile
       String fullName = userProfileRepository.findById(userId)
-            .map(profile -> profile.getFirstName() + " " + profile.getLastName())
+            .map(profile -> profile.getDisplayName())
             .orElse(principal.getUsername());
 
       // Cooldown check (prevent sending multiple emails within 30 seconds)

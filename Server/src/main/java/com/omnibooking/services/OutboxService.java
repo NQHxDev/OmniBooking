@@ -8,4 +8,6 @@ public interface OutboxService {
 
    void processOutbox();
 
+   void processSingleEvent(com.omnibooking.model.OutboxEvent event);
+
 }

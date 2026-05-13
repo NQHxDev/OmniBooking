@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from "react";
 import { GoogleMap, useJsApiLoader, MarkerF, Autocomplete } from "@react-google-maps/api";
 import { Search, Info, X, ChevronLeft, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { env } from "@/env";
 import Image from "next/image";
 

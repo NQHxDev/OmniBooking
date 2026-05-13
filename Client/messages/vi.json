@@ -449,6 +449,41 @@
          "privacyPolicy": "Chính sách Bảo mật",
          "humanRights": "Chính sách về Quyền con người",
          "terms": "Điều khoản dịch vụ"
+      },
+      "details": {
+         "title": "Thông tin cá nhân",
+         "subtitle": "Cập nhật thông tin của bạn và tìm hiểu các thông tin này được sử dụng ra sao.",
+         "edit": "Chỉnh sửa",
+         "add": "Thêm",
+         "verified": "Xác thực",
+         "name": "Tên",
+         "displayName": "Tên hiển thị",
+         "email": "Địa chỉ email",
+         "emailDesc": "Đây là địa chỉ email bạn dùng để đăng nhập. Chúng tôi cũng sẽ gửi các xác nhận đặt chỗ tới địa chỉ này.",
+         "phoneNumber": "Số điện thoại",
+         "phoneDesc": "Chỗ nghỉ hoặc địa điểm tham quan bạn đặt sẽ liên lạc với bạn qua số này nếu cần.",
+         "dateOfBirth": "Ngày sinh",
+         "nationality": "Quốc tịch",
+         "gender": "Giới tính",
+         "address": "Địa chỉ",
+         "passport": "Thông tin hộ chiếu",
+         "notProvided": "Chưa cung cấp",
+         "chooseDisplayName": "Chọn tên hiển thị",
+         "enterDob": "Nhập ngày sinh của bạn",
+         "selectNationality": "Chọn vùng/quốc gia của bạn",
+         "selectGender": "Chọn giới tính",
+         "enterAddress": "Nhập địa chỉ",
+         "verifyNow": "Xác thực ngay",
+         "verificationSent": "Yêu cầu xác thực đã được gửi! Vui lòng kiểm tra email của bạn",
+         "resendIn": "Gửi lại sau",
+         "rateLimitError": "Vui lòng đợi 30 giây trước khi yêu cầu lại",
+         "save": "Lưu",
+         "cancel": "Hủy",
+         "genderOptions": {
+            "MALE": "Nam",
+            "FEMALE": "Nữ",
+            "OTHER": "Khác"
+         }
       }
    },
    "NotFound": {

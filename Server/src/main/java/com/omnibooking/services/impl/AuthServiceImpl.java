@@ -88,11 +88,9 @@ public class AuthServiceImpl implements AuthService {
       bloomFilterService.add(savedUser.getEmail());
 
       // Create Profile
-      String[] nameParts = splitFullName(request.getFullName());
       UserProfile profile = UserProfile.builder()
             .user(savedUser)
-            .firstName(nameParts[0])
-            .lastName(nameParts[1])
+            .displayName(request.getFullName())
             .build();
       userProfileRepository.save(Objects.requireNonNull(profile));
 
@@ -215,6 +213,42 @@ public class AuthServiceImpl implements AuthService {
       });
    }
 
+   @Override
+   @Transactional
+   public void resendVerification(UUID userId) {
+      // 1. Rate limiting check (30 seconds cooldown per user)
+      String rateLimitKey = "auth:resend-limit:" + userId;
+      String lastSent = redisTemplate.opsForValue().get(rateLimitKey);
+      if (lastSent != null) {
+         throw new AppException(ErrorCode.RATE_LIMIT_EXCEEDED);
+      }
+
+      User user = userRepository.findById(userId)
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+      UserProfile profile = userProfileRepository.findByUserId(userId)
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+      if (Boolean.TRUE.equals(profile.getIsVerified())) {
+         log.info("User {} already verified, skipping resend", user.getEmail());
+         return;
+      }
+
+      // Create new verification token
+      String token = verificationService.createVerificationToken(user.getId());
+
+      // Save to Outbox to be picked up and sent to Kafka
+      log.info("Recording resend verification outbox event for: {}", user.getEmail());
+      outboxService.saveEvent(
+            user.getId(),
+            "USER",
+            "RESEND_VERIFICATION",
+            mailService.buildVerificationEmailEvent(user.getEmail(), profile.getDisplayName(), token));
+
+      // 4. Set rate limit in Redis for 30 seconds
+      redisTemplate.opsForValue().set(rateLimitKey, "true", 30, TimeUnit.SECONDS);
+   }
+
    /**
     * Centralized logic to issue tokens, save sessions, and set cookies.
     */
@@ -229,20 +263,8 @@ public class AuthServiceImpl implements AuthService {
       String accessToken = jwtService.generateAccessToken(user.getId(), roles, sessionId, fgpHash);
 
       String fullName;
-      if (profile != null) {
-         String first = profile.getFirstName() != null ? profile.getFirstName().trim() : "";
-         String last = profile.getLastName() != null ? profile.getLastName().trim() : "";
-
-         if (first.isEmpty())
-            fullName = last;
-         else if (last.isEmpty())
-            fullName = first;
-         else if (first.toLowerCase().contains(last.toLowerCase()))
-            fullName = first;
-         else if (last.toLowerCase().contains(first.toLowerCase()))
-            fullName = last;
-         else
-            fullName = first + " " + last;
+      if (profile != null && profile.getDisplayName() != null) {
+         fullName = profile.getDisplayName();
       } else {
          fullName = user.getUsername();
       }
@@ -311,20 +333,8 @@ public class AuthServiceImpl implements AuthService {
 
          UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
          String fullName;
-         if (profile != null) {
-            String first = profile.getFirstName() != null ? profile.getFirstName().trim() : "";
-            String last = profile.getLastName() != null ? profile.getLastName().trim() : "";
-
-            if (first.isEmpty())
-               fullName = last;
-            else if (last.isEmpty())
-               fullName = first;
-            else if (first.toLowerCase().contains(last.toLowerCase()))
-               fullName = first;
-            else if (last.toLowerCase().contains(first.toLowerCase()))
-               fullName = last;
-            else
-               fullName = first + " " + last;
+         if (profile != null && profile.getDisplayName() != null) {
+            fullName = profile.getDisplayName();
          } else {
             fullName = user.getUsername();
          }
@@ -388,22 +398,14 @@ public class AuthServiceImpl implements AuthService {
          // Sync profile info if changed
          if (profile != null) {
             boolean changed = false;
-            String[] nameParts = splitFullName(userInfo.getName());
-            String targetFirst = nameParts[0];
-            String targetLast = nameParts[1];
-
             if (userInfo.getPicture() != null && !userInfo.getPicture().equals(profile.getAvatarUrl())) {
                if (profile.getAvatarUrl() == null || profile.getAvatarUrl().contains("googleusercontent.com")) {
                   profile.setAvatarUrl(userInfo.getPicture());
                   changed = true;
                }
             }
-            if (!targetFirst.isEmpty() && !targetFirst.equals(profile.getFirstName())) {
-               profile.setFirstName(targetFirst);
-               changed = true;
-            }
-            if (!targetLast.isEmpty() && !targetLast.equals(profile.getLastName())) {
-               profile.setLastName(targetLast);
+            if (userInfo.getName() != null && !userInfo.getName().equals(profile.getDisplayName())) {
+               profile.setDisplayName(userInfo.getName());
                changed = true;
             }
             // Google users are always verified
@@ -436,11 +438,9 @@ public class AuthServiceImpl implements AuthService {
             bloomFilterService.add(user.getEmail());
 
             // Create Profile
-            String[] nameParts = splitFullName(userInfo.getName());
             profile = UserProfile.builder()
                   .user(user)
-                  .firstName(nameParts[0])
-                  .lastName(nameParts[1])
+                  .displayName(userInfo.getName())
                   .avatarUrl(userInfo.getPicture())
                   .isVerified(true)
                   .build();
@@ -462,20 +462,5 @@ public class AuthServiceImpl implements AuthService {
       }
 
       return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response);
-   }
-
-   private String[] splitFullName(String fullName) {
-      if (fullName == null || fullName.isBlank()) {
-         return new String[] { "", "" };
-      }
-      String trimmed = fullName.trim();
-      int lastSpaceIndex = trimmed.lastIndexOf(' ');
-      if (lastSpaceIndex == -1) {
-         return new String[] { trimmed, "" };
-      }
-      return new String[] {
-            trimmed.substring(0, lastSpaceIndex).trim(),
-            trimmed.substring(lastSpaceIndex + 1).trim()
-      };
    }
 }

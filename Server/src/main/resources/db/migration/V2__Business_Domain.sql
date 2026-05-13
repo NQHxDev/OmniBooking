@@ -164,6 +164,26 @@ CREATE TABLE IF NOT EXISTS transactions (
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Media Management Table
+CREATE TABLE IF NOT EXISTS media (
+   id UUID PRIMARY KEY,
+   url TEXT NOT NULL,
+   public_id VARCHAR(255) NOT NULL,
+   format VARCHAR(20),
+   resource_type VARCHAR(20),
+   bytes BIGINT,
+   
+   -- Relation fields
+   entity_id UUID NOT NULL,
+   entity_type VARCHAR(50) NOT NULL, -- PROPERTY, ROOM_TYPE, USER_AVATAR
+   is_main BOOLEAN DEFAULT FALSE,
+   
+   version BIGINT DEFAULT 0,
+   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   deleted_at TIMESTAMP WITH TIME ZONE
+);
+
 -- Create Indexes
 CREATE INDEX idx_properties_owner_id ON properties(owner_id);
 CREATE INDEX idx_properties_city ON properties(city);
@@ -174,3 +194,4 @@ CREATE INDEX idx_bookings_status ON bookings(status);
 CREATE INDEX idx_bookings_check_in ON bookings(check_in_date);
 CREATE INDEX idx_transactions_booking_id ON transactions(booking_id);
 CREATE INDEX idx_coupons_code ON coupons(code);
+CREATE INDEX idx_media_entity ON media(entity_id, entity_type);

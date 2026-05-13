@@ -27,9 +27,12 @@ import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 @CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true", allowedHeaders = "*")
 @RestController
@@ -112,14 +115,24 @@ public class AuthController {
    }
 
    @Anonymous
-   @org.springframework.web.bind.annotation.GetMapping("/verify")
+   @GetMapping("/verify")
    public ResponseEntity<ApiResponse<Void>> verify(
-         @org.springframework.web.bind.annotation.RequestParam String token,
+         @RequestParam String token,
          HttpServletRequest httpRequest) {
 
       String requestId = (String) httpRequest.getAttribute("requestId");
       authService.verifyEmail(token);
       return ResponseEntity.ok(ApiResponse.success(null, "Email verified successfully", requestId));
+   }
+
+   @PostMapping("/resend-verification")
+   public ResponseEntity<ApiResponse<Void>> resendVerification(
+         @AuthenticationPrincipal UserPrincipal principal,
+         HttpServletRequest httpRequest) {
+
+      String requestId = (String) httpRequest.getAttribute("requestId");
+      authService.resendVerification(principal.getId());
+      return ResponseEntity.ok(ApiResponse.success(null, "Verification email resent successfully", requestId));
    }
 
    @Anonymous
@@ -146,9 +159,9 @@ public class AuthController {
    }
 
    @Anonymous
-   @org.springframework.web.bind.annotation.GetMapping("/{provider}/url")
+   @GetMapping("/{provider}/url")
    public ResponseEntity<ApiResponse<String>> getOAuthUrl(
-         @org.springframework.web.bind.annotation.PathVariable String provider,
+         @PathVariable String provider,
          HttpServletRequest httpRequest) {
       String requestId = (String) httpRequest.getAttribute("requestId");
       String url = oAuth2ServiceFactory.getService(provider).generateAuthUrl();
@@ -156,11 +169,11 @@ public class AuthController {
    }
 
    @Anonymous
-   @org.springframework.web.bind.annotation.GetMapping("/{provider}/callback")
+   @GetMapping("/{provider}/callback")
    public void oauthCallback(
-         @org.springframework.web.bind.annotation.PathVariable String provider,
-         @org.springframework.web.bind.annotation.RequestParam String code,
-         @org.springframework.web.bind.annotation.RequestParam String state,
+         @PathVariable String provider,
+         @RequestParam String code,
+         @RequestParam String state,
          HttpServletRequest httpRequest,
          HttpServletResponse httpResponse) throws java.io.IOException {
 

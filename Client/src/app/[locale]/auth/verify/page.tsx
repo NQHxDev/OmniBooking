@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle, XCircle, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
 import Link from "next/link";
@@ -15,18 +15,15 @@ function VerifyContent() {
    const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
    const [message, setMessage] = useState("");
    const { user, setAuth } = useAuthStore();
+   const hasCalled = useRef(false);
 
    useEffect(() => {
-      if (!token) {
-         const timer = setTimeout(() => {
-            setStatus("error");
-            setMessage("Mã xác nhận không hợp lệ hoặc đã hết hạn.");
-         }, 0);
-         return () => clearTimeout(timer);
-      }
+      if (!token || hasCalled.current) return;
+      hasCalled.current = true;
 
       const verifyEmail = async () => {
          try {
+            console.log("DEBUG: Verifying email with token:", token);
             await apiClient.get(`/auth/verify?token=${token}`);
 
             // Cập nhật trạng thái verified trong store nếu đang đăng nhập

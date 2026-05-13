@@ -31,7 +31,7 @@ public interface UserMapper {
    @Mapping(target = "username", source = "user.username")
    @Mapping(target = "email", source = "user.email")
    @Mapping(target = "roles", source = "roles", qualifiedByName = "setToOrderedList")
-   @Mapping(target = "fullName", expression = "java(profile != null ? profile.getFirstName() + \" \" + profile.getLastName() : user.getUsername())")
+   @Mapping(target = "fullName", expression = "java(profile != null && profile.getDisplayName() != null ? profile.getDisplayName() : user.getUsername())")
    @Mapping(target = "avatarUrl", source = "profile.avatarUrl")
    @Mapping(target = "reputationScore", expression = "java(profile != null ? profile.getReputationScore() : 100.0)")
    @Mapping(target = "isVerified", expression = "java(profile != null ? profile.getIsVerified() : false)")

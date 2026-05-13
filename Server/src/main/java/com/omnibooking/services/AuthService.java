@@ -22,6 +22,8 @@ public interface AuthService {
 
    void verifyEmail(String token);
 
+   void resendVerification(UUID userId);
+
    void clearAllCookies(HttpServletResponse response);
 
    AuthResponse upgradeToPartner(UUID userId, String ip, String userAgent, HttpServletResponse response);

@@ -2,11 +2,15 @@ package com.omnibooking.services.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.omnibooking.config.KafkaConfig;
 import com.omnibooking.model.OutboxEvent;
 import com.omnibooking.repository.OutboxEventRepository;
 import com.omnibooking.services.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -29,6 +33,13 @@ public class OutboxServiceImpl implements OutboxService {
    private final ObjectMapper objectMapper;
    private final KafkaTemplate<String, Object> kafkaTemplate;
    private final AtomicBoolean isProcessing = new AtomicBoolean(false);
+   private OutboxService self;
+
+   @Lazy
+   @Autowired
+   public void setSelf(OutboxService self) {
+      this.self = self;
+   }
 
    @Override
    @Transactional(propagation = Propagation.MANDATORY)
@@ -51,7 +62,9 @@ public class OutboxServiceImpl implements OutboxService {
                @Override
                public void afterCommit() {
                   log.info("Transaction committed, triggering outbox processing immediately.");
-                  processOutbox();
+                  if (self != null) {
+                     self.processOutbox();
+                  }
                }
             });
          }
@@ -62,7 +75,6 @@ public class OutboxServiceImpl implements OutboxService {
    }
 
    @Override
-   @Transactional
    public void processOutbox() {
       // 1. Thread-safety check to avoid concurrent runs in the same instance
       if (!isProcessing.compareAndSet(false, true)) {
@@ -70,48 +82,62 @@ public class OutboxServiceImpl implements OutboxService {
       }
 
       try {
-         // 2. Fetch using FOR UPDATE SKIP LOCKED for multi-instance safety
+         // 2. Fetch unprocessed events
          List<OutboxEvent> events = outboxEventRepository.findUnprocessedForUpdate(PageRequest.of(0, 50));
-         if (events.isEmpty())
-            return;
+         if (events.isEmpty()) return;
 
-      log.info("Processing {} outbox events", events.size());
-      for (OutboxEvent event : events) {
-         try {
-            String topic = getTopicForEvent(event.getEventType());
-
-            // Deserialize back to original class to ensure correct Kafka
-            // headers/serialization
-            Class<?> clazz = Class.forName(event.getPayloadClass());
-            Object payload = objectMapper.readValue(event.getPayload(), clazz);
-
-            kafkaTemplate.send(topic, payload).whenComplete((result, ex) -> {
-               if (ex == null) {
-                  log.info("Successfully pushed outbox event {} to Kafka topic {}", event.getId(), topic);
-               } else {
-                  log.error("Failed to push outbox event {} to Kafka", event.getId(), ex);
+         log.info("Processing {} outbox events", events.size());
+         for (OutboxEvent event : events) {
+            if (self != null) {
+               try {
+                  self.processSingleEvent(event);
+               } catch (Exception e) {
+                  log.error("Failed to process outbox event: {}", event.getId(), e);
                }
-            });
+            }
+         }
+      } finally {
+         isProcessing.set(false);
+      }
+   }
 
+   @Override
+   @Transactional(propagation = Propagation.REQUIRES_NEW)
+   public void processSingleEvent(OutboxEvent event) {
+      try {
+         String topic = getTopicForEvent(event.getEventType());
+
+         // Deserialize back to original class
+         Class<?> clazz = Class.forName(event.getPayloadClass());
+         Object payload = objectMapper.readValue(event.getPayload(), clazz);
+
+         // Send to Kafka and WAIT for confirmation
+         try {
+            kafkaTemplate.send(topic, payload).get(5, java.util.concurrent.TimeUnit.SECONDS);
+            log.info("Successfully pushed outbox event {} to Kafka topic {}", event.getId(), topic);
+            
+            // ONLY mark as processed if Kafka send was successful
             event.setProcessed(true);
             event.setProcessedAt(Instant.now());
-            outboxEventRepository.save(event);
-         } catch (Exception e) {
-            log.error("Failed to process outbox event: {}", event.getId(), e);
+            outboxEventRepository.saveAndFlush(event);
+         } catch (Exception ex) {
+            log.error("Failed to push outbox event {} to Kafka", event.getId(), ex);
+            throw new RuntimeException("Kafka send failed", ex);
          }
+      } catch (Exception e) {
+         throw new RuntimeException("Error processing single outbox event", e);
       }
-   } finally {
-      isProcessing.set(false);
    }
-}
 
    private String getTopicForEvent(String eventType) {
-      if (eventType.contains("MAIL") || eventType.contains("REGISTERED") || eventType.contains("PASSWORD")) {
-         return com.omnibooking.config.KafkaConfig.MAIL_TOPIC;
+      if (eventType.contains("MAIL") || eventType.contains("REGISTERED") || 
+          eventType.contains("PASSWORD") || eventType.contains("VERIFICATION")) {
+         return KafkaConfig.MAIL_TOPIC;
       }
       if (eventType.contains("MEDIA")) {
-         return com.omnibooking.config.KafkaConfig.MEDIA_TOPIC;
+         return KafkaConfig.MEDIA_TOPIC;
       }
       return "omnibooking-default-topic";
    }
+
 }
