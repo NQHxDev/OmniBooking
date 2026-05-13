@@ -1,15 +1,16 @@
 package com.omnibooking.config;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
-@Configuration
-@ConfigurationProperties(prefix = "app")
 @Data
 @Validated
+@Configuration
+@ConfigurationProperties(prefix = "app")
 public class AppProperties {
 
    @NotBlank
@@ -26,6 +27,14 @@ public class AppProperties {
    private final Cloudinary cloudinary = new Cloudinary();
    private final Oauth2 oauth2 = new Oauth2();
    private final Geo geo = new Geo();
+   private final Currency currency = new Currency();
+
+   @Data
+   public static class Currency {
+      private String apiKey;
+      private String baseCurrency = "USD";
+      private String providerUrl = "https://v6.exchangerate-api.com/v6/%s/latest/%s";
+   }
 
    @Data
    public static class Geo {

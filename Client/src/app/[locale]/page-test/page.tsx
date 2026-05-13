@@ -2,6 +2,7 @@
 
 import { LocationPicker } from "@/components/Map";
 import Navbar from "@/components/Navbar";
+import PriceDisplay from "@/components/PriceDisplay";
 
 export default function DemoMapPage() {
    return (
@@ -17,13 +18,13 @@ export default function DemoMapPage() {
                </p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm p-2">
+            {/* <div className="bg-white rounded-2xl shadow-sm p-2">
                <LocationPicker
                   onLocationChange={(lat, lng, addr) => {
                      console.log("Location Changed:", { lat, lng, addr });
                   }}
                />
-            </div>
+            </div> */}
 
             <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
@@ -46,6 +47,32 @@ export default function DemoMapPage() {
                      Sử dụng hệ màu chuẩn và typography hiện đại, mang lại cảm giác tin cậy và
                      chuyên nghiệp.
                   </p>
+               </div>
+            </div>
+
+            <div className="mt-12 bg-white rounded-2xl shadow-sm p-8 border border-gray-100">
+               <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Demo: Currency Conversion</h2>
+                  <p className="text-gray-600 mt-1">
+                     Thử thay đổi tiền tệ ở thanh Menu phía trên để xem giá tự động cập nhật.
+                  </p>
+               </div>
+
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {[10, 49.99, 120, 1500].map((price) => (
+                     <div
+                        key={price}
+                        className="p-6 rounded-xl bg-gray-50 border border-gray-100 flex flex-col items-center justify-center gap-2 hover:shadow-md transition-shadow"
+                     >
+                        <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                           Giá gốc (USD): ${price}
+                        </span>
+                        <PriceDisplay amount={price} size="xl" className="text-[#006ce4]" />
+                        <span className="text-[10px] text-gray-500 italic">
+                           (Tỉ giá lấy từ Backend & Redis)
+                        </span>
+                     </div>
+                  ))}
                </div>
             </div>
          </div>

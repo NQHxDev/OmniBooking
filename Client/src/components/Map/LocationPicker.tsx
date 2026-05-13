@@ -40,6 +40,7 @@ export default function LocationPicker({
    initialPosition = defaultCenter,
    onLocationChange,
 }: LocationPickerProps) {
+   const t = useTranslations("Map");
    const { isLoaded } = useJsApiLoader({
       id: "google-map-script",
       googleMapsApiKey: env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -97,7 +98,7 @@ export default function LocationPicker({
       return (
          <div className="w-full h-[600px] bg-gray-100 flex flex-col items-center justify-center rounded-xl gap-4">
             <Loader2 className="h-10 w-10 text-[#006ce4] animate-spin" />
-            <p className="text-gray-500 font-medium">Đang tải bản đồ Google...</p>
+            <p className="text-gray-500 font-medium">{t("loading")}</p>
          </div>
       );
    }
@@ -125,15 +126,15 @@ export default function LocationPicker({
             <motion.div
                initial={{ opacity: 0, x: -20 }}
                animate={{ opacity: 1, x: 0 }}
-               className="bg-white p-6 rounded-lg shadow-xl border border-gray-100 pointer-events-auto"
+               className="bg-white/95 backdrop-blur-md p-8 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-white/20 pointer-events-auto"
             >
-               <h2 className="text-2xl font-bold text-gray-900 mb-6">Chỗ nghỉ của Quý vị ở đâu?</h2>
+               <h2 className="text-2xl font-bold text-gray-900 mb-6">{t("title")}</h2>
 
                <div className="space-y-4">
                   {/* Autocomplete Address Search */}
                   <div>
                      <label className="block text-sm font-bold text-gray-700 mb-1">
-                        Tìm địa chỉ của Quý vị
+                        {t("searchLabel")}
                      </label>
                      <div className="relative">
                         <Autocomplete
@@ -144,46 +145,46 @@ export default function LocationPicker({
                               type="text"
                               value={address}
                               onChange={(e) => setAddress(e.target.value)}
-                              className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#006ce4] focus:border-transparent outline-none transition-all"
-                              placeholder="Bắt đầu nhập địa chỉ..."
+                              className="w-full pl-4 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#006ce4] focus:border-transparent outline-none transition-all duration-200 text-gray-800"
+                              placeholder={t("searchPlaceholder")}
                            />
                         </Autocomplete>
-                        <Search className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+                        <Search className="absolute right-4 top-3.5 h-5 w-5 text-gray-400" />
                      </div>
                   </div>
 
                   <div>
                      <label className="block text-sm font-bold text-gray-700 mb-1">
-                        Số căn hộ hoặc tầng (không bắt buộc)
+                        {t("unitLabel")}
                      </label>
                      <input
                         type="text"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md outline-none focus:border-[#006ce4]"
-                        placeholder="Căn hộ, tòa nhà, tầng, v.v."
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#006ce4] focus:border-transparent transition-all duration-200"
+                        placeholder={t("unitPlaceholder")}
                      />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                      <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">
-                           Thành phố
+                           {t("cityLabel")}
                         </label>
                         <input
                            type="text"
                            value={city}
                            onChange={(e) => setCity(e.target.value)}
-                           className="w-full px-3 py-2 border border-gray-300 rounded-md outline-none"
+                           className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#006ce4] focus:border-transparent transition-all duration-200"
                         />
                      </div>
                      <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">
-                           Mã bưu chính
+                           {t("zipLabel")}
                         </label>
                         <input
                            type="text"
                            value={zipCode}
                            onChange={(e) => setZipCode(e.target.value)}
-                           className="w-full px-3 py-2 border border-gray-300 rounded-md outline-none"
+                           className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#006ce4] focus:border-transparent transition-all duration-200"
                         />
                      </div>
                   </div>
@@ -200,7 +201,7 @@ export default function LocationPicker({
                         htmlFor="auto-update"
                         className="text-sm font-medium text-gray-700 cursor-pointer"
                      >
-                        Cập nhật địa chỉ khi di chuyển ghim trên bản đồ.
+                        {t("autoUpdate")}
                      </label>
                   </div>
 
@@ -221,20 +222,19 @@ export default function LocationPicker({
                            <div className="flex gap-3">
                               <Info className="h-5 w-5 text-[#006ce4] shrink-0 mt-0.5" />
                               <p className="text-sm text-gray-600 leading-relaxed pr-4">
-                                 Sử dụng Google Maps giúp khách hàng tìm thấy bạn dễ dàng hơn. Bạn
-                                 có thể kéo thả Pin đến vị trí chính xác nhất.
+                                 {t("hint")}
                               </p>
                            </div>
                         </motion.div>
                      )}
                   </AnimatePresence>
 
-                  <div className="flex gap-3 pt-2">
-                     <button className="flex items-center justify-center w-12 h-12 border-2 border-[#006ce4] rounded-md text-[#006ce4] hover:bg-blue-50 transition-colors">
-                        <ChevronLeft className="h-6 w-6" />
+                  <div className="flex gap-4 pt-4">
+                     <button className="flex items-center justify-center w-14 h-14 border-2 border-[#006ce4] rounded-xl text-[#006ce4] hover:bg-blue-50 transition-all duration-200 active:scale-90">
+                        <ChevronLeft className="h-7 w-7" />
                      </button>
-                     <button className="flex-1 bg-[#006ce4] text-white font-bold py-3 rounded-md hover:bg-[#005bb8] transition-all shadow-lg active:scale-95">
-                        Tiếp tục
+                     <button className="flex-1 bg-[#006ce4] text-white font-bold text-lg rounded-xl hover:bg-[#005bb8] transition-all shadow-[0_10px_20px_rgba(0,108,228,0.3)] active:scale-95">
+                        {t("continue")}
                      </button>
                   </div>
                </div>
@@ -251,7 +251,7 @@ export default function LocationPicker({
                height={16}
             />
             <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">
-               Powered by Google
+               {t("poweredBy")}
             </span>
          </div>
       </div>

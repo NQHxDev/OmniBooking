@@ -52,7 +52,11 @@
       "cities": "Thành phố",
       "allRightsReserved": "Bảo lưu mọi quyền",
       "privacy": "Chính sách bảo mật",
-      "terms": "Điều khoản sử dụng"
+      "terms": "Điều khoản sử dụng",
+      "Currency": {
+         "USD": "Đô la Mỹ",
+         "VND": "Việt Nam Đồng"
+      }
    },
    "Auth": {
       "loginTitle": "Xin chào bạn quay lại!",
@@ -451,5 +455,19 @@
       "title": "Ui chao!<newline></newline><gradient>Bạn bị lạc rồi...</gradient>",
       "description": "Có vẻ như địa chỉ bạn đang tìm kiếm không tồn tại hoặc đã được di chuyển sang một hành trình khác.",
       "goBack": "Quay lại"
+   },
+   "Map": {
+      "loading": "Đang tải bản đồ Google...",
+      "title": "Chỗ nghỉ của Quý vị ở đâu?",
+      "searchLabel": "Tìm địa chỉ của Quý vị",
+      "searchPlaceholder": "Bắt đầu nhập địa chỉ...",
+      "unitLabel": "Số căn hộ hoặc tầng (không bắt buộc)",
+      "unitPlaceholder": "Căn hộ, tòa nhà, tầng, v.v.",
+      "cityLabel": "Thành phố",
+      "zipLabel": "Mã bưu chính",
+      "autoUpdate": "Cập nhật địa chỉ khi di chuyển ghim trên bản đồ.",
+      "hint": "Sử dụng Google Maps giúp khách hàng tìm thấy bạn dễ dàng hơn. Bạn có thể kéo thả Pin đến vị trí chính xác nhất.",
+      "continue": "Tiếp tục",
+      "poweredBy": "Powered by Google"
    }
 }

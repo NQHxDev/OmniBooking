@@ -86,6 +86,7 @@ public class SecurityConfig {
                   .requestMatchers("/destinations", "/destinations/**").permitAll()
                   .requestMatchers("/health/**").permitAll()
                   .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                  .requestMatchers("/currencies/**").permitAll()
                   .requestMatchers("/actuator/**").permitAll()
                   // Allow public property details view if needed
                   .requestMatchers(HttpMethod.GET, "/properties/**").permitAll() 

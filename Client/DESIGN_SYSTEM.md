@@ -208,6 +208,25 @@ _Lưu ý: Sự minh bạch trong cấu trúc thư mục quan trọng tương đ�
 - **Callback UX**: Trang `/auth/callback` phải có hiệu ứng **Skeleton** hoặc **Pulse Animation** đẹp mắt trong khi chờ Backend xử lý trao đổi token.
 - **Consistent Branding**: Mọi nút Social Login phải có cùng kích thước (`h-11` hoặc `h-12`) và độ bo góc (`rounded-sm`) tương đương với các nút Primary khác.
 
+## 13. Hiển thị Giá tiền & Tiền tệ (Price & Currency)
+
+Quy chuẩn hiển thị giá tiền đồng nhất trên toàn hệ thống để tạo sự tin cậy và chuyên nghiệp.
+
+### 13.1. Cấu trúc hiển thị
+
+- **Component tiêu chuẩn**: Sử dụng component `<PriceDisplay amount={number} />`.
+- **Định dạng**:
+   - **VND**: Không có số thập phân, ngăn cách hàng nghìn bằng dấu chấm (e.g., `2.500.000 ₫`).
+   - **USD/EUR**: 2 số thập phân, ngăn cách bằng dấu phẩy (e.g., `$100.00`).
+- **Loading State**: Sử dụng `Skeleton` với kích thước tương ứng của text để tránh hiện tượng nhảy layout (Layout Shift) khi đang tải tỉ giá.
+
+### 13.2. Lưu ý quan trọng (Critical Notes)
+
+- **Base in DB**: Mọi giá trị truyền từ Backend về ban đầu luôn là **USD**. Component Frontend có trách nhiệm tự gọi API tỉ giá để quy đổi sang tiền tệ người dùng chọn.
+- **Locking Rate**: Đối với các chức năng Booking, **BẮT BUỘC** phải lưu lại tỉ giá tại thời điểm đặt phòng (`exchange_rate_at_booking`) vào bảng `bookings`.
+   - _Lý do_: Tỉ giá hệ thống thay đổi mỗi 4 tiếng. Nếu không lưu lại tỉ giá lúc khách đặt, tổng tiền khách phải trả có thể bị thay đổi khi họ xem lại đơn hàng sau này, gây khiếu nại.
+- **Markup Visibility**: Người dùng chỉ nhìn thấy giá cuối cùng đã bao gồm Profit Margin. Tuyệt đối không hiển thị giá gốc từ API.
+
 ---
 
-_Last Updated: 2026-05-11_
+_Last Updated: 2026-05-13_

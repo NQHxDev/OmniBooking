@@ -52,7 +52,11 @@
       "cities": "Cities",
       "allRightsReserved": "All rights reserved",
       "privacy": "Privacy Policy",
-      "terms": "Terms of Service"
+      "terms": "Terms of Service",
+      "Currency": {
+         "USD": "US Dollar",
+         "VND": "Vietnamese Dong"
+      }
    },
    "Auth": {
       "loginTitle": "Welcome back!",
@@ -451,5 +455,19 @@
       "title": "Oops!<newline></newline><gradient>You've wandered off...</gradient>",
       "description": "Looks like you're lost? The page you're looking for doesn't exist or has been moved to another journey.",
       "goBack": "Go back"
+   },
+   "Map": {
+      "loading": "Loading Google Maps...",
+      "title": "Where is your property located?",
+      "searchLabel": "Find your address",
+      "searchPlaceholder": "Start typing your address...",
+      "unitLabel": "Apartment or floor number (optional)",
+      "unitPlaceholder": "Apartment, building, floor, etc.",
+      "cityLabel": "City",
+      "zipLabel": "Postcode",
+      "autoUpdate": "Update address when dragging the pin on the map.",
+      "hint": "Using Google Maps helps guests find you more easily. You can drag and drop the pin to the exact location.",
+      "continue": "Continue",
+      "poweredBy": "Powered by Google"
    }
 }

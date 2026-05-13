@@ -269,6 +269,32 @@ Hệ thống tìm kiếm của OmniBooking được thiết kế để mang lạ
 - **Dynamic Labels**: Các loại địa danh (Type Labels) được dịch động tại Frontend dựa trên namespace `Common.Search` trong các tệp `vi.json` và `en.json`.
 - **Locale-aware Search**: Elasticsearch được cấu hình để ưu tiên các kết quả phù hợp với ngôn ngữ hiện tại của người dùng, đảm bảo trải nghiệm bản địa hóa hoàn toàn.
 
+## 18. Global Currency & Real-time Pricing System
+
+Hệ thống OmniBooking được thiết kế để hoạt động trên quy mô toàn cầu với khả năng xử lý đa tiền tệ linh hoạt và chính xác:
+
+### 18.1. USD-Based Financial Core
+
+- **Single Base Currency**: Toàn bộ dữ liệu giá tiền (Property rates, Booking totals, Transactions) trong Database được lưu trữ duy nhất dưới đơn vị **USD** để đảm bảo tính nhất quán và dễ dàng hạch toán.
+- **Dynamic Conversion**: Giá tiền chỉ được quy đổi sang đơn vị tiền tệ của người dùng (VND, EUR...) tại thời điểm hiển thị hoặc thanh toán dựa trên tỉ giá thực tế.
+
+### 18.2. Multi-layer Exchange Rate Strategy
+
+Hệ thống sử dụng cơ chế lấy tỉ giá 3 lớp để tối ưu hóa hiệu năng và độ tin cậy:
+
+1. **Layer 1: Redis Cache**: Truy xuất tức thì với TTL 4 giờ.
+2. **Layer 2: Database**: Lưu trữ lịch sử tỉ giá (Audit Trail) và làm nguồn dự phòng nếu Redis bị trống.
+3. **Layer 3: External API (ExchangeRate-API)**: Nguồn dữ liệu gốc, chỉ gọi khi cả Redis và DB đều không có dữ liệu mới.
+
+### 18.3. Organic Pricing & Profit Margin (Markup)
+
+Để đảm bảo an toàn tài chính và tạo trải nghiệm "thật" cho người dùng, hệ thống áp dụng logic Markup thông minh:
+
+- **Automatic Markup**: Mọi tỉ giá lấy từ API đều được cộng thêm một khoảng chênh lệch trước khi lưu vào hệ thống:
+   - **VND**: Cộng ngẫu nhiên từ **300đ - 1,000đ** (Random Markup) để giá tiền thay đổi sinh động mỗi ngày.
+   - **Other Currencies**: Cộng thêm **5%** phí bảo hiểm tỉ giá.
+- **Update Cycle**: Một `CurrencyWorker` chạy định kỳ mỗi **4 tiếng** (0h, 4h, 8h, 12h, 16h, 20h) để cập nhật tỉ giá và thay đổi mức Random Markup, giúp website luôn có cảm giác "sống" và cập nhật liên tục.
+
 ---
 
-_Last Updated: 2026-05-12_
+_Last Updated: 2026-05-13_

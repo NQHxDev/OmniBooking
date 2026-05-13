@@ -1,34 +1,22 @@
 "use client";
 
-import { useLocale, useTranslations } from "next-intl";
-import { usePathname, useRouter } from "@/i18n/routing";
+import { useSettingStore } from "@/store/useSettingStore";
 import { useState, useRef, useEffect } from "react";
-import Image from "next/image";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, DollarSign } from "lucide-react";
+import { useTranslations } from "next-intl";
 
-export default function LanguageSwitcher() {
-   const locale = useLocale();
-   const t = useTranslations("Common");
-
-   const router = useRouter();
-   const pathname = usePathname();
+export default function CurrencySwitcher() {
+   const { currency, setCurrency } = useSettingStore();
    const [isOpen, setIsOpen] = useState(false);
+   const t = useTranslations("Common.Currency");
    const dropdownRef = useRef<HTMLDivElement>(null);
 
-   const languages = [
-      {
-         code: "vi",
-         name: "Tiếng Việt",
-         flag: "https://flagcdn.com/w40/vn.png",
-      },
-      {
-         code: "en",
-         name: "English",
-         flag: "https://flagcdn.com/w40/gb.png",
-      },
+   const currencies = [
+      { code: "USD", name: t("USD"), symbol: "$" },
+      { code: "VND", name: t("VND"), symbol: "₫" },
    ];
 
-   const currentLang = languages.find((l) => l.code === locale) || languages[0];
+   const currentCurrency = currencies.find((c) => c.code === currency) || currencies[0];
 
    useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
@@ -40,20 +28,18 @@ export default function LanguageSwitcher() {
       return () => document.removeEventListener("mousedown", handleClickOutside);
    }, []);
 
-   const handleLanguageChange = (newLocale: string) => {
+   const handleCurrencyChange = (newCurrency: string) => {
+      setCurrency(newCurrency);
       setIsOpen(false);
-      router.replace(pathname, { locale: newLocale });
    };
 
    return (
       <div className="relative" ref={dropdownRef}>
          <button
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 rounded-full p-1.5 hover:bg-white/10 transition-all active:scale-95"
+            className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 hover:bg-white/10 transition-all active:scale-95 text-white font-medium text-sm"
          >
-            <div className="relative h-5 w-7 overflow-hidden rounded-sm shadow-sm">
-               <Image src={currentLang.flag} alt={currentLang.name} fill className="object-cover" />
-            </div>
+            <span className="text-sm font-bold">{currentCurrency.code}</span>
             <ChevronDown
                className={`h-3 w-3 text-white/70 transition-transform ${isOpen ? "rotate-180" : ""}`}
             />
@@ -62,23 +48,26 @@ export default function LanguageSwitcher() {
          {isOpen && (
             <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-xl bg-white p-1.5 text-zinc-900 shadow-2xl ring-1 ring-black ring-opacity-5 animate-in fade-in zoom-in-95 duration-200 z-60">
                <div className="mb-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                  {t("selectLanguage") || "Chọn ngôn ngữ"}
+                  Chọn loại tiền tệ
                </div>
-               {languages.map((lang) => (
+               {currencies.map((c) => (
                   <button
-                     key={lang.code}
-                     onClick={() => handleLanguageChange(lang.code)}
+                     key={c.code}
+                     onClick={() => handleCurrencyChange(c.code)}
                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
-                        locale === lang.code
+                        currency === c.code
                            ? "bg-blue-50 text-blue-600"
                            : "hover:bg-zinc-50 text-zinc-700"
                      }`}
                   >
-                     <div className="relative h-4 w-6 overflow-hidden rounded-sm border border-zinc-100">
-                        <Image src={lang.flag} alt={lang.name} fill className="object-cover" />
+                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-[11px] font-bold">
+                        {c.symbol}
                      </div>
-                     {lang.name}
-                     {locale === lang.code && (
+                     <div className="flex flex-col items-start">
+                        <span className="leading-none">{c.code}</span>
+                        <span className="text-[10px] text-zinc-400">{c.name}</span>
+                     </div>
+                     {currency === c.code && (
                         <div className="ml-auto h-1.5 w-1.5 rounded-full bg-blue-500" />
                      )}
                   </button>

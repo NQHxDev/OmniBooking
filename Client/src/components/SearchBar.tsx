@@ -544,7 +544,7 @@ export default function SearchBar() {
             {/* Search Button */}
             <button
                onClick={handleSearch}
-               className="bg-[#006ce4] hover:bg-[#0057b7] text-white rounded-full px-8 py-3 flex items-center justify-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-[0.95] group ml-1"
+               className="bg-[#006ce4] hover:bg-[#0057b7] text-white rounded-full px-8 py-3 flex items-center justify-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-[0.95] group ml-1 cursor-pointer"
             >
                <span className="font-bold text-sm">{t("searchButton") || "Tìm kiếm"}</span>
                <div className="bg-white/20 p-1 rounded-full group-hover:translate-x-1 transition-transform">

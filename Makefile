@@ -20,7 +20,7 @@ dev-server:
 # Run Frontend only
 dev-client:
 	@echo "Starting Next.js Client..."
-	@npm run dev --prefix Client
+	@rm -rf Client/.next && npm run dev --prefix Client
 
 # Docker Infrastructure Commands
 docker-infra:

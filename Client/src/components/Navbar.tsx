@@ -20,6 +20,7 @@ import Image from "next/image";
 import { useAuthStore } from "@/store/useAuthStore";
 import { authService } from "@/lib/api/services/authService";
 import LanguageSwitcher from "./LanguageSwitcher";
+import CurrencySwitcher from "./CurrencySwitcher";
 import { useTranslations } from "next-intl";
 
 export default function Navbar() {
@@ -103,51 +104,57 @@ export default function Navbar() {
                <nav className="hidden space-x-1 text-[13px] font-medium md:flex">
                   <a
                      href="#"
-                     className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 hover:bg-white/20 transition-all"
+                     className="flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 hover:bg-white/20 transition-all min-w-[100px]"
                   >
-                     <BedDouble className="h-4 w-4" />
-                     {t("stays")}
+                     <BedDouble className="h-4 w-4 shrink-0" />
+                     <span className="truncate">{t("stays")}</span>
                   </a>
                   <a
                      href="#"
-                     className="flex items-center gap-2 px-4 py-1.5 hover:bg-white/10 rounded-full transition-all"
+                     className="flex items-center justify-center gap-2 px-4 py-1.5 hover:bg-white/10 rounded-full transition-all min-w-[100px]"
                   >
-                     <Globe className="h-4 w-4" />
-                     {t("flights")}
+                     <Globe className="h-4 w-4 shrink-0" />
+                     <span className="truncate">{t("flights")}</span>
                   </a>
                   <a
                      href="#"
-                     className="flex items-center gap-2 px-4 py-1.5 hover:bg-white/10 rounded-full transition-all"
+                     className="flex items-center justify-center gap-2 px-4 py-1.5 hover:bg-white/10 rounded-full transition-all min-w-[100px]"
                   >
-                     <Calendar className="h-4 w-4" />
-                     {t("carRentals")}
+                     <Calendar className="h-4 w-4 shrink-0" />
+                     <span className="truncate">{t("carRentals")}</span>
                   </a>
                </nav>
             </div>
 
             <div className="flex items-center gap-2">
-               <div className="flex items-center gap-0.5">
+               <div className="flex items-center gap-0.5 shrink-0">
                   <LanguageSwitcher />
-                  <button className="rounded-full p-2 hover:bg-white/10 transition-colors relative">
+                  <CurrencySwitcher />
+                  <button className="rounded-full p-2 hover:bg-white/10 transition-colors relative cursor-pointer shrink-0">
                      <Bell className="h-5 w-5" />
                      <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-[#003580]"></span>
                   </button>
-                  <button className="rounded-full p-2 hover:bg-white/10 transition-colors">
+                  <button className="rounded-full p-2 hover:bg-white/10 transition-colors cursor-pointer shrink-0">
                      <Heart className="h-5 w-5" />
                   </button>
                </div>
 
-               <div className="h-6 w-px bg-white/20 mx-2 hidden sm:block"></div>
+               <div className="h-6 w-px bg-white/20 mx-2 hidden sm:block shrink-0"></div>
 
-               <div className="flex items-center gap-4">
-                  <button className="hidden lg:block text-[13px] font-semibold hover:bg-white/10 px-3 py-1.5 rounded-md transition-colors">
+               <div className="flex items-center gap-4 shrink-0">
+                  <button className="hidden lg:block text-[13px] font-semibold hover:bg-white/10 px-3 py-1.5 rounded-md transition-colors min-w-[140px] text-center">
                      {isLoggedIn && isPartner ? (
-                        <Link href="/partner/dashboard" className="flex items-center gap-2">
-                           <ShieldCheck className="h-4 w-4 text-yellow-400" />
-                           {t("manageProperty")}
+                        <Link
+                           href="/partner/dashboard"
+                           className="flex items-center justify-center gap-2"
+                        >
+                           <ShieldCheck className="h-4 w-4 text-yellow-400 shrink-0" />
+                           <span className="truncate">{t("manageProperty")}</span>
                         </Link>
                      ) : (
-                        <Link href="/become-a-host">{t("listProperty")}</Link>
+                        <Link href="/become-a-host" className="block truncate">
+                           {t("listProperty")}
+                        </Link>
                      )}
                   </button>
 
@@ -157,7 +164,7 @@ export default function Navbar() {
                            onClick={() => setIsMenuOpen(!isMenuOpen)}
                            className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 hover:bg-white/10 transition-all active:scale-95"
                         >
-                           <div className="relative">
+                           <div className="relative shrink-0">
                               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-linear-to-tr from-blue-600 to-indigo-500 border-2 border-white shadow-sm overflow-hidden">
                                  {user?.avatarUrl ? (
                                     <Image
@@ -178,16 +185,16 @@ export default function Navbar() {
                                  <span className="text-[8px] font-bold text-[#003580]">G</span>
                               </div>
                            </div>
-                           <div className="hidden md:flex flex-col items-start text-left ml-1">
-                              <span className="text-[13px] font-bold leading-tight">
+                           <div className="hidden md:flex flex-col items-start text-left ml-1 min-w-[80px]">
+                              <span className="text-[13px] font-bold leading-tight truncate max-w-[120px]">
                                  {user?.fullName || user?.username || ""}
                               </span>
-                              <span className="text-[11px] font-semibold text-yellow-400">
+                              <span className="text-[11px] font-semibold text-yellow-400 truncate">
                                  {tProfile("level1")}
                               </span>
                            </div>
                            <ChevronDown
-                              className={`ml-1 h-3.5 w-3.5 transition-transform duration-300 ${isMenuOpen ? "rotate-180" : ""}`}
+                              className={`ml-1 h-3.5 w-3.5 shrink-0 transition-transform duration-300 ${isMenuOpen ? "rotate-180" : ""}`}
                            />
                         </button>
 
@@ -246,13 +253,13 @@ export default function Navbar() {
                      <div className="flex items-center gap-2.5">
                         <Link
                            href="/auth/register"
-                           className="rounded-md bg-white px-4 py-1.5 text-[13px] font-bold text-[#003580] hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
+                           className="flex items-center justify-center rounded-md bg-white px-4 py-1.5 text-[13px] font-bold text-[#003580] hover:bg-zinc-100 transition-all active:scale-95 shadow-sm cursor-pointer min-w-[90px]"
                         >
                            {t("register")}
                         </Link>
                         <Link
                            href="/auth/login"
-                           className="rounded-md bg-white px-4 py-1.5 text-[13px] font-bold text-[#003580] hover:bg-zinc-100 transition-all active:scale-95 shadow-sm"
+                           className="flex items-center justify-center rounded-md bg-white px-4 py-1.5 text-[13px] font-bold text-[#003580] hover:bg-zinc-100 transition-all active:scale-95 shadow-sm cursor-pointer min-w-[90px]"
                         >
                            {t("login")}
                         </Link>
