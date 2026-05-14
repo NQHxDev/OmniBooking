@@ -2,11 +2,20 @@
 
 import { Link } from "@/i18n/routing";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Mail, Lock, User, ArrowRight, ChevronLeft, Loader2, Eye, EyeOff } from "lucide-react";
+import {
+   Mail,
+   Lock,
+   User as UserIcon,
+   ArrowRight,
+   ChevronLeft,
+   Loader2,
+   Eye,
+   EyeOff,
+} from "lucide-react";
 
 import { useState } from "react";
-import { useAuthStore } from "@/store/useAuthStore";
-import { authService } from "@/lib/api/services/authService";
+import { useAuthStore, type User as UserType } from "@/store/useAuthStore";
+import { authService, type ApiResponse } from "@/lib/api/services/authService";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import AuthBranding from "@/components/AuthBranding";
@@ -66,18 +75,66 @@ export default function AuthPage() {
                  rememberMe: formData.rememberMe,
               });
 
-         if (result) {
-            setAuth(result);
-            if (!isLogin) {
-               toast.success(t("successRegister"), {
-                  description: t("successRegisterDesc"),
-                  duration: 6000,
-               });
-            }
-
+         if (isLogin) {
+            setAuth(result as UserType);
             const targetUrl = callbackUrl || "/";
             router.push(targetUrl);
             router.refresh();
+         } else {
+            // Handle Async Registration via SSE
+            const registerResponse = result as ApiResponse<UserType>;
+            const requestId = registerResponse.requestId;
+
+            if (requestId) {
+               // Ensure the URL always goes through /api/v1 context path to avoid 404
+               const host = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1/";
+               const baseUrl = host.includes("/api/v1")
+                  ? host.split("/api/v1")[0]
+                  : host.replace(/\/$/, "");
+               const fullSseUrl = `${baseUrl}/api/v1/auth/subscribe/${requestId}`;
+
+               const eventSource = new EventSource(fullSseUrl);
+               let sseCompleted = false;
+
+               eventSource.addEventListener("REGISTRATION_COMPLETE", async (e) => {
+                  try {
+                     sseCompleted = true;
+                     const userData = JSON.parse(e.data);
+                     const accessToken = userData.accessToken;
+
+                     // 1. Finalize registration to set HttpOnly cookies
+                     const finalUserData = await authService.finalizeRegistration(accessToken);
+
+                     // 2. Set local auth state
+                     setAuth(finalUserData);
+                     eventSource.close();
+
+                     toast.success(t("successRegister"), {
+                        description: t("successRegisterDesc"),
+                        duration: 6000,
+                     });
+
+                     const targetUrl = callbackUrl || "/";
+                     router.push(targetUrl);
+                     router.refresh();
+                  } catch (err) {
+                     console.error("Failed to finalize registration session:", err);
+                     setError(te("GEN_999"));
+                     setLoading(false);
+                     eventSource.close();
+                  }
+               });
+
+               eventSource.onerror = (err) => {
+                  // Only show error if we haven't successfully completed the registration flow
+                  if (!sseCompleted) {
+                     console.error("SSE Error:", err);
+                     setError(te("GEN_999"));
+                     setLoading(false);
+                  }
+                  eventSource.close();
+               };
+            }
          }
       } catch (err: unknown) {
          const error = err as { message?: string; errorCode?: string };
@@ -166,7 +223,7 @@ export default function AuthPage() {
                               {t("fullNameLabel")}
                            </label>
                            <div className="relative">
-                              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                              <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                               <input
                                  id="fullName"
                                  name="fullName"
@@ -204,24 +261,13 @@ export default function AuthPage() {
                      </div>
 
                      <div>
-                        <div className="flex justify-between items-end mb-1.5">
+                        <div className="mb-1.5">
                            <label
                               htmlFor="password"
                               className="text-sm font-bold text-zinc-700 cursor-pointer"
                            >
                               {t("passwordLabel")}
                            </label>
-                           {isLogin && (
-                              <Link
-                                 href={{
-                                    pathname: "/auth/forgot-password",
-                                    query: { email: formData.email },
-                                 }}
-                                 className="text-[11px] font-bold uppercase tracking-wider text-[#006ce4] hover:text-[#0057b7] cursor-pointer"
-                              >
-                                 {t("forgotPassword")}
-                              </Link>
-                           )}
                         </div>
                         <div className="relative">
                            <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
@@ -265,6 +311,18 @@ export default function AuthPage() {
                               {t("rememberMe")}
                            </span>
                         </label>
+
+                        {isLogin && (
+                           <Link
+                              href={{
+                                 pathname: "/auth/forgot-password",
+                                 query: { email: formData.email },
+                              }}
+                              className="text-[11px] font-bold uppercase tracking-wider text-[#006ce4] hover:text-[#0057b7] cursor-pointer transition-colors"
+                           >
+                              {t("forgotPassword")}
+                           </Link>
+                        )}
                      </div>
 
                      <button

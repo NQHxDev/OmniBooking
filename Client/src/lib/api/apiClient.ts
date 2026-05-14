@@ -105,7 +105,7 @@ apiClient.interceptors.response.use(
          return Promise.reject(error.response?.data || { message: error.message });
       }
 
-      if (!error.config?._skipToast && !errorCode) {
+      if (typeof window !== "undefined" && !error.config?._skipToast && !errorCode) {
          toast.error(message);
       }
 

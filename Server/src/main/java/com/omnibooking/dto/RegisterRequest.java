@@ -27,6 +27,8 @@ public class RegisterRequest {
    @NotBlank(message = "Full name is required")
    private String fullName;
 
+   private String requestId;
+
    private boolean rememberMe;
 
 }

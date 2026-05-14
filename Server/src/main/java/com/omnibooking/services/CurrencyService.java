@@ -1,4 +1,4 @@
-package com.omnibooking.service;
+package com.omnibooking.services;
 
 import com.omnibooking.config.AppProperties;
 import com.omnibooking.model.ExchangeRate;

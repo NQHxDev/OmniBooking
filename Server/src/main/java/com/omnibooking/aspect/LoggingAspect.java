@@ -8,7 +8,15 @@ import org.aspectj.lang.annotation.Pointcut;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestCookieException;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import com.omnibooking.exception.AppException;
+
 import java.util.Arrays;
+import java.util.Optional;
 
 @Aspect
 @Component
@@ -27,23 +35,38 @@ public class LoggingAspect {
       long start = System.currentTimeMillis();
       String className = joinPoint.getSignature().getDeclaringTypeName();
       String methodName = joinPoint.getSignature().getName();
-      
-      log.debug("Entering: {}.{}() with arguments = {}", className, methodName, Arrays.toString(joinPoint.getArgs()));
+
+      String requestId = Optional.ofNullable(RequestContextHolder.getRequestAttributes())
+            .filter(ServletRequestAttributes.class::isInstance)
+            .map(ServletRequestAttributes.class::cast)
+            .map(ServletRequestAttributes::getRequest)
+            .map(r -> (String) r.getAttribute("requestId"))
+            .orElse("unknown");
+
+      log.debug("[{}] Entering: {}.{}() with arguments = {}", requestId, className, methodName,
+            Arrays.toString(joinPoint.getArgs()));
 
       try {
          Object result = joinPoint.proceed();
          long duration = System.currentTimeMillis() - start;
-         
-         requestSuccessLogger.info("SUCCESS [{}ms]: {}.{}() - result = {}", 
-               duration, className, methodName, result);
-         
+
+         requestSuccessLogger.info("[{}] SUCCESS [{}ms]: {}.{}() - result = {}",
+               requestId, duration, className, methodName, result);
+
          return result;
       } catch (Throwable e) {
          long duration = System.currentTimeMillis() - start;
-         
-         requestErrorLogger.error("FAILED [{}ms]: {}.{}() - Exception: {} - Message: {}",
-               duration, className, methodName, e.getClass().getSimpleName(), e.getMessage());
-         
+
+         if (e instanceof AppException ||
+               e instanceof MethodArgumentNotValidException ||
+               e instanceof MissingRequestCookieException) {
+            requestErrorLogger.warn("[{}] FAILED [{}ms]: {}.{}() - Exception: {} - Message: {}",
+                  requestId, duration, className, methodName, e.getClass().getSimpleName(), e.getMessage());
+         } else {
+            requestErrorLogger.error("[{}] FAILED [{}ms]: {}.{}() - Exception: {} - Message: {}",
+                  requestId, duration, className, methodName, e.getClass().getSimpleName(), e.getMessage());
+         }
+
          throw e;
       }
    }

@@ -1,6 +1,6 @@
 package com.omnibooking.worker;
 
-import com.omnibooking.service.CurrencyService;
+import com.omnibooking.services.CurrencyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

@@ -16,14 +16,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 public class GlobalExceptionHandler {
 
-   private static final org.slf4j.Logger logRequestError = org.slf4j.LoggerFactory.getLogger("com.omnibooking.request.error");
-
    @ExceptionHandler(AppException.class)
    public ResponseEntity<ApiResponse<Object>> handleAppException(
          AppException ex, jakarta.servlet.http.HttpServletRequest request) {
 
       String requestId = (String) request.getAttribute("requestId");
-      logRequestError.warn("[{}] AppException: {} - {}", requestId, ex.getErrorCode(), ex.getMessage());
       
       return ResponseEntity.status(Objects.requireNonNull(ex.getStatus()))
             .body(ApiResponse.error(ex.getMessage(), ex.getErrorCode(), null, requestId));
@@ -41,7 +38,7 @@ public class GlobalExceptionHandler {
          errors.put(fieldName, errorMessage);
       });
       
-      logRequestError.warn("[{}] Validation failed: {}", requestId, errors);
+      
       
       return ResponseEntity.badRequest()
             .body(ApiResponse.error("Validation failed", ErrorCode.INVALID_KEY.getCode(), errors, requestId));
@@ -55,7 +52,7 @@ public class GlobalExceptionHandler {
       String requestId = (String) request.getAttribute("requestId");
       ErrorCode error = ErrorCode.INVALID_SESSION;
       
-      logRequestError.warn("[{}] Missing cookie: {}", requestId, ex.getMessage());
+      
       
       return ResponseEntity.status(Objects.requireNonNull(error.getStatus()))
             .body(ApiResponse.error("Session expired or invalid. Please login again.", error.getCode(), null,

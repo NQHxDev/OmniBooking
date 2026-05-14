@@ -63,7 +63,8 @@ public class SecurityConfig {
             "X-Request-ID",
             "x-fgp",
             "Accept",
-            "Origin"));
+            "Origin",
+            "X-Idempotency-Key"));
       config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
       config.setExposedHeaders(List.of("Set-Cookie"));
       config.setMaxAge(3600L);
@@ -83,7 +84,7 @@ public class SecurityConfig {
                   .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                   .requestMatchers("/auth/passkey/**").authenticated()
                   .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh",
-                        "/auth/forgot-password", "/auth/reset-password", "/auth/google/**")
+                        "/auth/forgot-password", "/auth/reset-password", "/auth/google/**", "/auth/subscribe/**", "/auth/finalize-registration")
                   .permitAll()
                   .requestMatchers("/properties/search", "/properties/search/**").permitAll()
                   .requestMatchers("/destinations", "/destinations/**").permitAll()

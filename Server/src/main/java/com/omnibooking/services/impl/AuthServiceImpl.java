@@ -153,7 +153,7 @@ public class AuthServiceImpl implements AuthService {
             .map(com.omnibooking.model.Role::getName)
             .collect(java.util.stream.Collectors.toSet());
 
-      UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+      UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
       long now = System.currentTimeMillis();
       return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
             now);
@@ -198,7 +198,7 @@ public class AuthServiceImpl implements AuthService {
                .map(com.omnibooking.model.Role::getName)
                .collect(java.util.stream.Collectors.toSet());
 
-         UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+         UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
 
          // Check hard cap
          long now = System.currentTimeMillis();
@@ -243,7 +243,7 @@ public class AuthServiceImpl implements AuthService {
       userRepository.save(user);
 
       // Update Profile verification status
-      userProfileRepository.findByUserId(userId).ifPresent(p -> {
+      userProfileRepository.findById(userId).ifPresent(p -> {
          p.setIsVerified(true);
          userProfileRepository.save(p);
       });
@@ -262,7 +262,7 @@ public class AuthServiceImpl implements AuthService {
       User user = userRepository.findById(userId)
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-      UserProfile profile = userProfileRepository.findByUserId(userId)
+      UserProfile profile = userProfileRepository.findById(userId)
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
       if (Boolean.TRUE.equals(profile.getIsVerified())) {
@@ -374,7 +374,7 @@ public class AuthServiceImpl implements AuthService {
       user.getRoles().add(partnerRole);
       userRepository.save(user);
 
-      UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+      UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
 
       log.info("Upgrading user {} to ROLE_PARTNER", user.getEmail());
 
@@ -410,7 +410,7 @@ public class AuthServiceImpl implements AuthService {
          // Save to Redis (15 minutes)
          redisTemplate.opsForValue().set(redisKey, Objects.requireNonNull(email), 15, TimeUnit.MINUTES);
 
-         UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+         UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
          String fullName;
          if (profile != null && profile.getDisplayName() != null) {
             fullName = profile.getDisplayName();
@@ -472,7 +472,7 @@ public class AuthServiceImpl implements AuthService {
          // User already exists, fetch them
          user = socialAccount.getUser();
          roles = user.getRoles().stream().map(Role::getName).collect(Collectors.toSet());
-         profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+         profile = userProfileRepository.findById(user.getId()).orElse(null);
 
          // Sync profile info if changed
          if (profile != null) {
@@ -526,7 +526,7 @@ public class AuthServiceImpl implements AuthService {
             profile = userProfileRepository.save(Objects.requireNonNull(profile));
          } else {
             // Existing user, just link social account
-            profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+            profile = userProfileRepository.findById(user.getId()).orElse(null);
          }
 
          // 4. Link social account
@@ -553,4 +553,28 @@ public class AuthServiceImpl implements AuthService {
       }
    }
 
+   @Override
+   @Transactional
+   public AuthResponse finalizeRegistration(String accessToken, String ip, String userAgent,
+         HttpServletResponse response) {
+      try {
+         UUID userId = jwtService.extractUserId(accessToken);
+         Set<String> roles = jwtService.extractRoles(accessToken);
+
+         User user = userRepository.findById(userId)
+               .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+         UserProfile profile = userProfileRepository.findById(userId).orElse(null);
+
+         long now = System.currentTimeMillis();
+         // For finalize registration, we don't have 'rememberMe' info from the original
+         // request yet,
+         // defaulting to false or we could pass it. Let's default to false for safety.
+         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now);
+      } catch (AppException e) {
+         throw e;
+      } catch (Exception e) {
+         log.error("Failed to finalize registration for token", e);
+         throw new AppException(ErrorCode.INVALID_TOKEN);
+      }
+   }
 }

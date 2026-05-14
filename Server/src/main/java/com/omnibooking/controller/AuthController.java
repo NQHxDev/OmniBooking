@@ -11,6 +11,8 @@ import com.omnibooking.dto.ResetPasswordRequest;
 import com.omnibooking.dto.oauth.OAuth2UserInfo;
 import com.omnibooking.services.AuthService;
 import com.omnibooking.services.OAuth2ServiceFactory;
+import com.omnibooking.services.RegistrationQueueService;
+import com.omnibooking.services.SseNotificationService;
 import com.omnibooking.config.AppProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,10 +20,13 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,6 +38,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+
+import com.omnibooking.annotation.Idempotent;
 
 @CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true", allowedHeaders = "*")
 @RestController
@@ -47,20 +54,46 @@ public class AuthController {
 
    private final AppProperties appProperties;
 
+   private final RegistrationQueueService registrationQueueService;
+
+   private final SseNotificationService sseNotificationService;
+
    @Anonymous
+   @Idempotent
    @PostMapping("/register")
-   public ResponseEntity<ApiResponse<AuthResponse>> register(
-         @Valid @RequestBody RegisterRequest request,
+   public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request,
+         HttpServletRequest httpRequest) {
+
+      String requestId = (String) httpRequest.getAttribute("requestId");
+      request.setRequestId(requestId);
+
+      // Push to Redis Queue for Batch Processing
+      registrationQueueService.pushToQueue(request);
+
+      return ResponseEntity.status(HttpStatus.ACCEPTED)
+            .body(ApiResponse.success(null, "Registration request received and is being processed.", requestId));
+   }
+
+   @Anonymous
+   @PostMapping("/finalize-registration")
+   public ResponseEntity<ApiResponse<AuthResponse>> finalizeRegistration(
+         @RequestBody Map<String, String> body,
          HttpServletRequest httpRequest,
          HttpServletResponse httpResponse) {
 
+      String accessToken = body.get("accessToken");
       String ip = getClientIp(httpRequest);
       String userAgent = httpRequest.getHeader("User-Agent");
       String requestId = (String) httpRequest.getAttribute("requestId");
 
-      AuthResponse response = authService.register(request, ip, userAgent, httpResponse, request.isRememberMe());
-      return ResponseEntity.status(HttpStatus.CREATED)
-            .body(ApiResponse.success(response, "User registered successfully", requestId));
+      AuthResponse authResponse = authService.finalizeRegistration(accessToken, ip, userAgent, httpResponse);
+      return ResponseEntity.ok(ApiResponse.success(authResponse, "Session synchronized successfully", requestId));
+   }
+
+   @Anonymous
+   @GetMapping(value = "/subscribe/{requestId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+   public SseEmitter subscribe(@PathVariable String requestId) {
+      return sseNotificationService.subscribe(requestId);
    }
 
    @Anonymous

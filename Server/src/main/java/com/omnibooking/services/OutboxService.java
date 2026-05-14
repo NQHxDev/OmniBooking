@@ -10,4 +10,6 @@ public interface OutboxService {
 
    void processSingleEvent(com.omnibooking.model.OutboxEvent event);
 
+   void markAsProcessed(UUID eventId);
+
 }

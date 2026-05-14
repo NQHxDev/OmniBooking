@@ -15,7 +15,7 @@ dev:
 # Run Backend only
 dev-server:
 	@echo "Starting Spring Boot Server..."
-	@make clear-logs && cd Server && ./mvnw spring-boot:run
+	@make clear-logs && cd Server && ./mvnw clean compile -DskipTests spring-boot:run
 
 # Run Frontend only
 dev-client:

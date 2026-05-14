@@ -37,6 +37,8 @@ public interface UserMapper {
    @Mapping(target = "isVerified", expression = "java(profile != null ? profile.getIsVerified() : false)")
    @Mapping(target = "rankName", expression = "java(profile != null && profile.getRank() != null ? profile.getRank().getName() : \"Bronze\")")
    @Mapping(target = "partnerBio", source = "profile.partnerBio")
+
+   @Mapping(target = "accessToken", ignore = true)
    AuthResponse toAuthResponse(User user, UserProfile profile, Set<String> roles);
 
    @Named("setToOrderedList")

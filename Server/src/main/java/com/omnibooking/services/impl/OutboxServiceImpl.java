@@ -129,6 +129,16 @@ public class OutboxServiceImpl implements OutboxService {
       }
    }
 
+   @Override
+   @Transactional(propagation = Propagation.REQUIRES_NEW)
+   public void markAsProcessed(UUID eventId) {
+      outboxEventRepository.findById(eventId).ifPresent(event -> {
+         event.setProcessed(true);
+         event.setProcessedAt(Instant.now());
+         outboxEventRepository.save(event);
+      });
+   }
+
    private String getTopicForEvent(String eventType) {
       if (eventType.contains("MAIL") || eventType.contains("REGISTERED") || 
           eventType.contains("PASSWORD") || eventType.contains("VERIFICATION") ||

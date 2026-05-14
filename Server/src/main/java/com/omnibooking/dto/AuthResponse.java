@@ -34,5 +34,7 @@ public class AuthResponse {
    private String rankName;
 
    private String partnerBio;
+   
+   private String accessToken;
 
 }

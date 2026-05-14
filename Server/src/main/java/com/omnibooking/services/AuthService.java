@@ -38,4 +38,6 @@ public interface AuthService {
 
    RedisSessionInfo getSessionInfo(String sessionId);
 
+   AuthResponse finalizeRegistration(String accessToken, String ip, String userAgent, HttpServletResponse response);
+
 }
