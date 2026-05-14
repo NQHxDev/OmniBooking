@@ -1,10 +1,9 @@
-iffile := $(wildcard .env)
-ifneq ($(iffile),)
-  include .env
-  export $(shell sed 's/=.*//' .env)
+ifneq (,$(wildcard .env))
+	include .env
+	export
 endif
 
-.PHONY: dev dev-server dev-client docker-infra docker-up docker-down docker-stop logs install restart build clean help
+.PHONY: dev dev-server dev-client docker-infra docker-up docker-down docker-stop logs install restart build clean clear-logs help
 
 .DEFAULT_GOAL := help
 
@@ -16,18 +15,23 @@ dev:
 # Run Backend only
 dev-server:
 	@echo "Starting Spring Boot Server..."
-	@cd Server && ./mvnw spring-boot:run
+	@make clear-logs && cd Server && ./mvnw clean compile -DskipTests spring-boot:run
 
 # Run Frontend only
 dev-client:
 	@echo "Starting Next.js Client..."
-	@npm run dev --prefix Client
+	@rm -rf Client/.next && npm run dev --prefix Client
 
 # Docker Infrastructure Commands
 docker-infra:
 	@echo "Starting infrastructure..."
 	@docker-compose up -d db redis kafka kafdrop elasticsearch kibana
-	@echo "Infrastructure (DB, Redis, Kafka, ES) is Ready..."
+	@echo "Waiting for Elasticsearch to be ready..."
+	@until [ "$$(docker inspect --format='{{.State.Health.Status}}' omnibooking-elastic)" = "healthy" ]; do \
+		printf '.'; \
+		sleep 2; \
+	done
+	@echo "\nInfrastructure (DB, Redis, Kafka, ES) is Ready..."
 
 # Docker Full Stack Commands
 docker-up:
@@ -71,6 +75,11 @@ clean:
 	@cd Server && ./mvnw clean
 	@echo "Cleaning Client build directory..."
 	@rm -rf Client/.next Client/out Client/node_modules
+
+# Clean logs
+clear-logs:
+	@rm -rf Server/logs/*
+	@echo "Logs cleaned..."
 
 # Display help information
 help:

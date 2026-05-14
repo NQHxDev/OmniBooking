@@ -13,14 +13,25 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PropertyRequest {
+
    private String name;
+
    private String description;
+
    private String propertyType; // HOTEL, APARTMENT, VILLA, RESORT
+
    private String address;
+
    private String city;
+
    private String country;
+
    private Integer starRating;
+
    private LocalTime checkInTime;
+
    private LocalTime checkOutTime;
+
    private UUID cancellationPolicyId;
+
 }

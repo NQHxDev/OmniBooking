@@ -12,70 +12,61 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MailService {
 
-   private final EmailProducer emailProducer;
    private final MailTemplateService mailTemplateService;
    private final AppProperties appProperties;
 
-   public void sendVerificationEmail(String toEmail, String userName, String token) {
-      // Construct the verification link (pointing to Frontend)
+   public EmailEvent buildVerificationEmailEvent(String toEmail, String userName, String token) {
       String verifyLink = appProperties.getClientUrl() + "/auth/verify?token=" + token;
-
-      // Prepare template variables
       Map<String, Object> variables = new HashMap<>();
       variables.put("userName", userName);
       variables.put("verifyLink", verifyLink);
-
-      // Render HTML content
       String htmlContent = mailTemplateService.buildHtmlContent("verify-email", variables);
 
-      // Send to Kafka
-      EmailEvent emailEvent = EmailEvent.builder()
+      return EmailEvent.builder()
             .to(toEmail)
             .subject("Xác nhận tài khoản OmniBooking của bạn")
             .content(htmlContent)
             .build();
-
-      emailProducer.sendEmailEvent(emailEvent);
    }
 
-   public void sendPartnerOtpEmail(String toEmail, String userName, String otpCode) {
-      // Prepare template variables
+   public EmailEvent buildPartnerOtpEmailEvent(String toEmail, String userName, String otpCode) {
       Map<String, Object> variables = new HashMap<>();
       variables.put("userName", userName);
       variables.put("otpCode", otpCode);
 
-      // Render HTML content
       String htmlContent = mailTemplateService.buildHtmlContent("partner-otp", variables);
 
-      // Send to Kafka
-      EmailEvent emailEvent = EmailEvent.builder()
+      return EmailEvent.builder()
             .to(toEmail)
             .subject("Mã xác thực đối tác OmniBooking")
             .content(htmlContent)
             .build();
-
-      emailProducer.sendEmailEvent(emailEvent);
    }
 
-   public void sendForgotPasswordEmail(String toEmail, String userName, String token) {
-      // Construct the reset link (pointing to Frontend)
+   public EmailEvent buildForgotPasswordEmailEvent(String toEmail, String userName, String token) {
       String resetLink = appProperties.getClientUrl() + "/auth/reset-password?token=" + token;
-
-      // Prepare template variables
       Map<String, Object> variables = new HashMap<>();
       variables.put("userName", userName);
       variables.put("resetLink", resetLink);
-
-      // Render HTML content
       String htmlContent = mailTemplateService.buildHtmlContent("reset-password", variables);
 
-      // Send to Kafka
-      EmailEvent emailEvent = EmailEvent.builder()
+      return EmailEvent.builder()
             .to(toEmail)
             .subject("Đặt lại mật khẩu OmniBooking")
             .content(htmlContent)
             .build();
+   }
 
-      emailProducer.sendEmailEvent(emailEvent);
+   public EmailEvent buildSecurityOtpEmailEvent(String toEmail, String userName, String otpCode) {
+      Map<String, Object> variables = new HashMap<>();
+      variables.put("userName", userName);
+      variables.put("otpCode", otpCode);
+      String htmlContent = mailTemplateService.buildHtmlContent("security-otp", variables);
+
+      return EmailEvent.builder()
+            .to(toEmail)
+            .subject("Mã xác thực hành động bảo mật OmniBooking")
+            .content(htmlContent)
+            .build();
    }
 }

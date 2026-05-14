@@ -10,7 +10,9 @@ import java.util.UUID;
 
 @Repository
 public interface MediaRepository extends JpaRepository<Media, UUID> {
+
    List<Media> findByEntityIdAndEntityType(UUID entityId, String entityType);
-   
+
    Optional<Media> findFirstByEntityIdAndEntityTypeAndIsMainTrue(UUID entityId, String entityType);
+
 }

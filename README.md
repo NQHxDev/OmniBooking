@@ -77,7 +77,7 @@ Dự án được tối ưu hóa với **Makefile** để bạn có thể khởi
 make install
 ```
 
-### 3. Triển khai hạ tầng (Database, Redis, Kafka)
+### 3. Triển khai hạ tầng (Database, Redis, Kafka, Elasticsearch, ...)
 
 ```bash
 make docker-infra

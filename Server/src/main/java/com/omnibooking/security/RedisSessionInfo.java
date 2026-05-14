@@ -31,4 +31,8 @@ public class RedisSessionInfo {
 
    private long createdAt;
 
+   private long lastAccessedAt;
+
+   private boolean rememberMe;
+
 }

@@ -60,7 +60,7 @@ export default function LanguageSwitcher() {
          </button>
 
          {isOpen && (
-            <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-xl bg-white p-1.5 text-zinc-900 shadow-2xl ring-1 ring-black ring-opacity-5 animate-in fade-in zoom-in-95 duration-200 z-[60]">
+            <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-xl bg-white p-1.5 text-zinc-900 shadow-2xl ring-1 ring-black ring-opacity-5 animate-in fade-in zoom-in-95 duration-200 z-60">
                <div className="mb-1.5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                   {t("selectLanguage") || "Chọn ngôn ngữ"}
                </div>

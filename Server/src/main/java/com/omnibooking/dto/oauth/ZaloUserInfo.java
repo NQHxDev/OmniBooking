@@ -6,8 +6,11 @@ import lombok.Data;
 public class ZaloUserInfo implements OAuth2UserInfo {
 
    private String id;
+
    private String name;
+
    private String email;
+
    private Picture picture;
 
    @Data
@@ -21,19 +24,8 @@ public class ZaloUserInfo implements OAuth2UserInfo {
    }
 
    @Override
-   public String getFirstName() {
-      // Zalo usually returns full name in 'name'.
-      // Our splitFullName helper in AuthServiceImpl will handle this.
-      return name;
-   }
-
-   @Override
-   public String getLastName() {
-      return "";
-   }
-
-   @Override
    public String getPicture() {
       return (picture != null && picture.getData() != null) ? picture.getData().getUrl() : null;
    }
+
 }

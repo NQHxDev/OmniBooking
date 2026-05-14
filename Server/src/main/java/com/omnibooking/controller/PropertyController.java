@@ -49,4 +49,5 @@ public class PropertyController {
       List<PropertyResponse> response = propertyService.getPropertiesByOwner(userId);
       return ApiResponse.success(response);
    }
+
 }

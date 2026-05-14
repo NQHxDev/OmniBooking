@@ -4,6 +4,9 @@ import com.omnibooking.document.PropertyDocument;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.services.PropertySearchService;
 import lombok.RequiredArgsConstructor;
+
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/search")
+@RequestMapping("/properties/search")
 @RequiredArgsConstructor
 public class PropertySearchController {
 
@@ -24,8 +27,11 @@ public class PropertySearchController {
          @RequestParam(required = false) Double minPrice,
          @RequestParam(required = false) Double maxPrice,
          @RequestParam(required = false) Integer stars,
+         @RequestParam(required = false, name = "group_adults") Integer adults,
+         @RequestParam(required = false, name = "group_children") Integer children,
+         @RequestParam(required = false, name = "no_rooms") Integer rooms,
          @RequestParam(required = false) String propertyType,
-         @RequestParam(required = false) java.util.List<String> amenities,
+         @RequestParam(required = false) List<String> amenities,
          @RequestParam(required = false) Double minRating,
          Pageable pageable) {
 

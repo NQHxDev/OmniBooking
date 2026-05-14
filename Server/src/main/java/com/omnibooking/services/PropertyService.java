@@ -11,4 +11,6 @@ public interface PropertyService {
 
    List<PropertyResponse> getPropertiesByOwner(UUID ownerId);
 
+   List<PropertyResponse> getFeaturedProperties(int limit);
+
 }

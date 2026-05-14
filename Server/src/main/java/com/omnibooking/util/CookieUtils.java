@@ -16,11 +16,12 @@ public class CookieUtils {
     * Sets auth cookies in the response.
     */
    public static void setAuthCookies(HttpServletResponse response, String accessToken, String sessionId,
-         String refreshToken, String fingerprint, boolean secure) {
-      addCookie(response, ACCESS_TOKEN, accessToken, 15 * 60, secure); // 15 mins
-      addCookie(response, SESSION_ID, sessionId, 7 * 24 * 60 * 60, secure); // 7 days
-      addCookie(response, REFRESH_TOKEN, refreshToken, 7 * 24 * 60 * 60, secure); // 7 days
-      addCookie(response, FINGERPRINT, fingerprint, 7 * 24 * 60 * 60, secure); // 7 days
+         String refreshToken, String fingerprint, boolean secure, int expiry) {
+      
+      addCookie(response, ACCESS_TOKEN, accessToken, 15 * 60, secure); // Access token always 15 mins
+      addCookie(response, SESSION_ID, sessionId, expiry, secure);
+      addCookie(response, REFRESH_TOKEN, refreshToken, expiry, secure);
+      addCookie(response, FINGERPRINT, fingerprint, expiry, secure);
    }
 
    /**
@@ -74,4 +75,5 @@ public class CookieUtils {
 
       return null;
    }
+
 }

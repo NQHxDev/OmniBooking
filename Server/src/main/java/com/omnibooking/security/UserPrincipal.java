@@ -18,10 +18,15 @@ import org.springframework.security.core.userdetails.UserDetails;
 public class UserPrincipal implements UserDetails {
 
    private final UUID id;
+
    private final String username;
+
    private final String password;
+
    private final String email;
+
    private final Collection<? extends GrantedAuthority> authorities;
+
    private final boolean active;
 
    public static UserPrincipal create(User user) {
@@ -73,4 +78,5 @@ public class UserPrincipal implements UserDetails {
    public boolean isEnabled() {
       return active;
    }
+
 }

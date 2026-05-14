@@ -35,14 +35,26 @@ public class UserProfile {
    @JoinColumn(name = "user_id")
    private User user;
 
-   @Column(name = "first_name", length = 50)
-   private String firstName;
+   @Column(name = "display_name", length = 100)
+   private String displayName;
 
-   @Column(name = "last_name", length = 50)
-   private String lastName;
+   @Column(name = "date_of_birth")
+   private java.time.LocalDate dateOfBirth;
 
-   @Column(name = "phone_number", unique = true, length = 20)
-   private String phoneNumber;
+   @Column(name = "gender", length = 20)
+   private String gender;
+
+   @Column(name = "address")
+   private String address;
+
+   @Column(name = "nationality", length = 100)
+   private String nationality;
+
+   @Column(name = "phone_encrypted", length = 255)
+   private String phoneEncrypted;
+
+   @Column(name = "phone_search_hash", length = 64)
+   private String phoneSearchHash;
 
    @Column(name = "avatar_url")
    private String avatarUrl;

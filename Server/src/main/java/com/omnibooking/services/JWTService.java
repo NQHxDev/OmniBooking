@@ -4,8 +4,13 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -15,7 +20,7 @@ public class JWTService {
 
    @Value("${app.security.jwt-secret}")
    private String secret;
- 
+
    @Value("${app.security.jwt-expiration-ms:900000}") // Default 15m
    private long expiration;
 
@@ -26,7 +31,8 @@ public class JWTService {
    /**
     * Generate an Access Token with userId, roles, and sessionId.
     */
-   public String generateAccessToken(UUID userId, java.util.Collection<String> roles, UUID sessionId, String fingerprintHash) {
+   public String generateAccessToken(UUID userId, java.util.Collection<String> roles, UUID sessionId,
+         String fingerprintHash) {
       return Jwts.builder()
             .subject(userId.toString())
             .claim("roles", roles)
@@ -69,6 +75,18 @@ public class JWTService {
     */
    public String extractFingerprintHash(String token) {
       return extractAllClaims(token).get("fgh", String.class);
+   }
+
+   public Set<String> extractRoles(String token) {
+      Object rolesObj = extractAllClaims(token).get("roles");
+      if (rolesObj instanceof List<?> rolesList) {
+         return rolesList.stream()
+               .filter(String.class::isInstance)
+               .map(String.class::cast)
+               .collect(Collectors.toSet());
+      }
+
+      return Collections.emptySet();
    }
 
 }

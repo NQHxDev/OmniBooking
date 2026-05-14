@@ -1,11 +1,13 @@
 import Navbar from "@/components/Navbar";
 import GeniusBanner from "@/components/GeniusBanner";
 import SearchBar from "@/components/SearchBar";
+import FeaturedProperties from "@/components/FeaturedProperties";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 
 export default function Home() {
    const t = useTranslations("Common");
+   const tHome = useTranslations("Home");
 
    return (
       <div className="flex min-h-screen flex-col bg-white">
@@ -67,9 +69,11 @@ export default function Home() {
 
             {/* Trending Destinations */}
             <div className="mt-16">
-               <h3 className="text-2xl font-bold text-black">Điểm đến đang thịnh hành</h3>
+               <h3 className="text-2xl font-bold text-black">
+                  {tHome("trendingDestinations") || "Điểm đến đang thịnh hành"}
+               </h3>
                <p className="mt-1 text-zinc-500">
-                  Các lựa chọn phổ biến nhất cho du khách từ Việt Nam
+                  {tHome("trendingSub") || "Các lựa chọn phổ biến nhất cho du khách từ Việt Nam"}
                </p>
 
                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
@@ -81,7 +85,7 @@ export default function Home() {
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
                      />
                      <div className="absolute top-4 left-4 flex items-center gap-2 text-white drop-shadow-md">
-                        <span className="text-xl font-bold">Đà Lạt</span>
+                        <span className="text-xl font-bold">{tHome("dalat") || "Đà Lạt"}</span>
                         <Image
                            src="https://flagcdn.com/vn.svg"
                            alt="VN Flag"
@@ -98,7 +102,7 @@ export default function Home() {
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
                      />
                      <div className="absolute top-4 left-4 flex items-center gap-2 text-white drop-shadow-md">
-                        <span className="text-xl font-bold">Hà Nội</span>
+                        <span className="text-xl font-bold">{tHome("hanoi") || "Hà Nội"}</span>
                         <Image
                            src="https://flagcdn.com/vn.svg"
                            alt="VN Flag"
@@ -115,7 +119,9 @@ export default function Home() {
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
                      />
                      <div className="absolute top-4 left-4 flex items-center gap-2 text-white drop-shadow-md">
-                        <span className="text-xl font-bold">Quảng Ninh</span>
+                        <span className="text-xl font-bold">
+                           {tHome("quangninh") || "Quảng Ninh"}
+                        </span>
                         <Image
                            src="https://flagcdn.com/vn.svg"
                            alt="VN Flag"
@@ -126,6 +132,9 @@ export default function Home() {
                   </div>
                </div>
             </div>
+
+            {/* Featured Properties from DB */}
+            <FeaturedProperties />
 
             {/* Loyalty/Genius Section */}
             <GeniusBanner />

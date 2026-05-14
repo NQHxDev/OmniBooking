@@ -25,7 +25,9 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 public class CustomCsrfFilter extends OncePerRequestFilter {
 
    private final ObjectMapper objectMapper;
+
    private final RequestMappingHandlerMapping requestMappingHandlerMapping;
+
    private static final List<String> STATE_CHANGING_METHODS = Arrays.asList("POST", "PUT", "DELETE", "PATCH");
 
    @Override

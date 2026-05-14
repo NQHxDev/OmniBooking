@@ -1,43 +1,30 @@
 import { ShieldCheck, Globe2, Smartphone, Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function WhyJoinUs() {
+   const t = useTranslations("BecomeAHost.whyJoin");
+
    return (
       <section className="py-16 bg-zinc-50">
          <div className="mx-auto max-w-[1100px] px-4 text-center">
-            <h2 className="text-3xl font-bold text-[#1a1a1a]">
-               Host an tâm đón khách - Đã có chúng tôi hỗ trợ
-            </h2>
-            <p className="mt-4 text-zinc-500 mb-16">
-               Mọi công cụ và sự hỗ trợ bạn cần để kinh doanh thành công
-            </p>
+            <h2 className="text-3xl font-bold text-[#1a1a1a]">{t("title")}</h2>
+            <p className="mt-4 text-zinc-500 mb-16">{t("subtitle")}</p>
 
             <div className="grid grid-cols-1 gap-12 lg:grid-cols-3">
                <FeatureItem
                   icon={<ShieldCheck className="h-10 w-10 text-[#006ce4]" />}
-                  title="An toàn tuyệt đối"
-                  points={[
-                     "Xác thực khách hàng nghiêm ngặt",
-                     "Chính sách bảo vệ chủ nhà",
-                     "Hỗ trợ giải quyết khiếu nại",
-                  ]}
+                  title={t("safetyTitle")}
+                  points={[t("safety1"), t("safety2"), t("safety3")]}
                />
                <FeatureItem
                   icon={<Globe2 className="h-10 w-10 text-[#006ce4]" />}
-                  title="Tiếp cận toàn cầu"
-                  points={[
-                     "Hiển thị trên 43 ngôn ngữ",
-                     "Tiếp cận 28 triệu lượt khách",
-                     "Quảng bá trên Google và Facebook",
-                  ]}
+                  title={t("reachTitle")}
+                  points={[t("reach1"), t("reach2"), t("reach3")]}
                />
                <FeatureItem
                   icon={<Smartphone className="h-10 w-10 text-[#006ce4]" />}
-                  title="Quản lý thông minh"
-                  points={[
-                     "Ứng dụng Pulse tiện lợi",
-                     "Đồng bộ lịch tự động",
-                     "Báo cáo doanh thu chi tiết",
-                  ]}
+                  title={t("manageTitle")}
+                  points={[t("manage1"), t("manage2"), t("manage3")]}
                />
             </div>
          </div>

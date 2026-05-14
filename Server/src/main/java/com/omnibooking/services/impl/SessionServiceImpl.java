@@ -21,35 +21,18 @@ public class SessionServiceImpl implements SessionService {
    private final ObjectMapper objectMapper;
    private final PasswordEncoder passwordEncoder;
 
-   private static final long REFRESH_TOKEN_EXPIRY_DAYS = 7;
-   private static final long REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-
    @Override
-   public void saveSession(UUID userId, String username, String email, String fullName, java.util.Set<String> roles, UUID sessionId,
-         UUID refreshToken,
-         String ip, String userAgent) {
+   public void saveSession(UUID sessionId, RedisSessionInfo info, long expiryMs) {
       try {
          String redisKey = "refresh:" + sessionId;
-         RedisSessionInfo info = RedisSessionInfo.builder()
-               .userId(userId)
-               .username(username)
-               .email(email)
-               .fullName(fullName)
-               .roles(roles)
-               .hashedRefreshToken(passwordEncoder.encode(refreshToken.toString()))
-               .ip(ip)
-               .userAgent(userAgent)
-               .createdAt(System.currentTimeMillis())
-               .build();
-
          String json = Objects.requireNonNull(objectMapper.writeValueAsString(info));
-         redisTemplate.opsForValue().set(redisKey, json, REFRESH_TOKEN_EXPIRY_DAYS, TimeUnit.DAYS);
+         redisTemplate.opsForValue().set(redisKey, json, expiryMs, TimeUnit.MILLISECONDS);
 
-         // Add to User Sessions Index (Sorted Set)
-         long expiryTimestamp = System.currentTimeMillis() + REFRESH_TOKEN_EXPIRY_MS;
-         String indexKey = "user_sessions:" + Objects.requireNonNull(userId.toString());
-         redisTemplate.opsForZSet().add(indexKey, Objects.requireNonNull(sessionId.toString()), expiryTimestamp);
-         redisTemplate.expire(indexKey, REFRESH_TOKEN_EXPIRY_DAYS, TimeUnit.DAYS);
+         // Add to User Sessions Index
+         String indexKey = "user_sessions:" + Objects.requireNonNull(info.getUserId().toString());
+         redisTemplate.opsForZSet().add(indexKey, Objects.requireNonNull(sessionId.toString()),
+               System.currentTimeMillis() + expiryMs);
+         redisTemplate.expire(indexKey, 30, TimeUnit.DAYS); // Hard index expiry
 
       } catch (Exception e) {
          log.error("Failed to save session to Redis", e);

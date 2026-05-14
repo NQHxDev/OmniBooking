@@ -15,6 +15,7 @@ import com.omnibooking.security.RedisSessionInfo;
 import com.omnibooking.services.AuthService;
 import com.omnibooking.services.JWTService;
 import com.omnibooking.services.MailService;
+import com.omnibooking.services.OutboxService;
 import com.omnibooking.services.SessionService;
 import com.omnibooking.services.VerificationService;
 import com.omnibooking.util.CookieUtils;
@@ -48,25 +49,43 @@ import com.omnibooking.services.BloomFilterService;
 public class AuthServiceImpl implements AuthService {
 
    private final UserRepository userRepository;
+
    private final RoleRepository roleRepository;
+
    private final UserProfileRepository userProfileRepository;
+
    private final PasswordEncoder passwordEncoder;
+
    private final JWTService jwtService;
+
    private final SessionService sessionService;
-   private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+
    private final VerificationService verificationService;
+
    private final StringRedisTemplate redisTemplate;
+
    private final BloomFilterService bloomFilterService;
+
    private final UserMapper userMapper;
+
    private final MailService mailService;
+
+   private final OutboxService outboxService;
+
    private final SocialAccountRepository socialAccountRepository;
+
+   private static final long SESSION_SLIDING_NORMAL_MS = 1 * 24 * 60 * 60 * 1000L;
+   private static final long SESSION_SLIDING_REMEMBER_ME_MS = 7 * 24 * 60 * 60 * 1000L;
+   private static final long SESSION_HARD_CAP_NORMAL_MS = 3 * 24 * 60 * 60 * 1000L;
+   private static final long SESSION_HARD_CAP_REMEMBER_ME_MS = 30 * 24 * 60 * 60 * 1000L;
 
    @Value("${app.security.cookie-secure:false}")
    private boolean cookieSecure;
 
    @Override
    @Transactional
-   public AuthResponse register(RegisterRequest request, String ip, String userAgent, HttpServletResponse response) {
+   public AuthResponse register(RegisterRequest request, String ip, String userAgent, HttpServletResponse response,
+         boolean rememberMe) {
       // 1. Check Bloom Filter first (Fast pre-check)
       if (bloomFilterService.mightContain(request.getEmail())) {
          if (userRepository.existsByEmail(request.getEmail())) {
@@ -87,21 +106,31 @@ public class AuthServiceImpl implements AuthService {
       bloomFilterService.add(savedUser.getEmail());
 
       // Create Profile
-      String[] nameParts = splitFullName(request.getFullName());
       UserProfile profile = UserProfile.builder()
             .user(savedUser)
-            .firstName(nameParts[0])
-            .lastName(nameParts[1])
+            .displayName(request.getFullName())
             .build();
       userProfileRepository.save(Objects.requireNonNull(profile));
 
-      // Publish Event
-      eventPublisher
-            .publishEvent(new com.omnibooking.event.UserRegisteredEvent(this, savedUser, request.getFullName()));
+      // 3. Reliable Email Delivery via Outbox
+      String token = verificationService.createVerificationToken(savedUser.getId());
+
+      // We use MailService to build the DTO but NOT send it to Kafka yet
+      com.omnibooking.dto.event.EmailEvent emailEvent = mailService.buildVerificationEmailEvent(
+            savedUser.getEmail(),
+            request.getFullName(),
+            token);
+
+      outboxService.saveEvent(
+            savedUser.getId(),
+            "USER",
+            "USER_REGISTERED",
+            emailEvent);
 
       // Automatic Login
       Set<String> roles = Collections.singleton(userRole.getName());
-      return issueTokensAndBuildResponse(savedUser, roles, profile, ip, userAgent, response);
+      long now = System.currentTimeMillis();
+      return issueTokensAndBuildResponse(savedUser, roles, profile, ip, userAgent, response, rememberMe, now, now);
    }
 
    @Override
@@ -124,8 +153,10 @@ public class AuthServiceImpl implements AuthService {
             .map(com.omnibooking.model.Role::getName)
             .collect(java.util.stream.Collectors.toSet());
 
-      UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response);
+      UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
+      long now = System.currentTimeMillis();
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
+            now);
    }
 
    @Override
@@ -138,11 +169,12 @@ public class AuthServiceImpl implements AuthService {
          rToken = UUID.fromString(refreshToken);
       } catch (IllegalArgumentException e) {
          log.error("Invalid UUID format for session or refresh token: session={}, refresh={}", sessionId, refreshToken);
+         CookieUtils.clearAuthCookies(response, cookieSecure);
          throw new AppException(ErrorCode.INVALID_SESSION);
       }
 
-      // LOCKING: Ngăn chặn race condition khi nhiều request refresh cùng lúc cho 1
-      // sessionId
+      // LOCKING: Prevent race condition when multiple refresh requests occur for the
+      // same sessionId
       String lockKey = "lock:refresh:" + sId;
       Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "L", 5, TimeUnit.SECONDS);
 
@@ -153,6 +185,7 @@ public class AuthServiceImpl implements AuthService {
 
       try {
          if (!sessionService.isValidSession(sId, rToken)) {
+            CookieUtils.clearAuthCookies(response, cookieSecure);
             throw new AppException(ErrorCode.INVALID_SESSION);
          }
 
@@ -165,13 +198,26 @@ public class AuthServiceImpl implements AuthService {
                .map(com.omnibooking.model.Role::getName)
                .collect(java.util.stream.Collectors.toSet());
 
-         UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+         UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
+
+         // Check hard cap
+         long now = System.currentTimeMillis();
+         long elapsed = now - info.getCreatedAt();
+         long hardCap = info.isRememberMe() ? SESSION_HARD_CAP_REMEMBER_ME_MS : SESSION_HARD_CAP_NORMAL_MS;
+
+         if (elapsed >= hardCap) {
+            log.warn("Session hard cap reached for user: {} ({} ms elapsed)", user.getEmail(), elapsed);
+            CookieUtils.clearAuthCookies(response, cookieSecure);
+            sessionService.deleteSession(sId);
+            throw new AppException(ErrorCode.INVALID_SESSION);
+         }
 
          // ROTATION: Thu hồi session cũ trước khi cấp mới
          sessionService.deleteSession(sId);
          log.info("Rotating session for user: {}", user.getEmail());
 
-         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response);
+         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, info.isRememberMe(),
+               info.getCreatedAt(), info.getLastAccessedAt());
       } finally {
          redisTemplate.delete(lockKey);
       }
@@ -197,17 +243,54 @@ public class AuthServiceImpl implements AuthService {
       userRepository.save(user);
 
       // Update Profile verification status
-      userProfileRepository.findByUserId(userId).ifPresent(p -> {
+      userProfileRepository.findById(userId).ifPresent(p -> {
          p.setIsVerified(true);
          userProfileRepository.save(p);
       });
+   }
+
+   @Override
+   @Transactional
+   public void resendVerification(UUID userId) {
+      // 1. Rate limiting check (30 seconds cooldown per user)
+      String rateLimitKey = "auth:resend-limit:" + userId;
+      String lastSent = redisTemplate.opsForValue().get(rateLimitKey);
+      if (lastSent != null) {
+         throw new AppException(ErrorCode.RATE_LIMIT_EXCEEDED);
+      }
+
+      User user = userRepository.findById(userId)
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+      UserProfile profile = userProfileRepository.findById(userId)
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+      if (Boolean.TRUE.equals(profile.getIsVerified())) {
+         log.info("User {} already verified, skipping resend", user.getEmail());
+         return;
+      }
+
+      // Create new verification token
+      String token = verificationService.createVerificationToken(user.getId());
+
+      // Save to Outbox to be picked up and sent to Kafka
+      log.info("Recording resend verification outbox event for: {}", user.getEmail());
+      outboxService.saveEvent(
+            user.getId(),
+            "USER",
+            "RESEND_VERIFICATION",
+            mailService.buildVerificationEmailEvent(user.getEmail(), profile.getDisplayName(), token));
+
+      // 4. Set rate limit in Redis for 30 seconds
+      redisTemplate.opsForValue().set(rateLimitKey, "true", 30, TimeUnit.SECONDS);
    }
 
    /**
     * Centralized logic to issue tokens, save sessions, and set cookies.
     */
    private AuthResponse issueTokensAndBuildResponse(User user, Set<String> roles, UserProfile profile,
-         String ip, String userAgent, HttpServletResponse response) {
+         String ip, String userAgent, HttpServletResponse response, boolean rememberMe, long createdAt,
+         long lastAccessedAt) {
       UUID sessionId = UuidCreator.getTimeOrderedEpoch();
       UUID refreshToken = UuidCreator.getTimeOrderedEpoch();
 
@@ -217,29 +300,57 @@ public class AuthServiceImpl implements AuthService {
       String accessToken = jwtService.generateAccessToken(user.getId(), roles, sessionId, fgpHash);
 
       String fullName;
-      if (profile != null) {
-         String first = profile.getFirstName() != null ? profile.getFirstName().trim() : "";
-         String last = profile.getLastName() != null ? profile.getLastName().trim() : "";
-
-         if (first.isEmpty())
-            fullName = last;
-         else if (last.isEmpty())
-            fullName = first;
-         else if (first.toLowerCase().contains(last.toLowerCase()))
-            fullName = first;
-         else if (last.toLowerCase().contains(first.toLowerCase()))
-            fullName = last;
-         else
-            fullName = first + " " + last;
+      if (profile != null && profile.getDisplayName() != null) {
+         fullName = profile.getDisplayName();
       } else {
          fullName = user.getUsername();
       }
 
-      sessionService.saveSession(user.getId(), user.getUsername(), user.getEmail(), fullName, roles,
-            sessionId, refreshToken, ip, userAgent);
+      long now = System.currentTimeMillis();
+      long slidingMs;
+
+      if (rememberMe) {
+         // Flexible Sliding Window for Remember Me
+         long maxDays = SESSION_SLIDING_REMEMBER_ME_MS / (24 * 60 * 60 * 1000L);
+         long offMs = now - lastAccessedAt;
+         long offDays = offMs / (24 * 60 * 60 * 1000L);
+         long extensionDays = Math.max(1, maxDays - offDays + 1);
+         if (extensionDays > maxDays)
+            extensionDays = maxDays;
+
+         slidingMs = extensionDays * 24 * 60 * 60 * 1000L;
+         log.info("Flexible sliding window for {}: offDays={}, extensionDays={}", user.getEmail(), offDays,
+               extensionDays);
+      } else {
+         slidingMs = SESSION_SLIDING_NORMAL_MS;
+      }
+
+      long hardCapMs = rememberMe ? SESSION_HARD_CAP_REMEMBER_ME_MS : SESSION_HARD_CAP_NORMAL_MS;
+      long remainingHardCapMs = hardCapMs - (now - createdAt);
+
+      long finalTtlMs = Math.min(slidingMs, remainingHardCapMs);
+      if (finalTtlMs < 0)
+         finalTtlMs = 0;
+
+      // Build Session Info Object
+      com.omnibooking.security.RedisSessionInfo sessionInfo = com.omnibooking.security.RedisSessionInfo.builder()
+            .userId(user.getId())
+            .username(user.getUsername())
+            .email(user.getEmail())
+            .fullName(fullName)
+            .roles(roles)
+            .hashedRefreshToken(passwordEncoder.encode(refreshToken.toString()))
+            .ip(ip)
+            .userAgent(userAgent)
+            .createdAt(createdAt)
+            .lastAccessedAt(now) // Current time is the new lastAccessedAt
+            .rememberMe(rememberMe)
+            .build();
+
+      sessionService.saveSession(sessionId, sessionInfo, finalTtlMs);
 
       CookieUtils.setAuthCookies(response, accessToken, sessionId.toString(), refreshToken.toString(), fingerprint,
-            cookieSecure);
+            cookieSecure, (int) (finalTtlMs / 1000));
 
       return userMapper.toAuthResponse(user, profile, roles);
    }
@@ -251,7 +362,8 @@ public class AuthServiceImpl implements AuthService {
 
    @Override
    @Transactional
-   public AuthResponse upgradeToPartner(UUID userId, String ip, String userAgent, HttpServletResponse response) {
+   public AuthResponse upgradeToPartner(UUID userId, String ip, String userAgent, HttpServletResponse response,
+         boolean rememberMe) {
       User user = userRepository.findById(Objects.requireNonNull(userId))
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
@@ -262,7 +374,7 @@ public class AuthServiceImpl implements AuthService {
       user.getRoles().add(partnerRole);
       userRepository.save(user);
 
-      UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+      UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
 
       log.info("Upgrading user {} to ROLE_PARTNER", user.getEmail());
 
@@ -270,7 +382,8 @@ public class AuthServiceImpl implements AuthService {
             .map(Role::getName)
             .collect(Collectors.toSet());
 
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response);
+      long now = System.currentTimeMillis();
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now);
    }
 
    @Override
@@ -297,28 +410,20 @@ public class AuthServiceImpl implements AuthService {
          // Save to Redis (15 minutes)
          redisTemplate.opsForValue().set(redisKey, Objects.requireNonNull(email), 15, TimeUnit.MINUTES);
 
-         UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+         UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
          String fullName;
-         if (profile != null) {
-            String first = profile.getFirstName() != null ? profile.getFirstName().trim() : "";
-            String last = profile.getLastName() != null ? profile.getLastName().trim() : "";
-
-            if (first.isEmpty())
-               fullName = last;
-            else if (last.isEmpty())
-               fullName = first;
-            else if (first.toLowerCase().contains(last.toLowerCase()))
-               fullName = first;
-            else if (last.toLowerCase().contains(first.toLowerCase()))
-               fullName = last;
-            else
-               fullName = first + " " + last;
+         if (profile != null && profile.getDisplayName() != null) {
+            fullName = profile.getDisplayName();
          } else {
             fullName = user.getUsername();
          }
 
-         log.info("Sending forgot password email to: {}", email);
-         mailService.sendForgotPasswordEmail(email, fullName, token);
+         log.info("Recording forgot password outbox event for: {}", email);
+         outboxService.saveEvent(
+               user.getId(),
+               "USER",
+               "FORGOT_PASSWORD",
+               mailService.buildForgotPasswordEmailEvent(email, fullName, token));
       });
    }
 
@@ -353,7 +458,7 @@ public class AuthServiceImpl implements AuthService {
    @Override
    @Transactional
    public AuthResponse loginWithOAuth2(String provider, OAuth2UserInfo userInfo, String ip, String userAgent,
-         HttpServletResponse response) {
+         HttpServletResponse response, boolean rememberMe) {
       // 1. Check if social account already exists
       String providerUpper = provider.toUpperCase();
       SocialAccount socialAccount = socialAccountRepository.findByProviderAndProviderId(providerUpper, userInfo.getId())
@@ -367,27 +472,19 @@ public class AuthServiceImpl implements AuthService {
          // User already exists, fetch them
          user = socialAccount.getUser();
          roles = user.getRoles().stream().map(Role::getName).collect(Collectors.toSet());
-         profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+         profile = userProfileRepository.findById(user.getId()).orElse(null);
 
          // Sync profile info if changed
          if (profile != null) {
             boolean changed = false;
-            String[] nameParts = splitFullName(userInfo.getName());
-            String targetFirst = nameParts[0];
-            String targetLast = nameParts[1];
-
             if (userInfo.getPicture() != null && !userInfo.getPicture().equals(profile.getAvatarUrl())) {
                if (profile.getAvatarUrl() == null || profile.getAvatarUrl().contains("googleusercontent.com")) {
                   profile.setAvatarUrl(userInfo.getPicture());
                   changed = true;
                }
             }
-            if (!targetFirst.isEmpty() && !targetFirst.equals(profile.getFirstName())) {
-               profile.setFirstName(targetFirst);
-               changed = true;
-            }
-            if (!targetLast.isEmpty() && !targetLast.equals(profile.getLastName())) {
-               profile.setLastName(targetLast);
+            if (userInfo.getName() != null && !userInfo.getName().equals(profile.getDisplayName())) {
+               profile.setDisplayName(userInfo.getName());
                changed = true;
             }
             // Google users are always verified
@@ -420,18 +517,16 @@ public class AuthServiceImpl implements AuthService {
             bloomFilterService.add(user.getEmail());
 
             // Create Profile
-            String[] nameParts = splitFullName(userInfo.getName());
             profile = UserProfile.builder()
                   .user(user)
-                  .firstName(nameParts[0])
-                  .lastName(nameParts[1])
+                  .displayName(userInfo.getName())
                   .avatarUrl(userInfo.getPicture())
                   .isVerified(true)
                   .build();
             profile = userProfileRepository.save(Objects.requireNonNull(profile));
          } else {
             // Existing user, just link social account
-            profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+            profile = userProfileRepository.findById(user.getId()).orElse(null);
          }
 
          // 4. Link social account
@@ -445,21 +540,41 @@ public class AuthServiceImpl implements AuthService {
          roles = user.getRoles().stream().map(Role::getName).collect(Collectors.toSet());
       }
 
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response);
+      long now = System.currentTimeMillis();
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now);
    }
 
-   private String[] splitFullName(String fullName) {
-      if (fullName == null || fullName.isBlank()) {
-         return new String[] { "", "" };
+   @Override
+   public RedisSessionInfo getSessionInfo(String sessionId) {
+      try {
+         return sessionService.getSession(UUID.fromString(sessionId));
+      } catch (Exception e) {
+         return null;
       }
-      String trimmed = fullName.trim();
-      int lastSpaceIndex = trimmed.lastIndexOf(' ');
-      if (lastSpaceIndex == -1) {
-         return new String[] { trimmed, "" };
+   }
+
+   @Override
+   @Transactional
+   public AuthResponse finalizeRegistration(String accessToken, String ip, String userAgent,
+         HttpServletResponse response) {
+      try {
+         UUID userId = jwtService.extractUserId(accessToken);
+         Set<String> roles = jwtService.extractRoles(accessToken);
+
+         User user = userRepository.findById(userId)
+               .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+         UserProfile profile = userProfileRepository.findById(userId).orElse(null);
+
+         long now = System.currentTimeMillis();
+         // For finalize registration, we don't have 'rememberMe' info from the original
+         // request yet,
+         // defaulting to false or we could pass it. Let's default to false for safety.
+         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now);
+      } catch (AppException e) {
+         throw e;
+      } catch (Exception e) {
+         log.error("Failed to finalize registration for token", e);
+         throw new AppException(ErrorCode.INVALID_TOKEN);
       }
-      return new String[] {
-            trimmed.substring(0, lastSpaceIndex).trim(),
-            trimmed.substring(lastSpaceIndex + 1).trim()
-      };
    }
 }

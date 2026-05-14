@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ResetPasswordRequest {
+
    @NotBlank(message = "Token is required")
    private String token;
 
@@ -21,4 +22,5 @@ public class ResetPasswordRequest {
 
    @Builder.Default
    private boolean logoutAll = false;
+
 }

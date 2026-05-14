@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="vi" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Xác thực bảo mật OmniBooking</title>
+   <style>
+      body {
+         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+         line-height: 1.8;
+         color: #2c3e50;
+         margin: 0;
+         padding: 0;
+         background-color: #f9f9f9;
+      }
+
+      .wrapper {
+         width: 100%;
+         table-layout: fixed;
+         background-color: #f9f9f9;
+         padding-bottom: 40px;
+      }
+
+      .main {
+         background-color: #ffffff;
+         margin: 0 auto;
+         width: 100%;
+         max-width: 600px;
+         border-top: 6px solid #003580;
+         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      }
+
+      .content {
+         padding: 40px 50px;
+      }
+
+      .logo {
+         text-align: left;
+         margin-bottom: 30px;
+      }
+
+      .logo span {
+         color: #003580;
+         font-size: 26px;
+         font-weight: 800;
+         letter-spacing: -0.5px;
+      }
+
+      .header h1 {
+         color: #1a1a1a;
+         font-size: 22px;
+         font-weight: 700;
+         margin: 0 0 20px 0;
+      }
+
+      .header p {
+         font-size: 15px;
+         color: #5e6d77;
+         margin: 0;
+      }
+
+      .otp-box {
+         background-color: #f4f7fa;
+         border-radius: 4px;
+         padding: 40px 20px;
+         text-align: center;
+         margin: 35px 0;
+      }
+
+      .otp-label {
+         font-size: 13px;
+         font-weight: 600;
+         color: #5e6d77;
+         text-transform: uppercase;
+         letter-spacing: 1.5px;
+         margin-bottom: 15px;
+      }
+
+      .otp-code {
+         font-size: 48px;
+         font-weight: 800;
+         color: #003580;
+         letter-spacing: 10px;
+         margin: 0;
+         font-family: 'Courier New', Courier, monospace;
+      }
+
+      .instruction {
+         font-size: 14px;
+         color: #5e6d77;
+         border-left: 3px solid #003580;
+         padding-left: 15px;
+         margin: 30px 0;
+      }
+
+      .footer {
+         background-color: #ffffff;
+         padding: 30px 50px;
+         border-top: 1px solid #f0f0f0;
+      }
+
+      .footer p {
+         font-size: 12px;
+         color: #99abb4;
+         margin: 5px 0;
+         line-height: 1.5;
+      }
+
+      .warning {
+         font-size: 13px;
+         color: #e74c3c;
+         margin-top: 25px;
+         font-style: italic;
+      }
+   </style>
+</head>
+
+<body>
+   <div class="wrapper">
+      <div class="main">
+         <div class="content">
+            <div class="logo">
+               <span>OmniBooking.com</span>
+            </div>
+            <div class="header">
+               <h1>Xác thực thao tác bảo mật</h1>
+               <p>Chào <strong th:text="${userName}" style="color: #1a1a1a;">Quý khách</strong>,</p>
+               <p style="margin-top: 10px;">Để bảo vệ tài khoản của Quý khách, vui lòng sử dụng mã xác thực dưới đây để
+                  hoàn tất thao tác bảo mật đang thực hiện.</p>
+            </div>
+
+            <div class="otp-box">
+               <div class="otp-label">Mã xác thực (OTP)</div>
+               <div class="otp-code" th:text="${otpCode}">A0B123</div>
+               <p style="margin-top: 15px; font-size: 12px; color: #a5b1b9;">Mã này có hiệu lực trong vòng 05 phút.</p>
+            </div>
+
+            <div class="instruction">
+               Hành động này giúp đảm bảo rằng mọi thay đổi quan trọng đối với tài khoản đều do chính Quý khách thực
+               hiện.
+            </div>
+
+            <p class="warning">
+               * Nếu Quý khách không yêu cầu mã này, vui lòng liên hệ với bộ phận CSKH của chúng tôi ngay lập tức để
+               được hỗ trợ bảo mật tài khoản.
+            </p>
+         </div>
+         <div class="footer">
+            <p>&copy; 2026 OmniBooking.com. Bảo lưu mọi quyền.</p>
+            <p>Địa chỉ: 123 Đường du lịch, Quận 1, TP. Hồ Chí Minh, Việt Nam</p>
+            <p>Email này được gửi tự động, vui lòng không phản hồi.</p>
+         </div>
+      </div>
+   </div>
+</body>
+
+</html>

@@ -1,21 +1,25 @@
 import apiClient from "../apiClient";
 import { type User } from "@/store/useAuthStore";
+import { v7 as uuidv7 } from "uuid";
 
 export interface ApiResponse<T> {
    message: string;
    errorCode?: string;
    data: T;
+   requestId?: string;
 }
 
 export interface LoginRequest {
    email: string;
    password: string;
+   rememberMe?: boolean;
 }
 
 export interface RegisterRequest {
    email: string;
    password: string;
    fullName: string;
+   rememberMe?: boolean;
 }
 
 let refreshPromise: Promise<User> | null = null;
@@ -36,13 +40,17 @@ export const authService = {
    /**
     * Registers a new user.
     */
-   register: async (payload: RegisterRequest): Promise<User> => {
+   register: async (payload: RegisterRequest): Promise<ApiResponse<User>> => {
+      const idempotencyKey = uuidv7();
       const response = (await apiClient.post("/auth/register", payload, {
          withCredentials: true,
+         headers: {
+            "X-Idempotency-Key": idempotencyKey,
+         },
          // @ts-expect-error - Custom axios config flag for interceptor
          _skipToast: true,
       })) as unknown as ApiResponse<User>;
-      return response.data;
+      return response;
    },
 
    /**
@@ -50,6 +58,13 @@ export const authService = {
     */
    verifyEmail: async (token: string) => {
       return apiClient.get<ApiResponse<void>>(`/auth/verify?token=${token}`);
+   },
+
+   /**
+    * Resends the verification email to the logged-in user.
+    */
+   resendVerification: async () => {
+      return apiClient.post<ApiResponse<void>>("/auth/resend-verification");
    },
 
    /**
@@ -109,5 +124,21 @@ export const authService = {
          withCredentials: true,
       })) as unknown as ApiResponse<string>;
       return response;
+   },
+
+   /**
+    * Finalizes registration session by setting HttpOnly cookies.
+    */
+   finalizeRegistration: async (accessToken: string): Promise<User> => {
+      const response = (await apiClient.post(
+         "/auth/finalize-registration",
+         { accessToken },
+         {
+            withCredentials: true,
+            // @ts-expect-error - Custom axios config flag for interceptor
+            _skipToast: true,
+         }
+      )) as unknown as ApiResponse<User>;
+      return response.data;
    },
 };

@@ -1,6 +1,7 @@
 package com.omnibooking.exception;
 
 import com.omnibooking.dto.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
    @ExceptionHandler(AppException.class)
@@ -19,6 +21,7 @@ public class GlobalExceptionHandler {
          AppException ex, jakarta.servlet.http.HttpServletRequest request) {
 
       String requestId = (String) request.getAttribute("requestId");
+      
       return ResponseEntity.status(Objects.requireNonNull(ex.getStatus()))
             .body(ApiResponse.error(ex.getMessage(), ex.getErrorCode(), null, requestId));
    }
@@ -34,6 +37,9 @@ public class GlobalExceptionHandler {
          String errorMessage = error.getDefaultMessage();
          errors.put(fieldName, errorMessage);
       });
+      
+      
+      
       return ResponseEntity.badRequest()
             .body(ApiResponse.error("Validation failed", ErrorCode.INVALID_KEY.getCode(), errors, requestId));
    }
@@ -45,6 +51,9 @@ public class GlobalExceptionHandler {
 
       String requestId = (String) request.getAttribute("requestId");
       ErrorCode error = ErrorCode.INVALID_SESSION;
+      
+      
+      
       return ResponseEntity.status(Objects.requireNonNull(error.getStatus()))
             .body(ApiResponse.error("Session expired or invalid. Please login again.", error.getCode(), null,
                   requestId));
@@ -56,6 +65,9 @@ public class GlobalExceptionHandler {
 
       String requestId = (String) request.getAttribute("requestId");
       ErrorCode error = ErrorCode.INTERNAL_SERVER_ERROR;
+      
+      log.error("[{}] UNEXPECTED ERROR: ", requestId, ex);
+      
       return ResponseEntity.status(Objects.requireNonNull(error.getStatus()))
             .body(ApiResponse.error(error.getMessage(), error.getCode(), ex.getMessage(),
                   requestId));

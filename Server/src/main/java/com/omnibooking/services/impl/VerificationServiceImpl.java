@@ -29,6 +29,7 @@ public class VerificationServiceImpl implements VerificationService {
       String token = base64Encoder.encodeToString(randomBytes);
 
       String key = VERIFY_PREFIX + token;
+      System.out.println("DEBUG: Creating token key: " + key + " for user: " + userId);
       redisTemplate.opsForValue().set(
             Objects.requireNonNull(key),
             Objects.requireNonNull(userId.toString()),
@@ -40,15 +41,21 @@ public class VerificationServiceImpl implements VerificationService {
 
    @Override
    public UUID verifyToken(String token) {
-      String key = VERIFY_PREFIX + token;
+      if (token == null) return null;
+      String cleanToken = token.trim();
+      String key = VERIFY_PREFIX + cleanToken;
+      
+      System.out.println("DEBUG: Verifying token key: " + key);
       String userIdStr = redisTemplate.opsForValue().get(key);
 
       if (userIdStr == null) {
+         System.out.println("DEBUG: Token NOT found in Redis for key: " + key);
          return null;
       }
 
       // Xóa luôn sau khi dùng (chỉ dùng 1 lần)
       redisTemplate.delete(key);
+      System.out.println("DEBUG: Token verified and deleted for user: " + userIdStr);
 
       return UUID.fromString(userIdStr);
    }

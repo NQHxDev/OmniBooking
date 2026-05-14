@@ -203,6 +203,20 @@
 			<artifactId>logstash-logback-encoder</artifactId>
 			<version>8.0</version>
 		</dependency>
+
+		<!-- WebAuthn (Passkey) Support -->
+		<dependency>
+			<groupId>com.webauthn4j</groupId>
+			<artifactId>webauthn4j-core</artifactId>
+			<version>0.24.0.RELEASE</version>
+		</dependency>
+
+		<!-- GeoIP2 for Location Detection -->
+		<dependency>
+			<groupId>com.maxmind.geoip2</groupId>
+			<artifactId>geoip2</artifactId>
+			<version>4.2.1</version>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -236,6 +250,9 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<mainClass>com.omnibooking.ServerApplication</mainClass>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>

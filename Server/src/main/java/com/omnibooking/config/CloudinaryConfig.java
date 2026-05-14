@@ -15,10 +15,10 @@ public class CloudinaryConfig {
    @Bean
    public Cloudinary cloudinary() {
       return new Cloudinary(ObjectUtils.asMap(
-         "cloud_name", appProperties.getCloudinary().getCloudName(),
-         "api_key", appProperties.getCloudinary().getApiKey(),
-         "api_secret", appProperties.getCloudinary().getApiSecret(),
-         "secure", true
-      ));
+            "cloud_name", appProperties.getCloudinary().getCloudName(),
+            "api_key", appProperties.getCloudinary().getApiKey(),
+            "api_secret", appProperties.getCloudinary().getApiSecret(),
+            "secure", true));
    }
+
 }

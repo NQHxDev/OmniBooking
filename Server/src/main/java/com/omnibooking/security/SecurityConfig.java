@@ -34,7 +34,9 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
    private final JWTService jwtService;
+
    private final CustomUserDetailsService userDetailsService;
+
    private final StringRedisTemplate redisTemplate;
 
    @Bean
@@ -61,7 +63,8 @@ public class SecurityConfig {
             "X-Request-ID",
             "x-fgp",
             "Accept",
-            "Origin"));
+            "Origin",
+            "X-Idempotency-Key"));
       config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
       config.setExposedHeaders(List.of("Set-Cookie"));
       config.setMaxAge(3600L);
@@ -75,22 +78,33 @@ public class SecurityConfig {
 
       http
             .csrf(AbstractHttpConfigurer::disable)
-            .cors(Customizer.withDefaults()) // Uses corsConfigurationSource bean
+            .cors(Customizer.withDefaults())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                   .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                  .requestMatchers("/auth/**").permitAll()
-                  .requestMatchers("/search/**").permitAll() // Allow public search
-                  .requestMatchers("/partner/**").authenticated() // Explicitly require auth for partner
+                  .requestMatchers("/auth/passkey/**").authenticated()
+                  .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh",
+                        "/auth/forgot-password", "/auth/reset-password", "/auth/google/**", "/auth/subscribe/**", "/auth/finalize-registration")
+                  .permitAll()
+                  .requestMatchers("/properties/search", "/properties/search/**").permitAll()
+                  .requestMatchers("/destinations", "/destinations/**").permitAll()
                   .requestMatchers("/health/**").permitAll()
                   .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                  .requestMatchers("/currencies/**").permitAll()
+                  .requestMatchers("/test/**").permitAll()
                   .requestMatchers("/actuator/**").permitAll()
+                  // Allow public property details view if needed
+                  .requestMatchers(HttpMethod.GET, "/properties/**").permitAll()
                   .anyRequest().authenticated())
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(exceptions -> exceptions
                   .authenticationEntryPoint((request, response, authException) -> {
                      String requestId = (String) request.getAttribute("requestId");
-                     boolean isExpired = "true".equals(request.getAttribute("expired_token"));
-                     ErrorCode errorCode = isExpired ? ErrorCode.TOKEN_EXPIRED : ErrorCode.INVALID_CREDENTIALS;
+                     ErrorCode errorCode = (ErrorCode) request.getAttribute("error_code");
+
+                     if (errorCode == null) {
+                        errorCode = ErrorCode.TOKEN_EXPIRED;
+                     }
 
                      response.setStatus(errorCode.getStatus().value());
                      response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -114,8 +128,7 @@ public class SecurityConfig {
                            accessDeniedException.getMessage(),
                            requestId);
                      response.getWriter().write(new ObjectMapper().writeValueAsString(apiResponse));
-                  }))
-            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                  }));
 
       return http.build();
    }

@@ -35,17 +35,20 @@ public interface PropertyDocumentMapper {
 
    @Named("mapAmenities")
    default List<String> mapAmenities(Set<Amenity> amenities) {
-      if (amenities == null) return Collections.emptyList();
+      if (amenities == null)
+         return Collections.emptyList();
       return amenities.stream().map(Amenity::getName).toList();
    }
 
    @Named("mapMinPrice")
    default Double mapMinPrice(Set<RoomType> roomTypes) {
-      if (roomTypes == null || roomTypes.isEmpty()) return 0.0;
+      if (roomTypes == null || roomTypes.isEmpty())
+         return 0.0;
       return roomTypes.stream()
             .map(RoomType::getBasePrice)
             .min(BigDecimal::compareTo)
             .map(BigDecimal::doubleValue)
             .orElse(0.0);
    }
+
 }

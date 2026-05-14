@@ -24,7 +24,9 @@ import io.jsonwebtoken.ExpiredJwtException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
    private final JWTService jwtService;
+
    private final CustomUserDetailsService userDetailsService;
+
    private final StringRedisTemplate redisTemplate;
 
    @Override
@@ -94,4 +96,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
       filterChain.doFilter(request, response);
    }
+
 }

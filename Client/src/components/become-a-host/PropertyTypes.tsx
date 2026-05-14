@@ -1,35 +1,36 @@
 import { Building2, Home, Hotel, Tent } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function PropertyTypes() {
+   const t = useTranslations("BecomeAHost.propertyTypes");
+
    const types = [
       {
          icon: <Home className="h-8 w-8" />,
-         title: "Căn hộ",
-         description: "Chỗ nghỉ tự phục vụ, thường nằm trong tòa nhà.",
+         title: t("apartment"),
+         description: t("apartmentDesc"),
       },
       {
          icon: <Hotel className="h-8 w-8" />,
-         title: "Khách sạn",
-         description: "Chỗ nghỉ có các tiện nghi và dịch vụ chuyên nghiệp.",
+         title: t("hotel"),
+         description: t("hotelDesc"),
       },
       {
          icon: <Building2 className="h-8 w-8" />,
-         title: "Nhà nghỉ",
-         description: "Chỗ nghỉ gia đình, ấm cúng và gần gũi.",
+         title: t("guesthouse"),
+         description: t("guesthouseDesc"),
       },
       {
          icon: <Tent className="h-8 w-8" />,
-         title: "Chỗ nghỉ độc đáo",
-         description: "Thuyền, lều, nhà trên cây và nhiều hơn nữa.",
+         title: t("unique"),
+         description: t("uniqueDesc"),
       },
    ];
 
    return (
       <section className="py-16 bg-white">
          <div className="mx-auto max-w-[1100px] px-4">
-            <h2 className="text-3xl font-bold text-[#1a1a1a] mb-12">
-               Đăng ký mọi loại hình chỗ nghỉ
-            </h2>
+            <h2 className="text-3xl font-bold text-[#1a1a1a] mb-12">{t("title")}</h2>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                {types.map((type, index) => (

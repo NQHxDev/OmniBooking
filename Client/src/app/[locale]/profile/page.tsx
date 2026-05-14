@@ -26,11 +26,15 @@ import {
    MessageSquare,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import Navbar from "@/components/Navbar";
+import { useTranslations } from "next-intl";
 
 export default function ProfilePage() {
    const [mounted, setMounted] = useState(false);
    const user = useAuthStore((state) => state.user);
+   const t = useTranslations("Profile");
+   const tCommon = useTranslations("BecomeAHost");
 
    useEffect(() => {
       const timer = setTimeout(() => setMounted(true), 0);
@@ -47,14 +51,26 @@ export default function ProfilePage() {
          <section className="bg-[#003580] pt-8 pb-16 text-white">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-full bg-blue-600 flex items-center justify-center text-white text-2xl font-bold border-2 border-white shadow-lg overflow-hidden">
-                     {user?.fullName?.charAt(0) || user?.username?.charAt(0)}
+                  <div className="h-16 w-16 rounded-full bg-blue-600 flex items-center justify-center text-white text-2xl font-bold border-2 border-white shadow-lg overflow-hidden relative">
+                     {user?.avatarUrl ? (
+                        <Image
+                           src={user.avatarUrl}
+                           alt={user?.fullName || "Avatar"}
+                           fill
+                           className="object-cover"
+                           unoptimized
+                        />
+                     ) : (
+                        user?.fullName?.charAt(0) || user?.username?.charAt(0)
+                     )}
                   </div>
                   <div>
                      <h1 className="text-2xl font-bold">
-                        Xin chào: {user?.fullName || user?.username}
+                        {t("greeting", { name: user?.fullName || user?.username || "" })}
                      </h1>
-                     <p className="text-sm font-medium text-yellow-400 mt-1 italic">Genius Cấp 1</p>
+                     <p className="text-sm font-medium text-yellow-400 mt-1 italic">
+                        {t("level1")}
+                     </p>
                   </div>
                </div>
             </div>
@@ -70,19 +86,18 @@ export default function ProfilePage() {
                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
                         <div>
                            <h2 className="text-xl font-bold text-zinc-900">
-                              Bạn có 3 tặng thưởng Genius
+                              {t("geniusRewards.title", { count: 3 })}
                            </h2>
                            <p className="text-sm text-zinc-500 mt-1">
-                              Tận hưởng tặng thưởng và giảm giá cho một số chỗ nghỉ và xe thuê trên
-                              toàn cầu.
+                              {t("geniusRewards.subtitle")}
                            </p>
                         </div>
                         <div className="flex gap-2">
                            <span className="rounded-md bg-yellow-400 px-3 py-1 text-[10px] font-bold text-[#003580] uppercase">
-                              Cấp 1
+                              {t("level1")}
                            </span>
                            <span className="rounded-md bg-zinc-100 px-3 py-1 text-[10px] font-bold text-zinc-400 uppercase">
-                              Cấp 2
+                              {t("level2")}
                            </span>
                         </div>
                      </div>
@@ -90,26 +105,26 @@ export default function ProfilePage() {
                      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                         <RewardItem
                            icon={<Building className="h-6 w-6 text-blue-600" />}
-                           label="Giảm 10% khi lưu trú"
+                           label={t("geniusRewards.reward1")}
                         />
                         <RewardItem
                            icon={<Car className="h-6 w-6 text-blue-600" />}
-                           label="Giảm giá 10% cho xe thuê"
+                           label={t("geniusRewards.reward2")}
                         />
                         <RewardItem
                            icon={<Plane className="h-6 w-6 text-orange-500" />}
-                           label="Thông báo giá vé máy bay"
+                           label={t("geniusRewards.reward3")}
                         />
                         <RewardItem
                            icon={<Building className="h-6 w-6 text-zinc-400" />}
-                           label="Giảm 10-15% khi lưu trú"
+                           label={t("geniusRewards.rewardLocked")}
                            locked
                         />
                      </div>
 
                      <div className="mt-4 pt-4 border-t border-zinc-100">
                         <Link href="#" className="text-sm font-bold text-[#006ce4] hover:underline">
-                           Tìm hiểu thêm về tặng thưởng
+                           {t("geniusRewards.learnMore")}
                         </Link>
                      </div>
                   </div>
@@ -122,14 +137,11 @@ export default function ProfilePage() {
                         </div>
                         <div>
                            <h3 className="font-bold text-zinc-900 leading-tight">
-                              Thông báo giá vé máy bay
+                              {t("flightAlert.title")}
                            </h3>
-                           <p className="text-sm text-zinc-500 mt-1">
-                              Theo dõi giá cho đường bay và ngày mong muốn trên ứng dụng
-                              OmniBooking.com.
-                           </p>
+                           <p className="text-sm text-zinc-500 mt-1">{t("flightAlert.desc")}</p>
                            <button className="mt-3 rounded-md bg-[#006ce4] px-4 py-2 text-sm font-bold text-white hover:bg-[#0057b7] transition-all">
-                              Tải ứng dụng
+                              {t("flightAlert.download")}
                            </button>
                         </div>
                      </div>
@@ -144,22 +156,20 @@ export default function ProfilePage() {
                         <div className="h-10 w-10 rounded-full bg-blue-900 flex items-center justify-center text-white">
                            <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                         </div>
-                        <h3 className="font-bold text-sm">
-                           Bạn còn 5 đơn đặt nữa để lên Genius Cấp 2
-                        </h3>
+                        <h3 className="font-bold text-sm">{t("progress.needed", { count: 5 })}</h3>
                      </div>
                      <Link href="#" className="text-sm font-bold text-[#006ce4] hover:underline">
-                        Kiểm tra tiến độ của bạn
+                        {t("progress.check")}
                      </Link>
                   </div>
 
                   <div className="rounded-xl bg-white p-6 shadow-sm border border-zinc-200">
                      <p className="text-sm text-zinc-600">
-                        Chưa có Tín dụng hay voucher <span className="font-bold ml-2">0</span>
+                        {t("credits.empty")} <span className="font-bold ml-2">0</span>
                      </p>
                      <div className="mt-4 pt-4 border-t border-zinc-100">
                         <Link href="#" className="text-sm font-bold text-[#006ce4] hover:underline">
-                           Xem chi tiết
+                           {t("credits.viewDetails")}
                         </Link>
                      </div>
                   </div>
@@ -168,108 +178,108 @@ export default function ProfilePage() {
 
             {/* Settings Grid Sections */}
             <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-               <SectionCard title="Thông tin thanh toán">
+               <SectionCard title={t("sections.payment")}>
                   <SectionItem
                      icon={<Gift className="h-5 w-5" />}
-                     label="Tặng thưởng & Ví"
+                     label={t("items.wallet")}
                      href="/wallet"
                   />
                   <SectionItem
                      icon={<PaymentIcon className="h-5 w-5" />}
-                     label="Phương thức thanh toán"
+                     label={t("items.paymentMethods")}
                      href="/payments"
                   />
                   <SectionItem
                      icon={<History className="h-5 w-5" />}
-                     label="Giao dịch"
+                     label={t("items.transactions")}
                      href="/transactions"
                   />
                </SectionCard>
 
-               <SectionCard title="Quản lý tài khoản">
+               <SectionCard title={t("sections.account")}>
                   <SectionItem
                      icon={<User className="h-5 w-5" />}
-                     label="Thông tin cá nhân"
+                     label={t("items.personalInfo")}
                      href="/profile/details"
                   />
                   <SectionItem
                      icon={<Lock className="h-5 w-5" />}
-                     label="Cài đặt bảo mật"
-                     href="/security"
+                     label={t("items.security")}
+                     href="/profile/security"
                   />
                   <SectionItem
                      icon={<Users className="h-5 w-5" />}
-                     label="Người đi cùng"
+                     label={t("items.guests")}
                      href="/guests"
                   />
                </SectionCard>
 
-               <SectionCard title="Cài đặt">
+               <SectionCard title={t("sections.settings")}>
                   <SectionItem
                      icon={<Settings className="h-5 w-5" />}
-                     label="Cài đặt chung"
+                     label={t("items.general")}
                      href="/settings"
                   />
                   <SectionItem
                      icon={<Mail className="h-5 w-5" />}
-                     label="Cài đặt email"
+                     label={t("items.email")}
                      href="/settings/email"
                   />
                </SectionCard>
 
-               <SectionCard title="Hoạt động du lịch">
+               <SectionCard title={t("sections.travel")}>
                   <SectionItem
                      icon={<Briefcase className="h-5 w-5" />}
-                     label="Chuyến đi và đơn đặt"
+                     label={t("items.bookings")}
                      href="/bookings"
                   />
                   <SectionItem
                      icon={<Heart className="h-5 w-5" />}
-                     label="Danh sách đã lưu"
+                     label={t("items.wishlist")}
                      href="/wishlist"
                   />
                   <SectionItem
                      icon={<MessageSquare className="h-5 w-5" />}
-                     label="Đánh giá của tôi"
+                     label={t("items.reviews")}
                      href="/reviews"
                   />
                </SectionCard>
 
-               <SectionCard title="Trợ giúp">
+               <SectionCard title={t("sections.help")}>
                   <SectionItem
                      icon={<HelpCircle className="h-5 w-5" />}
-                     label="Liên hệ dịch vụ khách hàng"
+                     label={t("items.customerService")}
                      href="/help"
                   />
                   <SectionItem
                      icon={<ShieldCheck className="h-5 w-5" />}
-                     label="Trung tâm thông tin bảo mật"
+                     label={t("items.safetyCenter")}
                      href="/safety"
                   />
                   <SectionItem
                      icon={<ShieldAlert className="h-5 w-5" />}
-                     label="Giải quyết khiếu nại"
+                     label={t("items.disputes")}
                      href="/disputes"
                   />
                </SectionCard>
 
-               <SectionCard title="Pháp lý và quyền riêng tư">
+               <SectionCard title={t("sections.legal")}>
                   <SectionItem
                      icon={<ShieldCheck className="h-5 w-5" />}
-                     label="Quản lý quyền riêng tư"
+                     label={t("items.privacy")}
                      href="/privacy"
                   />
                   <SectionItem
                      icon={<History className="h-5 w-5" />}
-                     label="Hướng dẫn nội dung"
+                     label={t("items.guidelines")}
                      href="/guidelines"
                   />
                </SectionCard>
 
-               <SectionCard title="Dành cho chủ chỗ nghỉ">
+               <SectionCard title={t("sections.host")}>
                   <SectionItem
                      icon={<Home className="h-5 w-5" />}
-                     label="Đăng chỗ nghỉ"
+                     label={t("items.becomeHost")}
                      href="/become-a-host"
                   />
                </SectionCard>
@@ -279,21 +289,19 @@ export default function ProfilePage() {
             <div className="mt-20 pt-8 border-t border-zinc-200 text-center">
                <div className="flex flex-wrap justify-center gap-4 text-xs font-medium text-zinc-500 mb-4">
                   <Link href="#" className="hover:underline">
-                     Liên hệ Dịch vụ Khách hàng
+                     {t("footer.customerService")}
                   </Link>
                   <Link href="#" className="hover:underline">
-                     Chính sách Bảo mật
+                     {t("footer.privacyPolicy")}
                   </Link>
                   <Link href="#" className="hover:underline">
-                     Chính sách về Quyền con người
+                     {t("footer.humanRights")}
                   </Link>
                   <Link href="#" className="hover:underline">
-                     Điều khoản dịch vụ
+                     {t("footer.terms")}
                   </Link>
                </div>
-               <p className="text-[10px] text-zinc-400">
-                  Bản quyền © 1996–2026 OmniBooking.com™. Bảo lưu mọi quyền.
-               </p>
+               <p className="text-[10px] text-zinc-400">{tCommon("footer.copyright")}</p>
             </div>
          </main>
       </div>
