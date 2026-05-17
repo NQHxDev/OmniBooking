@@ -1,7 +1,5 @@
 package com.omnibooking.services.impl;
 
-import com.omnibooking.services.MailService;
-
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.dto.RegisterRequest;
@@ -13,11 +11,13 @@ import com.omnibooking.model.UserProfile;
 import com.omnibooking.repository.RoleRepository;
 import com.omnibooking.repository.UserProfileRepository;
 import com.omnibooking.repository.UserRepository;
-import com.omnibooking.services.BloomFilterService;
-import com.omnibooking.services.JWTService;
-import com.omnibooking.services.SessionService;
-import com.omnibooking.services.VerificationService;
-import com.omnibooking.services.OutboxService;
+import com.omnibooking.services.auth.JWTService;
+import com.omnibooking.services.auth.SessionService;
+import com.omnibooking.services.auth.impl.AuthServiceImpl;
+import com.omnibooking.services.communication.MailService;
+import com.omnibooking.services.core.BloomFilterService;
+import com.omnibooking.services.core.OutboxService;
+import com.omnibooking.services.user.VerificationService;
 import com.omnibooking.mapper.UserMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -164,11 +164,11 @@ class AuthServiceImplTest {
       @DisplayName("Should login successfully with valid credentials")
       void shouldLogin_Success() {
          // Arrange
-      LoginRequest request = LoginRequest.builder()
-            .email("test@example.com")
-            .password("password123")
-            .rememberMe(false)
-            .build();
+         LoginRequest request = LoginRequest.builder()
+               .email("test@example.com")
+               .password("password123")
+               .rememberMe(false)
+               .build();
          Role role = Role.builder().name("ROLE_USER").build();
          User user = User.builder()
                .id(UUID.randomUUID())

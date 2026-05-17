@@ -2,8 +2,8 @@ package com.omnibooking.controller;
 
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.security.UserPrincipal;
-import com.omnibooking.services.MailService;
-import com.omnibooking.services.OutboxService;
+import com.omnibooking.services.communication.MailService;
+import com.omnibooking.services.core.OutboxService;
 import com.omnibooking.repository.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.omnibooking.services.AuthService;
+import com.omnibooking.services.auth.AuthService;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.util.OtpUtils;
 import jakarta.servlet.http.HttpServletRequest;

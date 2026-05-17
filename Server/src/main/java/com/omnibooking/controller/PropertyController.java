@@ -3,7 +3,7 @@ package com.omnibooking.controller;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.PropertyRequest;
 import com.omnibooking.dto.PropertyResponse;
-import com.omnibooking.services.PropertyService;
+import com.omnibooking.services.property.PropertyService;
 import com.omnibooking.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

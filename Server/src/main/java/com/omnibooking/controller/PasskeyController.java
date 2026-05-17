@@ -4,8 +4,12 @@ import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.auth.passkey.PasskeyRegistrationOptionsResponse;
 import com.omnibooking.dto.auth.passkey.PasskeyRegistrationVerifyRequest;
 import com.omnibooking.security.UserPrincipal;
-import com.omnibooking.services.PasskeyService;
+import com.omnibooking.services.auth.PasskeyService;
+import com.omnibooking.dto.auth.passkey.PasskeyResponse;
+import com.omnibooking.exception.ErrorCode;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,11 +19,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.omnibooking.exception.ErrorCode;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
+
 import java.util.UUID;
 import java.util.List;
-import com.omnibooking.dto.auth.passkey.PasskeyResponse;
 
 @RestController
 @RequestMapping("/auth/passkey")
@@ -27,7 +30,7 @@ import com.omnibooking.dto.auth.passkey.PasskeyResponse;
 public class PasskeyController {
 
    private final PasskeyService passkeyService;
-   private final com.omnibooking.services.SecurityVerificationService securityVerificationService;
+   private final com.omnibooking.services.auth.SecurityVerificationService securityVerificationService;
 
    @PostMapping("/register/options")
    public ResponseEntity<ApiResponse<PasskeyRegistrationOptionsResponse>> getRegistrationOptions(

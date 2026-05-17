@@ -1,6 +1,6 @@
 package com.omnibooking.security;
 
-import com.omnibooking.services.JWTService;
+import com.omnibooking.services.auth.JWTService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

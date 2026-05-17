@@ -2,7 +2,7 @@ package com.omnibooking.controller;
 
 import com.omnibooking.document.PropertyDocument;
 import com.omnibooking.dto.ApiResponse;
-import com.omnibooking.services.PropertySearchService;
+import com.omnibooking.services.property.PropertySearchService;
 import lombok.RequiredArgsConstructor;
 
 import java.util.List;

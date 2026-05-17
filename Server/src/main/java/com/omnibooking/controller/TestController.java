@@ -3,7 +3,7 @@ package com.omnibooking.controller;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.model.UserProfile;
 import com.omnibooking.repository.UserProfileRepository;
-import com.omnibooking.services.EncryptionService;
+import com.omnibooking.services.core.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

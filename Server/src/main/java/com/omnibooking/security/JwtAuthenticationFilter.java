@@ -1,6 +1,6 @@
 package com.omnibooking.security;
 
-import com.omnibooking.services.JWTService;
+import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.util.CookieUtils;
 import com.omnibooking.util.SecurityUtils;
 import jakarta.servlet.FilterChain;

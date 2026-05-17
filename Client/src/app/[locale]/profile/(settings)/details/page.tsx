@@ -27,6 +27,13 @@ import { authService } from "@/lib/api/services/authService";
 import { profileService, UserProfile as UserProfileType } from "@/lib/api/services/profileService";
 import { toast } from "sonner";
 
+const maskPhoneNumber = (phone: string | null | undefined) => {
+   if (!phone) return "";
+   const lastThree = phone.slice(-3);
+   const maskedLength = Math.max(0, phone.length - 3);
+   return "*".repeat(maskedLength) + lastThree;
+};
+
 export default function PersonalDetailsPage() {
    const [isResending, setIsResending] = useState(false);
    const [profileData, setProfileData] = useState<UserProfileType | null>(null);
@@ -221,7 +228,9 @@ export default function PersonalDetailsPage() {
                            profileData?.phoneNumber ? "text-zinc-900" : "text-zinc-400 italic"
                         }
                      >
-                        {profileData?.phoneNumber || tDetails("notProvided")}
+                        {profileData?.phoneNumber
+                           ? maskPhoneNumber(profileData.phoneNumber)
+                           : tDetails("notProvided")}
                      </span>
                      <p className="text-[12px] text-zinc-500 mt-0.5">{tDetails("phoneDesc")}</p>
                   </div>

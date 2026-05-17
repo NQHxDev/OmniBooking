@@ -4,7 +4,7 @@ import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.profile.UpdateProfileRequest;
 import com.omnibooking.dto.profile.UserProfileResponse;
 import com.omnibooking.security.UserPrincipal;
-import com.omnibooking.services.UserProfileService;
+import com.omnibooking.services.user.UserProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

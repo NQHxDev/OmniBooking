@@ -2,8 +2,8 @@ package com.omnibooking.controller;
 
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.response.DestinationSuggestionResponse;
-import com.omnibooking.services.DestinationService;
-import com.omnibooking.services.GeoLocationService;
+import com.omnibooking.services.property.DestinationService;
+import com.omnibooking.services.core.GeoLocationService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
