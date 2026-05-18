@@ -53,6 +53,7 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 - **Idempotency Framework (X-Idempotency-Key)**: Custom `@Idempotent` annotation and AOP-based interceptor using Redis to prevent duplicate request processing (Double-submit) for critical operations.
 - **Resilience Layer (Fault Tolerance)**: Integration of **Resilience4j** implementing Circuit Breaker and Retry patterns for third-party service calls (Cloudinary, Resend) to prevent cascading failures.
 - **Stateless Architecture**: Secured for future JWT integration with stateless session management.
+- **No Open-In-View (OSIV Disabled)**: Explicitly disabled OSIV (`spring.jpa.open-in-view=false`) to optimize database connection pool utilization and enforce clean boundaries. Mapping to DTOs is fully materialized inside transaction boundaries (`@Transactional` Service layer) using MapStruct to eliminate the risk of late `LazyInitializationException` and avoid N+1 query patterns during serialization.
 
 ### Observability & Traceability
 
@@ -297,4 +298,4 @@ To ensure financial safety and foster a highly interactive user experience, the 
 
 ---
 
-_Last Updated: 2026-05-13_
+_Last Updated: 2026-05-18_

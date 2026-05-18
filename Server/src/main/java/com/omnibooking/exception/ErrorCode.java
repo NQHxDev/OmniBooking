@@ -15,11 +15,12 @@ public enum ErrorCode {
    INVALID_TOKEN("AUTH_007", "Invalid or expired verification token", HttpStatus.BAD_REQUEST),
    USER_NOT_FOUND("AUTH_008", "User not found", HttpStatus.NOT_FOUND),
    SECURITY_VERIFICATION_REQUIRED("AUTH_009", "Security verification required", HttpStatus.FORBIDDEN),
-   INVALID_RESET_TOKEN("AUTH_010", "Invalid or expired reset token", HttpStatus.BAD_REQUEST),
+   TWO_FACTOR_REQUIRED("AUTH_010", "Two-factor authentication required", HttpStatus.UNAUTHORIZED),
    RATE_LIMIT_EXCEEDED("AUTH_011", "Rate limit exceeded, please try again later", HttpStatus.TOO_MANY_REQUESTS),
    OAUTH2_AUTHENTICATION_FAILED("AUTH_012", "OAuth2 authentication failed", HttpStatus.BAD_REQUEST),
    INVALID_OTP("AUTH_013", "Invalid or expired OTP", HttpStatus.BAD_REQUEST),
    PASSKEY_NOT_FOUND("AUTH_014", "Passkey not found", HttpStatus.NOT_FOUND),
+   INVALID_RESET_TOKEN("AUTH_016", "Invalid or expired reset token", HttpStatus.BAD_REQUEST),
 
    // General Errors
    UNCATEGORIZED_EXCEPTION("GEN_999", "Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR),

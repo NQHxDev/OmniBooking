@@ -69,4 +69,16 @@ public class MailService {
             .content(htmlContent)
             .build();
    }
+
+   public EmailEvent buildTwoFactorEnabledEmailEvent(String toEmail, String userName) {
+      Map<String, Object> variables = new HashMap<>();
+      variables.put("userName", userName);
+      String htmlContent = mailTemplateService.buildHtmlContent("two-factor-enabled", variables);
+
+      return EmailEvent.builder()
+            .to(toEmail)
+            .subject("Tính năng xác thực 2 yếu tố đã được kích hoạt")
+            .content(htmlContent)
+            .build();
+   }
 }

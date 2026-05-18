@@ -3,10 +3,6 @@
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 
-export const GOOGLE_MAPS_LIBRARIES: ("places" | "drawing" | "geometry" | "visualization")[] = [
-   "places",
-];
-
 export const MapView = dynamic(() => import("./MapView"), {
    ssr: false,
    loading: () => (

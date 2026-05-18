@@ -1,15 +1,28 @@
 "use client";
 
-import { GoogleMap, useJsApiLoader, MarkerF, InfoWindow } from "@react-google-maps/api";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { PropertyDocument } from "@/lib/api/services/propertyService";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
-import { Loader2 } from "lucide-react";
 import { env } from "@/env";
 
-const containerStyle = {
-   width: "100%",
-   height: "100%",
+// Custom price tag icon generator for Leaflet
+const createPriceIcon = (price: number, isSelected: boolean) => {
+   const text =
+      price >= 1000000 ? (price / 1000000).toFixed(1) + "tr" : (price / 1000).toFixed(0) + "k";
+
+   return L.divIcon({
+      html: `<div class="transition-all duration-200 cursor-pointer shadow-lg font-bold border-2 border-white rounded-full text-[10px] px-2.5 py-1.5 flex items-center justify-center whitespace-nowrap ${
+         isSelected
+            ? "bg-[#003580] text-white scale-110"
+            : "bg-[#006ce4] text-white hover:bg-[#003580] hover:scale-105"
+      }">${text}</div>`,
+      className: "custom-price-tag",
+      iconSize: [46, 28],
+      iconAnchor: [23, 14],
+   });
 };
 
 interface MapViewProps {
@@ -20,86 +33,103 @@ interface MapViewProps {
    showAttribution?: boolean;
 }
 
+// Map center tracking helper component
+function ChangeMapView({ center, zoom }: { center: [number, number]; zoom: number }) {
+   const map = useMap();
+   useEffect(() => {
+      map.setView(center, zoom);
+   }, [center, zoom, map]);
+   return null;
+}
+
 export default function MapView({
    properties,
    center = [10.762622, 106.660172],
-   zoom = 13,
+   zoom = 17,
+   showControls = true,
 }: MapViewProps) {
-   const { isLoaded } = useJsApiLoader({
-      id: "google-map-script",
-      googleMapsApiKey: env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
-   });
-
    const [selectedProperty, setSelectedProperty] = useState<PropertyDocument | null>(null);
 
-   const mapCenter =
-      properties.length > 0 && properties[0].location
-         ? { lat: properties[0].location.lat, lng: properties[0].location.lon }
-         : { lat: center[0], lng: center[1] };
+   const mapCenter = useMemo<[number, number]>(() => {
+      if (properties.length > 0 && properties[0].location) {
+         return [properties[0].location.lat, properties[0].location.lon];
+      }
+      return center;
+   }, [properties, center]);
 
-   if (!isLoaded) {
-      return (
-         <div className="w-full h-full min-h-[400px] bg-gray-50 flex items-center justify-center rounded-xl">
-            <Loader2 className="h-8 w-8 text-[#006ce4] animate-spin" />
-         </div>
-      );
-   }
+   const tileUrl = useMemo(() => {
+      const key = env.NEXT_PUBLIC_VIETMAP_API_KEY;
+      const isGoogleKey = key?.startsWith("AIzaSy");
+      const isPlaceholder = !key || key.includes("your_") || key.includes("api_key");
+      if (isGoogleKey || isPlaceholder) {
+         return "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
+      }
+      return `https://maps.vietmap.vn/maps/tiles/{z}/{x}/{y}.png?apikey=${key}`;
+   }, []);
+
+   const attribution = useMemo(() => {
+      const key = env.NEXT_PUBLIC_VIETMAP_API_KEY;
+      const isGoogleKey = key?.startsWith("AIzaSy");
+      const isPlaceholder = !key || key.includes("your_") || key.includes("api_key");
+      if (isGoogleKey || isPlaceholder) {
+         return '&copy; <a href="https://maps.google.com">Google Maps</a>';
+      }
+      return '&copy; <a href="https://vietmap.vn" target="_blank" rel="noopener noreferrer">VietMap</a>';
+   }, []);
 
    return (
-      <GoogleMap
-         mapContainerStyle={containerStyle}
-         center={mapCenter}
-         zoom={zoom}
-         options={{
-            disableDefaultUI: false,
-            zoomControl: true,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: true,
-         }}
-      >
-         {properties.map((property) => {
-            if (!property.location) return null;
+      <div className="w-full h-full min-h-[400px] rounded-xl overflow-hidden shadow-md border border-gray-100">
+         <MapContainer
+            center={mapCenter}
+            zoom={zoom}
+            className="w-full h-full"
+            style={{ width: "100%", height: "100%", zIndex: 1 }}
+            zoomControl={showControls}
+            attributionControl={false}
+         >
+            <ChangeMapView center={mapCenter} zoom={zoom} />
+            <TileLayer url={tileUrl} attribution={attribution} />
 
-            return (
-               <MarkerF
-                  key={property.id}
-                  position={{ lat: property.location.lat, lng: property.location.lon }}
-                  onClick={() => setSelectedProperty(property)}
-                  // You can add a custom label or icon here to show price
-                  label={{
-                     text:
-                        property.minPrice >= 1000000
-                           ? (property.minPrice / 1000000).toFixed(1) + "tr"
-                           : (property.minPrice / 1000).toFixed(0) + "k",
-                     className:
-                        "bg-[#006ce4] text-white px-2 py-1 rounded-full text-[10px] font-bold border-2 border-white",
-                  }}
-               />
-            );
-         })}
+            {properties.map((property) => {
+               if (!property.location) return null;
+               const isSelected = selectedProperty?.id === property.id;
 
-         {selectedProperty && selectedProperty.location && (
-            <InfoWindow
-               position={{ lat: selectedProperty.location.lat, lng: selectedProperty.location.lon }}
-               onCloseClick={() => setSelectedProperty(null)}
-            >
-               <div className="p-1 max-w-[200px]">
-                  <div className="relative w-full h-24 mb-2">
-                     <Image
-                        src={selectedProperty.mainImageUrl}
-                        alt={selectedProperty.name}
-                        fill
-                        className="object-cover rounded-md"
-                     />
-                  </div>
-                  <h4 className="font-bold text-sm leading-tight mb-1">{selectedProperty.name}</h4>
-                  <p className="text-[#006ce4] font-bold text-sm">
-                     {selectedProperty.minPrice.toLocaleString("vi-VN")}đ
-                  </p>
-               </div>
-            </InfoWindow>
-         )}
-      </GoogleMap>
+               return (
+                  <Marker
+                     key={property.id}
+                     position={[property.location.lat, property.location.lon]}
+                     icon={createPriceIcon(property.minPrice, isSelected)}
+                     eventHandlers={{
+                        popupopen: () => setSelectedProperty(property),
+                        popupclose: () => {
+                           if (selectedProperty?.id === property.id) {
+                              setSelectedProperty(null);
+                           }
+                        },
+                     }}
+                  >
+                     <Popup className="custom-leaflet-popup">
+                        <div className="p-1 w-[200px]">
+                           <div className="relative w-full h-24 mb-2">
+                              <Image
+                                 src={property.mainImageUrl}
+                                 alt={property.name}
+                                 fill
+                                 className="object-cover rounded-md"
+                              />
+                           </div>
+                           <h4 className="font-bold text-sm leading-tight mb-1 text-gray-900">
+                              {property.name}
+                           </h4>
+                           <p className="text-[#006ce4] font-bold text-sm">
+                              {property.minPrice.toLocaleString("vi-VN")}đ
+                           </p>
+                        </div>
+                     </Popup>
+                  </Marker>
+               );
+            })}
+         </MapContainer>
+      </div>
    );
 }

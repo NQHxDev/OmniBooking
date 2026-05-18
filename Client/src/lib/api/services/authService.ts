@@ -38,6 +38,23 @@ export const authService = {
    },
 
    /**
+    * Authenticates a user with 2FA OTP code.
+    */
+   loginWith2FA: async (payload: {
+      email: string;
+      password: string;
+      code: string;
+      rememberMe?: boolean;
+   }): Promise<User> => {
+      const response = (await apiClient.post("/auth/2fa/login", payload, {
+         withCredentials: true,
+         // @ts-expect-error - Custom axios config flag for interceptor
+         _skipToast: true,
+      })) as unknown as ApiResponse<User>;
+      return response.data;
+   },
+
+   /**
     * Registers a new user.
     */
    register: async (payload: RegisterRequest): Promise<ApiResponse<User>> => {

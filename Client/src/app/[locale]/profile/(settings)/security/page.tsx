@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Fingerprint, Smartphone, LogOut, Trash2, Loader2, Lock } from "lucide-react";
+import { Fingerprint, Smartphone, LogOut, Trash2, Loader2, Lock, Check } from "lucide-react";
 import { passkeyService, Passkey } from "@/services/passkeyService";
 import { motion, AnimatePresence } from "framer-motion";
 import { startRegistration } from "@simplewebauthn/browser";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useLocale } from "next-intl";
 import { securityService } from "@/lib/api/services/securityService";
 import SecurityOTPModal from "@/components/SecurityOTPModal";
+import TwoFactorSetupModal from "@/components/TwoFactorSetupModal";
 
 export default function SecurityPage() {
    const [isRegistering, setIsRegistering] = useState(false);
@@ -17,6 +18,21 @@ export default function SecurityPage() {
    const [isLoadingStatus, setIsLoadingStatus] = useState(true);
    const [passkeys, setPasskeys] = useState<Passkey[]>([]);
    const [showPasskeyManager, setShowPasskeyManager] = useState(false);
+
+   // Trạng thái 2FA
+   const [twoFactorStatus, setTwoFactorStatus] = useState<"UNSET" | "DISABLED" | "ENABLED">(
+      "UNSET"
+   );
+   const [isLoading2FA, setIsLoading2FA] = useState(true);
+   const [is2FASetupOpen, setIs2FASetupOpen] = useState(false);
+   const [isDisable2FAOpen, setIsDisable2FAOpen] = useState(false);
+   const [disableCode, setDisableCode] = useState("");
+   const [isDisabling, setIsDisabling] = useState(false);
+   const [twoFactorAction, setTwoFactorAction] = useState<"DISABLE" | "REMOVE" | "REACTIVATE">(
+      "DISABLE"
+   );
+
+   const is2FAEnabled = twoFactorStatus === "ENABLED";
 
    // Trạng thái cho Security Step-up
    const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
@@ -50,8 +66,23 @@ export default function SecurityPage() {
       }
    };
 
+   const fetch2FAStatus = async () => {
+      try {
+         setIsLoading2FA(true);
+         const status = await securityService.get2FAStatus();
+         setTwoFactorStatus(status);
+      } catch (err) {
+         console.error("Failed to fetch 2FA status:", err);
+      } finally {
+         setIsLoading2FA(false);
+      }
+   };
+
    useEffect(() => {
-      const timer = setTimeout(() => fetchPasskeyData(), 0);
+      const timer = setTimeout(() => {
+         fetchPasskeyData();
+         fetch2FAStatus();
+      }, 0);
       return () => clearTimeout(timer);
    }, []);
 
@@ -76,7 +107,6 @@ export default function SecurityPage() {
 
    const handleSecurityStepUp = async (action: "register" | "delete", data?: string) => {
       try {
-         // Yêu cầu gửi OTP trước khi hiện Modal
          await securityService.requestOTP();
          setPendingAction({ type: action, data });
          setIsOtpModalOpen(true);
@@ -120,7 +150,6 @@ export default function SecurityPage() {
          fetchPasskeyData();
       } catch (err: unknown) {
          const apiError = err as { errorCode?: string; name?: string };
-         // Nếu lỗi do yêu cầu xác thực bảo mật (AUTH_009)
          if (apiError.errorCode === "AUTH_009") {
             handleSecurityStepUp("register");
             return;
@@ -141,7 +170,6 @@ export default function SecurityPage() {
       try {
          await passkeyService.deletePasskey(id);
 
-         // Cập nhật State ngay lập tức để UX mượt mà
          const updatedPasskeys = passkeys.filter((pk) => pk.id !== id);
          setPasskeys(updatedPasskeys);
 
@@ -151,7 +179,6 @@ export default function SecurityPage() {
          }
 
          toast.success(t("manager.deleteSuccess"));
-         // Fetch lại để đồng bộ hoàn toàn với Server
          fetchPasskeyData();
       } catch (err: unknown) {
          const apiError = err as { errorCode?: string };
@@ -169,7 +196,6 @@ export default function SecurityPage() {
 
    const handleOtpSuccess = () => {
       setIsOtpModalOpen(false);
-      // Thực hiện lại hành động đang chờ
       if (pendingAction?.type === "register") {
          handleRegisterPasskey();
       } else if (pendingAction?.type === "delete" && pendingAction.data) {
@@ -186,6 +212,7 @@ export default function SecurityPage() {
          </div>
 
          <div className="space-y-4">
+            {/* Passkey Card */}
             <SecurityCard
                icon={<Fingerprint className="h-6 w-6 text-blue-600" />}
                title={t("passkey.title")}
@@ -275,17 +302,86 @@ export default function SecurityPage() {
                </AnimatePresence>
             </SecurityCard>
 
+            {/* Two-Factor Authentication Card */}
             <SecurityCard
-               icon={<Smartphone className="h-6 w-6 text-zinc-400" />}
-               title={t("twoFactor.title")}
+               icon={
+                  <Smartphone
+                     className={`h-6 w-6 ${is2FAEnabled ? "text-green-600" : "text-zinc-400"}`}
+                  />
+               }
+               title={
+                  <div className="flex items-center gap-2">
+                     <span>{t("twoFactor.title")}</span>
+                     {twoFactorStatus === "ENABLED" && (
+                        <Check className="h-4.5 w-4.5 text-green-600 stroke-[3px] shrink-0" />
+                     )}
+                     {twoFactorStatus === "DISABLED" && (
+                        <span className="text-[10px] font-bold text-orange-650 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-150 shrink-0 animate-in fade-in duration-300">
+                           {t("twoFactor.temporarilyDisabled")}
+                        </span>
+                     )}
+                  </div>
+               }
                description={t("twoFactor.desc")}
                action={
-                  <button className="text-sm font-bold text-[#006ce4] hover:bg-blue-50 px-4 py-2 rounded-md transition-all cursor-pointer">
-                     {t("twoFactor.setup")}
-                  </button>
+                  isLoading2FA ? (
+                     <Loader2 className="h-5 w-5 animate-spin text-zinc-300" />
+                  ) : twoFactorStatus === "ENABLED" ? (
+                     <div className="flex items-center gap-2.5">
+                        <button
+                           onClick={() => {
+                              setTwoFactorAction("DISABLE");
+                              setIsDisable2FAOpen(true);
+                           }}
+                           className="text-sm font-bold text-zinc-655 hover:bg-zinc-50 px-4 py-2 rounded-md transition-all cursor-pointer border border-zinc-200"
+                        >
+                           {t("twoFactor.disable")}
+                        </button>
+                        <button
+                           onClick={() => {
+                              setTwoFactorAction("REMOVE");
+                              setIsDisable2FAOpen(true);
+                           }}
+                           className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-all cursor-pointer border border-red-100"
+                           title={t("twoFactor.remove")}
+                        >
+                           <Trash2 className="h-4.5 w-4.5" />
+                        </button>
+                     </div>
+                  ) : twoFactorStatus === "DISABLED" ? (
+                     <div className="flex items-center gap-2.5">
+                        <button
+                           onClick={() => {
+                              setTwoFactorAction("REACTIVATE");
+                              setIsDisable2FAOpen(true);
+                           }}
+                           className="text-sm font-bold text-[#006ce4] hover:bg-blue-50 px-4 py-2 rounded-md transition-all cursor-pointer"
+                        >
+                           {t("twoFactor.reactivate")}
+                        </button>
+                        <button
+                           onClick={() => {
+                              setTwoFactorAction("REMOVE");
+                              setIsDisable2FAOpen(true);
+                           }}
+                           className="p-2 text-red-650 hover:bg-red-50 rounded-md transition-all cursor-pointer border border-red-100"
+                           title={t("twoFactor.remove")}
+                        >
+                           <Trash2 className="h-4.5 w-4.5" />
+                        </button>
+                     </div>
+                  ) : (
+                     <button
+                        onClick={() => setIs2FASetupOpen(true)}
+                        className="text-sm font-bold text-[#006ce4] hover:bg-blue-50 px-4 py-2 rounded-md transition-all cursor-pointer"
+                     >
+                        {t("twoFactor.setup")}
+                     </button>
+                  )
                }
             />
 
+            {/* Password Card */}
             <SecurityCard
                icon={<Lock className="h-6 w-6 text-zinc-400" />}
                title={t("password.title")}
@@ -297,6 +393,7 @@ export default function SecurityPage() {
                }
             />
 
+            {/* Active Sessions Card */}
             <SecurityCard
                icon={<LogOut className="h-6 w-6 text-orange-500" />}
                title={t("sessions.title")}
@@ -308,6 +405,7 @@ export default function SecurityPage() {
                }
             />
 
+            {/* Delete Account Card */}
             <SecurityCard
                icon={<Trash2 className="h-6 w-6 text-red-500" />}
                title={t("deleteAccount.title")}
@@ -320,6 +418,7 @@ export default function SecurityPage() {
             />
          </div>
 
+         {/* Security OTP Verification modal */}
          <SecurityOTPModal
             isOpen={isOtpModalOpen}
             onClose={() => {
@@ -328,6 +427,126 @@ export default function SecurityPage() {
             }}
             onSuccess={handleOtpSuccess}
          />
+
+         {/* 2FA Setup multi-step modal */}
+         <TwoFactorSetupModal
+            isOpen={is2FASetupOpen}
+            onClose={() => setIs2FASetupOpen(false)}
+            onSuccess={() => {
+               setIs2FASetupOpen(false);
+               fetch2FAStatus();
+            }}
+         />
+
+         {/* Disable 2FA Confirmation modal */}
+         <AnimatePresence>
+            {/* Modal Thao tác 2FA (Disable, Remove, Reactivate) */}
+            {isDisable2FAOpen && (
+               <div className="fixed inset-0 z-100 flex items-center justify-center p-4">
+                  <motion.div
+                     initial={{ opacity: 0 }}
+                     animate={{ opacity: 1 }}
+                     exit={{ opacity: 0 }}
+                     onClick={() => {
+                        setIsDisable2FAOpen(false);
+                        setDisableCode("");
+                     }}
+                     className="absolute inset-0 bg-zinc-900/60 backdrop-blur-sm"
+                  />
+                  <motion.div
+                     initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                     animate={{ opacity: 1, scale: 1, y: 0 }}
+                     exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                     className="relative w-full max-w-[400px] overflow-hidden rounded-2xl bg-white shadow-2xl p-6 sm:p-8"
+                  >
+                     <div
+                        className={`h-1.5 w-full absolute top-0 left-0 ${twoFactorAction === "REACTIVATE" ? "bg-[#003580]" : "bg-red-600"}`}
+                     />
+                     <h3 className="text-lg font-bold text-zinc-900 mt-2">
+                        {twoFactorAction === "DISABLE" && t("twoFactor.disableModalTitle")}
+                        {twoFactorAction === "REMOVE" && t("twoFactor.removeModalTitle")}
+                        {twoFactorAction === "REACTIVATE" && t("twoFactor.reactivateModalTitle")}
+                     </h3>
+                     <p className="text-xs text-zinc-500 mt-2 leading-relaxed">
+                        {twoFactorAction === "DISABLE" && t("twoFactor.disableModalDesc")}
+                        {twoFactorAction === "REMOVE" && t("twoFactor.removeModalDesc")}
+                        {twoFactorAction === "REACTIVATE" && t("twoFactor.reactivateModalDesc")}
+                     </p>
+                     <input
+                        type="text"
+                        maxLength={twoFactorAction === "REMOVE" ? 8 : 6}
+                        value={disableCode}
+                        onChange={(e) => setDisableCode(e.target.value.replace(/[^0-9]/g, ""))}
+                        placeholder={
+                           twoFactorAction === "REMOVE"
+                              ? t("twoFactor.removeModalPlaceholder")
+                              : t("twoFactor.disableModalPlaceholder")
+                        }
+                        className={`w-full h-11 border border-zinc-200 rounded-lg px-3 mt-4 text-center font-bold tracking-widest text-lg outline-none transition-colors ${twoFactorAction === "REACTIVATE" ? "focus:border-[#003580]" : "focus:border-red-600"} focus:ring-0`}
+                     />
+                     <div className="flex gap-3 mt-6">
+                        <button
+                           onClick={() => {
+                              setIsDisable2FAOpen(false);
+                              setDisableCode("");
+                           }}
+                           className="flex-1 py-2.5 text-xs font-bold text-zinc-500 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors"
+                        >
+                           {tDetails("cancel")}
+                        </button>
+                        <button
+                           onClick={async () => {
+                              try {
+                                 setIsDisabling(true);
+                                 if (twoFactorAction === "DISABLE") {
+                                    await securityService.disable2FA(disableCode);
+                                    toast.success(
+                                       t("twoFactor.disableSuccess") ||
+                                          "Đã vô hiệu hóa 2FA thành công!"
+                                    );
+                                 } else if (twoFactorAction === "REMOVE") {
+                                    await securityService.remove2FA(disableCode);
+                                    toast.success(
+                                       t("twoFactor.removeSuccess") || "Đã gỡ bỏ hoàn toàn 2FA!"
+                                    );
+                                 } else if (twoFactorAction === "REACTIVATE") {
+                                    await securityService.enable2FA(disableCode);
+                                    toast.success(
+                                       t("twoFactor.reactivateSuccess") ||
+                                          "Đã kích hoạt lại 2FA thành công!"
+                                    );
+                                 }
+                                 setIsDisable2FAOpen(false);
+                                 setDisableCode("");
+                                 fetch2FAStatus();
+                              } catch (err: unknown) {
+                                 const apiError = err as { errorCode?: string };
+                                 const msg = apiError.errorCode
+                                    ? tErrors(apiError.errorCode)
+                                    : t("twoFactor.modal.invalidCode");
+                                 toast.error(msg);
+                              } finally {
+                                 setIsDisabling(false);
+                              }
+                           }}
+                           disabled={
+                              isDisabling ||
+                              (twoFactorAction === "REMOVE"
+                                 ? disableCode.length !== 6 && disableCode.length !== 8
+                                 : disableCode.length !== 6)
+                           }
+                           className={`flex-1 py-2.5 text-xs font-bold text-white rounded-lg disabled:opacity-40 transition-colors flex items-center justify-center gap-1.5 ${twoFactorAction === "REACTIVATE" ? "bg-[#003580] hover:bg-[#002b66]" : "bg-red-600 hover:bg-red-700"}`}
+                        >
+                           {isDisabling && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                           {twoFactorAction === "DISABLE" && t("twoFactor.disableModalButton")}
+                           {twoFactorAction === "REMOVE" && t("twoFactor.removeModalButton")}
+                           {twoFactorAction === "REACTIVATE" && t("twoFactor.reactivate")}
+                        </button>
+                     </div>
+                  </motion.div>
+               </div>
+            )}
+         </AnimatePresence>
       </div>
    );
 }
@@ -340,7 +559,7 @@ function SecurityCard({
    children,
 }: {
    icon: React.ReactNode;
-   title: string;
+   title: React.ReactNode;
    description: string;
    action: React.ReactNode;
    children?: React.ReactNode;

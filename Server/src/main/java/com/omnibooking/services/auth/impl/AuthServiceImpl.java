@@ -74,6 +74,8 @@ public class AuthServiceImpl implements AuthService {
 
    private final SocialAccountRepository socialAccountRepository;
 
+   private final com.omnibooking.services.auth.TwoFactorAuthService twoFactorAuthService;
+
    private static final long SESSION_SLIDING_NORMAL_MS = 1 * 24 * 60 * 60 * 1000L;
    private static final long SESSION_SLIDING_REMEMBER_ME_MS = 7 * 24 * 60 * 60 * 1000L;
    private static final long SESSION_HARD_CAP_NORMAL_MS = 3 * 24 * 60 * 60 * 1000L;
@@ -152,6 +154,10 @@ public class AuthServiceImpl implements AuthService {
       Set<String> roles = user.getRoles().stream()
             .map(com.omnibooking.model.Role::getName)
             .collect(java.util.stream.Collectors.toSet());
+
+      if (twoFactorAuthService.is2FAEnabledForUser(user.getId())) {
+         throw new AppException(ErrorCode.TWO_FACTOR_REQUIRED);
+      }
 
       UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
       long now = System.currentTimeMillis();
@@ -576,5 +582,32 @@ public class AuthServiceImpl implements AuthService {
          log.error("Failed to finalize registration for token", e);
          throw new AppException(ErrorCode.INVALID_TOKEN);
       }
+   }
+
+   @Override
+   @Transactional
+   public AuthResponse loginWith2FA(com.omnibooking.dto.TwoFactorLoginRequest request, String ip, String userAgent, HttpServletResponse response) {
+      if (!bloomFilterService.mightContain(request.getEmail())) {
+         throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+      }
+
+      User user = userRepository.findByEmail(request.getEmail())
+            .orElseThrow(() -> new AppException(ErrorCode.INVALID_CREDENTIALS));
+
+      if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+         throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+      }
+
+      if (!twoFactorAuthService.verifyCode(user.getId(), request.getCode())) {
+         throw new AppException(ErrorCode.INVALID_OTP);
+      }
+
+      Set<String> roles = user.getRoles().stream()
+            .map(com.omnibooking.model.Role::getName)
+            .collect(java.util.stream.Collectors.toSet());
+
+      UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
+      long now = System.currentTimeMillis();
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now, now);
    }
 }

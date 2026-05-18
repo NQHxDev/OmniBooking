@@ -93,6 +93,7 @@ public class AppProperties {
       private String encryptionSecret;
       @NotBlank
       private String hashPepper;
+      private boolean twoFactorEnabled = true;
    }
 
    @Data

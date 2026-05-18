@@ -80,6 +80,8 @@ class AuthServiceImplTest {
    private MailService mailService;
    @Mock
    private OutboxService outboxService;
+   @Mock
+   private com.omnibooking.services.auth.TwoFactorAuthService twoFactorAuthService;
 
    @InjectMocks
    private AuthServiceImpl authService;
@@ -180,6 +182,7 @@ class AuthServiceImplTest {
          when(bloomFilterService.mightContain(request.getEmail())).thenReturn(true);
          when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
          when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
+         when(twoFactorAuthService.is2FAEnabledForUser(user.getId())).thenReturn(false);
          when(jwtService.generateAccessToken(any(), any(), any(), any())).thenReturn("access_token");
          when(userMapper.toAuthResponse(any(), any(), any())).thenReturn(AuthResponse.builder()
                .email(request.getEmail())
@@ -230,6 +233,34 @@ class AuthServiceImplTest {
          assertThatThrownBy(() -> authService.login(request, "ip", "ua", response))
                .isInstanceOf(AppException.class)
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.INVALID_CREDENTIALS);
+      }
+
+      @Test
+      @DisplayName("Should throw TWO_FACTOR_REQUIRED when user has 2FA enabled")
+      void shouldThrowTwoFactorRequired_When2FAEnabled() {
+         // Arrange
+         LoginRequest request = LoginRequest.builder()
+               .email("test@example.com")
+               .password("password123")
+               .rememberMe(false)
+               .build();
+         Role role = Role.builder().name("ROLE_USER").build();
+         User user = User.builder()
+               .id(UUID.randomUUID())
+               .email(request.getEmail())
+               .password("hashed_password")
+               .roles(Set.of(role))
+               .build();
+
+         when(bloomFilterService.mightContain(request.getEmail())).thenReturn(true);
+         when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
+         when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
+         when(twoFactorAuthService.is2FAEnabledForUser(user.getId())).thenReturn(true);
+
+         // Act & Assert
+         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response))
+               .isInstanceOf(AppException.class)
+               .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.TWO_FACTOR_REQUIRED);
       }
    }
 

@@ -15,6 +15,8 @@ public interface AuthService {
 
    AuthResponse login(LoginRequest request, String ip, String userAgent, HttpServletResponse response);
 
+   AuthResponse loginWith2FA(com.omnibooking.dto.TwoFactorLoginRequest request, String ip, String userAgent, HttpServletResponse response);
+
    AuthResponse loginWithOAuth2(String provider, com.omnibooking.dto.oauth.OAuth2UserInfo userInfo, String ip,
          String userAgent, HttpServletResponse response, boolean rememberMe);
 

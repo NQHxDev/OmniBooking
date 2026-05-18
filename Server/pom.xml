@@ -217,6 +217,13 @@
 			<artifactId>geoip2</artifactId>
 			<version>4.2.1</version>
 		</dependency>
+
+		<!-- TOTP 2FA Support -->
+		<dependency>
+			<groupId>dev.samstevens.totp</groupId>
+			<artifactId>totp</artifactId>
+			<version>1.7.1</version>
+		</dependency>
 	</dependencies>
 
 	<build>
