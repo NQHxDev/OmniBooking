@@ -115,6 +115,7 @@ export default function MapView({
                                  src={property.mainImageUrl}
                                  alt={property.name}
                                  fill
+                                 sizes="200px"
                                  className="object-cover rounded-md"
                               />
                            </div>

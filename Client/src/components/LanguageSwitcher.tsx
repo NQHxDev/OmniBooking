@@ -52,7 +52,13 @@ export default function LanguageSwitcher() {
             className="flex items-center gap-2 rounded-full p-1.5 hover:bg-white/10 transition-all active:scale-95"
          >
             <div className="relative h-5 w-7 overflow-hidden rounded-sm shadow-sm">
-               <Image src={currentLang.flag} alt={currentLang.name} fill className="object-cover" />
+               <Image
+                  src={currentLang.flag}
+                  alt={currentLang.name}
+                  fill
+                  sizes="28px"
+                  className="object-cover"
+               />
             </div>
             <ChevronDown
                className={`h-3 w-3 text-white/70 transition-transform ${isOpen ? "rotate-180" : ""}`}
@@ -75,7 +81,13 @@ export default function LanguageSwitcher() {
                      }`}
                   >
                      <div className="relative h-4 w-6 overflow-hidden rounded-sm border border-zinc-100">
-                        <Image src={lang.flag} alt={lang.name} fill className="object-cover" />
+                        <Image
+                           src={lang.flag}
+                           alt={lang.name}
+                           fill
+                           sizes="24px"
+                           className="object-cover"
+                        />
                      </div>
                      {lang.name}
                      {locale === lang.code && (

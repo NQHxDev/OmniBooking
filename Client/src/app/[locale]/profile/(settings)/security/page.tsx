@@ -11,6 +11,8 @@ import { useLocale } from "next-intl";
 import { securityService } from "@/lib/api/services/securityService";
 import SecurityOTPModal from "@/components/SecurityOTPModal";
 import TwoFactorSetupModal from "@/components/TwoFactorSetupModal";
+import { profileService } from "@/lib/api/services/profileService";
+import PasswordModal from "@/components/PasswordModal";
 
 export default function SecurityPage() {
    const [isRegistering, setIsRegistering] = useState(false);
@@ -36,6 +38,11 @@ export default function SecurityPage() {
 
    // Trạng thái cho Security Step-up
    const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
+
+   // Trạng thái Mật khẩu
+   const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+   const [isLoadingPasswordStatus, setIsLoadingPasswordStatus] = useState(true);
+   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
    const [pendingAction, setPendingAction] = useState<{
       type: "register" | "delete";
       data?: string;
@@ -78,10 +85,23 @@ export default function SecurityPage() {
       }
    };
 
+   const fetchPasswordStatus = async () => {
+      try {
+         setIsLoadingPasswordStatus(true);
+         const profile = await profileService.getMyProfile();
+         setHasPassword(profile.hasPassword);
+      } catch (err) {
+         console.error("Failed to fetch password status:", err);
+      } finally {
+         setIsLoadingPasswordStatus(false);
+      }
+   };
+
    useEffect(() => {
       const timer = setTimeout(() => {
          fetchPasskeyData();
          fetch2FAStatus();
+         fetchPasswordStatus();
       }, 0);
       return () => clearTimeout(timer);
    }, []);
@@ -385,11 +405,20 @@ export default function SecurityPage() {
             <SecurityCard
                icon={<Lock className="h-6 w-6 text-zinc-400" />}
                title={t("password.title")}
-               description={t("password.desc")}
+               description={hasPassword === false ? t("password.descCreate") : t("password.desc")}
                action={
-                  <button className="text-sm font-bold text-[#006ce4] hover:bg-blue-50 px-4 py-2 rounded-md transition-all cursor-pointer">
-                     {t("password.action")}
-                  </button>
+                  isLoadingPasswordStatus ? (
+                     <div className="flex h-9 w-20 items-center justify-center">
+                        <Loader2 className="h-4 w-4 animate-spin text-[#006ce4]" />
+                     </div>
+                  ) : (
+                     <button
+                        onClick={() => setIsPasswordModalOpen(true)}
+                        className="text-sm font-bold text-[#006ce4] hover:bg-blue-50 px-4 py-2 rounded-md transition-all cursor-pointer"
+                     >
+                        {hasPassword === false ? t("password.actionCreate") : t("password.action")}
+                     </button>
+                  )
                }
             />
 
@@ -436,6 +465,14 @@ export default function SecurityPage() {
                setIs2FASetupOpen(false);
                fetch2FAStatus();
             }}
+         />
+
+         {/* Password Setup & Change modal */}
+         <PasswordModal
+            isOpen={isPasswordModalOpen}
+            onClose={() => setIsPasswordModalOpen(false)}
+            hasPassword={!!hasPassword}
+            onSuccess={fetchPasswordStatus}
          />
 
          {/* Disable 2FA Confirmation modal */}

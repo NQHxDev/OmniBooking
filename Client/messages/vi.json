@@ -127,6 +127,7 @@
       "AUTH_013": "Mã xác thực OTP không chính xác hoặc đã hết hạn",
       "AUTH_014": "Không tìm thấy thông tin Passkey",
       "AUTH_016": "Mã reset không hợp lệ hoặc đã hết hạn",
+      "AUTH_017": "Mật khẩu hiện tại không chính xác",
       "GEN_999": "Đã có lỗi xảy ra, vui lòng thử lại sau",
       "GEN_500": "Lỗi hệ thống server",
       "IDEM_001": "Yêu cầu không hợp lệ hoặc đã được xử lý!",
@@ -325,7 +326,12 @@
       "quangninh": "Quảng Ninh",
       "featuredProperties": "Chỗ nghỉ nổi bật",
       "featuredSub": "Khám phá những lựa chọn tuyệt vời nhất cho chuyến đi của bạn",
-      "noFeaturedProperties": "Hiện chưa có chỗ nghỉ nổi bật nào tại khu vực này!"
+      "noFeaturedProperties": "Hiện chưa có chỗ nghỉ nổi bật nào tại khu vực này!",
+      "promoSummerTitle": "Giảm giá cho kỳ nghỉ hè",
+      "promoSummerDesc": "Tiết kiệm 15% hoặc hơn khi đặt từ nay đến 30/9/2026",
+      "promoSummerBtn": "Tìm ưu đãi",
+      "promoHanoiTitle": "Khám phá Hà Nội",
+      "promoHanoiDesc": "Trải nghiệm nét cổ kính và ẩm thực đường phố tuyệt vời"
    },
    "Genius": {
       "welcomeBack": "Chào mừng trở lại, {name}!",
@@ -579,7 +585,28 @@
          "password": {
             "title": "Mật khẩu",
             "desc": "Thay đổi mật khẩu đăng nhập của bạn thường xuyên để bảo mật.",
-            "action": "Thay đổi"
+            "descCreate": "Quý khách chưa thiết lập mật khẩu cho tài khoản này (Đăng nhập qua Google/Zalo). Hãy thiết lập mật khẩu để có thể đăng nhập bằng email.",
+            "action": "Thay đổi",
+            "actionCreate": "Thiết lập",
+            "modal": {
+               "titleChange": "Thay đổi mật khẩu",
+               "titleCreate": "Thiết lập mật khẩu",
+               "descChange": "Vui lòng nhập mật khẩu hiện tại và mật khẩu mới của Quý khách.",
+               "descCreate": "Vui lòng nhập mật khẩu mới để thiết lập đăng nhập trực tiếp bằng email.",
+               "currentPassword": "Mật khẩu hiện tại",
+               "newPassword": "Mật khẩu mới",
+               "confirmPassword": "Xác nhận mật khẩu mới",
+               "placeholderCurrent": "Nhập mật khẩu hiện tại",
+               "placeholderNew": "Nhập mật khẩu mới (tối thiểu 6 ký tự)",
+               "placeholderConfirm": "Xác nhận mật khẩu mới",
+               "submitChange": "Cập nhật mật khẩu",
+               "submitCreate": "Thiết lập mật khẩu",
+               "successChange": "Đã thay đổi mật khẩu thành công!",
+               "successCreate": "Đã thiết lập mật khẩu thành công!",
+               "mismatch": "Xác nhận mật khẩu không trùng khớp",
+               "required": "Thông tin này không được để trống",
+               "tooShort": "Mật khẩu phải có ít nhất 6 ký tự"
+            }
          },
          "manager": {
             "registeredDevices": "Thiết bị đã đăng ký",

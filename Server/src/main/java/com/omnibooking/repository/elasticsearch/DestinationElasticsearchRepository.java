@@ -8,10 +8,15 @@ import java.util.List;
 
 @Repository
 public interface DestinationElasticsearchRepository extends ElasticsearchRepository<DestinationDocument, String> {
-   
+
    @Query("{\"bool\": {\"should\": [" +
-          "{\"match_phrase_prefix\": {\"name\": \"?0\"}}," +
-          "{\"match\": {\"name\": \"?0\"}}" +
-          "]}}")
+         "{\"match_phrase_prefix\": {\"name\": \"?0\"}}," +
+         "{\"match\": {\"name\": \"?0\"}}" +
+         "]}}")
    List<DestinationDocument> searchByName(String name);
+
+   List<DestinationDocument> findTop5ByCountryCodeOrderByPopularityScoreDesc(String countryCode);
+
+   List<DestinationDocument> findTop5ByOrderByPopularityScoreDesc();
+
 }

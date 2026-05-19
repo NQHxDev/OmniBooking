@@ -38,7 +38,7 @@ public class DestinationServiceImpl implements DestinationService {
    public List<DestinationSuggestionResponse> getTrending(String countryCode) {
       List<String> trendingQueries = trendingService.getTrendingDestinations(countryCode, 8);
 
-      return trendingQueries.stream()
+      List<DestinationSuggestionResponse> trending = trendingQueries.stream()
             .map(query -> destinationRepository.searchByName(query))
             .filter(docs -> !docs.isEmpty())
             .map(docs -> docs.get(0))
@@ -48,6 +48,25 @@ public class DestinationServiceImpl implements DestinationService {
             .limit(5)
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+
+      // Fallback: If no trending search logs exist, fetch top destinations by popularity score
+      if (trending.isEmpty()) {
+         List<DestinationDocument> docs;
+         if (countryCode != null && !countryCode.isBlank()) {
+            docs = destinationRepository.findTop5ByCountryCodeOrderByPopularityScoreDesc(countryCode);
+            // If the country itself has no destinations seeded, fallback to global top destinations
+            if (docs.isEmpty()) {
+               docs = destinationRepository.findTop5ByOrderByPopularityScoreDesc();
+            }
+         } else {
+            docs = destinationRepository.findTop5ByOrderByPopularityScoreDesc();
+         }
+         return docs.stream()
+               .map(this::mapToResponse)
+               .collect(Collectors.toList());
+      }
+
+      return trending;
    }
 
    private DestinationSuggestionResponse mapToResponse(DestinationDocument doc) {
@@ -65,4 +84,5 @@ public class DestinationServiceImpl implements DestinationService {
             .imageUrl(doc.getImageUrl())
             .build();
    }
+
 }

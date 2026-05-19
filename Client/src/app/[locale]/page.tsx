@@ -37,16 +37,21 @@ export default function Home() {
                      src="/images/hero_banner.png"
                      alt="Promo 1"
                      fill
+                     sizes="(max-width: 768px) 100vw, 50vw"
                      className="object-cover opacity-80 group-hover:scale-105 transition-transform duration-500"
+                     priority
                   />
                   <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent" />
                   <div className="absolute bottom-6 left-6 text-white">
-                     <h3 className="text-2xl font-bold">Giảm giá cho kỳ nghỉ hè</h3>
+                     <h3 className="text-2xl font-bold">
+                        {tHome("promoSummerTitle") || "Giảm giá cho kỳ nghỉ hè"}
+                     </h3>
                      <p className="mt-2 text-sm">
-                        Tiết kiệm 15% hoặc hơn khi đặt từ nay đến 30/9/2026
+                        {tHome("promoSummerDesc") ||
+                           "Tiết kiệm 15% hoặc hơn khi đặt từ nay đến 30/9/2026"}
                      </p>
                      <button className="mt-4 rounded bg-[#006ce4] px-4 py-2 text-sm font-bold hover:bg-[#0057b7] transition-colors">
-                        Tìm ưu đãi
+                        {tHome("promoSummerBtn") || "Tìm ưu đãi"}
                      </button>
                   </div>
                </div>
@@ -55,13 +60,17 @@ export default function Home() {
                      src="/images/hanoi.png"
                      alt="Promo 2"
                      fill
+                     sizes="(max-width: 768px) 100vw, 50vw"
                      className="object-cover opacity-80 group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent" />
                   <div className="absolute bottom-6 left-6 text-white">
-                     <h3 className="text-2xl font-bold">Khám phá Hà Nội</h3>
+                     <h3 className="text-2xl font-bold">
+                        {tHome("promoHanoiTitle") || "Khám phá Hà Nội"}
+                     </h3>
                      <p className="mt-2 text-sm">
-                        Trải nghiệm nét cổ kính và ẩm thực đường phố tuyệt vời
+                        {tHome("promoHanoiDesc") ||
+                           "Trải nghiệm nét cổ kính và ẩm thực đường phố tuyệt vời"}
                      </p>
                   </div>
                </div>
@@ -82,15 +91,18 @@ export default function Home() {
                         src="/images/dalat.png"
                         alt="Da Lat"
                         fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
+                        priority
                      />
                      <div className="absolute top-4 left-4 flex items-center gap-2 text-white drop-shadow-md">
                         <span className="text-xl font-bold">{tHome("dalat") || "Đà Lạt"}</span>
-                        <Image
+                        <img
                            src="https://flagcdn.com/vn.svg"
                            alt="VN Flag"
                            width={20}
                            height={15}
+                           className="h-auto w-5"
                         />
                      </div>
                   </div>
@@ -99,15 +111,17 @@ export default function Home() {
                         src="/images/hanoi.png"
                         alt="Hanoi"
                         fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
                      />
                      <div className="absolute top-4 left-4 flex items-center gap-2 text-white drop-shadow-md">
                         <span className="text-xl font-bold">{tHome("hanoi") || "Hà Nội"}</span>
-                        <Image
+                        <img
                            src="https://flagcdn.com/vn.svg"
                            alt="VN Flag"
                            width={20}
                            height={15}
+                           className="h-auto w-5"
                         />
                      </div>
                   </div>
@@ -116,17 +130,19 @@ export default function Home() {
                         src="https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=2070&auto=format&fit=crop"
                         alt="Da Nang"
                         fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
                         className="object-cover group-hover:scale-110 transition-transform duration-500"
                      />
                      <div className="absolute top-4 left-4 flex items-center gap-2 text-white drop-shadow-md">
                         <span className="text-xl font-bold">
                            {tHome("quangninh") || "Quảng Ninh"}
                         </span>
-                        <Image
+                        <img
                            src="https://flagcdn.com/vn.svg"
                            alt="VN Flag"
                            width={20}
                            height={15}
+                           className="h-auto w-5"
                         />
                      </div>
                   </div>

@@ -5,10 +5,10 @@ import { routing } from "./i18n/routing";
 
 const intlMiddleware = createMiddleware(routing);
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
    const { pathname } = request.nextUrl;
 
-   // 1. Chạy intlMiddleware để xử lý locale và redirect tự động
+   // Chạy intlMiddleware để xử lý locale và redirect tự động
    const response = intlMiddleware(request);
 
    // Lấy session_id và refresh_token để kiểm tra đăng nhập
@@ -16,7 +16,7 @@ export function middleware(request: NextRequest) {
    const refreshToken = request.cookies.get("refresh_token")?.value;
    const hasSession = !!(sessionId || refreshToken);
 
-   // 2. Auth & Guest Guards
+   // Auth & Guest Guards
    // Kiểm tra xem pathname có bắt đầu bằng locale hợp lệ không (vi|en)
    const segments = pathname.split("/");
    const locale = routing.locales.includes(segments[1] as "vi" | "en")

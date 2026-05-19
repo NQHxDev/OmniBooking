@@ -150,6 +150,7 @@ export default function PersonalDetailsPage() {
                         src={profileData.avatarUrl}
                         alt="Avatar"
                         fill
+                        sizes="96px"
                         className="object-cover transition-transform group-hover:scale-110"
                         unoptimized
                      />

@@ -127,6 +127,7 @@
       "AUTH_013": "Invalid or expired OTP",
       "AUTH_014": "Passkey not found",
       "AUTH_016": "Invalid or expired reset token",
+      "AUTH_017": "Incorrect current password",
       "GEN_999": "An unexpected error occurred",
       "GEN_500": "Internal server error",
       "IDEM_001": "Invalid request or already processed!",
@@ -325,7 +326,12 @@
       "quangninh": "Quang Ninh",
       "featuredProperties": "Featured Properties",
       "featuredSub": "Discover the best options for your next trip",
-      "noFeaturedProperties": "No featured properties available at the moment!"
+      "noFeaturedProperties": "No featured properties available at the moment!",
+      "promoSummerTitle": "Summer vacation discounts",
+      "promoSummerDesc": "Save 15% or more when booking between now and September 30, 2026",
+      "promoSummerBtn": "Find Deals",
+      "promoHanoiTitle": "Explore Hanoi",
+      "promoHanoiDesc": "Experience the ancient charm and amazing street food"
    },
    "Genius": {
       "welcomeBack": "Welcome back, {name}!",
@@ -579,7 +585,28 @@
          "password": {
             "title": "Password",
             "desc": "Change your password regularly to keep your account secure.",
-            "action": "Change"
+            "descCreate": "You haven't set a password for this account (Signed in via Google/Zalo). Please set a password to enable email sign-in.",
+            "action": "Change",
+            "actionCreate": "Setup",
+            "modal": {
+               "titleChange": "Change password",
+               "titleCreate": "Set password",
+               "descChange": "Please enter your current and new passwords.",
+               "descCreate": "Please enter a new password to enable direct email login.",
+               "currentPassword": "Current password",
+               "newPassword": "New password",
+               "confirmPassword": "Confirm new password",
+               "placeholderCurrent": "Enter current password",
+               "placeholderNew": "Enter new password (minimum 6 characters)",
+               "placeholderConfirm": "Confirm new password",
+               "submitChange": "Update password",
+               "submitCreate": "Set password",
+               "successChange": "Password changed successfully!",
+               "successCreate": "Password set successfully!",
+               "mismatch": "Passwords do not match",
+               "required": "This field is required",
+               "tooShort": "Password must be at least 6 characters"
+            }
          },
          "manager": {
             "registeredDevices": "Registered devices",
