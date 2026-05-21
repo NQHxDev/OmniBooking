@@ -31,7 +31,7 @@ public class CurrencyController {
       return currencies.stream()
             .collect(Collectors.toMap(
                   Currency::getCode,
-                  c -> currencyService.getRate(c.getCode())
-            ));
+                  c -> currencyService.getRate(c.getCode())));
    }
+
 }

@@ -204,9 +204,11 @@
          "metaDesc": "Tham gia cùng OmniBooking và bắt đầu đón khách ngay hôm nay"
       },
       "createPropertyForm": {
-         "step1": "Thông tin",
+         "step1": "Thông tin cơ bản",
          "step2": "Vị trí",
-         "step3": "Hình ảnh",
+         "step3": "Thiết lập",
+         "step4": "Hình ảnh",
+         "step5": "Pháp lý",
          "basicInfo": "Thông tin cơ bản",
          "propertyName": "Tên chỗ nghỉ",
          "description": "Mô tả chi tiết",
@@ -231,13 +233,17 @@
          },
          "messages": {
             "flexibleInfo": "Chế độ 24/7 đang bật: Khách có thể nhận và trả phòng vào bất kỳ lúc nào trong ngày",
-            "imageUploadDesc": "Tải lên ít nhất 1 ảnh. Ảnh đầu tiên sẽ được chọn làm ảnh đại diện",
+            "imageUploadDesc": "Tải lên ít nhất 5 ảnh. Ảnh đầu tiên sẽ được chọn làm ảnh đại diện",
             "success": "Đã tạo chỗ nghỉ thành công!",
             "imageProcessing": "Đã gửi yêu cầu xử lý ảnh lên hệ thống",
             "error": "Đã xảy ra lỗi khi tạo chỗ nghỉ",
             "validationError": "Vui lòng kiểm tra lại thông tin",
             "stepError": "Vui lòng điền đầy đủ thông tin ở bước này",
-            "imageRequired": "Vui lòng tải lên ít nhất một ảnh cho chỗ nghỉ"
+            "imageRequired": "Vui lòng tải lên ít nhất 5 ảnh cho chỗ nghỉ",
+            "imageMinLimit": "Vui lòng tải lên ít nhất 5 ảnh.",
+            "roomsRequired": "Vui lòng thêm ít nhất một loại phòng.",
+            "legalRequired": "Vui lòng điền đầy đủ thông tin pháp lý.",
+            "termsRequired": "Bạn phải đồng ý với các điều khoản để tiếp tục."
          },
          "propertyTypes": {
             "HOTEL": {
@@ -259,7 +265,55 @@
             "RESORT": {
                "label": "Resort",
                "description": "Khu nghỉ dưỡng cao cấp, dịch vụ trọn gói"
+            },
+            "GUESTHOUSE": {
+               "label": "Nhà khách",
+               "description": "Phòng ấm cúng hoặc không gian chia sẻ với chủ nhà thân thiện"
             }
+         },
+         "roomsTitle": "Cấu hình loại phòng",
+         "roomsSubtitle": "Thêm các loại phòng có sẵn tại chỗ nghỉ của bạn",
+         "addRoom": "Thêm loại phòng",
+         "roomName": "Tên loại phòng",
+         "roomNamePlaceholder": "Ví dụ: Phòng Deluxe giường đôi",
+         "bedType": "Loại giường",
+         "roomSize": "Diện tích phòng (m²)",
+         "capacityAdults": "Sức chứa người lớn",
+         "capacityChildren": "Sức chứa trẻ em",
+         "totalRooms": "Số lượng phòng",
+         "basePrice": "Giá cơ bản mỗi đêm",
+         "amenitiesTitle": "Tiện ích chỗ nghỉ",
+         "amenitiesSubtitle": "Chọn các cơ sở vật chất và dịch vụ có sẵn tại chỗ nghỉ của bạn",
+         "amenitiesCategories": {
+            "GENERAL": "Tiện ích chung",
+            "ROOM": "Tiện nghi trong phòng",
+            "BATHROOM": "Tiện nghi phòng tắm",
+            "KITCHEN": "Tiện nghi nhà bếp"
+         },
+         "legalTitle": "Thông tin pháp lý",
+         "legalSubtitle": "Nhập chi tiết đăng ký kinh doanh và mã số thuế chính thức",
+         "businessRegistrationNumber": "Số Đăng ký Kinh doanh",
+         "taxCode": "Mã số thuế",
+         "legalOwnerName": "Tên chủ sở hữu pháp lý",
+         "businessRegistrationNumberPlaceholder": "Nhập số đăng ký",
+         "taxCodePlaceholder": "Nhập mã số thuế",
+         "legalOwnerNamePlaceholder": "Nhập tên đầy đủ của chủ sở hữu",
+         "termsAgreement": "Tôi xác nhận rằng tất cả các thông tin kinh doanh đã cung cấp là chính xác, và tôi đồng ý với Điều khoản Dịch vụ và Chính sách Bảo mật của Đối tác.",
+         "reviewTitle": "Xem lại thông tin đăng ký",
+         "reviewSubtitle": "Vui lòng kiểm tra lại tất cả chi tiết trước khi hoàn tất đăng ký",
+         "reviewBasicInfo": "Thông tin cơ bản",
+         "reviewLocation": "Chi tiết vị trí",
+         "reviewRooms": "Loại phòng ({count})",
+         "reviewAmenities": "Tiện ích ({count} đã chọn)",
+         "reviewImages": "Hình ảnh ({count} đã tải lên)",
+         "reviewLegal": "Tuân thủ pháp lý",
+         "reviewRoomsTable": {
+            "name": "Loại phòng",
+            "bedType": "Giường",
+            "size": "Diện tích",
+            "capacity": "Sức chứa",
+            "rooms": "Tổng số phòng",
+            "price": "Giá cả"
          }
       },
       "imageUpload": {
@@ -280,7 +334,18 @@
          "descMin": "Mô tả phải có ít nhất 20 ký tự",
          "addressRequired": "Địa chỉ không được để trống",
          "cityRequired": "Thành phố không được để trống",
-         "countryRequired": "Quốc gia không được để trống"
+         "countryRequired": "Quốc gia không được để trống",
+         "roomNameMin": "Tên phòng phải có ít nhất 3 ký tự",
+         "roomPriceMin": "Giá phòng phải lớn hơn 0",
+         "roomCapacityMin": "Yêu cầu sức chứa tối thiểu 1 người lớn",
+         "roomSizeMin": "Diện tích phòng phải lớn hơn 0",
+         "totalRoomsMin": "Yêu cầu số lượng tối thiểu 1 phòng",
+         "bedTypeRequired": "Loại giường không được để trống",
+         "businessRegRequired": "Mã số đăng ký kinh doanh không được để trống",
+         "taxCodeRequired": "Mã số thuế không được để trống",
+         "legalOwnerRequired": "Tên chủ sở hữu pháp lý không được để trống",
+         "agreeTermsRequired": "Bạn phải đồng ý với các điều khoản để tiếp tục",
+         "roomsRequired": "Vui lòng thêm ít nhất một loại phòng."
       }
    },
    "Search": {
@@ -636,6 +701,7 @@
       "unitLabel": "Số căn hộ hoặc tầng (không bắt buộc)",
       "unitPlaceholder": "Căn hộ, tòa nhà, tầng, v.v.",
       "cityLabel": "Thành phố",
+      "cityPlaceholder": "Nhập tên thành phố...",
       "zipLabel": "Mã bưu chính",
       "autoUpdate": "Cập nhật địa chỉ khi di chuyển ghim trên bản đồ.",
       "hint": "Sử dụng bản đồ VietMap giúp khách hàng tìm thấy bạn dễ dàng hơn. Bạn có thể kéo thả Pin đến vị trí chính xác nhất.",

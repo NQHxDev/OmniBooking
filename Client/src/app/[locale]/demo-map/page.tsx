@@ -105,8 +105,22 @@ export default function DemoMapPage() {
       address: string;
    } | null>(null);
 
+   const [addressDetails, setAddressDetails] = useState<{
+      address: string;
+      city: string;
+      country: string;
+   } | null>(null);
+
    const handleLocationChange = (lat: number, lng: number, address: string) => {
       setPickerResult({ lat, lng, address });
+   };
+
+   const handleAddressDetailsChange = (details: {
+      address: string;
+      city: string;
+      country: string;
+   }) => {
+      setAddressDetails(details);
    };
 
    return (
@@ -341,42 +355,46 @@ export default function DemoMapPage() {
             </div>
 
             {/* Map Frame (Column 8) */}
-            <div className="lg:col-span-8 flex flex-col h-[760px] bg-zinc-950 border border-zinc-800/60 rounded-3xl overflow-hidden shadow-2xl relative">
-               <AnimatePresence mode="wait">
-                  {activeTab === "view" ? (
-                     <motion.div
-                        key="view-map"
-                        initial={{ opacity: 0, scale: 0.98 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.98 }}
-                        transition={{ duration: 0.3 }}
-                        className="w-full h-full relative"
-                     >
-                        <MapView
-                           properties={mockProperties}
-                           center={[10.7769, 106.7009]}
-                           zoom={13}
-                           showControls={true}
-                        />
-                     </motion.div>
-                  ) : (
-                     <motion.div
-                        key="pick-map"
-                        initial={{ opacity: 0, scale: 0.98 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.98 }}
-                        transition={{ duration: 0.3 }}
-                        className="w-full h-full relative"
-                     >
-                        <LocationPicker
-                           initialPosition={{ lat: 10.7769, lng: 106.7009 }}
-                           onLocationChange={handleLocationChange}
-                        />
-                     </motion.div>
-                  )}
-               </AnimatePresence>
+            <div className="lg:col-span-8 flex flex-col h-[760px] bg-zinc-950 border border-zinc-800/60 rounded-3xl overflow-hidden shadow-2xl relative z-0">
+               <MapView
+                  properties={mockProperties}
+                  center={[10.7769, 106.7009]}
+                  zoom={13}
+                  showControls={true}
+               />
             </div>
          </main>
+
+         {/* Fullscreen LocationPicker Overlay matching the partner flow */}
+         <AnimatePresence>
+            {activeTab === "pick" && (
+               <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  transition={{ duration: 0.3 }}
+                  className="fixed inset-x-0 bottom-0 top-[72px] z-50 bg-zinc-50"
+               >
+                  <LocationPicker
+                     onLocationChange={handleLocationChange}
+                     onAddressDetailsChange={handleAddressDetailsChange}
+                     showNavigation={true}
+                     onBack={() => setActiveTab("view")}
+                     onNext={() => {
+                        alert(
+                           `Đăng ký vị trí thành công (Demo)!\n\n` +
+                              `• Tọa độ: Lat ${pickerResult?.lat}, Lng ${pickerResult?.lng}\n` +
+                              `• Địa chỉ: ${addressDetails?.address || "—"}\n` +
+                              `• Thành phố: ${addressDetails?.city || "—"}\n` +
+                              `• Quốc gia: ${addressDetails?.country || "—"}`
+                        );
+                        setActiveTab("view");
+                     }}
+                     className="h-full w-full border-none rounded-none shadow-none"
+                  />
+               </motion.div>
+            )}
+         </AnimatePresence>
       </div>
    );
 }

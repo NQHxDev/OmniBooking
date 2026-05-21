@@ -4,9 +4,8 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { PropertyDocument } from "@/lib/api/services/propertyService";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import Image from "next/image";
-import { env } from "@/env";
 
 // Custom price tag icon generator for Leaflet
 const createPriceIcon = (price: number, isSelected: boolean) => {
@@ -14,14 +13,14 @@ const createPriceIcon = (price: number, isSelected: boolean) => {
       price >= 1000000 ? (price / 1000000).toFixed(1) + "tr" : (price / 1000).toFixed(0) + "k";
 
    return L.divIcon({
-      html: `<div class="transition-all duration-200 cursor-pointer shadow-lg font-bold border-2 border-white rounded-full text-[10px] px-2.5 py-1.5 flex items-center justify-center whitespace-nowrap ${
+      html: `<div class="px-2.5 py-1 rounded-full text-xs font-bold shadow-md border transition-all duration-200 ${
          isSelected
-            ? "bg-[#003580] text-white scale-110"
-            : "bg-[#006ce4] text-white hover:bg-[#003580] hover:scale-105"
+            ? "bg-[#006ce4] text-white border-[#006ce4] scale-110 z-50"
+            : "bg-white text-gray-900 border-gray-200 hover:scale-105 hover:z-40"
       }">${text}</div>`,
       className: "custom-price-tag",
-      iconSize: [46, 28],
-      iconAnchor: [23, 14],
+      iconSize: [60, 30],
+      iconAnchor: [30, 15],
    });
 };
 
@@ -36,8 +35,31 @@ interface MapViewProps {
 // Map center tracking helper component
 function ChangeMapView({ center, zoom }: { center: [number, number]; zoom: number }) {
    const map = useMap();
+   const lastCenterRef = useRef<[number, number] | null>(null);
+   const lastZoomRef = useRef<number | null>(null);
+
    useEffect(() => {
-      map.setView(center, zoom);
+      const isSameCenter =
+         lastCenterRef.current &&
+         lastCenterRef.current[0] === center[0] &&
+         lastCenterRef.current[1] === center[1];
+      const isSameZoom = lastZoomRef.current === zoom;
+
+      if (!isSameCenter || !isSameZoom) {
+         lastCenterRef.current = center;
+         lastZoomRef.current = zoom;
+         map.setView(center, zoom);
+         map.invalidateSize();
+
+         const timer1 = setTimeout(() => map.invalidateSize(), 100);
+         const timer2 = setTimeout(() => map.invalidateSize(), 300);
+         const timer3 = setTimeout(() => map.invalidateSize(), 600);
+         return () => {
+            clearTimeout(timer1);
+            clearTimeout(timer2);
+            clearTimeout(timer3);
+         };
+      }
    }, [center, zoom, map]);
    return null;
 }
@@ -49,6 +71,16 @@ export default function MapView({
    showControls = true,
 }: MapViewProps) {
    const [selectedProperty, setSelectedProperty] = useState<PropertyDocument | null>(null);
+   const [isRetina, setIsRetina] = useState(false);
+
+   useEffect(() => {
+      const timer = setTimeout(() => {
+         if (typeof window !== "undefined" && window.devicePixelRatio > 1) {
+            setIsRetina(true);
+         }
+      }, 0);
+      return () => clearTimeout(timer);
+   }, []);
 
    const mapCenter = useMemo<[number, number]>(() => {
       if (properties.length > 0 && properties[0].location) {
@@ -58,41 +90,36 @@ export default function MapView({
    }, [properties, center]);
 
    const tileUrl = useMemo(() => {
-      const key = env.NEXT_PUBLIC_VIETMAP_API_KEY;
-      const isGoogleKey = key?.startsWith("AIzaSy");
-      const isPlaceholder = !key || key.includes("your_") || key.includes("api_key");
-      if (isGoogleKey || isPlaceholder) {
-         return "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
-      }
-      return `https://maps.vietmap.vn/maps/tiles/{z}/{x}/{y}.png?apikey=${key}`;
-   }, []);
+      return isRetina
+         ? "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&scale=2"
+         : "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
+   }, [isRetina]);
 
-   const attribution = useMemo(() => {
-      const key = env.NEXT_PUBLIC_VIETMAP_API_KEY;
-      const isGoogleKey = key?.startsWith("AIzaSy");
-      const isPlaceholder = !key || key.includes("your_") || key.includes("api_key");
-      if (isGoogleKey || isPlaceholder) {
-         return '&copy; <a href="https://maps.google.com">Google Maps</a>';
-      }
-      return '&copy; <a href="https://vietmap.vn" target="_blank" rel="noopener noreferrer">VietMap</a>';
-   }, []);
+   const attribution = '&copy; <a href="https://maps.google.com">Google Maps</a>';
 
    return (
-      <div className="w-full h-full min-h-[400px] rounded-xl overflow-hidden shadow-md border border-gray-100">
+      <div className="relative w-full h-full min-h-[400px] rounded-xl overflow-hidden shadow-md border border-gray-100 z-0">
+         <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+            integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+            crossOrigin=""
+         />
          <MapContainer
             center={mapCenter}
             zoom={zoom}
+            minZoom={4}
+            maxZoom={20}
             className="w-full h-full"
-            style={{ width: "100%", height: "100%", zIndex: 1 }}
             zoomControl={showControls}
             attributionControl={false}
          >
             <ChangeMapView center={mapCenter} zoom={zoom} />
-            <TileLayer url={tileUrl} attribution={attribution} />
-
+            <TileLayer key={tileUrl} url={tileUrl} attribution={attribution} />
             {properties.map((property) => {
-               if (!property.location) return null;
                const isSelected = selectedProperty?.id === property.id;
+
+               if (!property.location) return null;
 
                return (
                   <Marker

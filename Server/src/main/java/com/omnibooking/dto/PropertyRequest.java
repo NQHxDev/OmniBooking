@@ -34,4 +34,14 @@ public class PropertyRequest {
 
    private UUID cancellationPolicyId;
 
+   private String businessRegistrationNumber;
+
+   private String taxCode;
+
+   private String legalOwnerName;
+
+   private java.util.List<String> amenities;
+
+   private java.util.List<RoomTypeRequest> roomTypes;
+
 }

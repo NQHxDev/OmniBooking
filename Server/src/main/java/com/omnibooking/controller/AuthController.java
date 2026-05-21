@@ -71,7 +71,7 @@ public class AuthController {
       registrationQueueService.pushToQueue(request);
 
       return ResponseEntity.status(HttpStatus.ACCEPTED)
-            .body(ApiResponse.success(null, "Registration request received and is being processed.", requestId));
+            .body(ApiResponse.success(null, "Registration request received and is being processed", requestId));
    }
 
    @Anonymous

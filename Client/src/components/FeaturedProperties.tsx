@@ -12,7 +12,7 @@ export default async function FeaturedProperties() {
       console.error("Failed to fetch featured properties", error);
    }
 
-   if (properties.length === 0) {
+   if (!properties || properties.length === 0) {
       return (
          <section className="mt-16 bg-zinc-50 rounded-[2rem] p-12 text-center border border-zinc-100">
             <div className="max-w-md mx-auto">

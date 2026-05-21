@@ -2,6 +2,17 @@ import apiClient from "./apiClient";
 import { getBaseURL } from "./config";
 import { ApiResponse } from "./services/authService";
 
+export interface RoomTypeRequest {
+   name: string;
+   description?: string;
+   basePrice: number;
+   capacityAdults: number;
+   capacityChildren: number;
+   totalRooms: number;
+   roomSizeSqm: number;
+   bedType: string;
+}
+
 export interface PropertyRequest {
    name: string;
    description: string;
@@ -13,6 +24,11 @@ export interface PropertyRequest {
    checkInTime: string;
    checkOutTime: string;
    cancellationPolicyId?: string;
+   businessRegistrationNumber?: string;
+   taxCode?: string;
+   legalOwnerName?: string;
+   amenities?: string[];
+   roomTypes?: RoomTypeRequest[];
 }
 
 export interface PropertyResponse {

@@ -23,11 +23,17 @@ public class AppProperties {
    private String contextPath;
 
    private final Security security = new Security();
+
    private final Mail mail = new Mail();
+
    private final Cloudinary cloudinary = new Cloudinary();
+
    private final Oauth2 oauth2 = new Oauth2();
+
    private final Geo geo = new Geo();
+
    private final Currency currency = new Currency();
+
    private final Webauthn webauthn = new Webauthn();
 
    @Data

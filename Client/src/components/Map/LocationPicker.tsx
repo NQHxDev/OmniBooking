@@ -12,9 +12,22 @@ import axios from "axios";
 
 // Default coordinates centered on Vietnam
 const defaultCenter = {
-   lat: 10.762622,
-   lng: 106.660172,
+   lat: 14.058324,
+   lng: 108.277199,
 };
+
+const countriesList = [
+   { name: "Việt Nam", code: "VN", lat: 14.058324, lng: 108.277199, zoom: 5 },
+   { name: "Singapore", code: "SG", lat: 1.352083, lng: 103.819836, zoom: 11 },
+   { name: "Thailand", code: "TH", lat: 15.870032, lng: 100.992541, zoom: 5 },
+   { name: "Malaysia", code: "MY", lat: 4.210484, lng: 101.98855, zoom: 6 },
+   { name: "Indonesia", code: "ID", lat: -0.789275, lng: 113.921327, zoom: 4 },
+   { name: "Japan", code: "JP", lat: 36.204824, lng: 138.252924, zoom: 5 },
+   { name: "South Korea", code: "KR", lat: 35.907757, lng: 127.766922, zoom: 6 },
+   { name: "United States", code: "US", lat: 37.09024, lng: -95.712891, zoom: 4 },
+   { name: "United Kingdom", code: "GB", lat: 55.378051, lng: -3.435973, zoom: 5 },
+   { name: "France", code: "FR", lat: 46.227638, lng: 2.213749, zoom: 5 },
+];
 
 // Premium custom animated marker pin for Leaflet
 const pickerMarkerIcon = L.divIcon({
@@ -38,19 +51,59 @@ interface SuggestionItem {
    lat?: number;
    lng?: number;
    isOsm?: boolean;
+   isGoong?: boolean;
    osmAddress?: Record<string, string>;
 }
 
 interface LocationPickerProps {
    initialPosition?: { lat: number; lng: number };
    onLocationChange?: (lat: number, lng: number, address: string) => void;
+   onAddressDetailsChange?: (details: { address: string; city: string; country: string }) => void;
+   showNavigation?: boolean;
+   onBack?: () => void;
+   onNext?: () => void;
+   className?: string;
 }
 
 // Map center tracking helper component
 function ChangeMapView({ center, zoom }: { center: [number, number]; zoom: number }) {
    const map = useMap();
    useEffect(() => {
+      const container = map.getContainer();
+      console.log("ChangeMapView -> Map Container Dimensions:", {
+         width: container?.clientWidth,
+         height: container?.clientHeight,
+         offsetWidth: container?.offsetWidth,
+         offsetHeight: container?.offsetHeight,
+      });
       map.setView(center, zoom);
+      map.invalidateSize();
+      const timer1 = setTimeout(() => {
+         console.log("ChangeMapView (100ms) -> Dimensions:", {
+            width: container?.clientWidth,
+            height: container?.clientHeight,
+         });
+         map.invalidateSize();
+      }, 100);
+      const timer2 = setTimeout(() => {
+         console.log("ChangeMapView (300ms) -> Dimensions:", {
+            width: container?.clientWidth,
+            height: container?.clientHeight,
+         });
+         map.invalidateSize();
+      }, 300);
+      const timer3 = setTimeout(() => {
+         console.log("ChangeMapView (600ms) -> Dimensions:", {
+            width: container?.clientWidth,
+            height: container?.clientHeight,
+         });
+         map.invalidateSize();
+      }, 600);
+      return () => {
+         clearTimeout(timer1);
+         clearTimeout(timer2);
+         clearTimeout(timer3);
+      };
    }, [center, zoom, map]);
    return null;
 }
@@ -68,16 +121,109 @@ function MapEventsHelper({ onClick }: { onClick: (lat: number, lng: number) => v
 export default function LocationPicker({
    initialPosition = defaultCenter,
    onLocationChange,
+   onAddressDetailsChange,
+   showNavigation = true,
+   onBack,
+   onNext,
+   className = "h-[600px] rounded-xl shadow-2xl border border-gray-200",
 }: LocationPickerProps) {
    const t = useTranslations("Map");
 
+   // Check if the initial position is the default center of Vietnam
+   const isDefaultVietnam = initialPosition.lat === 14.058324 && initialPosition.lng === 108.277199;
+
    const [position, setPosition] = useState(initialPosition);
+   const [zoom, setZoom] = useState(isDefaultVietnam ? 5 : 17);
+   const [hasSelectedLocation, setHasSelectedLocation] = useState(!isDefaultVietnam);
    const [searchQuery, setSearchQuery] = useState("");
-   const [address, setAddress] = useState("151 Bến Vân Đồn");
-   const [city, setCity] = useState("Thành phố Hồ Chí Minh");
-   const [zipCode, setZipCode] = useState("700000");
+   const [address, setAddress] = useState("");
+   const [city, setCity] = useState("");
+   const [country, setCountry] = useState("Việt Nam");
+   const [zipCode, setZipCode] = useState("");
    const [autoUpdate, setAutoUpdate] = useState(true);
    const [showHint, setShowHint] = useState(true);
+   const [isRetina, setIsRetina] = useState(false);
+
+   useEffect(() => {
+      const timer = setTimeout(() => {
+         if (typeof window !== "undefined" && window.devicePixelRatio > 1) {
+            setIsRetina(true);
+         }
+      }, 0);
+      return () => clearTimeout(timer);
+   }, []);
+
+   // IP-based Country Geolocation detection
+   useEffect(() => {
+      // Only run geolocation detection if starting with the default Vietnam center
+      if (!isDefaultVietnam) return;
+
+      const detectCountryAndLocate = async () => {
+         try {
+            // Call our internal backend API to bypass client-side CORS and ad blockers
+            const res = await axios.get("/api/geolocation");
+            if (res.data && res.data.countryCode) {
+               const countryCode = res.data.countryCode;
+               const countryName = res.data.countryName;
+               const latitude = res.data.latitude;
+               const longitude = res.data.longitude;
+
+               const matched = countriesList.find(
+                  (c) =>
+                     c.code === countryCode || c.name.toLowerCase() === countryName.toLowerCase()
+               );
+
+               if (matched) {
+                  setCountry(matched.name);
+                  setPosition({ lat: matched.lat, lng: matched.lng });
+                  setZoom(matched.zoom);
+               } else {
+                  setCountry(countryName || "Việt Nam");
+                  if (typeof latitude === "number" && typeof longitude === "number") {
+                     setPosition({ lat: latitude, lng: longitude });
+                     setZoom(5);
+                  }
+               }
+            }
+         } catch (error) {
+            console.error("IP Geolocation via server failed, falling back to default:", error);
+            // Explicitly fallback to default country and coordinates (Vietnam)
+            const defaultMatched = countriesList.find((c) => c.code === "VN") || {
+               name: "Việt Nam",
+               lat: 14.058324,
+               lng: 108.277199,
+               zoom: 5,
+            };
+            setCountry(defaultMatched.name);
+            setPosition({ lat: defaultMatched.lat, lng: defaultMatched.lng });
+            setZoom(defaultMatched.zoom);
+         }
+      };
+      detectCountryAndLocate();
+   }, [isDefaultVietnam]);
+
+   // Sync address details to parent
+   const onAddressDetailsChangeRef = useRef(onAddressDetailsChange);
+   useEffect(() => {
+      onAddressDetailsChangeRef.current = onAddressDetailsChange;
+   }, [onAddressDetailsChange]);
+
+   useEffect(() => {
+      if (onAddressDetailsChangeRef.current) {
+         onAddressDetailsChangeRef.current({ address, city, country });
+      }
+   }, [address, city, country]);
+
+   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const selectedName = e.target.value;
+      setCountry(selectedName);
+
+      const matched = countriesList.find((c) => c.name === selectedName);
+      if (matched) {
+         setPosition({ lat: matched.lat, lng: matched.lng });
+         setZoom(matched.zoom);
+      }
+   };
 
    // Autocomplete & Search state
    const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
@@ -88,24 +234,12 @@ export default function LocationPicker({
    const suggestionsRef = useRef<HTMLDivElement | null>(null);
 
    const tileUrl = useMemo(() => {
-      const key = env.NEXT_PUBLIC_VIETMAP_API_KEY;
-      const isGoogleKey = key?.startsWith("AIzaSy");
-      const isPlaceholder = !key || key.includes("your_") || key.includes("api_key");
-      if (isGoogleKey || isPlaceholder) {
-         return "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
-      }
-      return `https://maps.vietmap.vn/maps/tiles/{z}/{x}/{y}.png?apikey=${key}`;
-   }, []);
+      return isRetina
+         ? "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&scale=2"
+         : "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}";
+   }, [isRetina]);
 
-   const attribution = useMemo(() => {
-      const key = env.NEXT_PUBLIC_VIETMAP_API_KEY;
-      const isGoogleKey = key?.startsWith("AIzaSy");
-      const isPlaceholder = !key || key.includes("your_") || key.includes("api_key");
-      if (isGoogleKey || isPlaceholder) {
-         return '&copy; <a href="https://maps.google.com">Google Maps</a>';
-      }
-      return '&copy; <a href="https://vietmap.vn" target="_blank" rel="noopener noreferrer">VietMap</a>';
-   }, []);
+   const attribution = '&copy; <a href="https://maps.google.com">Google Maps</a>';
 
    // Close suggestions when clicking outside
    useEffect(() => {
@@ -130,11 +264,40 @@ export default function LocationPicker({
       const delayDebounce = setTimeout(async () => {
          setIsLoadingSuggestions(true);
          try {
+            const goongKey = env.NEXT_PUBLIC_GOONG_API_KEY;
             const key = env.NEXT_PUBLIC_VIETMAP_API_KEY;
             const isGoogleKey = key?.startsWith("AIzaSy");
             const isPlaceholder = !key || key.includes("your_") || key.includes("api_key");
 
-            if (isGoogleKey || isPlaceholder) {
+            if (key && !isPlaceholder && !isGoogleKey) {
+               const response = await axios.get("https://maps.vietmap.vn/api/autocomplete/v4", {
+                  params: {
+                     apikey: key,
+                     text: searchQuery,
+                     focus: `${position.lat},${position.lng}`,
+                     display_type: 5,
+                  },
+               });
+               setSuggestions(response.data || []);
+            } else if (goongKey && goongKey.length > 5) {
+               // Use Goong Autocomplete API
+               const response = await axios.get("https://rsapi.goong.io/Place/AutoComplete", {
+                  params: {
+                     api_key: goongKey,
+                     input: searchQuery,
+                     location: `${position.lat},${position.lng}`,
+                     limit: 5,
+                  },
+               });
+               const predictions = response.data.predictions || [];
+               const items = predictions.map((pred: { description: string; place_id: string }) => ({
+                  name: pred.description,
+                  display: pred.description,
+                  ref_id: pred.place_id,
+                  isGoong: true,
+               }));
+               setSuggestions(items);
+            } else {
                // Robust, 100% free high-quality Vietnamese address search via OSM Nominatim API
                const fetchAddress = async (query: string) => {
                   const res = await axios.get("https://nominatim.openstreetmap.org/search", {
@@ -144,6 +307,7 @@ export default function LocationPicker({
                         "accept-language": "vi",
                         limit: 5,
                         addressdetails: 1,
+                        countrycodes: "vn", // Restrict results to Vietnam
                      },
                   });
                   return res.data || [];
@@ -179,16 +343,6 @@ export default function LocationPicker({
                   })
                );
                setSuggestions(items);
-            } else {
-               const response = await axios.get("https://maps.vietmap.vn/api/autocomplete/v4", {
-                  params: {
-                     apikey: key,
-                     text: searchQuery,
-                     focus: `${position.lat},${position.lng}`,
-                     display_type: 5,
-                  },
-               });
-               setSuggestions(response.data || []);
             }
          } catch (error) {
             console.error("Autocomplete search error:", error);
@@ -203,6 +357,7 @@ export default function LocationPicker({
    // Handle click on map to position pin
    const handleMapClick = useCallback(
       (lat: number, lng: number) => {
+         setHasSelectedLocation(true);
          const newPos = { lat, lng };
          setPosition(newPos);
          if (onLocationChange) onLocationChange(newPos.lat, newPos.lng, address);
@@ -216,6 +371,7 @@ export default function LocationPicker({
          dragend() {
             const marker = markerRef.current;
             if (marker != null) {
+               setHasSelectedLocation(true);
                const newPos = marker.getLatLng();
                setPosition({ lat: newPos.lat, lng: newPos.lng });
                if (onLocationChange) onLocationChange(newPos.lat, newPos.lng, address);
@@ -227,6 +383,7 @@ export default function LocationPicker({
 
    // Handle choosing a suggestion
    const handleSelectSuggestion = async (item: SuggestionItem) => {
+      setHasSelectedLocation(true);
       setSearchQuery(item.display || item.name);
       setAddress(item.display || item.name);
       setShowSuggestions(false);
@@ -234,6 +391,7 @@ export default function LocationPicker({
       if (item.isOsm && typeof item.lat === "number" && typeof item.lng === "number") {
          const newPos = { lat: item.lat, lng: item.lng };
          setPosition(newPos);
+         setZoom(18);
 
          const addr = item.osmAddress || {};
          const houseNumber = addr.house_number || "";
@@ -257,6 +415,9 @@ export default function LocationPicker({
          const postalVal = addr.postcode || "700000";
          if (postalVal) setZipCode(postalVal);
 
+         const countryVal = addr.country || "Việt Nam";
+         setCountry(countryVal);
+
          if (onLocationChange) {
             onLocationChange(newPos.lat, newPos.lng, streetAddress);
          }
@@ -265,6 +426,39 @@ export default function LocationPicker({
 
       const refId = item.ref_id || item.refid;
       if (!refId) return;
+
+      if (item.isGoong) {
+         try {
+            const response = await axios.get("https://rsapi.goong.io/Place/Detail", {
+               params: {
+                  api_key: env.NEXT_PUBLIC_GOONG_API_KEY,
+                  place_id: refId,
+               },
+            });
+            const result = response.data.result;
+            if (result && result.geometry && result.geometry.location) {
+               const lat = result.geometry.location.lat;
+               const lng = result.geometry.location.lng;
+               const newPos = { lat, lng };
+               setPosition(newPos);
+               setZoom(18);
+
+               const display = result.formatted_address || result.name;
+               setAddress(display);
+
+               const compound = result.compound || {};
+               if (compound.province) setCity(compound.province);
+               setCountry("Việt Nam");
+
+               if (onLocationChange) {
+                  onLocationChange(lat, lng, display);
+               }
+            }
+         } catch (error) {
+            console.error("Goong place details error:", error);
+         }
+         return;
+      }
 
       try {
          const response = await axios.get("https://maps.vietmap.vn/api/place/v4", {
@@ -278,9 +472,11 @@ export default function LocationPicker({
          if (data && typeof data.lat === "number" && typeof data.lng === "number") {
             const newPos = { lat: data.lat, lng: data.lng };
             setPosition(newPos);
+            setZoom(18);
 
             // Populate other fields if possible
             if (data.city) setCity(data.city);
+            if (data.country) setCountry(data.country);
             if (data.hs_num && data.street) {
                setAddress(`${data.hs_num} ${data.street}`);
             } else if (data.display) {
@@ -297,26 +493,36 @@ export default function LocationPicker({
    };
 
    return (
-      <div className="relative w-full h-[600px] rounded-xl overflow-hidden shadow-2xl border border-gray-200 bg-gray-50 z-0">
+      <div className={`relative w-full overflow-hidden bg-gray-50 z-0 ${className}`}>
+         <link
+            rel="stylesheet"
+            href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+            integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+            crossOrigin=""
+         />
          {/* VietMap Leaflet Map */}
          <MapContainer
             center={[position.lat, position.lng]}
-            zoom={17}
+            zoom={zoom}
+            minZoom={4}
+            maxZoom={20}
             className="w-full h-full"
             style={{ width: "100%", height: "100%", zIndex: 1 }}
             zoomControl={false}
             attributionControl={false}
          >
-            <ChangeMapView center={[position.lat, position.lng]} zoom={17} />
-            <TileLayer url={tileUrl} attribution={attribution} />
+            <ChangeMapView center={[position.lat, position.lng]} zoom={zoom} />
+            <TileLayer key={tileUrl} url={tileUrl} attribution={attribution} />
             <MapEventsHelper onClick={handleMapClick} />
-            <Marker
-               position={[position.lat, position.lng]}
-               draggable={true}
-               icon={pickerMarkerIcon}
-               ref={markerRef}
-               eventHandlers={eventHandlers}
-            />
+            {hasSelectedLocation && (
+               <Marker
+                  position={[position.lat, position.lng]}
+                  draggable={true}
+                  icon={pickerMarkerIcon}
+                  ref={markerRef}
+                  eventHandlers={eventHandlers}
+               />
+            )}
          </MapContainer>
 
          {/* Overlay Form */}
@@ -399,7 +605,7 @@ export default function LocationPicker({
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                     <div>
+                     <div className="col-span-2">
                         <label className="block text-sm font-bold text-gray-700 mb-1">
                            {t("cityLabel")}
                         </label>
@@ -407,8 +613,25 @@ export default function LocationPicker({
                            type="text"
                            value={city}
                            onChange={(e) => setCity(e.target.value)}
+                           placeholder={t("cityPlaceholder")}
                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#006ce4] focus:border-transparent transition-all duration-200 text-sm text-gray-800"
                         />
+                     </div>
+                     <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">
+                           Quốc gia
+                        </label>
+                        <select
+                           value={country}
+                           onChange={handleCountryChange}
+                           className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#006ce4] focus:border-transparent transition-all duration-200 text-sm text-gray-800 font-medium cursor-pointer"
+                        >
+                           {countriesList.map((c) => (
+                              <option key={c.code} value={c.name}>
+                                 {c.name}
+                              </option>
+                           ))}
+                        </select>
                      </div>
                      <div>
                         <label className="block text-sm font-bold text-gray-700 mb-1">
@@ -463,24 +686,26 @@ export default function LocationPicker({
                      )}
                   </AnimatePresence>
 
-                  <div className="flex gap-4 pt-4">
-                     <button className="flex items-center justify-center w-14 h-14 border-2 border-[#006ce4] rounded-xl text-[#006ce4] hover:bg-blue-50 transition-all duration-200 active:scale-90 cursor-pointer">
-                        <ChevronLeft className="h-7 w-7" />
-                     </button>
-                     <button className="flex-1 bg-[#006ce4] text-white font-bold text-lg rounded-xl hover:bg-[#005bb8] transition-all shadow-[0_10px_20px_rgba(0,108,228,0.3)] active:scale-95 cursor-pointer">
-                        {t("continue")}
-                     </button>
-                  </div>
+                  {showNavigation && (
+                     <div className="flex gap-4 pt-4">
+                        <button
+                           type="button"
+                           onClick={onBack}
+                           className="flex items-center justify-center w-14 h-14 border-2 border-[#006ce4] rounded-xl text-[#006ce4] hover:bg-blue-50 transition-all duration-200 active:scale-90 cursor-pointer"
+                        >
+                           <ChevronLeft className="h-7 w-7" />
+                        </button>
+                        <button
+                           type="button"
+                           onClick={onNext}
+                           className="flex-1 bg-[#006ce4] text-white font-bold text-lg rounded-xl hover:bg-[#005bb8] transition-all shadow-[0_10px_20px_rgba(0,108,228,0.3)] active:scale-95 cursor-pointer"
+                        >
+                           {t("continue")}
+                        </button>
+                     </div>
+                  )}
                </div>
             </motion.div>
-         </div>
-
-         {/* VietMap Badge */}
-         <div className="absolute bottom-6 right-6 z-999 bg-white px-4 py-2 rounded-full shadow-lg border border-gray-200 flex items-center gap-2 hover:scale-105 transition-transform duration-200 select-none">
-            <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
-            <span className="text-[10px] font-extrabold text-gray-700 uppercase tracking-widest">
-               Bản đồ VietMap
-            </span>
          </div>
       </div>
    );

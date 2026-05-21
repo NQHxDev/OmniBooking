@@ -1,5 +1,6 @@
 import { Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
+import "leaflet/dist/leaflet.css";
 
 const beVietnamPro = Be_Vietnam_Pro({
    variable: "--font-be-vietnam-pro",

@@ -3,6 +3,7 @@ package com.omnibooking.services.auth.impl;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.dto.RegisterRequest;
+import com.omnibooking.dto.event.EmailEvent;
 import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.exception.AppException;
 import com.omnibooking.model.Role;
@@ -88,7 +89,7 @@ public class AuthServiceImpl implements AuthService {
    @Transactional
    public AuthResponse register(RegisterRequest request, String ip, String userAgent, HttpServletResponse response,
          boolean rememberMe) {
-      // 1. Check Bloom Filter first (Fast pre-check)
+      // Check Bloom Filter first (Fast pre-check)
       if (bloomFilterService.mightContain(request.getEmail())) {
          if (userRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
@@ -104,7 +105,7 @@ public class AuthServiceImpl implements AuthService {
 
       User savedUser = userRepository.save(Objects.requireNonNull(user));
 
-      // 2. Add to Bloom Filter after successful DB save
+      // Add to Bloom Filter after successful DB save
       bloomFilterService.add(savedUser.getEmail());
 
       // Create Profile
@@ -114,11 +115,11 @@ public class AuthServiceImpl implements AuthService {
             .build();
       userProfileRepository.save(Objects.requireNonNull(profile));
 
-      // 3. Reliable Email Delivery via Outbox
+      // Reliable Email Delivery via Outbox
       String token = verificationService.createVerificationToken(savedUser.getId());
 
       // We use MailService to build the DTO but NOT send it to Kafka yet
-      com.omnibooking.dto.event.EmailEvent emailEvent = mailService.buildVerificationEmailEvent(
+      EmailEvent emailEvent = mailService.buildVerificationEmailEvent(
             savedUser.getEmail(),
             request.getFullName(),
             token);
@@ -132,15 +133,14 @@ public class AuthServiceImpl implements AuthService {
       // Automatic Login
       Set<String> roles = Collections.singleton(userRole.getName());
       long now = System.currentTimeMillis();
+
       return issueTokensAndBuildResponse(savedUser, roles, profile, ip, userAgent, response, rememberMe, now, now);
    }
 
    @Override
    public AuthResponse login(LoginRequest request, String ip, String userAgent, HttpServletResponse response) {
-      // 1. Check Bloom Filter (Security & Performance layer)
-      // Nếu Bloom Filter nói không có, chắc chắn là không có -> Reject ngay
+      // Check Bloom Filter
       if (!bloomFilterService.mightContain(request.getEmail())) {
-         log.warn("Login attempt for non-existent email (blocked by Bloom): {}", request.getEmail());
          throw new AppException(ErrorCode.INVALID_CREDENTIALS);
       }
 
@@ -161,6 +161,7 @@ public class AuthServiceImpl implements AuthService {
 
       UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
       long now = System.currentTimeMillis();
+
       return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
             now);
    }
@@ -179,8 +180,6 @@ public class AuthServiceImpl implements AuthService {
          throw new AppException(ErrorCode.INVALID_SESSION);
       }
 
-      // LOCKING: Prevent race condition when multiple refresh requests occur for the
-      // same sessionId
       String lockKey = "lock:refresh:" + sId;
       Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "L", 5, TimeUnit.SECONDS);
 
@@ -258,7 +257,7 @@ public class AuthServiceImpl implements AuthService {
    @Override
    @Transactional
    public void resendVerification(UUID userId) {
-      // 1. Rate limiting check (30 seconds cooldown per user)
+      // Rate limiting check
       String rateLimitKey = "auth:resend-limit:" + userId;
       String lastSent = redisTemplate.opsForValue().get(rateLimitKey);
       if (lastSent != null) {
@@ -287,7 +286,7 @@ public class AuthServiceImpl implements AuthService {
             "RESEND_VERIFICATION",
             mailService.buildVerificationEmailEvent(user.getEmail(), profile.getDisplayName(), token));
 
-      // 4. Set rate limit in Redis for 30 seconds
+      // Set rate limit in Redis for 30 seconds
       redisTemplate.opsForValue().set(rateLimitKey, "true", 30, TimeUnit.SECONDS);
    }
 
@@ -465,7 +464,7 @@ public class AuthServiceImpl implements AuthService {
    @Transactional
    public AuthResponse loginWithOAuth2(String provider, OAuth2UserInfo userInfo, String ip, String userAgent,
          HttpServletResponse response, boolean rememberMe) {
-      // 1. Check if social account already exists
+      // Check if social account already exists
       String providerUpper = provider.toUpperCase();
       SocialAccount socialAccount = socialAccountRepository.findByProviderAndProviderId(providerUpper, userInfo.getId())
             .orElse(null);
@@ -535,7 +534,7 @@ public class AuthServiceImpl implements AuthService {
             profile = userProfileRepository.findById(user.getId()).orElse(null);
          }
 
-         // 4. Link social account
+         // Link social account
          SocialAccount newSocialAccount = SocialAccount.builder()
                .user(user)
                .provider(providerUpper)
@@ -586,7 +585,8 @@ public class AuthServiceImpl implements AuthService {
 
    @Override
    @Transactional
-   public AuthResponse loginWith2FA(com.omnibooking.dto.TwoFactorLoginRequest request, String ip, String userAgent, HttpServletResponse response) {
+   public AuthResponse loginWith2FA(com.omnibooking.dto.TwoFactorLoginRequest request, String ip, String userAgent,
+         HttpServletResponse response) {
       if (!bloomFilterService.mightContain(request.getEmail())) {
          throw new AppException(ErrorCode.INVALID_CREDENTIALS);
       }
@@ -608,6 +608,7 @@ public class AuthServiceImpl implements AuthService {
 
       UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
       long now = System.currentTimeMillis();
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now, now);
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
+            now);
    }
 }

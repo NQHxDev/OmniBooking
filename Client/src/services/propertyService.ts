@@ -17,6 +17,6 @@ export const propertyService = {
       const response = await apiClient.get<unknown, ApiResponse<PropertyResponse[]>>(
          `/properties/featured?limit=${limit}`
       );
-      return response.data;
+      return response.data || [];
    },
 };

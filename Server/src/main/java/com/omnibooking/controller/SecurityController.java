@@ -77,4 +77,5 @@ public class SecurityController {
 
       return ResponseEntity.ok(ApiResponse.success(response, "Lấy trạng thái bảo mật thành công", requestId));
    }
+
 }

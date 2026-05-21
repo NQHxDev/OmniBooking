@@ -204,9 +204,11 @@
          "metaDesc": "Join OmniBooking and start welcoming guests today"
       },
       "createPropertyForm": {
-         "step1": "Info",
+         "step1": "Basic Info",
          "step2": "Location",
-         "step3": "Images",
+         "step3": "Setup",
+         "step4": "Gallery",
+         "step5": "Legal",
          "basicInfo": "Basic Information",
          "propertyName": "Property Name",
          "description": "Detailed Description",
@@ -231,13 +233,17 @@
          },
          "messages": {
             "flexibleInfo": "24/7 mode enabled: Guests can check-in and check-out at any time of the day",
-            "imageUploadDesc": "Upload at least 1 image. The first one will be set as the main photo",
+            "imageUploadDesc": "Upload at least 5 images. The first one will be set as the main photo",
             "success": "Property created successfully!",
             "imageProcessing": "Image processing request has been sent to the system",
             "error": "An error occurred while creating the property",
             "validationError": "Please check your information again",
             "stepError": "Please complete all information in this step",
-            "imageRequired": "Please upload at least one image for your property"
+            "imageRequired": "Please upload at least five images for your property",
+            "imageMinLimit": "Please upload at least 5 images.",
+            "roomsRequired": "Please add at least one room type.",
+            "legalRequired": "Please fill in all legal information fields.",
+            "termsRequired": "You must agree to the terms to proceed."
          },
          "propertyTypes": {
             "HOTEL": {
@@ -259,7 +265,55 @@
             "RESORT": {
                "label": "Resort",
                "description": "High-end resorts, all-inclusive services"
+            },
+            "GUESTHOUSE": {
+               "label": "Guesthouse",
+               "description": "Cozy rooms or shared spaces with a friendly host"
             }
+         },
+         "roomsTitle": "Rooms Configuration",
+         "roomsSubtitle": "Add the types of rooms available in your property",
+         "addRoom": "Add Room Type",
+         "roomName": "Room Name",
+         "roomNamePlaceholder": "e.g., Deluxe Double Room",
+         "bedType": "Bed Type",
+         "roomSize": "Room Size (sqm)",
+         "capacityAdults": "Adult Capacity",
+         "capacityChildren": "Child Capacity",
+         "totalRooms": "Number of Rooms",
+         "basePrice": "Base Price per Night",
+         "amenitiesTitle": "Property Amenities",
+         "amenitiesSubtitle": "Select the facilities and services available at your property",
+         "amenitiesCategories": {
+            "GENERAL": "General Facilities",
+            "ROOM": "Room Amenities",
+            "BATHROOM": "Bathroom Amenities",
+            "KITCHEN": "Kitchen Amenities"
+         },
+         "legalTitle": "Legal Information",
+         "legalSubtitle": "Enter official business registration and tax details",
+         "businessRegistrationNumber": "Business Registration Number",
+         "taxCode": "Tax Code",
+         "legalOwnerName": "Legal Owner Name",
+         "businessRegistrationNumberPlaceholder": "Enter registration number",
+         "taxCodePlaceholder": "Enter tax code",
+         "legalOwnerNamePlaceholder": "Enter legal owner's full name",
+         "termsAgreement": "I certify that all the provided business information is accurate, and I agree to the Partner Terms of Service and Privacy Policy.",
+         "reviewTitle": "Review Your Registration",
+         "reviewSubtitle": "Please check all details before finalizing your registration",
+         "reviewBasicInfo": "Basic Details",
+         "reviewLocation": "Location Details",
+         "reviewRooms": "Room Types ({count})",
+         "reviewAmenities": "Amenities ({count} selected)",
+         "reviewImages": "Images ({count} uploaded)",
+         "reviewLegal": "Legal Compliance",
+         "reviewRoomsTable": {
+            "name": "Room Type",
+            "bedType": "Bed",
+            "size": "Size",
+            "capacity": "Capacity",
+            "rooms": "Total Rooms",
+            "price": "Price"
          }
       },
       "imageUpload": {
@@ -280,7 +334,18 @@
          "descMin": "Description must be at least 20 characters",
          "addressRequired": "Address cannot be empty",
          "cityRequired": "City cannot be empty",
-         "countryRequired": "Country cannot be empty"
+         "countryRequired": "Country cannot be empty",
+         "roomNameMin": "Room name must be at least 3 characters",
+         "roomPriceMin": "Price must be greater than 0",
+         "roomCapacityMin": "At least 1 adult capacity required",
+         "roomSizeMin": "Room size must be positive",
+         "totalRoomsMin": "At least 1 room required",
+         "bedTypeRequired": "Bed type is required",
+         "businessRegRequired": "Business registration number is required",
+         "taxCodeRequired": "Tax code is required",
+         "legalOwnerRequired": "Legal owner name is required",
+         "agreeTermsRequired": "You must agree to the terms to proceed",
+         "roomsRequired": "Please add at least one room type."
       }
    },
    "Search": {
@@ -636,6 +701,7 @@
       "unitLabel": "Apartment or floor number (optional)",
       "unitPlaceholder": "Apartment, building, floor, etc.",
       "cityLabel": "City",
+      "cityPlaceholder": "Enter city name...",
       "zipLabel": "Postcode",
       "autoUpdate": "Update address when dragging the pin on the map.",
       "hint": "Using VietMap helps guests find you more easily. You can drag and drop the pin to the exact location.",
