@@ -2,22 +2,35 @@ package com.omnibooking.services.property.impl;
 
 import com.omnibooking.dto.PropertyRequest;
 import com.omnibooking.dto.PropertyResponse;
+import com.omnibooking.dto.RoomTypeRequest;
+import com.omnibooking.exception.AppException;
+import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.Property;
 import com.omnibooking.model.RoomType;
+import com.omnibooking.model.User;
 import com.omnibooking.model.RoomAvailability;
 import com.omnibooking.model.Amenity;
 import com.omnibooking.model.enums.AmenityCategory;
+import com.omnibooking.model.enums.PropertyType;
 import com.omnibooking.repository.MediaRepository;
 import com.omnibooking.repository.PropertyRepository;
 import com.omnibooking.repository.RoomTypeRepository;
+import com.omnibooking.repository.UserRepository;
 import com.omnibooking.repository.RoomAvailabilityRepository;
 import com.omnibooking.repository.AmenityRepository;
 import com.omnibooking.services.property.PropertyService;
+import com.omnibooking.services.property.PropertySyncProducer;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.omnibooking.dto.PartnerLegalProfileResponse;
+import com.omnibooking.model.PartnerLegalProfile;
+import com.omnibooking.repository.PartnerLegalProfileRepository;
+import com.omnibooking.services.core.EncryptionService;
 
 import java.util.List;
 import java.util.Set;
@@ -25,6 +38,8 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.UUID;
 import java.time.LocalDate;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Slf4j
 @Service
@@ -32,27 +47,44 @@ import java.time.LocalDate;
 public class PropertyServiceImpl implements PropertyService {
 
    private final PropertyRepository propertyRepository;
-   private final com.omnibooking.repository.UserRepository userRepository;
+
+   private final UserRepository userRepository;
+
    private final MediaRepository mediaRepository;
+
    private final RoomTypeRepository roomTypeRepository;
+
    private final RoomAvailabilityRepository roomAvailabilityRepository;
+
    private final AmenityRepository amenityRepository;
-   private final com.omnibooking.services.property.PropertySyncProducer propertySyncProducer;
+
+   private final PropertySyncProducer propertySyncProducer;
+
+   private final PartnerLegalProfileRepository partnerLegalProfileRepository;
+
+   private final EncryptionService encryptionService;
 
    @Override
    @Transactional
+   @CacheEvict(value = "properties", allEntries = true)
    public PropertyResponse createProperty(PropertyRequest request, UUID ownerId) {
-      log.info("Creating new property: {} for owner: {}", request.getName(), ownerId);
-
-      com.omnibooking.model.User owner = userRepository.findById(Objects.requireNonNull(ownerId))
+      User owner = userRepository.findById(Objects.requireNonNull(ownerId))
             .orElseThrow(
-                  () -> new com.omnibooking.exception.AppException(com.omnibooking.exception.ErrorCode.USER_NOT_FOUND));
+                  () -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+      String encryptedRegNum = request.getBusinessRegistrationNumber() != null
+            ? encryptionService.encrypt(request.getBusinessRegistrationNumber())
+            : null;
+      String encryptedTaxCode = request.getTaxCode() != null ? encryptionService.encrypt(request.getTaxCode()) : null;
+      String encryptedOwnerName = request.getLegalOwnerName() != null
+            ? encryptionService.encrypt(request.getLegalOwnerName())
+            : null;
 
       Property property = Property.builder()
             .owner(owner)
             .name(request.getName())
             .description(request.getDescription())
-            .propertyType(com.omnibooking.model.enums.PropertyType.valueOf(request.getPropertyType()))
+            .propertyType(PropertyType.valueOf(request.getPropertyType()))
             .address(request.getAddress())
             .city(request.getCity())
             .country(request.getCountry())
@@ -60,13 +92,17 @@ public class PropertyServiceImpl implements PropertyService {
                   request.getStarRating() != null && request.getStarRating() == 0 ? null : request.getStarRating())
             .checkInTime(request.getCheckInTime())
             .checkOutTime(request.getCheckOutTime())
-            .businessRegistrationNumber(request.getBusinessRegistrationNumber())
-            .taxCode(request.getTaxCode())
-            .legalOwnerName(request.getLegalOwnerName())
+            .businessRegistrationNumber(encryptedRegNum)
+            .taxCode(encryptedTaxCode)
+            .legalOwnerName(encryptedOwnerName)
             .isActive(true)
             .build();
 
       Property saved = propertyRepository.save(Objects.requireNonNull(property));
+
+      // Save/reactivate partner legal profile
+      savePartnerLegalProfile(owner, request.getBusinessRegistrationNumber(), request.getTaxCode(),
+            request.getLegalOwnerName());
 
       // Save Amenities
       if (request.getAmenities() != null && !request.getAmenities().isEmpty()) {
@@ -88,7 +124,7 @@ public class PropertyServiceImpl implements PropertyService {
 
       // Save Room Types & Initialize Availability
       if (request.getRoomTypes() != null && !request.getRoomTypes().isEmpty()) {
-         for (com.omnibooking.dto.RoomTypeRequest roomRequest : request.getRoomTypes()) {
+         for (RoomTypeRequest roomRequest : request.getRoomTypes()) {
             RoomType roomType = RoomType.builder()
                   .property(saved)
                   .name(roomRequest.getName())
@@ -151,29 +187,136 @@ public class PropertyServiceImpl implements PropertyService {
             .toList();
    }
 
-   @Override
-   @Cacheable(value = "properties", key = "'featured:' + #limit")
-   public List<PropertyResponse> getFeaturedProperties(int limit) {
-      log.info("Fetching {} featured properties", limit);
-      List<Property> properties = propertyRepository
-            .findFeaturedProperties(org.springframework.data.domain.PageRequest.of(0, limit));
+    @Override
+    @Cacheable(value = "properties", key = "'featured:' + #limit")
+    public List<PropertyResponse> getFeaturedProperties(int limit) {
+       log.info("Fetching {} featured properties", limit);
+       Instant startDate = Instant.now().minus(30, ChronoUnit.DAYS);
+       List<Property> properties = propertyRepository
+             .findFeaturedProperties(startDate, org.springframework.data.domain.PageRequest.of(0, limit));
 
-      return properties.stream()
-            .map(p -> PropertyResponse.builder()
-                  .id(p.getId())
-                  .name(p.getName())
-                  .propertyType(p.getPropertyType().name())
-                  .city(p.getCity())
-                  .country(p.getCountry())
-                  .imageUrl(getMainImageUrl(p.getId()))
-                  .build())
-            .toList();
-   }
+       return properties.stream()
+             .map(p -> PropertyResponse.builder()
+                   .id(p.getId())
+                   .name(p.getName())
+                   .propertyType(p.getPropertyType().name())
+                   .city(p.getCity())
+                   .country(p.getCountry())
+                   .imageUrl(getMainImageUrl(p.getId()))
+                   .build())
+             .toList();
+    }
+
+    @Override
+    @Cacheable(value = "properties", key = "'new:' + #limit")
+    public List<PropertyResponse> getNewProperties(int limit) {
+       log.info("Fetching {} new properties", limit);
+       List<Property> properties = propertyRepository
+             .findNewProperties(org.springframework.data.domain.PageRequest.of(0, limit));
+
+       return properties.stream()
+             .map(p -> PropertyResponse.builder()
+                   .id(p.getId())
+                   .name(p.getName())
+                   .propertyType(p.getPropertyType().name())
+                   .city(p.getCity())
+                   .country(p.getCountry())
+                   .imageUrl(getMainImageUrl(p.getId()))
+                   .build())
+             .toList();
+    }
 
    private String getMainImageUrl(UUID propertyId) {
       return mediaRepository.findFirstByEntityIdAndEntityTypeAndIsMainTrue(propertyId, "PROPERTY")
             .map(com.omnibooking.model.Media::getUrl)
             .orElse(null);
+   }
+
+   @Override
+   public List<PartnerLegalProfileResponse> getPartnerLegalProfiles(UUID partnerId) {
+      log.info("Fetching active partner legal profiles for partner: {}", partnerId);
+      List<PartnerLegalProfile> profiles = partnerLegalProfileRepository
+            .findByPartnerIdAndIsActiveTrueOrderByCreatedAtDesc(partnerId);
+      return profiles.stream()
+            .map(p -> {
+               try {
+                  return PartnerLegalProfileResponse.builder()
+                        .id(p.getId())
+                        .businessRegistrationNumber(encryptionService.decrypt(p.getBusinessRegistrationNumber()))
+                        .taxCode(encryptionService.decrypt(p.getTaxCode()))
+                        .legalOwnerName(encryptionService.decrypt(p.getLegalOwnerName()))
+                        .build();
+               } catch (Exception e) {
+                  log.error("Failed to decrypt profile response for profile: {}", p.getId(), e);
+                  return null;
+               }
+            })
+            .filter(Objects::nonNull)
+            .toList();
+   }
+
+   private void savePartnerLegalProfile(com.omnibooking.model.User partner, String regNum, String taxCode,
+         String ownerName) {
+      if (regNum == null || regNum.isBlank() ||
+            taxCode == null || taxCode.isBlank() ||
+            ownerName == null || ownerName.isBlank()) {
+         return;
+      }
+
+      List<PartnerLegalProfile> allProfiles = partnerLegalProfileRepository.findByPartnerId(partner.getId());
+      PartnerLegalProfile matchedProfile = null;
+
+      for (PartnerLegalProfile profile : allProfiles) {
+         try {
+            String decryptedRegNum = encryptionService.decrypt(profile.getBusinessRegistrationNumber());
+            String decryptedTaxCode = encryptionService.decrypt(profile.getTaxCode());
+            String decryptedOwnerName = encryptionService.decrypt(profile.getLegalOwnerName());
+
+            if (regNum.trim().equalsIgnoreCase(decryptedRegNum.trim()) &&
+                  taxCode.trim().equalsIgnoreCase(decryptedTaxCode.trim()) &&
+                  ownerName.trim().equalsIgnoreCase(decryptedOwnerName.trim())) {
+               matchedProfile = profile;
+               break;
+            }
+         } catch (Exception e) {
+            log.error("Failed to decrypt profile: {}", profile.getId(), e);
+         }
+      }
+
+      if (matchedProfile != null) {
+         if (Boolean.TRUE.equals(matchedProfile.getIsActive())) {
+            // Already active, do nothing
+            return;
+         }
+         // Reactivate the matched profile
+         List<PartnerLegalProfile> activeProfiles = new java.util.ArrayList<>(
+               partnerLegalProfileRepository.findByPartnerIdAndIsActiveTrueOrderByCreatedAtAsc(partner.getId()));
+         while (activeProfiles.size() >= 2) {
+            PartnerLegalProfile oldest = activeProfiles.remove(0);
+            oldest.setIsActive(false);
+            partnerLegalProfileRepository.save(oldest);
+         }
+         matchedProfile.setIsActive(true);
+         partnerLegalProfileRepository.save(matchedProfile);
+      } else {
+         // Create a new one
+         List<PartnerLegalProfile> activeProfiles = new java.util.ArrayList<>(
+               partnerLegalProfileRepository.findByPartnerIdAndIsActiveTrueOrderByCreatedAtAsc(partner.getId()));
+         while (activeProfiles.size() >= 2) {
+            PartnerLegalProfile oldest = activeProfiles.remove(0);
+            oldest.setIsActive(false);
+            partnerLegalProfileRepository.save(oldest);
+         }
+
+         PartnerLegalProfile newProfile = PartnerLegalProfile.builder()
+               .partner(partner)
+               .businessRegistrationNumber(encryptionService.encrypt(regNum.trim()))
+               .taxCode(encryptionService.encrypt(taxCode.trim()))
+               .legalOwnerName(encryptionService.encrypt(ownerName.trim()))
+               .isActive(true)
+               .build();
+         partnerLegalProfileRepository.save(newProfile);
+      }
    }
 
 }

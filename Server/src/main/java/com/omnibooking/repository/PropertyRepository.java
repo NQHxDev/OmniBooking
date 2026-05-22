@@ -13,7 +13,18 @@ public interface PropertyRepository extends JpaRepository<Property, UUID>, JpaSp
 
    List<Property> findByOwnerId(UUID ownerId);
 
-   @org.springframework.data.jpa.repository.Query("SELECT p FROM Property p WHERE p.isActive = true ORDER BY p.createdAt DESC")
-   List<Property> findFeaturedProperties(org.springframework.data.domain.Pageable pageable);
+   @org.springframework.data.jpa.repository.Query("SELECT p FROM Property p WHERE p.isActive = true " +
+         "AND EXISTS (SELECT m FROM com.omnibooking.model.Media m WHERE m.entityId = p.id AND m.entityType = 'PROPERTY' AND m.isMain = true) " +
+         "ORDER BY (SELECT COUNT(b) FROM Booking b WHERE b.roomType.property = p " +
+         "AND b.status IN (com.omnibooking.model.enums.BookingStatus.CONFIRMED, com.omnibooking.model.enums.BookingStatus.STAYED) " +
+         "AND b.createdAt >= :startDate) DESC, random()")
+   List<Property> findFeaturedProperties(
+         @org.springframework.data.repository.query.Param("startDate") java.time.Instant startDate, 
+         org.springframework.data.domain.Pageable pageable);
+
+   @org.springframework.data.jpa.repository.Query("SELECT p FROM Property p WHERE p.isActive = true " +
+         "AND EXISTS (SELECT m FROM com.omnibooking.model.Media m WHERE m.entityId = p.id AND m.entityType = 'PROPERTY' AND m.isMain = true) " +
+         "ORDER BY p.createdAt DESC")
+   List<Property> findNewProperties(org.springframework.data.domain.Pageable pageable);
 
 }

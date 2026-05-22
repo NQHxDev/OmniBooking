@@ -47,10 +47,26 @@ const getPropertySchema = (tv: (key: string) => string) =>
       businessRegistrationNumber: z.string().min(5, tv("businessRegRequired")),
       taxCode: z.string().min(5, tv("taxCodeRequired")),
       legalOwnerName: z.string().min(2, tv("legalOwnerRequired")),
-      agreeToTerms: z.boolean().refine((val) => val === true, {
-         message: tv("agreeTermsRequired"),
-      }),
    });
+
+const waitImagesSync = async (propertyId: string): Promise<number> => {
+   const startTime = Date.now();
+   const maxPollTime = 30000; // 30s timeout
+
+   while (Date.now() - startTime < maxPollTime) {
+      try {
+         const myProperties = await propertyService.getMyProperties();
+         const createdProperty = myProperties.find((p) => p.id === propertyId);
+         if (createdProperty && createdProperty.imageUrl) {
+            break;
+         }
+      } catch (error) {
+         console.error("Failed to check image status", error);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+   }
+   return Date.now() - startTime;
+};
 
 export default function CreatePropertyForm() {
    const t = useTranslations("Partner.createPropertyForm");
@@ -105,12 +121,14 @@ export default function CreatePropertyForm() {
       }
 
       setIsSubmitting(true);
+      const loadingToastId = toast.loading(
+         t("messages.uploading") || "Đang đăng tải thông tin chỗ nghỉ..."
+      );
       try {
          // 1. Create Property
          const property = await propertyService.createProperty(data);
-         toast.success(t("messages.success"));
 
-         // 2. Upload Images in Background
+         // 2. Upload Images
          setImages((prev) => prev.map((img) => ({ ...img, isUploading: true })));
 
          const uploadPromises = images.map((img, index) =>
@@ -118,10 +136,30 @@ export default function CreatePropertyForm() {
          );
 
          await Promise.all(uploadPromises);
-         toast.success(t("messages.imageProcessing"));
+
+         // Cập nhật toast thành đang xử lý tối ưu ảnh
+         toast.loading(
+            t("messages.imageProcessing") || "Hình ảnh đang được tối ưu hóa trên hệ thống CDN...",
+            {
+               id: loadingToastId,
+            }
+         );
+
+         // 3. Chờ ảnh được Kafka/CDN xử lý xong bất đồng bộ
+         const elapsedTime = await waitImagesSync(property.id);
+
+         // Nếu xử lý quá nhanh (dưới 3 giây), cố tình delay thêm cho đủ 3 giây để trải nghiệm mượt mà hơn
+         if (elapsedTime < 3000) {
+            await new Promise((resolve) => setTimeout(resolve, 3000 - elapsedTime));
+         }
+
+         toast.success(t("messages.success") || "Tạo chỗ nghỉ và đồng bộ hình ảnh thành công!", {
+            id: loadingToastId,
+         });
 
          router.push("/partner/dashboard");
       } catch (error: unknown) {
+         toast.dismiss(loadingToastId);
          const apiError = error as { response?: { data?: { message?: string } } };
          toast.error(apiError.response?.data?.message || t("messages.error"));
       } finally {

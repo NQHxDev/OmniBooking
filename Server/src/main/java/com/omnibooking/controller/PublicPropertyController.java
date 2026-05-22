@@ -32,4 +32,13 @@ public class PublicPropertyController {
       return ApiResponse.success(response);
    }
 
+   @GetMapping("/new")
+   @Operation(summary = "Get newly added properties for homepage")
+   public ApiResponse<List<PropertyResponse>> getNewProperties(
+         @RequestParam(defaultValue = "15") int limit) {
+      log.info("Public API: Fetching {} new properties", limit);
+      List<PropertyResponse> response = propertyService.getNewProperties(limit);
+      return ApiResponse.success(response);
+   }
+
 }

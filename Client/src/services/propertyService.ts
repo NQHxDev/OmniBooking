@@ -19,4 +19,11 @@ export const propertyService = {
       );
       return response.data || [];
    },
+
+   getNew: async (limit: number = 15): Promise<PropertyResponse[]> => {
+      const response = await apiClient.get<unknown, ApiResponse<PropertyResponse[]>>(
+         `/properties/new?limit=${limit}`
+      );
+      return response.data || [];
+   },
 };

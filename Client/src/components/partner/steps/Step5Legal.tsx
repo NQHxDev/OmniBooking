@@ -1,9 +1,12 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { useTranslations } from "next-intl";
-import { FileText, CheckCircle2, ChevronLeft, Loader2 } from "lucide-react";
+import { FileText, CheckCircle2, ChevronLeft, Loader2, History } from "lucide-react";
 import type { PropertyFormValues } from "../CreatePropertyForm";
+import { propertyService } from "@/lib/api/propertyService";
+import type { PartnerLegalProfileResponse } from "@/lib/api/propertyService";
 import Image from "next/image";
 
 interface Step5LegalProps {
@@ -16,8 +19,48 @@ export default function Step5Legal({ images, isSubmitting, onBack }: Step5LegalP
    const t = useTranslations("Partner.createPropertyForm");
    const {
       register,
+      setValue,
+      trigger,
       formState: { errors },
    } = useFormContext<PropertyFormValues>();
+
+   const [profiles, setProfiles] = useState<PartnerLegalProfileResponse[]>([]);
+   const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
+
+   useEffect(() => {
+      let isMounted = true;
+      propertyService
+         .getLegalProfiles()
+         .then((data) => {
+            if (isMounted) {
+               setProfiles(data);
+               setIsLoadingProfiles(false);
+            }
+         })
+         .catch((err) => {
+            console.error("Failed to fetch legal profiles", err);
+            if (isMounted) {
+               setIsLoadingProfiles(false);
+            }
+         });
+      return () => {
+         isMounted = false;
+      };
+   }, []);
+
+   const handleSelectProfile = (profile: PartnerLegalProfileResponse) => {
+      setValue("businessRegistrationNumber", profile.businessRegistrationNumber);
+      setValue("taxCode", profile.taxCode);
+      setValue("legalOwnerName", profile.legalOwnerName);
+      trigger(["businessRegistrationNumber", "taxCode", "legalOwnerName"]);
+   };
+
+   const maskValue = (value: string) => {
+      if (!value) return "";
+      const trimmed = value.trim();
+      if (trimmed.length <= 7) return trimmed;
+      return `${trimmed.slice(0, 3)}...${trimmed.slice(-4)}`;
+   };
 
    const watchAllFields = useWatch<PropertyFormValues>();
 
@@ -35,6 +78,46 @@ export default function Step5Legal({ images, isSubmitting, onBack }: Step5LegalP
                   <p className="text-xs text-zinc-500">{t("legalSubtitle")}</p>
                </div>
             </div>
+
+            {/* Previous Legal Profiles */}
+            {!isLoadingProfiles && profiles.length > 0 && (
+               <div className="space-y-3 p-4 rounded-2xl bg-zinc-50 border border-zinc-100">
+                  <div className="flex items-center gap-2 text-zinc-800">
+                     <History className="h-4 w-4 text-[#003580]" />
+                     <span className="text-[13px] font-bold uppercase tracking-tight text-zinc-700">
+                        {t("previousLegalProfiles")}
+                     </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     {profiles.map((profile) => (
+                        <button
+                           key={profile.id}
+                           type="button"
+                           onClick={() => handleSelectProfile(profile)}
+                           className="flex flex-col text-left p-4 rounded-xl border border-zinc-200 bg-white hover:border-[#003580] hover:shadow-md hover:shadow-blue-50/50 transition-all duration-300 group cursor-pointer"
+                        >
+                           <span className="text-[13px] font-bold text-zinc-800 mb-1 group-hover:text-[#003580] transition-colors">
+                              {profile.legalOwnerName}
+                           </span>
+                           <div className="space-y-0.5 text-xs text-zinc-500">
+                              <p>
+                                 <span className="font-semibold text-zinc-700">
+                                    {t("businessRegistrationNumber")}:
+                                 </span>{" "}
+                                 {maskValue(profile.businessRegistrationNumber)}
+                              </p>
+                              <p>
+                                 <span className="font-semibold text-zinc-700">
+                                    {t("taxCode")}:
+                                 </span>{" "}
+                                 {maskValue(profile.taxCode)}
+                              </p>
+                           </div>
+                        </button>
+                     ))}
+                  </div>
+               </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <div>

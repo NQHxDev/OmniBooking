@@ -11,6 +11,10 @@ public interface PropertyService {
 
    List<PropertyResponse> getPropertiesByOwner(UUID ownerId);
 
-   List<PropertyResponse> getFeaturedProperties(int limit);
+    List<PropertyResponse> getFeaturedProperties(int limit);
+
+    List<PropertyResponse> getNewProperties(int limit);
+
+   List<com.omnibooking.dto.PartnerLegalProfileResponse> getPartnerLegalProfiles(UUID partnerId);
 
 }

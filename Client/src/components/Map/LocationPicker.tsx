@@ -140,6 +140,7 @@ export default function LocationPicker({
    const [city, setCity] = useState("");
    const [country, setCountry] = useState("Việt Nam");
    const [zipCode, setZipCode] = useState("");
+   const [unit, setUnit] = useState("");
    const [autoUpdate, setAutoUpdate] = useState(true);
    const [showHint, setShowHint] = useState(true);
    const [isRetina, setIsRetina] = useState(false);
@@ -210,9 +211,11 @@ export default function LocationPicker({
 
    useEffect(() => {
       if (onAddressDetailsChangeRef.current) {
-         onAddressDetailsChangeRef.current({ address, city, country });
+         const trimmedUnit = unit.trim();
+         const fullAddress = trimmedUnit ? `${trimmedUnit}, ${address}` : address;
+         onAddressDetailsChangeRef.current({ address: fullAddress, city, country });
       }
-   }, [address, city, country]);
+   }, [address, unit, city, country]);
 
    const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
       const selectedName = e.target.value;
@@ -354,15 +357,140 @@ export default function LocationPicker({
       return () => clearTimeout(delayDebounce);
    }, [searchQuery, position]);
 
+   // Reverse geocode lat/lng to get address details
+   const handleReverseGeocode = useCallback(
+      async (lat: number, lng: number) => {
+         try {
+            const key = env.NEXT_PUBLIC_VIETMAP_API_KEY;
+            const goongKey = env.NEXT_PUBLIC_GOONG_API_KEY;
+            const isGoogleKey = key?.startsWith("AIzaSy");
+            const isPlaceholder = !key || key.includes("your_") || key.includes("api_key");
+
+            let streetAddress = "";
+            let cityVal = "";
+            let countryVal = "Việt Nam";
+            let postalVal = "";
+
+            if (key && !isPlaceholder && !isGoogleKey) {
+               // VietMap Reverse Geocoding v4
+               const response = await axios.get("https://maps.vietmap.vn/api/reverse/v4", {
+                  params: {
+                     apikey: key,
+                     lat: lat,
+                     lng: lng,
+                  },
+               });
+               const data = response.data;
+               interface VietMapReverseItem {
+                  address?: string;
+                  display?: string;
+                  city?: string;
+                  province?: string;
+                  country?: string;
+               }
+               if (Array.isArray(data) && data.length > 0) {
+                  const result = data[0] as VietMapReverseItem;
+                  streetAddress = result.address || result.display || "";
+                  cityVal = result.city || result.province || "";
+                  countryVal = result.country || "Việt Nam";
+               } else if (data && typeof data === "object") {
+                  const result = data as VietMapReverseItem;
+                  streetAddress = result.address || result.display || "";
+                  cityVal = result.city || result.province || "";
+                  countryVal = result.country || "Việt Nam";
+               }
+            } else if (goongKey && goongKey.length > 5) {
+               // Goong Reverse Geocoding
+               const response = await axios.get("https://rsapi.goong.io/Geocode", {
+                  params: {
+                     latlng: `${lat},${lng}`,
+                     api_key: goongKey,
+                  },
+               });
+               const results = response.data.results || [];
+               if (results.length > 0) {
+                  const result = results[0];
+                  streetAddress = result.formatted_address || "";
+
+                  interface GoongAddressComponent {
+                     types: string[];
+                     long_name: string;
+                     short_name: string;
+                  }
+                  const components = (result.address_components || []) as GoongAddressComponent[];
+                  const cityComp = components.find(
+                     (c) => c.types && c.types.includes("administrative_area_level_1")
+                  );
+                  if (cityComp) {
+                     cityVal = cityComp.long_name || cityComp.short_name || "";
+                  }
+                  const countryComp = components.find(
+                     (c) => c.types && c.types.includes("country")
+                  );
+                  if (countryComp) {
+                     countryVal = countryComp.long_name || "Việt Nam";
+                  }
+               }
+            } else {
+               // OSM Nominatim Reverse Geocoding
+               const response = await axios.get("https://nominatim.openstreetmap.org/reverse", {
+                  params: {
+                     format: "json",
+                     lat: lat,
+                     lon: lng,
+                     "accept-language": "vi",
+                     addressdetails: 1,
+                  },
+               });
+               const data = response.data || {};
+               streetAddress = data.display_name || "";
+               const addr = (data.address || {}) as Record<string, string>;
+
+               const houseNumber = addr.house_number || "";
+               const road = addr.road || "";
+               if (houseNumber && road) {
+                  streetAddress = `${houseNumber} ${road}`;
+               } else if (road) {
+                  streetAddress = road;
+               }
+
+               cityVal =
+                  addr.city || addr.town || addr.municipality || addr.province || addr.state || "";
+               countryVal = addr.country || "Việt Nam";
+               postalVal = addr.postcode || "700000";
+            }
+
+            if (streetAddress) {
+               setAddress(streetAddress);
+               setSearchQuery(streetAddress);
+            }
+            if (cityVal) setCity(cityVal);
+            if (countryVal) setCountry(countryVal);
+            if (postalVal) setZipCode(postalVal);
+
+            if (onLocationChange) {
+               onLocationChange(lat, lng, streetAddress);
+            }
+         } catch (error) {
+            console.error("Reverse geocoding failed:", error);
+         }
+      },
+      [onLocationChange]
+   );
+
    // Handle click on map to position pin
    const handleMapClick = useCallback(
       (lat: number, lng: number) => {
          setHasSelectedLocation(true);
          const newPos = { lat, lng };
          setPosition(newPos);
-         if (onLocationChange) onLocationChange(newPos.lat, newPos.lng, address);
+         if (autoUpdate) {
+            handleReverseGeocode(lat, lng);
+         } else if (onLocationChange) {
+            onLocationChange(newPos.lat, newPos.lng, address);
+         }
       },
-      [address, onLocationChange]
+      [address, autoUpdate, handleReverseGeocode, onLocationChange]
    );
 
    // Handle dragging of pin
@@ -374,11 +502,15 @@ export default function LocationPicker({
                setHasSelectedLocation(true);
                const newPos = marker.getLatLng();
                setPosition({ lat: newPos.lat, lng: newPos.lng });
-               if (onLocationChange) onLocationChange(newPos.lat, newPos.lng, address);
+               if (autoUpdate) {
+                  handleReverseGeocode(newPos.lat, newPos.lng);
+               } else if (onLocationChange) {
+                  onLocationChange(newPos.lat, newPos.lng, address);
+               }
             }
          },
       }),
-      [address, onLocationChange]
+      [address, autoUpdate, handleReverseGeocode, onLocationChange]
    );
 
    // Handle choosing a suggestion
@@ -595,10 +727,25 @@ export default function LocationPicker({
 
                   <div>
                      <label className="block text-sm font-bold text-gray-700 mb-1">
+                        {t("addressLabel")}
+                     </label>
+                     <input
+                        type="text"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#006ce4] focus:border-transparent transition-all duration-200 text-sm text-gray-800"
+                        placeholder={t("addressPlaceholder")}
+                     />
+                  </div>
+
+                  <div>
+                     <label className="block text-sm font-bold text-gray-700 mb-1">
                         {t("unitLabel")}
                      </label>
                      <input
                         type="text"
+                        value={unit}
+                        onChange={(e) => setUnit(e.target.value)}
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#006ce4] focus:border-transparent transition-all duration-200 text-sm text-gray-800"
                         placeholder={t("unitPlaceholder")}
                      />

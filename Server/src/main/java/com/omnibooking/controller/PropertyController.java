@@ -50,4 +50,14 @@ public class PropertyController {
       return ApiResponse.success(response);
    }
 
+   @GetMapping("/legal-profiles")
+   @PreAuthorize("hasAuthority(T(com.omnibooking.constant.SecurityConstants.Roles).PARTNER)")
+   @Operation(summary = "Get active legal profiles for current partner")
+   public ApiResponse<List<com.omnibooking.dto.PartnerLegalProfileResponse>> getLegalProfiles() {
+      UUID userId = SecurityUtils.getCurrentUserId();
+      log.info("Controller: Fetching legal profiles for partner: {}", userId);
+      List<com.omnibooking.dto.PartnerLegalProfileResponse> response = propertyService.getPartnerLegalProfiles(userId);
+      return ApiResponse.success(response);
+   }
+
 }

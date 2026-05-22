@@ -12,12 +12,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.omnibooking.services.auth.AuthService;
+import com.omnibooking.services.partner.PartnerService;
+import com.omnibooking.dto.PartnerStatsResponse;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.util.OtpUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,6 +45,22 @@ public class PartnerController {
    private final AuthService authService;
 
    private final OutboxService outboxService;
+
+   private final PartnerService partnerService;
+
+   @GetMapping("/stats")
+   public ResponseEntity<ApiResponse<PartnerStatsResponse>> getStats(
+         @AuthenticationPrincipal UserPrincipal principal,
+         HttpServletRequest request) {
+
+      String requestIdAttr = (String) request.getAttribute("requestId");
+      String requestId = requestIdAttr != null ? requestIdAttr : "N/A";
+
+      UUID userId = Objects.requireNonNull(principal.getId(), "User ID cannot be null");
+      PartnerStatsResponse stats = partnerService.getPartnerStats(userId);
+
+      return ResponseEntity.ok(ApiResponse.success(stats, "Lấy thống kê đối tác thành công", requestId));
+   }
 
    @Transactional
    @PostMapping("/send-otp")

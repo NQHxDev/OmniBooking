@@ -2,6 +2,7 @@ import Navbar from "@/components/Navbar";
 import GeniusBanner from "@/components/GeniusBanner";
 import SearchBar from "@/components/SearchBar";
 import FeaturedProperties from "@/components/FeaturedProperties";
+import NewProperties from "@/components/NewProperties";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 
@@ -14,7 +15,7 @@ export default function Home() {
          <Navbar />
 
          {/* Hero Section */}
-         <section className="bg-[#003580] pb-16 pt-12 text-white">
+         <section className="bg-[#003580] pt-16 pb-28 text-white">
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                <h2 className="text-5xl font-bold leading-tight">
                   {t("heroTitle") || "Tìm chỗ nghỉ tiếp theo"}
@@ -151,6 +152,9 @@ export default function Home() {
 
             {/* Featured Properties from DB */}
             <FeaturedProperties />
+
+            {/* New Properties from DB */}
+            <NewProperties />
 
             {/* Loyalty/Genius Section */}
             <GeniusBanner />

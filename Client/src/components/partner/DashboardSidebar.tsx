@@ -8,7 +8,7 @@ import {
    MessageSquare,
    BarChart3,
    Settings,
-   LogOut,
+   Home,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
@@ -61,10 +61,13 @@ export default function DashboardSidebar() {
             </nav>
 
             <div className="mt-auto border-t border-zinc-100 pt-6">
-               <button className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-all">
-                  <LogOut className="h-5 w-5" />
-                  {t("logout")}
-               </button>
+               <Link
+                  href="/"
+                  className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 transition-all cursor-pointer"
+               >
+                  <Home className="h-5 w-5 text-zinc-400" />
+                  {t("backToHome")}
+               </Link>
             </div>
          </div>
       </aside>

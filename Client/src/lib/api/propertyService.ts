@@ -40,6 +40,13 @@ export interface PropertyResponse {
    imageUrl?: string;
 }
 
+export interface PartnerLegalProfileResponse {
+   id: string;
+   businessRegistrationNumber: string;
+   taxCode: string;
+   legalOwnerName: string;
+}
+
 export const propertyService = {
    createProperty: async (data: PropertyRequest) => {
       const response = await apiClient.post<unknown, ApiResponse<PropertyResponse>>(
@@ -104,5 +111,12 @@ export const propertyService = {
          },
       });
       return response.data;
+   },
+
+   getLegalProfiles: async (): Promise<PartnerLegalProfileResponse[]> => {
+      const response = await apiClient.get<unknown, ApiResponse<PartnerLegalProfileResponse[]>>(
+         "/partner/properties/legal-profiles"
+      );
+      return response.data || [];
    },
 };

@@ -2,7 +2,17 @@
 
 import React, { useState } from "react";
 import { PropertyResponse } from "@/lib/api/propertyService";
-import { MapPin, Hotel, ChevronLeft, ChevronRight, Eye, Edit3, Trash2, Star } from "lucide-react";
+import {
+   MapPin,
+   Hotel,
+   ChevronLeft,
+   ChevronRight,
+   Eye,
+   Edit3,
+   Trash2,
+   Star,
+   Loader2,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -50,19 +60,26 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
                   className="group relative flex flex-col overflow-hidden rounded-[2rem] bg-white shadow-sm border border-zinc-100 hover:shadow-xl hover:shadow-zinc-200 transition-all duration-500"
                >
                   {/* Image Section - Reduced height */}
-                  <div className="relative h-48 w-full overflow-hidden">
-                     <Image
-                        src={
-                           property.imageUrl ||
-                           "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=800"
-                        }
-                        alt={property.name}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        className="object-cover transition-transform duration-700 group-hover:scale-110"
-                        unoptimized={!property.imageUrl}
-                     />
-                     <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  <div className="relative h-48 w-full overflow-hidden bg-zinc-100">
+                     {property.imageUrl ? (
+                        <>
+                           <Image
+                              src={property.imageUrl}
+                              alt={property.name}
+                              fill
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              className="object-cover transition-transform duration-700 group-hover:scale-110"
+                           />
+                           <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                        </>
+                     ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-linear-to-br from-zinc-800 to-zinc-900 text-white p-4">
+                           <Loader2 className="h-6 w-6 animate-spin text-zinc-400 mb-2" />
+                           <span className="text-xs font-bold tracking-wide animate-pulse text-zinc-300">
+                              {t("imageProcessing")}
+                           </span>
+                        </div>
+                     )}
 
                      {/* Badge Status - Smaller */}
                      <div className="absolute left-4 top-4">
