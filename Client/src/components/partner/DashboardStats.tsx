@@ -55,32 +55,37 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
          {statsConfig.map((stat) => (
             <div
                key={stat.labelKey}
-               className="group cursor-pointer rounded-3xl bg-white p-6 border border-zinc-100 shadow-sm hover:shadow-md hover:border-zinc-200 active:scale-[0.99] transition-all duration-300"
+               className="group cursor-pointer rounded-3xl bg-white p-6 border border-zinc-100 shadow-xs hover:shadow-md hover:border-zinc-200 active:scale-[0.99] transition-all duration-300"
             >
-               <div className="flex items-center justify-between mb-4">
-                  <div className="rounded-2xl bg-zinc-900 text-zinc-50 border border-zinc-800 p-3 transition-transform group-hover:scale-110 duration-300">
-                     <stat.icon className="h-6 w-6" />
-                  </div>
-                  <div
-                     className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold border ${
-                        stat.isUp
-                           ? "bg-emerald-50/60 text-emerald-700 border-emerald-100"
-                           : "bg-rose-50/60 text-rose-700 border-rose-100"
-                     }`}
-                  >
-                     {stat.isUp ? (
-                        <ArrowUpRight className="h-3 w-3 stroke-[2.5]" />
-                     ) : (
-                        <ArrowDownRight className="h-3 w-3 stroke-[2.5]" />
-                     )}
-                     {formatValue(stat.change)}
+               <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                     {t(stat.labelKey)}
+                  </span>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border text-[#003580] bg-[#003580]/5 border-[#003580]/10 transition-transform group-hover:scale-110 duration-300">
+                     <stat.icon className="h-5 w-5" />
                   </div>
                </div>
-               <div>
-                  <p className="text-sm font-bold text-zinc-400">{t(stat.labelKey)}</p>
-                  <p className="text-2xl font-black text-zinc-900 mt-1">
+               <div className="mt-4 flex items-center justify-between">
+                  <span className="text-2xl font-bold text-zinc-950">
                      {formatValue(stat.value)}
-                  </p>
+                  </span>
+                  <div
+                     className={`flex items-center gap-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${
+                        stat.labelKey === "ratingScore"
+                           ? "text-zinc-500 bg-zinc-50 border-zinc-100"
+                           : stat.isUp
+                             ? "text-emerald-700 bg-emerald-50 border-emerald-100"
+                             : "text-rose-700 bg-rose-50 border-rose-100"
+                     }`}
+                  >
+                     {stat.labelKey !== "ratingScore" &&
+                        (stat.isUp ? (
+                           <ArrowUpRight className="h-3 w-3 stroke-[2.5]" />
+                        ) : (
+                           <ArrowDownRight className="h-3 w-3 stroke-[2.5]" />
+                        ))}
+                     {formatValue(stat.change)}
+                  </div>
                </div>
             </div>
          ))}

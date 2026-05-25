@@ -66,6 +66,12 @@
       "registerSub": "Chỉ mất vài phút để bắt đầu tiết kiệm cho mọi chuyến đi",
       "emailLabel": "Địa chỉ Email",
       "passwordLabel": "Mật khẩu",
+      "passwordMinLength": "Tối thiểu 6 ký tự",
+      "passwordRequireUppercase": "Ít nhất 1 chữ cái in hoa (A-Z)",
+      "passwordRequireLowercase": "Ít nhất 1 chữ cái in thường (a-z)",
+      "passwordRequireNumber": "Ít nhất 1 chữ số (0-9)",
+      "passwordRequireSpecial": "Ít nhất 1 ký tự đặc biệt (ví dụ: @, $, !, %, *, ?, &)",
+      "passwordMissingRequirements": "Mật khẩu cần thêm: ",
       "twoFactorLoginTitle": "Xác thực 2 yếu tố (2FA)",
       "twoFactorLoginSub": "Vui lòng nhập mã xác thực gồm 6 số từ ứng dụng xác thực của bạn.",
       "otpLabel": "Mã xác thực 2FA",
@@ -246,7 +252,8 @@
             "imageMinLimit": "Vui lòng tải lên ít nhất 5 ảnh.",
             "roomsRequired": "Vui lòng thêm ít nhất một loại phòng.",
             "legalRequired": "Vui lòng điền đầy đủ thông tin pháp lý.",
-            "termsRequired": "Bạn phải đồng ý với các điều khoản để tiếp tục."
+            "termsRequired": "Bạn phải đồng ý với các điều khoản để tiếp tục.",
+            "uploading": "Đang đăng tải thông tin chỗ nghỉ..."
          },
          "propertyTypes": {
             "HOTEL": {
@@ -352,6 +359,44 @@
          "legalOwnerRequired": "Tên chủ sở hữu pháp lý không được để trống",
          "agreeTermsRequired": "Bạn phải đồng ý với các điều khoản để tiếp tục",
          "roomsRequired": "Vui lòng thêm ít nhất một loại phòng."
+      },
+      "propertyDetail": {
+         "title": "Chi tiết chỗ nghỉ đối tác",
+         "backToDashboard": "Quay lại trang chính",
+         "editProperty": "Chỉnh sửa chỗ nghỉ",
+         "statusActive": "Đang hoạt động",
+         "statusInactive": "Ngừng hoạt động",
+         "stats": {
+            "occupancyRate": "Tỷ lệ lấp đầy",
+            "monthlyBookings": "Lượt đặt phòng tháng",
+            "estimatedRevenue": "Doanh thu dự kiến",
+            "ratingScore": "Điểm đánh giá"
+         },
+         "basicInfo": {
+            "title": "Thông tin cơ bản",
+            "description": "Mô tả chỗ nghỉ",
+            "propertyType": "Loại hình chỗ nghỉ",
+            "location": "Vị trí địa lý",
+            "amenities": "Tiện ích & Dịch vụ",
+            "checkIn": "Nhận phòng",
+            "checkOut": "Trả phòng"
+         },
+         "rooms": {
+            "title": "Cấu hình danh sách loại phòng",
+            "name": "Loại phòng",
+            "capacity": "Sức chứa",
+            "size": "Diện tích",
+            "bedType": "Loại giường",
+            "basePrice": "Giá cơ bản",
+            "totalRooms": "Tổng số phòng",
+            "noRooms": "Chưa có loại phòng nào được cấu hình."
+         },
+         "legal": {
+            "title": "Hồ sơ pháp lý & Tuân thủ",
+            "businessRegistrationNumber": "Số Đăng ký Kinh doanh",
+            "taxCode": "Mã số thuế",
+            "legalOwnerName": "Chủ sở hữu pháp lý"
+         }
       }
    },
    "Search": {
@@ -581,6 +626,8 @@
          "verificationSent": "Yêu cầu xác thực đã được gửi! Vui lòng kiểm tra email của bạn",
          "resendIn": "Gửi lại sau",
          "rateLimitError": "Vui lòng đợi 30 giây trước khi yêu cầu lại",
+         "invalidPhoneNumber": "Số điện thoại không hợp lệ theo định dạng của quốc gia đã chọn.",
+         "phonePlaceholder": "Nhập số điện thoại (ví dụ: 987 654 321)",
          "save": "Lưu",
          "cancel": "Hủy",
          "genderOptions": {

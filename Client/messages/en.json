@@ -66,6 +66,12 @@
       "registerSub": "It only takes a few minutes to start saving on every trip",
       "emailLabel": "Email Address",
       "passwordLabel": "Password",
+      "passwordMinLength": "Minimum 6 characters",
+      "passwordRequireUppercase": "At least 1 uppercase letter (A-Z)",
+      "passwordRequireLowercase": "At least 1 lowercase letter (a-z)",
+      "passwordRequireNumber": "At least 1 number (0-9)",
+      "passwordRequireSpecial": "At least 1 special character (e.g. @, $, !, %, *, ?, &)",
+      "passwordMissingRequirements": "Password needs: ",
       "twoFactorLoginTitle": "Two-Factor Authentication (2FA)",
       "twoFactorLoginSub": "Please enter the 6-digit verification code from your authenticator app.",
       "otpLabel": "2FA Verification Code",
@@ -246,7 +252,8 @@
             "imageMinLimit": "Please upload at least 5 images.",
             "roomsRequired": "Please add at least one room type.",
             "legalRequired": "Please fill in all legal information fields.",
-            "termsRequired": "You must agree to the terms to proceed."
+            "termsRequired": "You must agree to the terms to proceed.",
+            "uploading": "Uploading property information..."
          },
          "propertyTypes": {
             "HOTEL": {
@@ -352,6 +359,44 @@
          "legalOwnerRequired": "Legal owner name is required",
          "agreeTermsRequired": "You must agree to the terms to proceed",
          "roomsRequired": "Please add at least one room type."
+      },
+      "propertyDetail": {
+         "title": "Partner Property Details",
+         "backToDashboard": "Back to Dashboard",
+         "editProperty": "Edit Property",
+         "statusActive": "Active",
+         "statusInactive": "Inactive",
+         "stats": {
+            "occupancyRate": "Occupancy Rate",
+            "monthlyBookings": "Monthly Bookings",
+            "estimatedRevenue": "Estimated Revenue",
+            "ratingScore": "Rating Score"
+         },
+         "basicInfo": {
+            "title": "Basic Information",
+            "description": "Description",
+            "propertyType": "Property Type",
+            "location": "Location",
+            "amenities": "Amenities & Services",
+            "checkIn": "Check-in",
+            "checkOut": "Check-out"
+         },
+         "rooms": {
+            "title": "Room Configurations",
+            "name": "Room Type",
+            "capacity": "Capacity",
+            "size": "Size",
+            "bedType": "Bed Type",
+            "basePrice": "Base Price",
+            "totalRooms": "Total Rooms",
+            "noRooms": "No room types configured yet."
+         },
+         "legal": {
+            "title": "Legal & Compliance Profile",
+            "businessRegistrationNumber": "Business Registration Number",
+            "taxCode": "Tax Code",
+            "legalOwnerName": "Legal Owner Name"
+         }
       }
    },
    "Search": {
@@ -581,6 +626,8 @@
          "verificationSent": "Verification request sent! Please check your email",
          "resendIn": "Resend in",
          "rateLimitError": "Please wait 30 seconds before requesting again",
+         "invalidPhoneNumber": "Invalid phone number for the selected country.",
+         "phonePlaceholder": "Enter phone number (e.g. 987 654 321)",
          "save": "Save",
          "cancel": "Cancel",
          "genderOptions": {

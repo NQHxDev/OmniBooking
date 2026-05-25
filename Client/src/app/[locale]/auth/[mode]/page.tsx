@@ -1,7 +1,7 @@
 "use client";
 
-import { Link } from "@/i18n/routing";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Link, useRouter } from "@/i18n/routing";
+import { useParams, useSearchParams } from "next/navigation";
 import {
    Mail,
    Lock,
@@ -13,7 +13,7 @@ import {
    EyeOff,
 } from "lucide-react";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuthStore, type User as UserType } from "@/store/useAuthStore";
 import { authService, type ApiResponse } from "@/lib/api/services/authService";
 import { toast } from "sonner";
@@ -49,12 +49,45 @@ export default function AuthPage() {
    const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
    const turnstileRef = useRef<TurnstileRef>(null);
 
+   const [debouncedPassword, setDebouncedPassword] = useState("");
+   const [isPasswordTyping, setIsPasswordTyping] = useState(false);
+
+   const getMissingRequirements = (pw: string) => {
+      const missing = [];
+      if (pw.length < 6) missing.push("passwordMinLength");
+      if (!/[A-Z]/.test(pw)) missing.push("passwordRequireUppercase");
+      if (!/[a-z]/.test(pw)) missing.push("passwordRequireLowercase");
+      if (!/[0-9]/.test(pw)) missing.push("passwordRequireNumber");
+      if (!/[^A-Za-z0-9]/.test(pw)) missing.push("passwordRequireSpecial");
+      return missing;
+   };
+
+   useEffect(() => {
+      if (isLogin || !formData.password) return;
+
+      const timer = setTimeout(() => {
+         setDebouncedPassword(formData.password);
+         setIsPasswordTyping(false);
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timer);
+   }, [formData.password, isLogin]);
+
    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const { name, value, type, checked } = e.target;
       setFormData({
          ...formData,
          [name]: type === "checkbox" ? checked : value,
       });
+
+      if (name === "password" && !isLogin) {
+         if (!value) {
+            setDebouncedPassword("");
+            setIsPasswordTyping(false);
+         } else {
+            setIsPasswordTyping(true);
+         }
+      }
    };
 
    const handleToggle = (login: boolean) => {
@@ -82,6 +115,15 @@ export default function AuthPage() {
             router.push(targetUrl);
             router.refresh();
             return;
+         }
+
+         if (!isLogin) {
+            const missing = getMissingRequirements(formData.password);
+            if (missing.length > 0) {
+               setError(t("passwordMissingRequirements") + missing.map((m) => t(m)).join(", "));
+               setLoading(false);
+               return;
+            }
          }
 
          if (!turnstileToken) {
@@ -369,6 +411,25 @@ export default function AuthPage() {
                                     )}
                                  </button>
                               </div>
+                              {!isLogin &&
+                                 formData.password &&
+                                 !isPasswordTyping &&
+                                 (() => {
+                                    const missingList = getMissingRequirements(debouncedPassword);
+                                    if (missingList.length === 0) return null;
+                                    return (
+                                       <div className="mt-2.5 text-xs text-red-500 bg-red-50/60 border border-red-100 rounded-xl p-3.5 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                          <span className="font-bold text-red-700">
+                                             {t("passwordMissingRequirements")}
+                                          </span>
+                                          <ul className="list-disc list-inside mt-1 space-y-1 pl-1 text-red-600 font-medium">
+                                             {missingList.map((reqKey) => (
+                                                <li key={reqKey}>{t(reqKey)}</li>
+                                             ))}
+                                          </ul>
+                                       </div>
+                                    );
+                                 })()}
                            </div>
 
                            <div className="flex items-center justify-between">

@@ -2,6 +2,7 @@ package com.omnibooking.services.property;
 
 import com.omnibooking.dto.PropertyRequest;
 import com.omnibooking.dto.PropertyResponse;
+import com.omnibooking.dto.PropertyDetailResponse;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,5 +17,7 @@ public interface PropertyService {
     List<PropertyResponse> getNewProperties(int limit);
 
    List<com.omnibooking.dto.PartnerLegalProfileResponse> getPartnerLegalProfiles(UUID partnerId);
+
+   PropertyDetailResponse getPropertyDetailForPartner(UUID propertyId, UUID ownerId);
 
 }

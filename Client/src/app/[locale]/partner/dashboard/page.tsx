@@ -42,7 +42,7 @@ export default async function PartnerDashboard() {
                {/* Welcome & Action */}
                <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
                   <div>
-                     <h1 className="text-3xl font-black tracking-tight text-zinc-900">
+                     <h1 className="text-3xl font-bold tracking-normal text-zinc-900">
                         {t("title")}
                      </h1>
                      <p className="mt-1 text-zinc-500 font-medium">{t("welcome")}</p>

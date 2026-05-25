@@ -3,6 +3,8 @@ package com.omnibooking.services.property.impl;
 import com.omnibooking.dto.PropertyRequest;
 import com.omnibooking.dto.PropertyResponse;
 import com.omnibooking.dto.RoomTypeRequest;
+import com.omnibooking.dto.PropertyDetailResponse;
+import com.omnibooking.dto.RoomTypeResponse;
 import com.omnibooking.exception.AppException;
 import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.Property;
@@ -317,6 +319,64 @@ public class PropertyServiceImpl implements PropertyService {
                .build();
          partnerLegalProfileRepository.save(newProfile);
       }
+   }
+
+   @Override
+   @Transactional(readOnly = true)
+   public PropertyDetailResponse getPropertyDetailForPartner(UUID propertyId, UUID ownerId) {
+      Property property = propertyRepository.findById(propertyId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND)); // Property not found
+
+      if (!property.getOwner().getId().equals(ownerId)) {
+         throw new AppException(ErrorCode.UNAUTHORIZED);
+      }
+
+      String decryptedRegNum = property.getBusinessRegistrationNumber() != null
+            ? encryptionService.decrypt(property.getBusinessRegistrationNumber())
+            : null;
+      String decryptedTaxCode = property.getTaxCode() != null
+            ? encryptionService.decrypt(property.getTaxCode())
+            : null;
+      String decryptedOwnerName = property.getLegalOwnerName() != null
+            ? encryptionService.decrypt(property.getLegalOwnerName())
+            : null;
+
+      List<String> amenities = property.getAmenities() != null
+            ? property.getAmenities().stream().map(Amenity::getName).toList()
+            : List.of();
+
+      List<RoomTypeResponse> roomTypes = roomTypeRepository.findByPropertyId(propertyId).stream()
+            .map(r -> RoomTypeResponse.builder()
+                  .id(r.getId())
+                  .name(r.getName())
+                  .description(r.getDescription())
+                  .basePrice(r.getBasePrice())
+                  .capacityAdults(r.getCapacityAdults())
+                  .capacityChildren(r.getCapacityChildren())
+                  .totalRooms(r.getTotalRooms())
+                  .roomSizeSqm(r.getRoomSizeSqm())
+                  .bedType(r.getBedType())
+                  .build())
+            .toList();
+
+      return PropertyDetailResponse.builder()
+            .id(property.getId())
+            .name(property.getName())
+            .description(property.getDescription())
+            .propertyType(property.getPropertyType().name())
+            .address(property.getAddress())
+            .city(property.getCity())
+            .country(property.getCountry())
+            .starRating(property.getStarRating())
+            .checkInTime(property.getCheckInTime() != null ? property.getCheckInTime().toString() : null)
+            .checkOutTime(property.getCheckOutTime() != null ? property.getCheckOutTime().toString() : null)
+            .imageUrl(getMainImageUrl(property.getId()))
+            .businessRegistrationNumber(decryptedRegNum)
+            .taxCode(decryptedTaxCode)
+            .legalOwnerName(decryptedOwnerName)
+            .amenities(amenities)
+            .roomTypes(roomTypes)
+            .build();
    }
 
 }

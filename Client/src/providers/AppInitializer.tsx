@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { authService } from "@/lib/api/services/authService";
 import GlobalLoadingOverlay from "@/components/GlobalLoadingOverlay";
 
 export default function AppInitializer({ children }: { children: React.ReactNode }) {
-   const { isLoggedIn, setAuth, logout, isReady, setReady } = useAuthStore();
+   const { setAuth, logout, isReady, setReady } = useAuthStore();
    const [mounted, setMounted] = useState(false);
+   const initializedRef = useRef(false);
 
    useEffect(() => {
       const timer = setTimeout(() => setMounted(true), 0);
@@ -22,17 +23,10 @@ export default function AppInitializer({ children }: { children: React.ReactNode
          }, 2500);
 
          try {
-            if (isLoggedIn) {
-               const freshUser = await authService.refresh();
-               if (freshUser) {
-                  setAuth(freshUser);
-               }
-            } else {
-               // Thử refresh xem có session cookie từ trước không
-               const freshUser = await authService.refresh();
-               if (freshUser) {
-                  setAuth(freshUser);
-               }
+            // Thử refresh xem có session cookie từ trước không
+            const freshUser = await authService.refresh();
+            if (freshUser) {
+               setAuth(freshUser);
             }
          } catch (error: unknown) {
             const err = error as { status?: number; message?: string };
@@ -46,10 +40,11 @@ export default function AppInitializer({ children }: { children: React.ReactNode
          }
       };
 
-      if (mounted) {
+      if (mounted && !initializedRef.current) {
+         initializedRef.current = true;
          syncSession();
       }
-   }, [isLoggedIn, mounted, setAuth, logout, setReady]);
+   }, [mounted, setAuth, logout, setReady]);
 
    return (
       <>

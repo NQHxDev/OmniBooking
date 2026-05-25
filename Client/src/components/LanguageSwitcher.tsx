@@ -6,7 +6,11 @@ import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import { ChevronDown } from "lucide-react";
 
-export default function LanguageSwitcher() {
+interface LanguageSwitcherProps {
+   theme?: "blue-bg" | "white-bg";
+}
+
+export default function LanguageSwitcher({ theme = "blue-bg" }: LanguageSwitcherProps) {
    const locale = useLocale();
    const t = useTranslations("Common");
 
@@ -45,11 +49,15 @@ export default function LanguageSwitcher() {
       router.replace(pathname, { locale: newLocale });
    };
 
+   const isBlueBg = theme === "blue-bg";
+
    return (
       <div className="relative" ref={dropdownRef}>
          <button
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 rounded-full p-1.5 hover:bg-white/10 transition-all active:scale-95"
+            className={`flex items-center gap-2 rounded-full p-1.5 transition-all active:scale-95 ${
+               isBlueBg ? "hover:bg-white/10" : "hover:bg-zinc-50 border border-zinc-100"
+            }`}
          >
             <div className="relative h-5 w-7 overflow-hidden rounded-sm shadow-sm">
                <Image
@@ -61,7 +69,9 @@ export default function LanguageSwitcher() {
                />
             </div>
             <ChevronDown
-               className={`h-3 w-3 text-white/70 transition-transform ${isOpen ? "rotate-180" : ""}`}
+               className={`h-3 w-3 transition-transform ${
+                  isBlueBg ? "text-white/70" : "text-zinc-500"
+               } ${isOpen ? "rotate-180" : ""}`}
             />
          </button>
 

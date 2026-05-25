@@ -224,6 +224,13 @@
 			<artifactId>totp</artifactId>
 			<version>1.7.1</version>
 		</dependency>
+
+		<!-- Google libphonenumber for global phone validation -->
+		<dependency>
+			<groupId>com.googlecode.libphonenumber</groupId>
+			<artifactId>libphonenumber</artifactId>
+			<version>8.13.35</version>
+		</dependency>
 	</dependencies>
 
 	<build>

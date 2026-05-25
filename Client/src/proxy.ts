@@ -5,28 +5,182 @@ import { routing } from "./i18n/routing";
 
 const intlMiddleware = createMiddleware(routing);
 
-export function proxy(request: NextRequest) {
+function isTokenExpired(token: string): boolean {
+   try {
+      const parts = token.split(".");
+      if (parts.length !== 3) return true;
+      const decodedPayload = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+      const payload = JSON.parse(decodedPayload);
+      const exp = payload.exp;
+      if (!exp) return true;
+      return Date.now() >= exp * 1000 - 10000; // 10 seconds buffer
+   } catch {
+      return true;
+   }
+}
+
+interface CookieOptions {
+   path?: string;
+   domain?: string;
+   maxAge?: number;
+   expires?: Date;
+   secure?: boolean;
+   httpOnly?: boolean;
+   sameSite?: boolean | "lax" | "strict" | "none";
+}
+
+interface ParsedCookie {
+   name: string;
+   value: string;
+   options: CookieOptions;
+}
+
+function parseSetCookie(setCookieStr: string): ParsedCookie | null {
+   const parts = setCookieStr.split(";").map((p) => p.trim());
+   const nameValue = parts[0];
+   const eqIdx = nameValue.indexOf("=");
+   if (eqIdx === -1) return null;
+   const name = nameValue.substring(0, eqIdx);
+   const value = nameValue.substring(eqIdx + 1);
+
+   const cookieOpt: CookieOptions = {};
+   parts.slice(1).forEach((opt) => {
+      const eqSign = opt.indexOf("=");
+      let key = opt;
+      let val = "";
+      if (eqSign !== -1) {
+         key = opt.substring(0, eqSign).trim();
+         val = opt.substring(eqSign + 1).trim();
+      }
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === "path") cookieOpt.path = val;
+      else if (lowerKey === "domain") cookieOpt.domain = val;
+      else if (lowerKey === "max-age") cookieOpt.maxAge = parseInt(val, 10);
+      else if (lowerKey === "expires") cookieOpt.expires = new Date(val);
+      else if (lowerKey === "secure") cookieOpt.secure = true;
+      else if (lowerKey === "httponly") cookieOpt.httpOnly = true;
+      else if (lowerKey === "samesite") {
+         const s = val.toLowerCase();
+         if (s === "lax" || s === "strict" || s === "none") {
+            cookieOpt.sameSite = s;
+         } else if (s === "true" || s === "false") {
+            cookieOpt.sameSite = s === "true";
+         }
+      }
+   });
+
+   return { name, value, options: cookieOpt };
+}
+
+export async function proxy(request: NextRequest) {
    const { pathname } = request.nextUrl;
 
-   // Chạy intlMiddleware để xử lý locale và redirect tự động
-   const response = intlMiddleware(request);
-
-   // Lấy session_id và refresh_token để kiểm tra đăng nhập
-   const sessionId = request.cookies.get("session_id")?.value;
+   // Lấy access_token, session_id và refresh_token để kiểm tra đăng nhập
+   let accessToken = request.cookies.get("access_token")?.value;
+   let sessionId = request.cookies.get("session_id")?.value;
    const refreshToken = request.cookies.get("refresh_token")?.value;
-   const hasSession = !!(sessionId || refreshToken);
 
-   // Auth & Guest Guards
-   // Kiểm tra xem pathname có bắt đầu bằng locale hợp lệ không (vi|en)
+   // Xác định ngôn ngữ (locale) hiện tại
    const segments = pathname.split("/");
    const locale = routing.locales.includes(segments[1] as "vi" | "en")
       ? segments[1]
       : routing.defaultLocale;
 
-   // GUEST GUARD: Nếu đã login thì không cho vào trang auth (trừ verify)
+   const refreshedCookies: ParsedCookie[] = [];
+   let isRefreshSuccess = false;
+
+   // Nếu access token (accessToken) đã hết hạn hoặc không tồn tại, nhưng có refresh token
+   if ((!accessToken || isTokenExpired(accessToken)) && refreshToken) {
+      try {
+         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1/";
+         const refreshUrl = apiUrl.endsWith("/api/v1/")
+            ? `${apiUrl}auth/refresh`
+            : `${apiUrl.replace(/\/$/, "")}/api/v1/auth/refresh`;
+
+         const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+         };
+         const cookieHeader = request.headers.get("cookie");
+         if (cookieHeader) {
+            headers["Cookie"] = cookieHeader;
+         }
+         const xFgp = request.cookies.get("x_fgp")?.value;
+         if (xFgp) {
+            headers["x-fgp"] = xFgp;
+         }
+
+         const res = await fetch(refreshUrl, {
+            method: "POST",
+            headers,
+         });
+
+         if (res.ok) {
+            const rawSetCookies = res.headers.getSetCookie();
+            if (rawSetCookies && rawSetCookies.length > 0) {
+               rawSetCookies.forEach((sc) => {
+                  const parsed = parseSetCookie(sc);
+                  if (parsed) {
+                     refreshedCookies.push(parsed);
+                     if (parsed.name === "access_token") {
+                        accessToken = parsed.value;
+                     } else if (parsed.name === "session_id") {
+                        sessionId = parsed.value;
+                     }
+                  }
+               });
+               isRefreshSuccess = true;
+            }
+         } else {
+            // Refresh thất bại (ví dụ refresh token cũng hết hạn) -> Xóa cookie và đẩy về trang đăng nhập
+            const loginUrl = new URL(`/${locale}/auth/login`, request.url);
+            loginUrl.searchParams.set("callbackUrl", pathname);
+            const response = NextResponse.redirect(loginUrl);
+            response.cookies.delete("access_token");
+            response.cookies.delete("session_id");
+            response.cookies.delete("refresh_token");
+            return response;
+         }
+      } catch (err) {
+         console.error("Silent token refresh in middleware failed:", err);
+      }
+   }
+
+   // Cập nhật lại cookies của request để các bước xử lý và các Server Components phía sau nhận được token mới
+   if (isRefreshSuccess && refreshedCookies.length > 0) {
+      refreshedCookies.forEach((c) => {
+         request.cookies.set(c.name, c.value);
+      });
+      const updatedCookiesStr = request.cookies
+         .getAll()
+         .map((c) => `${c.name}=${c.value}`)
+         .join("; ");
+      request.headers.set("Cookie", updatedCookiesStr);
+   }
+
+   // Chạy next-intl middleware để xử lý ngôn ngữ và chuyển hướng
+   const response = intlMiddleware(request);
+
+   // Nếu đã refresh thành công, gán các cookie mới vào response trả về cho trình duyệt lưu lại
+   if (isRefreshSuccess && refreshedCookies.length > 0) {
+      if (response) {
+         refreshedCookies.forEach((c) => {
+            response.cookies.set(c.name, c.value, c.options);
+         });
+      }
+   }
+
+   const hasSession = !!(sessionId || refreshToken);
+
+   // GUEST GUARD: Nếu đã đăng nhập thì không cho vào trang đăng nhập/đăng ký
    const isAuthPage = /^\/([a-z]{2})\/auth\/(?!verify)/.test(pathname);
    if (isAuthPage && hasSession) {
-      return NextResponse.redirect(new URL(`/${locale}`, request.url));
+      const redirectResponse = NextResponse.redirect(new URL(`/${locale}`, request.url));
+      if (isRefreshSuccess && refreshedCookies.length > 0) {
+         refreshedCookies.forEach((c) => {
+            redirectResponse.cookies.set(c.name, c.value, c.options);
+         });
+      }
+      return redirectResponse;
    }
 
    // AUTH GUARD: Bảo vệ các trang cá nhân

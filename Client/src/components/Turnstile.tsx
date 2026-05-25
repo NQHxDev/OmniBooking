@@ -40,6 +40,14 @@ const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
       const containerRef = useRef<HTMLDivElement>(null);
       const widgetIdRef = useRef<string | null>(null);
 
+      const onVerifyRef = useRef(onVerify);
+      const onErrorRef = useRef(onError);
+      const onExpireRef = useRef(onExpire);
+
+      onVerifyRef.current = onVerify;
+      onErrorRef.current = onError;
+      onExpireRef.current = onExpire;
+
       useImperativeHandle(ref, () => ({
          reset: () => {
             if (window.turnstile && widgetIdRef.current) {
@@ -59,13 +67,13 @@ const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
                   const id = window.turnstile.render(containerRef.current, {
                      sitekey: siteKey,
                      callback: (token: string) => {
-                        onVerify(token);
+                        onVerifyRef.current(token);
                      },
                      "error-callback": () => {
-                        if (onError) onError();
+                        if (onErrorRef.current) onErrorRef.current();
                      },
                      "expired-callback": () => {
-                        if (onExpire) onExpire();
+                        if (onExpireRef.current) onExpireRef.current();
                      },
                      theme,
                   });
@@ -92,7 +100,7 @@ const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
                }
             }
          };
-      }, [siteKey, onVerify, onError, onExpire, theme]);
+      }, [siteKey, theme]);
 
       return (
          <div className="flex justify-center my-4">

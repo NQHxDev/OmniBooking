@@ -25,8 +25,11 @@ import java.util.UUID;
 public class UserProfileServiceImpl implements UserProfileService {
 
    private final UserProfileRepository userProfileRepository;
+
    private final EncryptionService encryptionService;
+
    private final UserRepository userRepository;
+
    private final PasswordEncoder passwordEncoder;
 
    @Override
@@ -55,7 +58,7 @@ public class UserProfileServiceImpl implements UserProfileService {
          profile.setNationality(request.getNationality());
       if (request.getAvatarUrl() != null)
          profile.setAvatarUrl(request.getAvatarUrl());
-      
+
       if (request.getPhoneNumber() != null) {
          profile.setPhoneEncrypted(encryptionService.encrypt(request.getPhoneNumber()));
          profile.setPhoneSearchHash(encryptionService.createBlindIndex(request.getPhoneNumber()));
@@ -69,6 +72,9 @@ public class UserProfileServiceImpl implements UserProfileService {
 
    private UserProfileResponse mapToResponse(UserProfile profile) {
       boolean hasPassword = profile.getUser().getPassword() != null && !profile.getUser().getPassword().isEmpty();
+      String phone = encryptionService.decrypt(profile.getPhoneEncrypted());
+      String maskedPhone = maskPhoneNumber(phone);
+
       return UserProfileResponse.builder()
             .email(profile.getUser().getEmail())
             .displayName(profile.getDisplayName())
@@ -76,13 +82,25 @@ public class UserProfileServiceImpl implements UserProfileService {
             .gender(profile.getGender())
             .address(profile.getAddress())
             .nationality(profile.getNationality())
-            .phoneNumber(encryptionService.decrypt(profile.getPhoneEncrypted()))
+            .phoneNumber(maskedPhone)
             .avatarUrl(profile.getAvatarUrl())
             .isVerified(Boolean.TRUE.equals(profile.getIsVerified()))
             .points(profile.getPoints())
             .rankName(profile.getRank() != null ? profile.getRank().getName() : "BRONZE")
             .hasPassword(hasPassword)
             .build();
+   }
+
+   private String maskPhoneNumber(String phone) {
+      if (phone == null || phone.trim().isEmpty()) {
+         return null;
+      }
+      String trimmed = phone.trim();
+      if (trimmed.length() <= 3) {
+         return "*".repeat(trimmed.length());
+      }
+      String lastThree = trimmed.substring(trimmed.length() - 3);
+      return "*".repeat(trimmed.length() - 3) + lastThree;
    }
 
    @Override
@@ -109,4 +127,3 @@ public class UserProfileServiceImpl implements UserProfileService {
    }
 
 }
-

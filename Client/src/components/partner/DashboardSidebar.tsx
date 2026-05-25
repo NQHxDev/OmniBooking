@@ -30,7 +30,14 @@ export default function DashboardSidebar() {
       <aside className="fixed left-0 top-0 hidden h-screen w-64 border-r border-zinc-200 bg-white lg:block z-20">
          <div className="flex h-full flex-col p-6">
             <div className="mb-10 px-2">
-               <Link href="/" className="text-xl font-black tracking-tighter text-[#003580]">
+               <Link
+                  href="/partner/dashboard"
+                  onClick={(e) => {
+                     e.preventDefault();
+                     window.location.href = "/partner/dashboard";
+                  }}
+                  className="text-xl font-bold tracking-tighter text-[#003580]"
+               >
                   OmniBooking<span className="text-[#006ce4]">.</span>
                </Link>
                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 mt-1">

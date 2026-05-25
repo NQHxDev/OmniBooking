@@ -23,10 +23,13 @@ import { useAuthStore } from "@/store/useAuthStore";
 import LanguageSwitcher from "./LanguageSwitcher";
 import CurrencySwitcher from "./CurrencySwitcher";
 import { useTranslations } from "next-intl";
+import { usePathname } from "next/navigation";
 
 export default function Navbar() {
    const t = useTranslations("Common");
    const tProfile = useTranslations("Profile");
+   const pathname = usePathname();
+   const isProfilePage = pathname ? pathname.includes("/profile") : false;
 
    const [mounted, setMounted] = useState(false);
    const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -235,54 +238,56 @@ export default function Navbar() {
          </div>
 
          {/* Dòng 2: Thanh điều hướng các dịch vụ */}
-         <div className="border-t border-white/10">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-1.5">
-               <nav className="flex space-x-1.5 overflow-x-auto no-scrollbar text-[13.5px] font-medium py-1 scroll-smooth">
-                  <a
-                     href="#"
-                     className="flex items-center justify-center gap-2 rounded-full border border-white bg-white/10 px-4 py-2 hover:bg-white/20 transition-all shrink-0"
-                  >
-                     <BedDouble className="h-4.5 w-4.5 shrink-0" />
-                     <span>{t("stays")}</span>
-                  </a>
-                  <a
-                     href="#"
-                     className="flex items-center justify-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-all shrink-0"
-                  >
-                     <Plane className="h-4.5 w-4.5 shrink-0" />
-                     <span>{t("flights")}</span>
-                  </a>
-                  <a
-                     href="#"
-                     className="flex items-center justify-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-all shrink-0"
-                  >
-                     <Plane className="h-4.5 w-4.5 shrink-0" />
-                     <span>{t("flightHotel")}</span>
-                  </a>
-                  <a
-                     href="#"
-                     className="flex items-center justify-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-all shrink-0"
-                  >
-                     <Car className="h-4.5 w-4.5 shrink-0" />
-                     <span>{t("carRentals")}</span>
-                  </a>
-                  <a
-                     href="#"
-                     className="flex items-center justify-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-all shrink-0"
-                  >
-                     <Compass className="h-4.5 w-4.5 shrink-0" />
-                     <span>{t("attractions")}</span>
-                  </a>
-                  <a
-                     href="#"
-                     className="flex items-center justify-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-all shrink-0"
-                  >
-                     <CarTaxiFront className="h-4.5 w-4.5 shrink-0" />
-                     <span>{t("airportTaxis")}</span>
-                  </a>
-               </nav>
+         {!isProfilePage && (
+            <div className="border-t border-white/10">
+               <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-1.5">
+                  <nav className="flex space-x-1.5 overflow-x-auto no-scrollbar text-[13.5px] font-medium py-1 scroll-smooth">
+                     <a
+                        href="#"
+                        className="flex items-center justify-center gap-2 rounded-full border border-white bg-white/10 px-4 py-2 hover:bg-white/20 transition-all shrink-0"
+                     >
+                        <BedDouble className="h-4.5 w-4.5 shrink-0" />
+                        <span>{t("stays")}</span>
+                     </a>
+                     <a
+                        href="#"
+                        className="flex items-center justify-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-all shrink-0"
+                     >
+                        <Plane className="h-4.5 w-4.5 shrink-0" />
+                        <span>{t("flights")}</span>
+                     </a>
+                     <a
+                        href="#"
+                        className="flex items-center justify-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-all shrink-0"
+                     >
+                        <Plane className="h-4.5 w-4.5 shrink-0" />
+                        <span>{t("flightHotel")}</span>
+                     </a>
+                     <a
+                        href="#"
+                        className="flex items-center justify-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-all shrink-0"
+                     >
+                        <Car className="h-4.5 w-4.5 shrink-0" />
+                        <span>{t("carRentals")}</span>
+                     </a>
+                     <a
+                        href="#"
+                        className="flex items-center justify-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-all shrink-0"
+                     >
+                        <Compass className="h-4.5 w-4.5 shrink-0" />
+                        <span>{t("attractions")}</span>
+                     </a>
+                     <a
+                        href="#"
+                        className="flex items-center justify-center gap-2 px-4 py-2 hover:bg-white/10 rounded-full transition-all shrink-0"
+                     >
+                        <CarTaxiFront className="h-4.5 w-4.5 shrink-0" />
+                        <span>{t("airportTaxis")}</span>
+                     </a>
+                  </nav>
+               </div>
             </div>
-         </div>
+         )}
       </header>
    );
 }

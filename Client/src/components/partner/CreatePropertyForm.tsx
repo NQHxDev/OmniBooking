@@ -47,6 +47,9 @@ const getPropertySchema = (tv: (key: string) => string) =>
       businessRegistrationNumber: z.string().min(5, tv("businessRegRequired")),
       taxCode: z.string().min(5, tv("taxCodeRequired")),
       legalOwnerName: z.string().min(2, tv("legalOwnerRequired")),
+      agreeToTerms: z.boolean().refine((val) => val === true, {
+         message: tv("agreeTermsRequired"),
+      }),
    });
 
 const waitImagesSync = async (propertyId: string): Promise<number> => {
