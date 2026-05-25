@@ -13,6 +13,7 @@ export interface LoginRequest {
    email: string;
    password: string;
    rememberMe?: boolean;
+   turnstileToken?: string;
 }
 
 export interface RegisterRequest {
@@ -20,6 +21,7 @@ export interface RegisterRequest {
    password: string;
    fullName: string;
    rememberMe?: boolean;
+   turnstileToken?: string;
 }
 
 let refreshPromise: Promise<User> | null = null;

@@ -36,6 +36,8 @@ public class AppProperties {
 
    private final Webauthn webauthn = new Webauthn();
 
+   private final Turnstile turnstile = new Turnstile();
+
    @Data
    public static class Webauthn {
       @NotBlank
@@ -118,6 +120,15 @@ public class AppProperties {
       private String apiKey;
       @NotBlank
       private String apiSecret;
+   }
+
+   @Data
+   public static class Turnstile {
+      private boolean enabled = true;
+      @NotBlank
+      private String secretKey;
+      @NotBlank
+      private String verifyUrl = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
    }
 
 }

@@ -11,6 +11,7 @@ import com.omnibooking.dto.ResetPasswordRequest;
 import com.omnibooking.dto.oauth.OAuth2UserInfo;
 import com.omnibooking.services.auth.AuthService;
 import com.omnibooking.services.auth.OAuth2ServiceFactory;
+import com.omnibooking.services.auth.TurnstileService;
 import com.omnibooking.services.user.RegistrationQueueService;
 import com.omnibooking.services.communication.SseNotificationService;
 import com.omnibooking.config.AppProperties;
@@ -58,11 +59,17 @@ public class AuthController {
 
    private final SseNotificationService sseNotificationService;
 
+   private final TurnstileService turnstileService;
+
    @Anonymous
    @Idempotent
    @PostMapping("/register")
    public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request,
          HttpServletRequest httpRequest) {
+
+      // Verify CAPTCHA
+      String ip = getClientIp(httpRequest);
+      turnstileService.verifyToken(request.getTurnstileToken(), ip);
 
       String requestId = (String) httpRequest.getAttribute("requestId");
       request.setRequestId(requestId);
@@ -104,6 +111,10 @@ public class AuthController {
          HttpServletResponse httpResponse) {
 
       String ip = getClientIp(httpRequest);
+
+      // Verify CAPTCHA
+      turnstileService.verifyToken(request.getTurnstileToken(), ip);
+
       String userAgent = httpRequest.getHeader("User-Agent");
       String requestId = (String) httpRequest.getAttribute("requestId");
 

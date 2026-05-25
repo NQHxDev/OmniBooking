@@ -129,6 +129,7 @@
       "AUTH_014": "Không tìm thấy thông tin Passkey",
       "AUTH_016": "Mã reset không hợp lệ hoặc đã hết hạn",
       "AUTH_017": "Mật khẩu hiện tại không chính xác",
+      "AUTH_018": "Xác thực bảo mật (CAPTCHA) không thành công. Vui lòng thử lại.",
       "GEN_999": "Đã có lỗi xảy ra, vui lòng thử lại sau",
       "GEN_500": "Lỗi hệ thống server",
       "IDEM_001": "Yêu cầu không hợp lệ hoặc đã được xử lý!",

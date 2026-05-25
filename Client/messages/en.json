@@ -129,6 +129,7 @@
       "AUTH_014": "Passkey not found",
       "AUTH_016": "Invalid or expired reset token",
       "AUTH_017": "Incorrect current password",
+      "AUTH_018": "CAPTCHA security verification failed. Please try again.",
       "GEN_999": "An unexpected error occurred",
       "GEN_500": "Internal server error",
       "IDEM_001": "Invalid request or already processed!",

@@ -22,6 +22,7 @@ public enum ErrorCode {
    PASSKEY_NOT_FOUND("AUTH_014", "Passkey not found", HttpStatus.NOT_FOUND),
    INVALID_RESET_TOKEN("AUTH_016", "Invalid or expired reset token", HttpStatus.BAD_REQUEST),
    INCORRECT_CURRENT_PASSWORD("AUTH_017", "Incorrect current password", HttpStatus.BAD_REQUEST),
+   INVALID_CAPTCHA("AUTH_018", "Invalid or missing CAPTCHA verification", HttpStatus.BAD_REQUEST),
 
    // General Errors
    UNCATEGORIZED_EXCEPTION("GEN_999", "Uncategorized error", HttpStatus.INTERNAL_SERVER_ERROR),

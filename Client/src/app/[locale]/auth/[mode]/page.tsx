@@ -13,12 +13,14 @@ import {
    EyeOff,
 } from "lucide-react";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuthStore, type User as UserType } from "@/store/useAuthStore";
 import { authService, type ApiResponse } from "@/lib/api/services/authService";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import AuthBranding from "@/components/AuthBranding";
+import Turnstile, { type TurnstileRef } from "@/components/Turnstile";
+import { env } from "@/env";
 
 export default function AuthPage() {
    const t = useTranslations("Auth");
@@ -44,6 +46,8 @@ export default function AuthPage() {
    const [error, setError] = useState("");
    const [showOtp, setShowOtp] = useState(false);
    const [otpCode, setOtpCode] = useState("");
+   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+   const turnstileRef = useRef<TurnstileRef>(null);
 
    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const { name, value, type, checked } = e.target;
@@ -55,6 +59,8 @@ export default function AuthPage() {
 
    const handleToggle = (login: boolean) => {
       setError("");
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
       router.push(`/auth/${login ? "login" : "register"}`, { scroll: false });
    };
 
@@ -78,17 +84,25 @@ export default function AuthPage() {
             return;
          }
 
+         if (!turnstileToken) {
+            setError(te("AUTH_018"));
+            setLoading(false);
+            return;
+         }
+
          const result = isLogin
             ? await authService.login({
                  email: formData.email,
                  password: formData.password,
                  rememberMe: formData.rememberMe,
+                 turnstileToken,
               })
             : await authService.register({
                  email: formData.email,
                  password: formData.password,
                  fullName: formData.fullName,
                  rememberMe: formData.rememberMe,
+                 turnstileToken,
               });
 
          if (isLogin) {
@@ -153,6 +167,10 @@ export default function AuthPage() {
             }
          }
       } catch (err: unknown) {
+         // Reset Turnstile on error
+         turnstileRef.current?.reset();
+         setTurnstileToken(null);
+
          const error = err as { message?: string; errorCode?: string };
 
          if (error?.errorCode === "AUTH_010") {
@@ -383,6 +401,17 @@ export default function AuthPage() {
                               )}
                            </div>
                         </>
+                     )}
+
+                     {!showOtp && (
+                        <Turnstile
+                           ref={turnstileRef}
+                           siteKey={env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                           onVerify={(token) => setTurnstileToken(token)}
+                           onError={() => setTurnstileToken(null)}
+                           onExpire={() => setTurnstileToken(null)}
+                           theme="light"
+                        />
                      )}
 
                      <button
