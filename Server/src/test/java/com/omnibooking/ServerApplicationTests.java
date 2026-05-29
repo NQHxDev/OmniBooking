@@ -8,6 +8,8 @@ import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
 import com.omnibooking.repository.elasticsearch.DestinationElasticsearchRepository;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.KafkaAdmin;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 @SpringBootTest
 class ServerApplicationTests {
@@ -26,6 +28,12 @@ class ServerApplicationTests {
 
 	@MockitoBean
 	private KafkaAdmin kafkaAdmin;
+
+	@MockitoBean
+	private StringRedisTemplate stringRedisTemplate;
+
+	@MockitoBean
+	private RedisMessageListenerContainer redisMessageListenerContainer;
 
 	@Test
 	void contextLoads() {

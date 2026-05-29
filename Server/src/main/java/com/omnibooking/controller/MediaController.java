@@ -2,7 +2,7 @@ package com.omnibooking.controller;
 
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.event.MediaUploadEvent;
-import com.omnibooking.services.MediaProducer;
+import com.omnibooking.services.media.MediaProducer;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

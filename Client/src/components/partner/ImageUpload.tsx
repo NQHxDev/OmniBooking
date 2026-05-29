@@ -134,6 +134,7 @@ export default function ImageUpload({
                         src={img.preview}
                         alt={`Preview ${index}`}
                         fill
+                        sizes="(max-width: 768px) 50vw, 25vw"
                         className="object-cover"
                         unoptimized
                      />

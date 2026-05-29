@@ -14,6 +14,7 @@ export default function AuthBranding() {
             src="/images/hero_banner.png"
             alt="Auth Background"
             fill
+            sizes="(max-width: 1024px) 100vw, 50vw"
             className="object-cover transition-transform duration-10000 hover:scale-110"
             priority
          />

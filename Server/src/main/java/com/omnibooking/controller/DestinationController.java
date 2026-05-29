@@ -2,8 +2,8 @@ package com.omnibooking.controller;
 
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.response.DestinationSuggestionResponse;
-import com.omnibooking.services.DestinationService;
-import com.omnibooking.services.GeoLocationService;
+import com.omnibooking.services.property.DestinationService;
+import com.omnibooking.services.core.GeoLocationService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,16 +21,19 @@ import java.util.List;
 public class DestinationController {
 
    private final DestinationService destinationService;
+
    private final GeoLocationService geoLocationService;
 
    @GetMapping("/trending")
-   public ApiResponse<List<DestinationSuggestionResponse>> getTrending(HttpServletRequest request) {
+   public ApiResponse<List<DestinationSuggestionResponse>> getTrending(
+         HttpServletRequest request,
+         @RequestParam(required = false, defaultValue = "vi") String locale) {
       String ipAddress = getClientIp(request);
       String countryCode = geoLocationService.getCountryCode(ipAddress);
-      
-      log.info("Fetching trending destinations for IP: {} (Country: {})", ipAddress, countryCode);
-      
-      List<DestinationSuggestionResponse> trending = destinationService.getTrending(countryCode);
+
+      log.info("Fetching trending destinations for IP: {} (Country: {}) with locale: {}", ipAddress, countryCode, locale);
+
+      List<DestinationSuggestionResponse> trending = destinationService.getTrending(countryCode, locale);
       return ApiResponse.success(trending);
    }
 
@@ -38,7 +41,7 @@ public class DestinationController {
    public ApiResponse<List<DestinationSuggestionResponse>> search(
          @RequestParam String query,
          @RequestParam(required = false, defaultValue = "vi") String locale) {
-      
+
       List<DestinationSuggestionResponse> suggestions = destinationService.searchSuggestions(query, locale);
       return ApiResponse.success(suggestions);
    }
@@ -53,4 +56,5 @@ public class DestinationController {
       }
       return remoteAddr;
    }
+
 }

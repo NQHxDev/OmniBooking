@@ -1,30 +1,26 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useForm, FieldErrors, useWatch } from "react-hook-form";
+import { useState, useMemo, useCallback } from "react";
+import { useForm, FieldErrors, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import {
-   Building2,
-   MapPin,
-   Clock,
-   ChevronRight,
-   ChevronLeft,
-   CheckCircle2,
-   Hotel,
-   Home,
-   Palmtree,
-   Building,
-   ImageIcon,
-   Loader2,
-} from "lucide-react";
+import { Building2, CheckCircle2 } from "lucide-react";
 import { propertyService } from "@/lib/api/propertyService";
 import { toast } from "sonner";
-import ImageUpload from "./ImageUpload";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
-type PropertyFormValues = z.infer<ReturnType<typeof getPropertySchema>>;
+import { useSettingStore } from "@/store/useSettingStore";
+import { useQuery } from "@tanstack/react-query";
+import apiClient from "@/lib/api/apiClient";
+
+import Step1BasicInfo from "./steps/Step1BasicInfo";
+import Step2Location from "./steps/Step2Location";
+import Step3Setup from "./steps/Step3Setup";
+import Step4Media from "./steps/Step4Media";
+import Step5Legal from "./steps/Step5Legal";
+
+export type PropertyFormValues = z.infer<ReturnType<typeof getPropertySchema>>;
 
 const getPropertySchema = (tv: (key: string) => string) =>
    z.object({
@@ -37,33 +33,51 @@ const getPropertySchema = (tv: (key: string) => string) =>
       starRating: z.number().min(0).max(5),
       checkInTime: z.string(),
       checkOutTime: z.string(),
+      amenities: z.array(z.string()),
+      roomTypes: z
+         .array(
+            z.object({
+               name: z.string().min(3, tv("roomNameMin")),
+               description: z.string().optional(),
+               basePrice: z.number().min(1, tv("roomPriceMin")),
+               capacityAdults: z.number().min(1, tv("roomCapacityMin")),
+               capacityChildren: z.number().min(0),
+               totalRooms: z.number().min(1, tv("totalRoomsMin")),
+               roomSizeSqm: z.number().min(1, tv("roomSizeMin")),
+               bedType: z.string().min(1, tv("bedTypeRequired")),
+            })
+         )
+         .min(1, tv("roomsRequired")),
+      businessRegistrationNumber: z.string().min(5, tv("businessRegRequired")),
+      taxCode: z.string().min(5, tv("taxCodeRequired")),
+      legalOwnerName: z.string().min(2, tv("legalOwnerRequired")),
+      agreeToTerms: z.boolean().refine((val) => val === true, {
+         message: tv("agreeTermsRequired"),
+      }),
    });
 
-const PROPERTY_TYPES = [
-   {
-      id: "HOTEL",
-      icon: Hotel,
-   },
-   {
-      id: "APARTMENT",
-      icon: Building,
-   },
-   {
-      id: "VILLA",
-      icon: Home,
-   },
-   {
-      id: "HOMESTAY",
-      icon: Palmtree,
-   },
-   {
-      id: "RESORT",
-      icon: Building2,
-   },
-];
+const waitImagesSync = async (propertyId: string): Promise<number> => {
+   const startTime = Date.now();
+   const maxPollTime = 30000; // 30s timeout
+
+   while (Date.now() - startTime < maxPollTime) {
+      try {
+         const myProperties = await propertyService.getMyProperties();
+         const createdProperty = myProperties.find((p) => p.id === propertyId);
+         if (createdProperty && createdProperty.imageUrl) {
+            break;
+         }
+      } catch (error) {
+         console.error("Failed to check image status", error);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+   }
+   return Date.now() - startTime;
+};
 
 export default function CreatePropertyForm() {
    const t = useTranslations("Partner.createPropertyForm");
+   const tHeader = useTranslations("Partner.createProperty");
    const tv = useTranslations("Partner.validation");
    const [step, setStep] = useState(1);
    const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,57 +87,77 @@ export default function CreatePropertyForm() {
    const [isFlexibleTime, setIsFlexibleTime] = useState(false);
    const router = useRouter();
 
+   const { currency } = useSettingStore();
+   const { data: rates } = useQuery({
+      queryKey: ["currency-rates"],
+      queryFn: async () => {
+         const response = await apiClient.get<unknown, Record<string, number>>("/currencies/rates");
+         return response;
+      },
+      staleTime: 1000 * 60 * 60, // 1 hour
+   });
+
    const propertySchema = useMemo(() => getPropertySchema(tv), [tv]);
 
-   const {
-      register,
-      handleSubmit,
-      setValue,
-      control,
-      trigger,
-      formState: { errors },
-   } = useForm<PropertyFormValues>({
+   const methods = useForm<PropertyFormValues>({
       resolver: zodResolver(propertySchema),
       defaultValues: {
+         name: "",
+         description: "",
          propertyType: "HOTEL",
+         address: "",
+         city: "",
+         country: "",
          starRating: 0,
          checkInTime: "14:00",
          checkOutTime: "12:00",
+         amenities: [],
+         roomTypes: [],
+         businessRegistrationNumber: "",
+         taxCode: "",
+         legalOwnerName: "",
+         agreeToTerms: false,
       },
    });
 
-   const selectedType = useWatch({
-      control,
-      name: "propertyType",
-   });
+   const { handleSubmit, setValue, trigger, getValues } = methods;
 
-   const handleImageUpload = (file: File) => {
-      const preview = URL.createObjectURL(file);
-      setImages((prev) => [...prev, { file, preview, isUploading: false }]);
-   };
-
-   const removeImage = (index: number) => {
-      setImages((prev) => {
-         const newImages = [...prev];
-         URL.revokeObjectURL(newImages[index].preview);
-         newImages.splice(index, 1);
-         return newImages;
-      });
-   };
+   const handleAddressDetailsChange = useCallback(
+      (details: { address: string; city: string; country: string }) => {
+         setValue("address", details.address, { shouldValidate: true });
+         setValue("city", details.city, { shouldValidate: true });
+         setValue("country", details.country, { shouldValidate: true });
+      },
+      [setValue]
+   );
 
    const onSubmit = async (data: PropertyFormValues) => {
-      if (images.length === 0) {
-         toast.error(t("messages.imageRequired"));
+      if (images.length < 5) {
+         toast.error(t("messages.imageMinLimit"));
          return;
       }
 
       setIsSubmitting(true);
+      const loadingToastId = toast.loading(
+         t("messages.uploading") || "Đang đăng tải thông tin chỗ nghỉ..."
+      );
       try {
-         // 1. Create Property
-         const property = await propertyService.createProperty(data);
-         toast.success(t("messages.success"));
+         // Convert basePrice to USD before submitting
+         const rate = rates?.[currency] || 1;
+         const convertedRoomTypes = data.roomTypes?.map((room) => ({
+            ...room,
+            basePrice:
+               currency === "USD" ? room.basePrice : Number((room.basePrice / rate).toFixed(2)),
+         }));
+         const submissionData = {
+            ...data,
+            roomTypes: convertedRoomTypes,
+         };
 
-         // 2. Upload Images in Background
+         // 1. Create Property
+         const property = await propertyService.createProperty(submissionData);
+
+         // 2. Upload Images
          setImages((prev) => prev.map((img) => ({ ...img, isUploading: true })));
 
          const uploadPromises = images.map((img, index) =>
@@ -131,10 +165,30 @@ export default function CreatePropertyForm() {
          );
 
          await Promise.all(uploadPromises);
-         toast.success(t("messages.imageProcessing"));
+
+         // Cập nhật toast thành đang xử lý tối ưu ảnh
+         toast.loading(
+            t("messages.imageProcessing") || "Hình ảnh đang được tối ưu hóa trên hệ thống CDN...",
+            {
+               id: loadingToastId,
+            }
+         );
+
+         // 3. Chờ ảnh được Kafka/CDN xử lý xong bất đồng bộ
+         const elapsedTime = await waitImagesSync(property.id);
+
+         // Nếu xử lý quá nhanh (dưới 3 giây), cố tình delay thêm cho đủ 3 giây để trải nghiệm mượt mà hơn
+         if (elapsedTime < 3000) {
+            await new Promise((resolve) => setTimeout(resolve, 3000 - elapsedTime));
+         }
+
+         toast.success(t("messages.success") || "Tạo chỗ nghỉ và đồng bộ hình ảnh thành công!", {
+            id: loadingToastId,
+         });
 
          router.push("/partner/dashboard");
       } catch (error: unknown) {
+         toast.dismiss(loadingToastId);
          const apiError = error as { response?: { data?: { message?: string } } };
          toast.error(apiError.response?.data?.message || t("messages.error"));
       } finally {
@@ -146,16 +200,38 @@ export default function CreatePropertyForm() {
       const firstError = Object.values(errors)[0];
       if (firstError?.message) {
          toast.error(t("messages.validationError"), {
-            description: firstError.message,
+            description: firstError.message as string,
          });
       }
    };
 
    const nextStep = async () => {
       let fieldsToValidate: (keyof PropertyFormValues)[] = [];
-      if (step === 1) fieldsToValidate = ["name", "description", "propertyType"];
-      if (step === 2)
-         fieldsToValidate = ["address", "city", "country", "checkInTime", "checkOutTime"];
+      if (step === 1) {
+         fieldsToValidate = ["name", "propertyType", "checkInTime", "checkOutTime"];
+      } else if (step === 2) {
+         fieldsToValidate = ["address", "city", "country"];
+      } else if (step === 3) {
+         fieldsToValidate = ["roomTypes", "amenities"];
+         const roomTypesValue = getValues("roomTypes") || [];
+         if (roomTypesValue.length === 0) {
+            toast.error(t("messages.roomsRequired"));
+            return;
+         }
+      } else if (step === 4) {
+         fieldsToValidate = ["description"];
+         const isValid = await trigger(fieldsToValidate);
+         if (!isValid) {
+            toast.error(t("messages.stepError"));
+            return;
+         }
+         if (images.length < 5) {
+            toast.error(t("messages.imageMinLimit"));
+            return;
+         }
+         setStep(5);
+         return;
+      }
 
       const isValid = await trigger(fieldsToValidate);
       if (isValid) {
@@ -168,330 +244,135 @@ export default function CreatePropertyForm() {
    const prevStep = () => setStep((s) => s - 1);
 
    return (
-      <div className="max-w-4xl mx-auto">
-         {/* Stepper Header */}
-         <div className="flex items-center justify-between mb-12 relative px-4">
-            <div className="absolute top-1/2 left-0 w-full h-0.5 bg-zinc-100 -translate-y-1/2 z-0" />
-            {[1, 2, 3].map((s) => (
-               <div
-                  key={s}
-                  className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-500 ${
-                     step >= s
-                        ? "border-[#003580] bg-[#003580] text-white shadow-lg shadow-blue-200"
-                        : "border-zinc-200 bg-white text-zinc-400"
-                  }`}
-               >
-                  {step > s ? (
-                     <CheckCircle2 className="h-6 w-6" />
-                  ) : (
-                     <span className="text-sm font-bold">{s}</span>
-                  )}
-                  <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">
-                     {t(`step${s}`)}
-                  </span>
+      <div className="pb-20">
+         {/* Page Header (Only when not in full-screen map Step 2) */}
+         {step !== 2 && (
+            <div className="bg-white border-b border-zinc-200 mb-12">
+               <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+                  <div className="flex flex-col items-center text-center">
+                     <div className="h-16 w-16 bg-blue-50 text-[#003580] rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-blue-100">
+                        <Building2 className="h-8 w-8" />
+                     </div>
+                     <h1
+                        className="text-3xl md:text-4xl font-extrabold text-zinc-900 tracking-tight mb-4 animate-in fade-in duration-700"
+                        style={{ fontFamily: "var(--font-be-vietnam-pro)" }}
+                     >
+                        {tHeader("title")}
+                     </h1>
+                     <p className="max-w-xl text-zinc-500 text-lg leading-relaxed animate-in fade-in duration-1000">
+                        {tHeader("subtitle")}
+                     </p>
+                  </div>
                </div>
-            ))}
-         </div>
-
-         <form
-            onSubmit={handleSubmit(onSubmit, onInvalid)}
-            className="bg-white rounded-3xl border border-zinc-100 shadow-xl shadow-zinc-200/50 overflow-hidden"
-         >
-            <div className="p-8 md:p-12">
-               {/* Step 1: Basic Info */}
-               {step === 1 && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                     <section className="space-y-6">
-                        <div className="flex items-center gap-3 mb-2">
-                           <Building2 className="h-5 w-5 text-[#003580]" />
-                           <h2 className="text-xl font-bold text-zinc-900">{t("basicInfo")}</h2>
-                        </div>
-
-                        <div className="space-y-4">
-                           <div>
-                              <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                                 {t("propertyName")}
-                              </label>
-                              <input
-                                 {...register("name")}
-                                 placeholder={t("placeholders.name")}
-                                 className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:border-[#003580] focus:ring-4 focus:ring-blue-50 outline-none transition-all placeholder:text-zinc-300"
-                              />
-                              {errors.name && (
-                                 <p className="mt-2 text-xs text-red-500 font-medium">
-                                    {errors.name.message}
-                                 </p>
-                              )}
-                           </div>
-
-                           <div>
-                              <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                                 {t("description")}
-                              </label>
-                              <textarea
-                                 {...register("description")}
-                                 rows={4}
-                                 placeholder={t("placeholders.description")}
-                                 className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:border-[#003580] focus:ring-4 focus:ring-blue-50 outline-none transition-all placeholder:text-zinc-300 resize-none"
-                              />
-                              {errors.description && (
-                                 <p className="mt-2 text-xs text-red-500 font-medium">
-                                    {errors.description.message}
-                                 </p>
-                              )}
-                           </div>
-                        </div>
-                     </section>
-
-                     <section className="space-y-6">
-                        <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                           {t("propertyType")}
-                        </label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           {PROPERTY_TYPES.map((type) => (
-                              <button
-                                 key={type.id}
-                                 type="button"
-                                 onClick={() =>
-                                    setValue(
-                                       "propertyType",
-                                       type.id as PropertyFormValues["propertyType"]
-                                    )
-                                 }
-                                 className={`flex items-start gap-4 p-4 rounded-2xl border-2 text-left transition-all duration-300 ${
-                                    selectedType === type.id
-                                       ? "border-[#003580] bg-blue-50/50"
-                                       : "border-zinc-100 hover:border-zinc-200 bg-zinc-50/30"
-                                 }`}
-                              >
-                                 <div
-                                    className={`p-3 rounded-xl ${selectedType === type.id ? "bg-[#003580] text-white" : "bg-white text-zinc-400 shadow-sm"}`}
-                                 >
-                                    <type.icon className="h-6 w-6" />
-                                 </div>
-                                 <div>
-                                    <p className="font-bold text-zinc-900">
-                                       {t(`propertyTypes.${type.id}.label`)}
-                                    </p>
-                                    <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                                       {t(`propertyTypes.${type.id}.description`)}
-                                    </p>
-                                 </div>
-                              </button>
-                           ))}
-                        </div>
-                     </section>
-
-                     <div className="flex justify-end pt-4">
-                        <button
-                           type="button"
-                           onClick={nextStep}
-                           className="flex items-center gap-2 px-8 py-3.5 bg-[#003580] text-white rounded-xl font-bold hover:bg-[#002b66] transition-all active:scale-95 shadow-lg shadow-blue-200"
-                        >
-                           {t("next")} <ChevronRight className="h-5 w-5" />
-                        </button>
-                     </div>
-                  </div>
-               )}
-
-               {/* Step 2: Location & Rating */}
-               {step === 2 && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                     <section className="space-y-6">
-                        <div className="flex items-center gap-3 mb-2">
-                           <MapPin className="h-5 w-5 text-[#003580]" />
-                           <h2 className="text-xl font-bold text-zinc-900">
-                              {t("locationRating")}
-                           </h2>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                           <div className="md:col-span-2">
-                              <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                                 {t("address")}
-                              </label>
-                              <input
-                                 {...register("address")}
-                                 className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:border-[#003580] focus:ring-4 focus:ring-blue-50 outline-none transition-all"
-                              />
-                           </div>
-                           <div>
-                              <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                                 {t("city")}
-                              </label>
-                              <input
-                                 {...register("city")}
-                                 className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:border-[#003580] focus:ring-4 focus:ring-blue-50 outline-none transition-all"
-                              />
-                           </div>
-                           <div>
-                              <label className="block text-[13px] font-bold text-zinc-700 mb-2 uppercase tracking-tight">
-                                 {t("country")}
-                              </label>
-                              <input
-                                 {...register("country")}
-                                 className="w-full px-4 py-3 rounded-xl border border-zinc-200 focus:border-[#003580] focus:ring-4 focus:ring-blue-50 outline-none transition-all"
-                              />
-                           </div>
-                        </div>
-                     </section>
-
-                     <section className="space-y-6">
-                        <div className="flex items-center justify-between">
-                           <div className="flex items-center gap-3">
-                              <Clock className="h-5 w-5 text-[#003580]" />
-                              <h2 className="text-xl font-bold text-zinc-900">{t("timeTitle")}</h2>
-                           </div>
-                           <label className="flex items-center gap-3 cursor-pointer group">
-                              <span className="text-[13px] font-bold text-zinc-500 group-hover:text-[#003580] transition-colors">
-                                 {t("flexibleTime")}
-                              </span>
-                              <div className="relative">
-                                 <input
-                                    type="checkbox"
-                                    className="sr-only"
-                                    checked={isFlexibleTime}
-                                    onChange={(e) => {
-                                       const checked = e.target.checked;
-                                       setIsFlexibleTime(checked);
-                                       if (checked) {
-                                          setValue("checkInTime", "00:00");
-                                          setValue("checkOutTime", "00:00");
-                                       } else {
-                                          setValue("checkInTime", "14:00");
-                                          setValue("checkOutTime", "12:00");
-                                       }
-                                    }}
-                                 />
-                                 <div
-                                    className={`block w-12 h-6 rounded-full transition-all duration-300 ${isFlexibleTime ? "bg-[#003580]" : "bg-zinc-200"}`}
-                                 ></div>
-                                 <div
-                                    className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 ${isFlexibleTime ? "translate-x-6" : ""}`}
-                                 ></div>
-                              </div>
-                           </label>
-                        </div>
-
-                        <div
-                           className={`grid grid-cols-2 gap-6 p-6 rounded-2xl border-2 transition-all duration-500 ${isFlexibleTime ? "bg-zinc-50/50 border-zinc-100 opacity-60" : "bg-white border-zinc-100"}`}
-                        >
-                           <div>
-                              <label
-                                 className={`block text-[11px] font-bold mb-2 uppercase tracking-widest ${isFlexibleTime ? "text-zinc-400" : "text-zinc-500"}`}
-                              >
-                                 {t("checkIn")}
-                              </label>
-                              <div className="relative">
-                                 <input
-                                    type="time"
-                                    disabled={isFlexibleTime}
-                                    {...register("checkInTime")}
-                                    className={`w-full px-4 py-3 rounded-xl border border-zinc-200 outline-none transition-all ${isFlexibleTime ? "bg-transparent cursor-not-allowed" : "focus:border-[#003580] bg-white"}`}
-                                 />
-                                 {isFlexibleTime && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-zinc-50/10 backdrop-blur-[1px] rounded-xl text-[10px] font-bold text-zinc-400 uppercase">
-                                       {t("placeholders.anytime")}
-                                    </div>
-                                 )}
-                              </div>
-                           </div>
-                           <div>
-                              <label
-                                 className={`block text-[11px] font-bold mb-2 uppercase tracking-widest ${isFlexibleTime ? "text-zinc-400" : "text-zinc-500"}`}
-                              >
-                                 {t("checkOut")}
-                              </label>
-                              <div className="relative">
-                                 <input
-                                    type="time"
-                                    disabled={isFlexibleTime}
-                                    {...register("checkOutTime")}
-                                    className={`w-full px-4 py-3 rounded-xl border border-zinc-200 outline-none transition-all ${isFlexibleTime ? "bg-transparent cursor-not-allowed" : "focus:border-[#003580] bg-white"}`}
-                                 />
-                                 {isFlexibleTime && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-zinc-50/10 backdrop-blur-[1px] rounded-xl text-[10px] font-bold text-zinc-400 uppercase">
-                                       {t("placeholders.anytime")}
-                                    </div>
-                                 )}
-                              </div>
-                           </div>
-                        </div>
-
-                        {isFlexibleTime && (
-                           <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-50 border border-blue-100 animate-in fade-in zoom-in-95 duration-300">
-                              <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></div>
-                              <p className="text-[12px] font-medium text-[#003580]">
-                                 {t("messages.flexibleInfo")}
-                              </p>
-                           </div>
-                        )}
-                     </section>
-
-                     <div className="flex justify-between pt-4">
-                        <button
-                           type="button"
-                           onClick={prevStep}
-                           className="flex items-center gap-2 px-8 py-3.5 bg-zinc-100 text-zinc-700 rounded-xl font-bold hover:bg-zinc-200 transition-all active:scale-95"
-                        >
-                           <ChevronLeft className="h-5 w-5" /> {t("back")}
-                        </button>
-                        <button
-                           type="button"
-                           onClick={nextStep}
-                           className="flex items-center gap-2 px-8 py-3.5 bg-[#003580] text-white rounded-xl font-bold hover:bg-[#002b66] transition-all active:scale-95 shadow-lg shadow-blue-200"
-                        >
-                           {t("next")} <ChevronRight className="h-5 w-5" />
-                        </button>
-                     </div>
-                  </div>
-               )}
-
-               {/* Step 3: Images */}
-               {step === 3 && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                     <section className="space-y-6">
-                        <div className="flex items-center gap-3 mb-2">
-                           <ImageIcon className="h-5 w-5 text-[#003580]" />
-                           <h2 className="text-xl font-bold text-zinc-900">{t("imagesTitle")}</h2>
-                        </div>
-                        <p className="text-sm text-zinc-500">{t("messages.imageUploadDesc")}</p>
-
-                        <ImageUpload
-                           images={images}
-                           onUploadSuccess={handleImageUpload}
-                           onRemove={removeImage}
-                           onReorder={setImages}
-                        />
-                     </section>
-
-                     <div className="flex justify-between pt-8 border-t border-zinc-100">
-                        <button
-                           type="button"
-                           onClick={prevStep}
-                           disabled={isSubmitting}
-                           className="flex items-center gap-2 px-8 py-3.5 bg-zinc-100 text-zinc-700 rounded-xl font-bold hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50"
-                        >
-                           <ChevronLeft className="h-5 w-5" /> {t("back")}
-                        </button>
-                        <button
-                           type="submit"
-                           disabled={isSubmitting}
-                           className="flex items-center gap-2 px-10 py-3.5 bg-[#006ce4] text-white rounded-xl font-bold hover:bg-[#005bb8] transition-all active:scale-95 shadow-lg shadow-blue-200 disabled:opacity-50"
-                        >
-                           {isSubmitting ? (
-                              <>
-                                 <Loader2 className="h-5 w-5 animate-spin" /> {t("processing")}
-                              </>
-                           ) : (
-                              t("finish")
-                           )}
-                        </button>
-                     </div>
-                  </div>
-               )}
             </div>
-         </form>
+         )}
+
+         {/* Compact Sticky Header (Only when in full-screen map Step 2) */}
+         {step === 2 && (
+            <div className="bg-white border-b border-zinc-200 shadow-sm fixed top-0 inset-x-0 h-20 z-50 flex items-center px-8">
+               <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
+                  <div className="flex items-center gap-3">
+                     <Building2 className="h-6 w-6 text-[#003580]" />
+                     <span className="font-bold text-[#003580] text-lg">OmniBooking</span>
+                  </div>
+                  {/* Stepper Header (Inline compact version for step 2) */}
+                  <div className="flex items-center gap-12">
+                     {[1, 2, 3, 4, 5].map((s) => (
+                        <div key={s} className="flex items-center gap-2">
+                           <div
+                              className={`h-8 w-8 rounded-full border-2 flex items-center justify-center font-bold text-xs transition-colors duration-300 ${
+                                 step >= s
+                                    ? "border-[#003580] bg-[#003580] text-white"
+                                    : "border-zinc-200 bg-white text-zinc-400"
+                              }`}
+                           >
+                              {s}
+                           </div>
+                           <span
+                              className={`text-xs font-bold uppercase tracking-wider transition-colors duration-300 ${step >= s ? "text-zinc-800" : "text-zinc-400"}`}
+                           >
+                              {t(`step${s}`)}
+                           </span>
+                        </div>
+                     ))}
+                  </div>
+                  <div className="w-24"></div> {/* spacer */}
+               </div>
+            </div>
+         )}
+
+         <div className={step === 2 ? "" : "max-w-4xl mx-auto px-4 sm:px-6 lg:px-8"}>
+            {step !== 2 && (
+               /* Stepper Header for Steps 1, 3, 4 & 5 */
+               <div className="flex items-center justify-between mb-12 relative px-4">
+                  <div className="absolute top-1/2 left-0 w-full h-0.5 bg-zinc-100 -translate-y-1/2 z-0" />
+                  {[1, 2, 3, 4, 5].map((s) => (
+                     <div
+                        key={s}
+                        className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-500 ${
+                           step >= s
+                              ? "border-[#003580] bg-[#003580] text-white shadow-lg shadow-blue-200"
+                              : "border-zinc-200 bg-white text-zinc-400"
+                        }`}
+                     >
+                        {step > s ? (
+                           <CheckCircle2 className="h-6 w-6" />
+                        ) : (
+                           <span className="text-sm font-bold">{s}</span>
+                        )}
+                        <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">
+                           {t(`step${s}`)}
+                        </span>
+                     </div>
+                  ))}
+               </div>
+            )}
+
+            <FormProvider {...methods}>
+               {step === 2 ? (
+                  /* Full-screen Map for Step 2 */
+                  <Step2Location
+                     handleAddressDetailsChange={handleAddressDetailsChange}
+                     onBack={prevStep}
+                     onNext={nextStep}
+                  />
+               ) : (
+                  <form
+                     onSubmit={handleSubmit(onSubmit, onInvalid)}
+                     className="bg-white rounded-3xl border border-zinc-100 shadow-xl shadow-zinc-200/50 overflow-hidden"
+                  >
+                     <div className="p-8 md:p-12">
+                        {step === 1 && (
+                           <Step1BasicInfo
+                              isFlexibleTime={isFlexibleTime}
+                              setIsFlexibleTime={setIsFlexibleTime}
+                              onNext={nextStep}
+                           />
+                        )}
+
+                        {step === 3 && <Step3Setup onBack={prevStep} onNext={nextStep} />}
+
+                        {step === 4 && (
+                           <Step4Media
+                              images={images}
+                              setImages={setImages}
+                              onBack={prevStep}
+                              onNext={nextStep}
+                           />
+                        )}
+
+                        {step === 5 && (
+                           <Step5Legal
+                              images={images}
+                              isSubmitting={isSubmitting}
+                              onBack={prevStep}
+                           />
+                        )}
+                     </div>
+                  </form>
+               )}
+            </FormProvider>
+         </div>
       </div>
    );
 }

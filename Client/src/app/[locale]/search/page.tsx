@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { Search, MapPin, Filter, SlidersHorizontal, Loader2 } from "lucide-react";
@@ -9,49 +9,28 @@ import { useQuery } from "@tanstack/react-query";
 import { propertyService, PropertyDocument } from "@/lib/api/services/propertyService";
 import PropertyCard from "@/components/PropertyCard";
 import MapView from "@/components/Map";
+import { useSettingStore } from "@/store/useSettingStore";
+import apiClient from "@/lib/api/apiClient";
 
-export default function SearchResultsPage() {
-   const t = useTranslations("Common");
+interface BudgetFilterProps {
+   currency: string;
+   rates?: Record<string, number>;
+   searchParams: ReturnType<typeof useSearchParams>;
+}
+
+function BudgetFilter({ currency, rates, searchParams }: BudgetFilterProps) {
    const ts = useTranslations("Search");
-   const tp = useTranslations("Partner");
-   const searchParams = useSearchParams();
+   const isVnd = currency === "VND";
+   const sliderMin = isVnd ? 200000 : 10;
+   const sliderMax = isVnd ? 5000000 : 200;
+   const sliderStep = isVnd ? 100000 : 5;
 
-   const destination = searchParams.get("ss") || "";
-   const checkin = searchParams.get("checkin");
-   const checkout = searchParams.get("checkout");
-
-   const { data: results, isLoading } = useQuery({
-      queryKey: ["search", searchParams.toString()],
-      queryFn: () =>
-         propertyService.search({
-            ss: destination,
-            minPrice: searchParams.get("minPrice")
-               ? Number(searchParams.get("minPrice"))
-               : undefined,
-            maxPrice: searchParams.get("maxPrice")
-               ? Number(searchParams.get("maxPrice"))
-               : undefined,
-            stars: searchParams.get("stars") ? Number(searchParams.get("stars")) : undefined,
-            propertyType: searchParams.get("propertyType") || undefined,
-            amenities: searchParams.getAll("amenities"),
-            minRating: searchParams.get("minRating")
-               ? Number(searchParams.get("minRating"))
-               : undefined,
-            page: 0,
-            size: 20,
-         }),
-   });
-
-   const properties = results?.content || [];
-
-   // State for price range slider (local to avoid excessive re-fetches during dragging)
-   const [priceRange, setPriceRange] = React.useState<[number, number]>([
-      Number(searchParams.get("minPrice")) || 200000,
-      Number(searchParams.get("maxPrice")) || 5000000,
+   const [priceRange, setPriceRange] = React.useState<[number, number]>(() => [
+      Number(searchParams.get("minPrice")) || (currency === "VND" ? 200000 : 10),
+      Number(searchParams.get("maxPrice")) || (currency === "VND" ? 5000000 : 200),
    ]);
 
    const [isMounted, setIsMounted] = React.useState(false);
-   const [showFullMap, setShowFullMap] = React.useState(false);
 
    React.useEffect(() => {
       const handle = requestAnimationFrame(() => setIsMounted(true));
@@ -65,8 +44,10 @@ export default function SearchResultsPage() {
    // Auto-apply filter after 1.5s of inactivity
    React.useEffect(() => {
       const timeoutId = setTimeout(() => {
-         const currentMin = Number(searchParams.get("minPrice")) || 200000;
-         const currentMax = Number(searchParams.get("maxPrice")) || 5000000;
+         const currentMin =
+            Number(searchParams.get("minPrice")) || (currency === "VND" ? 200000 : 10);
+         const currentMax =
+            Number(searchParams.get("maxPrice")) || (currency === "VND" ? 5000000 : 200);
 
          // Only update if values actually changed
          if (priceRange[0] !== currentMin || priceRange[1] !== currentMax) {
@@ -78,7 +59,222 @@ export default function SearchResultsPage() {
       }, 1500);
 
       return () => clearTimeout(timeoutId);
-   }, [priceRange, searchParams]);
+   }, [priceRange, searchParams, currency]);
+
+   return (
+      <div>
+         <div className="flex justify-between items-center mb-4">
+            <h3 className="font-bold text-sm">{ts("budget")}</h3>
+         </div>
+
+         <div className="px-2 space-y-4">
+            <div className="relative h-2 bg-zinc-100 rounded-full">
+               <input
+                  type="range"
+                  min={sliderMin}
+                  max={sliderMax}
+                  step={sliderStep}
+                  value={priceRange[0]}
+                  onChange={(e) => handlePriceChange([Number(e.target.value), priceRange[1]])}
+                  className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#006ce4] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md"
+               />
+               <input
+                  type="range"
+                  min={sliderMin}
+                  max={sliderMax}
+                  step={sliderStep}
+                  value={priceRange[1]}
+                  onChange={(e) => handlePriceChange([priceRange[0], Number(e.target.value)])}
+                  className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#006ce4] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md"
+               />
+            </div>
+
+            <div className="flex justify-between items-center text-[11px] font-bold text-zinc-600">
+               <span>
+                  {isMounted
+                     ? isVnd
+                        ? `${priceRange[0].toLocaleString("vi-VN")}đ`
+                        : `$${priceRange[0]}`
+                     : "---"}
+               </span>
+               <span>
+                  {isMounted
+                     ? priceRange[1] >= sliderMax
+                        ? isVnd
+                           ? "5.000.000đ+"
+                           : "$200+"
+                        : isVnd
+                          ? `${priceRange[1].toLocaleString("vi-VN")}đ`
+                          : `$${priceRange[1]}`
+                     : "---"}
+               </span>
+            </div>
+         </div>
+      </div>
+   );
+}
+
+export default function SearchResultsPage() {
+   const t = useTranslations("Common");
+   const ts = useTranslations("Search");
+   const tp = useTranslations("Partner");
+   const searchParams = useSearchParams();
+   const locale = useLocale();
+
+   const rawDestination = searchParams.get("ss") || "";
+   const destination = React.useMemo(() => {
+      if (locale === "en") {
+         switch (rawDestination) {
+            case "Hồ Chí Minh":
+               return "Ho Chi Minh City";
+            case "Hà Nội":
+               return "Hanoi";
+            case "Đà Nẵng":
+               return "Da Nang";
+            case "Hội An":
+               return "Hoi An";
+            case "Phú Quốc":
+               return "Phu Quoc";
+            case "Quảng Ninh":
+               return "Quang Ninh";
+            case "Hạ Long":
+               return "Ha Long";
+            case "Nha Trang":
+               return "Nha Trang";
+            case "Đà Lạt":
+               return "Da Lat";
+            case "Vũng Tàu":
+               return "Vung Tau";
+            case "Sapa":
+               return "Sapa";
+            case "Huế":
+               return "Hue";
+            case "Hải Phòng":
+               return "Hai Phong";
+            case "Cần Thơ":
+               return "Can Tho";
+            default:
+               return rawDestination;
+         }
+      } else {
+         switch (rawDestination) {
+            case "Ho Chi Minh City":
+            case "Ho Chi Minh":
+               return "Hồ Chí Minh";
+            case "Hanoi":
+               return "Hà Nội";
+            case "Da Nang":
+               return "Đà Nẵng";
+            case "Hoi An":
+               return "Hội An";
+            case "Phu Quoc":
+               return "Phú Quốc";
+            case "Quang Ninh":
+               return "Quảng Ninh";
+            case "Ha Long":
+               return "Hạ Long";
+            case "Nha Trang":
+               return "Nha Trang";
+            case "Da Lat":
+               return "Đà Lạt";
+            case "Vung Tau":
+               return "Vũng Tàu";
+            case "Hue":
+               return "Huế";
+            case "Hai Phong":
+               return "Hải Phòng";
+            case "Can Tho":
+               return "Cần Thơ";
+            default:
+               return rawDestination;
+         }
+      }
+   }, [rawDestination, locale]);
+   const checkin = searchParams.get("checkin");
+   const checkout = searchParams.get("checkout");
+
+   const { currency } = useSettingStore();
+   const { data: rates } = useQuery({
+      queryKey: ["currency-rates"],
+      queryFn: async () => {
+         const response = await apiClient.get<unknown, Record<string, number>>("/currencies/rates");
+         return response;
+      },
+      staleTime: 1000 * 60 * 60, // 1 hour
+   });
+
+   const rate = rates?.[currency] || 1;
+   const minPriceVal = searchParams.get("minPrice")
+      ? Number(searchParams.get("minPrice"))
+      : undefined;
+   const maxPriceVal = searchParams.get("maxPrice")
+      ? Number(searchParams.get("maxPrice"))
+      : undefined;
+
+   const usdMinPrice =
+      minPriceVal !== undefined
+         ? currency === "USD"
+            ? minPriceVal
+            : minPriceVal / rate
+         : undefined;
+   const usdMaxPrice =
+      maxPriceVal !== undefined
+         ? currency === "USD"
+            ? maxPriceVal
+            : maxPriceVal / rate
+         : undefined;
+
+   const { data: results, isLoading } = useQuery({
+      queryKey: ["search", searchParams.toString(), currency, rate],
+      queryFn: () =>
+         propertyService.search({
+            ss: destination,
+            minPrice: usdMinPrice,
+            maxPrice: usdMaxPrice,
+            stars: searchParams.get("stars") ? Number(searchParams.get("stars")) : undefined,
+            propertyType: searchParams.get("propertyType") || undefined,
+            amenities: searchParams.getAll("amenities"),
+            minRating: searchParams.get("minRating")
+               ? Number(searchParams.get("minRating"))
+               : undefined,
+            page: 0,
+            size: 20,
+         }),
+   });
+
+   const properties = results?.content || [];
+
+   // Sync URL params when currency changes
+   React.useEffect(() => {
+      const currentMin = Number(searchParams.get("minPrice"));
+      const currentMax = Number(searchParams.get("maxPrice"));
+
+      if (currentMin && currentMax) {
+         if (currency === "VND" && currentMin < 1000) {
+            // Price was in USD, convert to VND
+            const rateVal = rates?.["VND"] || 27000;
+            const newMin = Math.round((currentMin * rateVal) / 100000) * 100000;
+            const newMax = Math.round((currentMax * rateVal) / 100000) * 100000;
+
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("minPrice", newMin.toString());
+            params.set("maxPrice", newMax.toString());
+            window.history.replaceState(null, "", `?${params.toString()}`);
+         } else if (currency === "USD" && currentMin > 10000) {
+            // Price was in VND, convert to USD
+            const rateVal = rates?.["VND"] || 27000;
+            const newMin = Math.round(currentMin / rateVal / 5) * 5;
+            const newMax = Math.round(currentMax / rateVal / 5) * 5;
+
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("minPrice", newMin.toString());
+            params.set("maxPrice", newMax.toString());
+            window.history.replaceState(null, "", `?${params.toString()}`);
+         }
+      }
+   }, [currency, searchParams, rates]);
+
+   const [showFullMap, setShowFullMap] = React.useState(false);
 
    return (
       <div className="flex min-h-screen flex-col bg-[#f5f5f5]">
@@ -119,6 +315,7 @@ export default function SearchResultsPage() {
                         zoom={11}
                         showControls={false}
                         showAttribution={false}
+                        searchCity={rawDestination}
                      />
                      <div className="absolute inset-0 bg-black/5 group-hover:bg-black/0 transition-colors z-1001" />
                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-1002">
@@ -137,51 +334,12 @@ export default function SearchResultsPage() {
                   </div>
 
                   <div className="p-4 space-y-6">
-                     <div>
-                        <div className="flex justify-between items-center mb-4">
-                           <h3 className="font-bold text-sm">{ts("budget")}</h3>
-                        </div>
-
-                        <div className="px-2 space-y-4">
-                           <div className="relative h-2 bg-zinc-100 rounded-full">
-                              <input
-                                 type="range"
-                                 min="200000"
-                                 max="5000000"
-                                 step="100000"
-                                 value={priceRange[0]}
-                                 onChange={(e) =>
-                                    handlePriceChange([Number(e.target.value), priceRange[1]])
-                                 }
-                                 className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#006ce4] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md"
-                              />
-                              <input
-                                 type="range"
-                                 min="200000"
-                                 max="5000000"
-                                 step="100000"
-                                 value={priceRange[1]}
-                                 onChange={(e) =>
-                                    handlePriceChange([priceRange[0], Number(e.target.value)])
-                                 }
-                                 className="absolute w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#006ce4] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md"
-                              />
-                           </div>
-
-                           <div className="flex justify-between items-center text-[11px] font-bold text-zinc-600">
-                              <span>
-                                 {isMounted ? priceRange[0].toLocaleString("vi-VN") : "---"}đ
-                              </span>
-                              <span>
-                                 {isMounted
-                                    ? priceRange[1] >= 5000000
-                                       ? "5.000.000đ+"
-                                       : `${priceRange[1].toLocaleString("vi-VN")}đ`
-                                    : "---"}
-                              </span>
-                           </div>
-                        </div>
-                     </div>
+                     <BudgetFilter
+                        key={`${currency}-${searchParams.get("minPrice")}-${searchParams.get("maxPrice")}`}
+                        currency={currency}
+                        rates={rates}
+                        searchParams={searchParams}
+                     />
 
                      <div>
                         <h3 className="font-bold text-sm mb-3">{ts("propertyTypeLabel")}</h3>
@@ -321,7 +479,10 @@ export default function SearchResultsPage() {
             <div className="flex-1">
                <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-bold">
-                     {ts("resultsFor", { destination, count: results?.totalElements || 0 })}
+                     {ts("resultsFor", {
+                        destination: destination || ts("allProperties"),
+                        count: results?.totalElements || 0,
+                     })}
                   </h2>
                   <div className="flex items-center gap-2">
                      <span className="text-sm text-zinc-500">{ts("sortBy")}</span>
@@ -362,7 +523,10 @@ export default function SearchResultsPage() {
                <div className="h-16 border-b border-zinc-200 px-6 flex items-center justify-between bg-white">
                   <div className="flex items-center gap-4">
                      <h2 className="font-bold text-lg">
-                        {ts("resultsFor", { destination, count: properties.length })}
+                        {ts("resultsFor", {
+                           destination: destination || ts("allProperties"),
+                           count: properties.length,
+                        })}
                      </h2>
                   </div>
                   <button
@@ -374,7 +538,7 @@ export default function SearchResultsPage() {
                   </button>
                </div>
                <div className="flex-1 relative">
-                  <MapView properties={properties} zoom={13} />
+                  <MapView properties={properties} zoom={13} searchCity={rawDestination} />
                </div>
             </div>
          )}

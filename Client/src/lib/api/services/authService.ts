@@ -13,6 +13,7 @@ export interface LoginRequest {
    email: string;
    password: string;
    rememberMe?: boolean;
+   turnstileToken?: string;
 }
 
 export interface RegisterRequest {
@@ -20,6 +21,7 @@ export interface RegisterRequest {
    password: string;
    fullName: string;
    rememberMe?: boolean;
+   turnstileToken?: string;
 }
 
 let refreshPromise: Promise<User> | null = null;
@@ -30,6 +32,23 @@ export const authService = {
     */
    login: async (payload: LoginRequest): Promise<User> => {
       const response = (await apiClient.post("/auth/login", payload, {
+         withCredentials: true,
+         // @ts-expect-error - Custom axios config flag for interceptor
+         _skipToast: true,
+      })) as unknown as ApiResponse<User>;
+      return response.data;
+   },
+
+   /**
+    * Authenticates a user with 2FA OTP code.
+    */
+   loginWith2FA: async (payload: {
+      email: string;
+      password: string;
+      code: string;
+      rememberMe?: boolean;
+   }): Promise<User> => {
+      const response = (await apiClient.post("/auth/2fa/login", payload, {
          withCredentials: true,
          // @ts-expect-error - Custom axios config flag for interceptor
          _skipToast: true,

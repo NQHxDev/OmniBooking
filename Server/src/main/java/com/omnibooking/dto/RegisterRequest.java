@@ -31,4 +31,6 @@ public class RegisterRequest {
 
    private boolean rememberMe;
 
+   private String turnstileToken;
+
 }

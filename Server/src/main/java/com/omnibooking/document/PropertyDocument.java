@@ -36,7 +36,7 @@ public class PropertyDocument {
    @Field(type = FieldType.Text, analyzer = "vi_analyzer")
    private String address;
 
-   @Field(type = FieldType.Keyword)
+   @Field(type = FieldType.Text, analyzer = "vi_analyzer")
    private String city;
 
    @Field(type = FieldType.Keyword)

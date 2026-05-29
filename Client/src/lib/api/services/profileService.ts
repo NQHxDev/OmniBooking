@@ -12,6 +12,7 @@ export interface UserProfile {
    verified: boolean;
    points: number;
    rankName: string;
+   hasPassword: boolean;
 }
 
 export interface UpdateProfileRequest {
@@ -47,5 +48,15 @@ export const profileService = {
          payload
       )) as unknown as ApiResponse<UserProfile>;
       return response.data;
+   },
+
+   /**
+    * Changes or sets the user's password.
+    */
+   changePassword: async (payload: {
+      currentPassword?: string;
+      newPassword: string;
+   }): Promise<void> => {
+      await apiClient.post("/profile/password", payload);
    },
 };

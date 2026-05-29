@@ -53,18 +53,19 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 - **Idempotency Framework (X-Idempotency-Key)**: Custom `@Idempotent` annotation and AOP-based interceptor using Redis to prevent duplicate request processing (Double-submit) for critical operations.
 - **Resilience Layer (Fault Tolerance)**: Integration of **Resilience4j** implementing Circuit Breaker and Retry patterns for third-party service calls (Cloudinary, Resend) to prevent cascading failures.
 - **Stateless Architecture**: Secured for future JWT integration with stateless session management.
+- **No Open-In-View (OSIV Disabled)**: Explicitly disabled OSIV (`spring.jpa.open-in-view=false`) to optimize database connection pool utilization and enforce clean boundaries. Mapping to DTOs is fully materialized inside transaction boundaries (`@Transactional` Service layer) using MapStruct to eliminate the risk of late `LazyInitializationException` and avoid N+1 query patterns during serialization.
 
 ### Observability & Traceability
 
 - **Request Tracing**: `RequestIdFilter` generates a unique `X-Request-ID` for every request.
-   - **4-Layer Split Logging**: Hệ thống phân tách log thành 4 luồng riêng biệt để tối ưu giám sát:
-      - `system.log`: Hoạt động chung của hệ thống.
-      - `request_success.log`: Toàn bộ request thành công (2xx) kèm theo thời gian xử lý (`execution time`).
-      - `request_error.log`: Các lỗi nghiệp vụ và client (4xx, Validation).
-      - `error.log`: Các lỗi nghiêm trọng (5xx) và Exceptions.
-   - **Hierarchical Archiving**: Log cũ được nén `.gz` và lưu trữ theo cấu trúc thư mục `logs/archive/YYYY-MM/YYYY-MM-DD/` để quản lý gọn gàng và dễ dàng truy xuất theo thời gian.
-   - **Execution Time Tracking**: Sử dụng AOP (`LoggingAspect`) để đo lường và ghi nhận độ trễ (latency) của từng request ngay trong log.
-   - **MDC Integration**: Trace ID (`requestId`) được tự động tiêm vào mọi dòng log để liên kết dữ liệu giữa 4 file log khác nhau.
+   - **4-Layer Split Logging**: The system segregates logs into 4 distinct streams to optimize monitoring:
+      - `system.log`: General system operations and activities.
+      - `request_success.log`: All successful requests (2xx) along with their processing duration (`execution time`).
+      - `request_error.log`: Business logic and client-side errors (4xx, Validation failures).
+      - `error.log`: Critical system errors (5xx) and unhandled exceptions.
+   - **Hierarchical Archiving**: Historical logs are compressed as `.gz` and organized in a structured `logs/archive/YYYY-MM/YYYY-MM-DD/` directory path for tidy management and easy time-based retrieval.
+   - **Execution Time Tracking**: Utilizes AOP (`LoggingAspect`) to measure and record the latency of each request directly in the logs.
+   - **MDC Integration**: Trace ID (`requestId`) is automatically injected into all log entries to correlate log events across the 4 distinct log files.
 
 - **Health Monitoring**: Integrated Spring Boot Actuator for real-time system monitoring.
 - **Request Context**: `RequestContextHolder` (ThreadLocal) provides global access to request-scoped data (Trace ID, User ID), similar to NestJS ExecutionContext.
@@ -74,9 +75,9 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 ### API Architecture
 
 - **Axios Client**: Centralized `apiClient` with interceptors for:
-   - **Cross-system Traceability**: Tự động tạo và đính kèm `X-Request-ID`.
-   - **Synchronized Refresh Queue**: Cơ chế hàng đợi thông minh giúp chặn đứng việc gọi `refresh` token trùng lặp. Khi có nhiều request cùng bị lỗi 401, chỉ có duy nhất 1 request `refresh` được gửi đi, các request còn lại sẽ nằm trong hàng đợi và tự động thực hiện lại sau khi có session mới.
-   - **Global Error Normalization**: Chuyển đổi mã lỗi backend thành thông báo thân thiện cho người dùng.
+   - **Cross-system Traceability**: Automatically generates and attaches the `X-Request-ID` header.
+   - **Synchronized Refresh Queue**: A smart queuing mechanism that prevents duplicate refresh token requests. When multiple concurrent requests fail with a 401 error, only a single refresh request is sent; other pending requests are queued and automatically retried once a new session is established.
+   - **Global Error Normalization**: Standardizes backend error codes into user-friendly localized notification messages.
 
 ### State Management
 
@@ -119,7 +120,7 @@ The system implements a robust, secure authentication mechanism designed for pro
 
 To maintain platform quality, the partner registration is a multi-stage verified process:
 
-1. **OTP Verification**: Quy trình xác thực email/OTP được thực hiện tin cậy thông qua **Transactional Outbox Pattern**, đảm bảo mã xác thực luôn được ghi nhận và gửi đến người dùng kể cả khi có sự cố mạng.
+1. **OTP Verification**: The email/OTP verification workflow is reliably executed via the **Transactional Outbox Pattern**, ensuring that verification codes are always persisted and successfully delivered to the user even in the event of network disruptions.
 2. **Role Upgrade**: Upon verification, the user's role is upgraded to `ROLE_PARTNER` via a specialized backend endpoint.
 3. **Session Re-authentication**: After upgrade, a new JWT containing the updated roles is issued to ensure immediate access to partner-specific features.
 
@@ -129,9 +130,9 @@ To ensure high performance and non-blocking operations, the system implements an
 
 - **Kafka Integration**: Used as the primary message broker for cross-service communication and background tasks.
 - **Reliable Email System**:
-   - **Persistence**: Các sự kiện email được lưu vào bảng `outbox_events` ngay trong cùng transaction nghiệp vụ.
-   - **Worker**: `OutboxWorker` quét bảng và đẩy dữ liệu sang Kafka topic `omnibooking-mail-topic`.
-   - **Delivery**: Consumer nghe topic và gọi **Resend SDK** để gửi email thực tế.
+   - **Persistence**: Email events are stored in the `outbox_events` table within the same business database transaction.
+   - **Worker**: The `OutboxWorker` scans this table periodically and publishes payload details to the Kafka topic `omnibooking-mail-topic`.
+   - **Delivery**: A consumer listens to the topic and invokes the **Resend SDK** to perform the actual email delivery.
 - **Template Engine**: Uses **Thymeleaf** to render premium HTML email templates with dynamic data injection.
 
 ## 10. Configuration Management (NestJS Style)
@@ -203,98 +204,105 @@ The system implements a multi-layered security approach for sensitive operations
 
 ## 14. OAuth2 & Social Authentication Architecture
 
-Hệ thống triển khai một kiến trúc linh hoạt cho phép tích hợp không giới hạn các nhà cung cấp định danh (Social Providers):
+The system implements a flexible, highly extensible architecture allowing seamless integration of unlimited identity providers (Social Providers):
 
 ### OAuth2 Strategy & Factory Pattern
 
-- **OAuth2ProviderService (Strategy)**: Interface định nghĩa các phương thức chung cho mọi nhà cung cấp (generate URL, exchange code).
-- **OAuth2ServiceFactory (Factory)**: Tự động phát hiện và cung cấp Service tương ứng dựa trên provider name (`google`, `apple`...).
-- **Unified Controller**: Mọi provider đều dùng chung các endpoint động `/auth/{provider}/url` và `/auth/{provider}/callback`.
+- **OAuth2ProviderService (Strategy)**: Interface defining common methods for all identity providers (e.g., generate authorization URL, exchange authorization code).
+- **OAuth2ServiceFactory (Factory)**: Automatically detects and provides the appropriate Service based on the provider's name (`google`, `zalo`, etc.).
+- **Unified Controller**: All social providers share the dynamic endpoints `/auth/{provider}/url` and `/auth/{provider}/callback`.
 
 ### Smart Data Synchronization
 
-- **Smart Name Splitting**: Triển khai thuật toán tách tên dựa trên logic văn hóa (Last word = Tên, Rest = Họ và Đệm) để đảm bảo dữ liệu trong `UserProfile` luôn chuẩn xác và không bị trùng lặp khi lấy từ các API xã hội.
-- **Avatar Protection Policy**: Hệ thống chỉ tự động cập nhật ảnh đại diện từ mạng xã hội nếu người dùng chưa có ảnh hoặc đang sử dụng ảnh cũ của mạng xã hội đó. Nếu người dùng đã tự upload ảnh cá nhân, hệ thống sẽ tôn trọng và bảo vệ lựa chọn đó.
+- **Smart Name Splitting**: Implements a culturally aware name splitting algorithm (e.g., Last word = First Name, Rest = Last & Middle Name) to ensure that the `UserProfile` data is accurate and not duplicated when retrieved from social APIs.
+- **Avatar Protection Policy**: The system only automatically updates the user's avatar from their social profile if they don't have an avatar set or are using an older social-provided avatar. If the user has uploaded a custom personal avatar, the system respects and preserves their choice.
 
 ## 15. Smart Search & Real-time Indexing Architecture
 
-Kiến trúc tìm kiếm của OmniBooking được thiết kế để xử lý hàng triệu bản ghi với tốc độ mili giây, kết hợp sức mạnh của Elasticsearch và luồng dữ liệu thời gian thực của Kafka:
+OmniBooking's search architecture is engineered to query millions of records in milliseconds by leveraging Elasticsearch combined with real-time data streaming via Kafka:
 
 ### Elasticsearch Search Engine
 
-- **Full-text Search**: Sử dụng Elasticsearch 8.x để tìm kiếm không dấu/có dấu, tìm kiếm gần đúng (Fuzzy Search) cho các địa danh.
-- **Criteria-based Filtering**: Triển khai `CriteriaQuery` để xử lý các bộ lọc phức tạp (Giá, Loại hình chỗ nghỉ, Tiện ích, Điểm đánh giá) một cách linh hoạt mà không làm giảm hiệu năng.
-- **Geo-spatial Search**: Lưu trữ tọa độ (`GeoPoint`) để hỗ trợ tìm kiếm theo bán kính và hiển thị bản đồ.
+- **Full-text Search**: Utilizes Elasticsearch 8.x for accented/unaccented searching, including Fuzzy Search for locations.
+- **Criteria-based Filtering**: Implements complex criteria queries to handle advanced filtering (Price, Accommodation Type, Amenities, Review Score) dynamically without sacrificing performance.
+- **Geo-spatial Search**: Stores coordinate points (`GeoPoint`) to support radius-based searching and map integration.
 
 ### Real-time Data Synchronization (Kafka Pipeline)
 
-- **CDC-like Pattern**: Mọi thay đổi về thông tin khách sạn hoặc giá phòng ở PostgreSQL đều kích hoạt một sự kiện (Event) đẩy vào Kafka.
-- **Search Indexer**: Một Service chuyên biệt lắng nghe Kafka và cập nhật ngay lập tức vào Elasticsearch Index, đảm bảo dữ liệu tìm kiếm luôn đồng bộ với Database chính.
+- **CDC-like Pattern**: Any updates to hotel information or room rates in PostgreSQL trigger an event published to Kafka.
+- **Search Indexer**: A dedicated service consumes events from Kafka and immediately updates the Elasticsearch index, ensuring search data is perfectly synchronized with the primary database.
 
 ### Interactive Map Engine (Leaflet)
 
-- **Client-side Rendering**: Sử dụng Leaflet với cơ chế **Dynamic Import** để tối ưu hóa SEO và tốc độ tải trang (LCP).
-- **Price-tag Markers**: Custom Markers hiển thị trực tiếp giá tiền trên bản đồ, giúp người dùng có trải nghiệm tương tác trực quan như các nền tảng OTA hàng đầu thế giới.
+- **Client-side Rendering**: Uses Leaflet with **Dynamic Import** components to optimize SEO and page load performance (LCP).
+- **Price-tag Markers**: Custom Markers display rates directly on the map, providing users with an intuitive, interactive experience similar to top-tier global Online Travel Agencies (OTAs).
 
 ## 16. Reliable Messaging (Transactional Outbox Pattern)
 
-Để đảm bảo tính nhất quán tuyệt đối giữa Database và Message Broker (Kafka), hệ thống triển khai Transactional Outbox Pattern:
+To guarantee absolute consistency between the relational Database and the Message Broker (Kafka), the system implements the Transactional Outbox Pattern:
 
-- **Atomic Operations**: Các sự kiện (như Register, Forgot Password) không bắn trực tiếp vào Kafka. Thay vào đó, chúng được lưu vào bảng `outbox_events` trong cùng một Transaction với dữ liệu nghiệp vụ.
-- **Guaranteed Delivery**: Một `OutboxWorker` (Scheduled Task) định kỳ quét các sự kiện chưa xử lý và đẩy chúng vào Kafka. Điều này đảm bảo hễ User được tạo thành công thì chắc chắn Email sẽ được gửi, kể cả khi Kafka tạm thời bị sập.
-- **Hybrid Wake-Up Mechanism**: Để tối ưu độ trễ, hệ thống sử dụng cơ chế "đánh thức" tức thì. Ngay sau khi Transaction nghiệp vụ commit thành công, một tín hiệu sẽ kích hoạt Worker xử lý ngay mà không đợi đến chu kỳ quét tiếp theo.
+- **Atomic Operations**: Critical events (such as User Registration or Password Reset) are not published directly to Kafka. Instead, they are persisted to the `outbox_events` table in the exact same database transaction as the business state change.
+- **Guaranteed Delivery**: An `OutboxWorker` (Scheduled Task) periodically polls unprocessed events and publishes them to Kafka. This ensures that once a user is successfully created, the welcome/verification email is guaranteed to be sent, even if Kafka is temporarily offline.
+- **Hybrid Wake-Up Mechanism**: To optimize latency, the system utilizes a real-time wake-up mechanism. As soon as the business transaction commits successfully, an internal signal immediately wakes up the Outbox worker to process the event, bypassing the standard polling delay.
 - **Concurrency & Safety**:
-   - **Instance Level**: Sử dụng `AtomicBoolean` để đảm bảo trong cùng một máy chủ, chỉ có duy nhất một luồng xử lý Outbox tại một thời điểm, tránh lãng phí tài nguyên.
-   - **Cluster Level**: Sử dụng câu lệnh SQL `FOR UPDATE SKIP LOCKED` giúp nhiều instance có thể chạy song song mà không tranh chấp hoặc xử lý trùng lặp dữ liệu.
-- **Data Integrity**: Payload của sự kiện được lưu trữ dưới dạng JSON kèm theo thông tin `payload_class` để đảm bảo việc giải mã chính xác tại worker trước khi gửi đi.
+   - **Instance Level**: Uses an `AtomicBoolean` lock flag to ensure that only one processing thread runs per server instance at a time, avoiding wasted system resources.
+   - **Cluster Level**: Uses the `SELECT ... FOR UPDATE SKIP LOCKED` SQL query to enable multiple distributed instances to run concurrently without lock contention or duplicate event processing.
+- **Data Integrity**: The event payload is stored as JSON alongside a `payload_class` metadata column to guarantee highly accurate deserialization at the worker level prior to dispatch.
 
 ## 17. Global Search & Discovery Engine
 
-Hệ thống tìm kiếm của OmniBooking được thiết kế để mang lại trải nghiệm nhanh chóng, chính xác và mang tính khám phá cao, tương đương với các tiêu chuẩn của Airbnb hay Booking.com.
+OmniBooking's search system is designed to provide a fast, accurate, and discovery-driven experience matching global standards established by platforms like Airbnb and Booking.com.
 
 ### 17.1. Hybrid Search Architecture (Elasticsearch + Postgres)
 
-- **Search Index (Elasticsearch)**: Toàn bộ dữ liệu về địa danh (Cities, Regions, Hotels, Landmarks) được đánh chỉ mục vào Elasticsearch.
-- **Full-text & Fuzzy Matching**: Sử dụng cơ chế `bool query` kết hợp `match_phrase_prefix` và `fuzzy` để xử lý các tìm kiếm có dấu, không dấu, hoặc gõ sai chính tả của người dùng.
-- **Unified DTO Mapping**: Backend trả về một cấu trúc `DestinationSuggestionResponse` nhất quán, hỗ trợ i18n đa ngôn ngữ cho các loại địa danh (ví dụ: City -> Thành phố, Hotel -> Khách sạn).
+- **Search Index (Elasticsearch)**: All location-relevant data (Cities, Regions, Hotels, Landmarks) is indexed in Elasticsearch.
+- **Full-text & Fuzzy Matching**: Leverages a `bool query` combined with `match_phrase_prefix` and `fuzzy` matching to handle accented, unaccented, or typo-ridden user searches.
+- **Unified DTO Mapping**: The backend returns a standardized `DestinationSuggestionResponse` structure, fully supporting multi-language i18n translations for location types (e.g., City -> "City" / "Thành phố", Hotel -> "Hotel" / "Khách sạn").
 
 ### 17.2. Search Analytics & Discovery (Trending Logic)
 
-- **Search Logging**: Mọi hành vi tìm kiếm của người dùng đều được ghi lại vào bảng `search_logs` thông qua `SearchLogService`. Dữ liệu bao gồm: từ khóa, mã quốc gia (dựa trên IP), và tọa độ địa lý.
-- **Trending Algorithm**: Danh sách "Trending Now" được tính toán dựa trên tần suất xuất hiện của từ khóa trong 7 ngày gần nhất.
-- **Manual Boosting**: Hệ thống hỗ trợ cờ `is_boosted` trong Database để quản trị viên có thể đẩy các địa danh chiến dịch (Promotion) lên vị trí đầu tiên của danh sách gợi ý.
+- **Search Logging**: Every user search behavior is logged to the `search_logs` table via `SearchLogService`, capturing the keyword, country code (resolved via client IP), and geographic coordinates.
+- **Trending Algorithm**: The "Trending Now" list is dynamically computed based on search term frequency over the past 7 days.
+- **Manual Boosting**: Administrators can manually push specific promotional/campaign locations to the top of the search suggestions using the `is_boosted` flag in the database.
 
 ### 17.3. Internationalization (i18n) Strategy
 
-- **Dynamic Labels**: Các loại địa danh (Type Labels) được dịch động tại Frontend dựa trên namespace `Common.Search` trong các tệp `vi.json` và `en.json`.
-- **Locale-aware Search**: Elasticsearch được cấu hình để ưu tiên các kết quả phù hợp với ngôn ngữ hiện tại của người dùng, đảm bảo trải nghiệm bản địa hóa hoàn toàn.
+- **Dynamic Labels**: Location type labels are translated dynamically on the frontend using the `Common.Search` namespace within `vi.json` and `en.json`.
+- **Locale-aware Search**: Elasticsearch is configured to prioritize search results that match the user's active locale, ensuring a fully localized search experience.
+
+### 17.4. IP-Based Geolocation & Country Detection
+
+- **Client IP Extraction**: The backend extracts the client's public IP address via the `X-FORWARDED-FOR` request header (which is populated by reverse proxies or forwarded by the Next.js server). If not present, it falls back to `HttpServletRequest.getRemoteAddr()`.
+- **MaxMind GeoIP2 Resolution**: The `GeoLocationService` reads the client IP and queries a local MaxMind GeoIP2 city database (`GeoLite2-City.mmdb`) to resolve the user's ISO 3166-1 alpha-2 country code (e.g. `VN`, `FR`, `US`).
+- **Configurable Fallback**: If the IP is a local loopback address (`127.0.0.1`, `0:0:0:0:0:0:0:1`) or if the database is missing, it falls back to a default country configured via `app.geo.default-country` (defaults to `VN`).
+- **Next.js SSR Forwarding**: For Server-side Rendering (SSR) fetches where the request originates from the Next.js server itself, the client's original IP address is read from the incoming request's `x-forwarded-for` header and forwarded to the backend API inside the `X-Forwarded-For` HTTP header. This ensures correct location targeting.
 
 ## 18. Global Currency & Real-time Pricing System
 
-Hệ thống OmniBooking được thiết kế để hoạt động trên quy mô toàn cầu với khả năng xử lý đa tiền tệ linh hoạt và chính xác:
+The OmniBooking system is designed to operate globally with flexible and highly precise multi-currency processing:
 
 ### 18.1. USD-Based Financial Core
 
-- **Single Base Currency**: Toàn bộ dữ liệu giá tiền (Property rates, Booking totals, Transactions) trong Database được lưu trữ duy nhất dưới đơn vị **USD** để đảm bảo tính nhất quán và dễ dàng hạch toán.
-- **Dynamic Conversion**: Giá tiền chỉ được quy đổi sang đơn vị tiền tệ của người dùng (VND, EUR...) tại thời điểm hiển thị hoặc thanh toán dựa trên tỉ giá thực tế.
+- **Single Base Currency**: All financial pricing data (Property rates, Booking totals, Transactions) is stored exclusively in **USD** within the database to maintain absolute consistency and simplify accounting auditing.
+- **Dynamic Conversion**: Rates are converted to the user's preferred local currency (VND, EUR, etc.) on-the-fly during rendering or payment processing based on live exchange rates.
 
 ### 18.2. Multi-layer Exchange Rate Strategy
 
-Hệ thống sử dụng cơ chế lấy tỉ giá 3 lớp để tối ưu hóa hiệu năng và độ tin cậy:
+To optimize performance and fault-tolerance, the system retrieves exchange rates via a 3-tier strategy:
 
-1. **Layer 1: Redis Cache**: Truy xuất tức thì với TTL 4 giờ.
-2. **Layer 2: Database**: Lưu trữ lịch sử tỉ giá (Audit Trail) và làm nguồn dự phòng nếu Redis bị trống.
-3. **Layer 3: External API (ExchangeRate-API)**: Nguồn dữ liệu gốc, chỉ gọi khi cả Redis và DB đều không có dữ liệu mới.
+1. **Layer 1: Redis Cache**: Immediate retrieval with a 4-hour Time-to-Live (TTL).
+2. **Layer 2: Database**: Persisted exchange rate history (Audit Trail) serving as a fallback if the cache is empty.
+3. **Layer 3: External API (ExchangeRate-API)**: The source of truth, fetched only when both Redis and the database lack current exchange rate data.
 
 ### 18.3. Organic Pricing & Profit Margin (Markup)
 
-Để đảm bảo an toàn tài chính và tạo trải nghiệm "thật" cho người dùng, hệ thống áp dụng logic Markup thông minh:
+To ensure financial safety and foster a highly interactive user experience, the system applies a smart markup logic:
 
-- **Automatic Markup**: Mọi tỉ giá lấy từ API đều được cộng thêm một khoảng chênh lệch trước khi lưu vào hệ thống:
-   - **VND**: Cộng ngẫu nhiên từ **300đ - 1,000đ** (Random Markup) để giá tiền thay đổi sinh động mỗi ngày.
-   - **Other Currencies**: Cộng thêm **5%** phí bảo hiểm tỉ giá.
-- **Update Cycle**: Một `CurrencyWorker` chạy định kỳ mỗi **4 tiếng** (0h, 4h, 8h, 12h, 16h, 20h) để cập nhật tỉ giá và thay đổi mức Random Markup, giúp website luôn có cảm giác "sống" và cập nhật liên tục.
+- **Automatic Markup**: Exchange rates fetched from the API are marked up before system storage:
+   - **VND**: Applies a random markup ranging from **300 VND to 1,000 VND** (Random Markup) to make prices feel dynamic and alive daily.
+   - **Other Currencies**: Incorporates a standard **5%** spread fee to cushion against intra-day currency fluctuations.
+- **Update Cycle**: A periodic `CurrencyWorker` runs every **4 hours** (0:00, 4:00, 8:00, 12:00, 16:00, 20:00) to fetch the latest rates and recalculate the Random Markup, ensuring the website consistently feels active and freshly updated.
 
 ---
 
-_Last Updated: 2026-05-13_
+_Last Updated: 2026-05-18_

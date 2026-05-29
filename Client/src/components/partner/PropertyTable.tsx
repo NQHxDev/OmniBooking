@@ -2,7 +2,17 @@
 
 import React, { useState } from "react";
 import { PropertyResponse } from "@/lib/api/propertyService";
-import { MapPin, Hotel, ChevronLeft, ChevronRight, Eye, Edit3, Trash2, Star } from "lucide-react";
+import {
+   MapPin,
+   Hotel,
+   ChevronLeft,
+   ChevronRight,
+   Eye,
+   Edit3,
+   Trash2,
+   Star,
+   Loader2,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -43,26 +53,33 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
    return (
       <div className="space-y-8">
          {/* Grid View - Smaller and more elegant cards */}
-         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
             {visibleProperties.map((property) => (
                <div
                   key={property.id}
                   className="group relative flex flex-col overflow-hidden rounded-[2rem] bg-white shadow-sm border border-zinc-100 hover:shadow-xl hover:shadow-zinc-200 transition-all duration-500"
                >
                   {/* Image Section - Reduced height */}
-                  <div className="relative h-48 w-full overflow-hidden">
-                     <Image
-                        src={
-                           property.imageUrl ||
-                           "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=800"
-                        }
-                        alt={property.name}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        className="object-cover transition-transform duration-700 group-hover:scale-110"
-                        unoptimized={!property.imageUrl}
-                     />
-                     <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  <div className="relative h-48 w-full overflow-hidden bg-zinc-100">
+                     {property.imageUrl ? (
+                        <>
+                           <Image
+                              src={property.imageUrl}
+                              alt={property.name}
+                              fill
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                              className="object-cover transition-transform duration-700 group-hover:scale-110"
+                           />
+                           <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                        </>
+                     ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-linear-to-br from-zinc-800 to-zinc-900 text-white p-4">
+                           <Loader2 className="h-6 w-6 animate-spin text-zinc-400 mb-2" />
+                           <span className="text-xs font-bold tracking-wide animate-pulse text-zinc-300">
+                              {t("imageProcessing")}
+                           </span>
+                        </div>
+                     )}
 
                      {/* Badge Status - Smaller */}
                      <div className="absolute left-4 top-4">
@@ -93,13 +110,13 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
                               <Hotel className="h-3 w-3" />
                               {t(`type${property.propertyType}`)}
                            </div>
-                           <h3 className="text-lg font-black text-zinc-900 group-hover:text-[#006ce4] transition-colors leading-tight truncate">
+                           <h3 className="text-lg font-bold text-zinc-900 group-hover:text-[#006ce4] transition-colors leading-tight truncate">
                               {property.name}
                            </h3>
                         </div>
                         <div className="flex items-center gap-1 rounded-lg bg-zinc-50 px-2 py-1 border border-zinc-100 ml-2">
                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                           <span className="text-[11px] font-black text-zinc-900">4.8</span>
+                           <span className="text-[11px] font-bold text-zinc-900">4.8</span>
                         </div>
                      </div>
 
@@ -117,12 +134,15 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
                            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
                               {t("inventory")}
                            </span>
-                           <span className="text-sm font-black text-zinc-900">12 {t("rooms")}</span>
+                           <span className="text-sm font-bold text-zinc-900">12 {t("rooms")}</span>
                         </div>
-                        <button className="flex items-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-zinc-800 transition-all shadow-md shadow-zinc-100 active:scale-[0.98]">
+                        <Link
+                           href={`/partner/properties/${property.id}`}
+                           className="flex items-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-zinc-800 transition-all shadow-md shadow-zinc-100 active:scale-[0.98]"
+                        >
                            <Eye className="h-3.5 w-3.5" />
                            {t("details")}
-                        </button>
+                        </Link>
                      </div>
                   </div>
                </div>

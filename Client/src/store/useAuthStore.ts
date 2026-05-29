@@ -19,7 +19,9 @@ export interface User {
 interface AuthState {
    user: User | null;
    isLoggedIn: boolean;
+   isReady: boolean;
    setAuth: (user: User) => void;
+   setReady: (ready: boolean) => void;
    logout: () => Promise<void>;
 }
 
@@ -28,7 +30,9 @@ export const useAuthStore = create<AuthState>()(
       (set) => ({
          user: null,
          isLoggedIn: false,
+         isReady: false,
          setAuth: (user) => set({ user, isLoggedIn: true }),
+         setReady: (ready) => set({ isReady: ready }),
          logout: async () => {
             try {
                await axios.post(`${getBaseURL()}auth/logout`, {}, { withCredentials: true });
@@ -41,6 +45,10 @@ export const useAuthStore = create<AuthState>()(
       }),
       {
          name: "auth-storage",
+         partialize: (state) => ({
+            user: state.user,
+            isLoggedIn: state.isLoggedIn,
+         }),
       }
    )
 );

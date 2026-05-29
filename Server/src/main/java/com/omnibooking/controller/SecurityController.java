@@ -4,7 +4,7 @@ import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.auth.SecurityCheckResponse;
 import com.omnibooking.dto.auth.SecurityOtpVerifyRequest;
 import com.omnibooking.security.UserPrincipal;
-import com.omnibooking.services.SecurityVerificationService;
+import com.omnibooking.services.auth.SecurityVerificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -77,4 +77,5 @@ public class SecurityController {
 
       return ResponseEntity.ok(ApiResponse.success(response, "Lấy trạng thái bảo mật thành công", requestId));
    }
+
 }

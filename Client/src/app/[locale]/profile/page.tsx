@@ -57,6 +57,7 @@ export default function ProfilePage() {
                            src={user.avatarUrl}
                            alt={user?.fullName || "Avatar"}
                            fill
+                           sizes="64px"
                            className="object-cover"
                            unoptimized
                         />

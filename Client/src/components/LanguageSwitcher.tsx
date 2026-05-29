@@ -2,16 +2,22 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/routing";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { ChevronDown } from "lucide-react";
 
-export default function LanguageSwitcher() {
+interface LanguageSwitcherProps {
+   theme?: "blue-bg" | "white-bg";
+}
+
+function LanguageSwitcherComponent({ theme = "blue-bg" }: LanguageSwitcherProps) {
    const locale = useLocale();
    const t = useTranslations("Common");
 
    const router = useRouter();
    const pathname = usePathname();
+   const searchParams = useSearchParams();
    const [isOpen, setIsOpen] = useState(false);
    const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -42,20 +48,34 @@ export default function LanguageSwitcher() {
 
    const handleLanguageChange = (newLocale: string) => {
       setIsOpen(false);
-      router.replace(pathname, { locale: newLocale });
+      const params = searchParams.toString();
+      const targetPath = params ? `${pathname}?${params}` : pathname;
+      router.replace(targetPath, { locale: newLocale });
    };
+
+   const isBlueBg = theme === "blue-bg";
 
    return (
       <div className="relative" ref={dropdownRef}>
          <button
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 rounded-full p-1.5 hover:bg-white/10 transition-all active:scale-95"
+            className={`flex items-center gap-2 rounded-full p-1.5 transition-all active:scale-95 ${
+               isBlueBg ? "hover:bg-white/10" : "hover:bg-zinc-50 border border-zinc-100"
+            }`}
          >
             <div className="relative h-5 w-7 overflow-hidden rounded-sm shadow-sm">
-               <Image src={currentLang.flag} alt={currentLang.name} fill className="object-cover" />
+               <Image
+                  src={currentLang.flag}
+                  alt={currentLang.name}
+                  fill
+                  sizes="28px"
+                  className="object-cover"
+               />
             </div>
             <ChevronDown
-               className={`h-3 w-3 text-white/70 transition-transform ${isOpen ? "rotate-180" : ""}`}
+               className={`h-3 w-3 transition-transform ${
+                  isBlueBg ? "text-white/70" : "text-zinc-500"
+               } ${isOpen ? "rotate-180" : ""}`}
             />
          </button>
 
@@ -75,7 +95,13 @@ export default function LanguageSwitcher() {
                      }`}
                   >
                      <div className="relative h-4 w-6 overflow-hidden rounded-sm border border-zinc-100">
-                        <Image src={lang.flag} alt={lang.name} fill className="object-cover" />
+                        <Image
+                           src={lang.flag}
+                           alt={lang.name}
+                           fill
+                           sizes="24px"
+                           className="object-cover"
+                        />
                      </div>
                      {lang.name}
                      {locale === lang.code && (
@@ -86,5 +112,13 @@ export default function LanguageSwitcher() {
             </div>
          )}
       </div>
+   );
+}
+
+export default function LanguageSwitcher(props: LanguageSwitcherProps) {
+   return (
+      <Suspense fallback={<div className="h-8 w-8 rounded-full bg-zinc-100/10 animate-pulse" />}>
+         <LanguageSwitcherComponent {...props} />
+      </Suspense>
    );
 }

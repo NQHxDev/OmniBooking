@@ -23,12 +23,20 @@ public class AppProperties {
    private String contextPath;
 
    private final Security security = new Security();
+
    private final Mail mail = new Mail();
+
    private final Cloudinary cloudinary = new Cloudinary();
+
    private final Oauth2 oauth2 = new Oauth2();
+
    private final Geo geo = new Geo();
+
    private final Currency currency = new Currency();
+
    private final Webauthn webauthn = new Webauthn();
+
+   private final Turnstile turnstile = new Turnstile();
 
    @Data
    public static class Webauthn {
@@ -93,6 +101,7 @@ public class AppProperties {
       private String encryptionSecret;
       @NotBlank
       private String hashPepper;
+      private boolean twoFactorEnabled = true;
    }
 
    @Data
@@ -111,6 +120,15 @@ public class AppProperties {
       private String apiKey;
       @NotBlank
       private String apiSecret;
+   }
+
+   @Data
+   public static class Turnstile {
+      private boolean enabled = true;
+      @NotBlank
+      private String secretKey;
+      @NotBlank
+      private String verifyUrl = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
    }
 
 }

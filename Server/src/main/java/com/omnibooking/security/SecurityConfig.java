@@ -1,6 +1,6 @@
 package com.omnibooking.security;
 
-import com.omnibooking.services.JWTService;
+import com.omnibooking.services.auth.JWTService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -83,7 +83,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                   .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                   .requestMatchers("/auth/passkey/**").authenticated()
-                  .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh",
+                  .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh", "/auth/logout", "/auth/2fa/login",
                         "/auth/forgot-password", "/auth/reset-password", "/auth/google/**", "/auth/subscribe/**", "/auth/finalize-registration")
                   .permitAll()
                   .requestMatchers("/properties/search", "/properties/search/**").permitAll()

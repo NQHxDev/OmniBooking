@@ -41,3 +41,9 @@ Client/.pnp.js
 
 # --- Husky ---
 .husky/_/
+
+# --- AI Linter Outputs ---
+lint-output.txt
+lint-results.json
+**/lint-output.txt
+**/lint-results.json

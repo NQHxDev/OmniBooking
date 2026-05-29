@@ -24,4 +24,6 @@ public class LoginRequest {
 
    private boolean rememberMe;
 
+   private String turnstileToken;
+
 }

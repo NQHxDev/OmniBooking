@@ -2,7 +2,7 @@ package com.omnibooking.controller;
 
 import com.omnibooking.model.Currency;
 import com.omnibooking.repository.CurrencyRepository;
-import com.omnibooking.services.CurrencyService;
+import com.omnibooking.services.core.CurrencyService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +31,7 @@ public class CurrencyController {
       return currencies.stream()
             .collect(Collectors.toMap(
                   Currency::getCode,
-                  c -> currencyService.getRate(c.getCode())
-            ));
+                  c -> currencyService.getRate(c.getCode())));
    }
+
 }

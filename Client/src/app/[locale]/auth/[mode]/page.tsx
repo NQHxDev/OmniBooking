@@ -1,7 +1,7 @@
 "use client";
 
-import { Link } from "@/i18n/routing";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Link, useRouter } from "@/i18n/routing";
+import { useParams, useSearchParams } from "next/navigation";
 import {
    Mail,
    Lock,
@@ -13,12 +13,14 @@ import {
    EyeOff,
 } from "lucide-react";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuthStore, type User as UserType } from "@/store/useAuthStore";
 import { authService, type ApiResponse } from "@/lib/api/services/authService";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 import AuthBranding from "@/components/AuthBranding";
+import Turnstile, { type TurnstileRef } from "@/components/Turnstile";
+import { env } from "@/env";
 
 export default function AuthPage() {
    const t = useTranslations("Auth");
@@ -42,6 +44,34 @@ export default function AuthPage() {
    const [loading, setLoading] = useState(false);
    const [showPassword, setShowPassword] = useState(false);
    const [error, setError] = useState("");
+   const [showOtp, setShowOtp] = useState(false);
+   const [otpCode, setOtpCode] = useState("");
+   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+   const turnstileRef = useRef<TurnstileRef>(null);
+
+   const [debouncedPassword, setDebouncedPassword] = useState("");
+   const [isPasswordTyping, setIsPasswordTyping] = useState(false);
+
+   const getMissingRequirements = (pw: string) => {
+      const missing = [];
+      if (pw.length < 6) missing.push("passwordMinLength");
+      if (!/[A-Z]/.test(pw)) missing.push("passwordRequireUppercase");
+      if (!/[a-z]/.test(pw)) missing.push("passwordRequireLowercase");
+      if (!/[0-9]/.test(pw)) missing.push("passwordRequireNumber");
+      if (!/[^A-Za-z0-9]/.test(pw)) missing.push("passwordRequireSpecial");
+      return missing;
+   };
+
+   useEffect(() => {
+      if (isLogin || !formData.password) return;
+
+      const timer = setTimeout(() => {
+         setDebouncedPassword(formData.password);
+         setIsPasswordTyping(false);
+      }, 500); // 500ms debounce
+
+      return () => clearTimeout(timer);
+   }, [formData.password, isLogin]);
 
    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const { name, value, type, checked } = e.target;
@@ -49,10 +79,21 @@ export default function AuthPage() {
          ...formData,
          [name]: type === "checkbox" ? checked : value,
       });
+
+      if (name === "password" && !isLogin) {
+         if (!value) {
+            setDebouncedPassword("");
+            setIsPasswordTyping(false);
+         } else {
+            setIsPasswordTyping(true);
+         }
+      }
    };
 
    const handleToggle = (login: boolean) => {
       setError("");
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
       router.push(`/auth/${login ? "login" : "register"}`, { scroll: false });
    };
 
@@ -62,17 +103,48 @@ export default function AuthPage() {
       setError("");
 
       try {
+         if (showOtp) {
+            const finalUser = await authService.loginWith2FA({
+               email: formData.email,
+               password: formData.password,
+               code: otpCode,
+               rememberMe: formData.rememberMe,
+            });
+            setAuth(finalUser as UserType);
+            const targetUrl = callbackUrl || "/";
+            router.push(targetUrl);
+            router.refresh();
+            return;
+         }
+
+         if (!isLogin) {
+            const missing = getMissingRequirements(formData.password);
+            if (missing.length > 0) {
+               setError(t("passwordMissingRequirements") + missing.map((m) => t(m)).join(", "));
+               setLoading(false);
+               return;
+            }
+         }
+
+         if (!turnstileToken) {
+            setError(te("AUTH_018"));
+            setLoading(false);
+            return;
+         }
+
          const result = isLogin
             ? await authService.login({
                  email: formData.email,
                  password: formData.password,
                  rememberMe: formData.rememberMe,
+                 turnstileToken,
               })
             : await authService.register({
                  email: formData.email,
                  password: formData.password,
                  fullName: formData.fullName,
                  rememberMe: formData.rememberMe,
+                 turnstileToken,
               });
 
          if (isLogin) {
@@ -137,7 +209,18 @@ export default function AuthPage() {
             }
          }
       } catch (err: unknown) {
+         // Reset Turnstile on error
+         turnstileRef.current?.reset();
+         setTurnstileToken(null);
+
          const error = err as { message?: string; errorCode?: string };
+
+         if (error?.errorCode === "AUTH_010") {
+            setShowOtp(true);
+            setError("");
+            return;
+         }
+
          let errorMessage = error?.message || "Đã có lỗi xảy ra";
 
          if (error?.errorCode) {
@@ -183,27 +266,37 @@ export default function AuthPage() {
                      <ChevronLeft className="h-4 w-4" /> {t("backToHome")}
                   </Link>
 
-                  <div className="mb-10 flex p-1 bg-zinc-100 rounded-xl">
-                     <button
-                        onClick={() => handleToggle(true)}
-                        className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all duration-300 ${isLogin ? "bg-white text-[#006ce4] shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
-                     >
-                        {tc("login")}
-                     </button>
-                     <button
-                        onClick={() => handleToggle(false)}
-                        className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all duration-300 ${!isLogin ? "bg-white text-[#006ce4] shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
-                     >
-                        {tc("register")}
-                     </button>
-                  </div>
+                  {!showOtp && (
+                     <div className="mb-10 flex p-1 bg-zinc-100 rounded-xl">
+                        <button
+                           onClick={() => handleToggle(true)}
+                           className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all duration-300 ${isLogin ? "bg-white text-[#006ce4] shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
+                        >
+                           {tc("login")}
+                        </button>
+                        <button
+                           onClick={() => handleToggle(false)}
+                           className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all duration-300 ${!isLogin ? "bg-white text-[#006ce4] shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
+                        >
+                           {tc("register")}
+                        </button>
+                     </div>
+                  )}
 
                   <div className="mb-8">
                      <h1 className="text-3xl font-bold tracking-tight">
-                        {isLogin ? t("loginTitle") : t("registerTitle")}
+                        {showOtp
+                           ? t("twoFactorLoginTitle")
+                           : isLogin
+                             ? t("loginTitle")
+                             : t("registerTitle")}
                      </h1>
                      <p className="mt-2 text-zinc-500">
-                        {isLogin ? t("loginSub") : t("registerSub")}
+                        {showOtp
+                           ? t("twoFactorLoginSub")
+                           : isLogin
+                             ? t("loginSub")
+                             : t("registerSub")}
                      </p>
                   </div>
 
@@ -214,116 +307,173 @@ export default function AuthPage() {
                   )}
 
                   <form onSubmit={handleSubmit} className="space-y-5">
-                     {!isLogin && (
+                     {showOtp ? (
                         <div>
                            <label
-                              htmlFor="fullName"
+                              htmlFor="otpCode"
                               className="mb-1.5 block text-sm font-semibold text-zinc-700 cursor-pointer"
                            >
-                              {t("fullNameLabel")}
+                              {t("otpLabel")}
                            </label>
                            <div className="relative">
-                              <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                               <input
-                                 id="fullName"
-                                 name="fullName"
+                                 id="otpCode"
+                                 name="otpCode"
                                  type="text"
                                  required
-                                 placeholder={t("fullNamePlaceholder")}
-                                 value={formData.fullName}
-                                 onChange={handleChange}
-                                 className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
+                                 maxLength={8}
+                                 placeholder={t("otpPlaceholder")}
+                                 value={otpCode}
+                                 onChange={(e) => setOtpCode(e.target.value)}
+                                 className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50 tracking-[0.2em] font-mono text-center"
                               />
                            </div>
                         </div>
+                     ) : (
+                        <>
+                           {!isLogin && (
+                              <div>
+                                 <label
+                                    htmlFor="fullName"
+                                    className="mb-1.5 block text-sm font-semibold text-zinc-700 cursor-pointer"
+                                 >
+                                    {t("fullNameLabel")}
+                                 </label>
+                                 <div className="relative">
+                                    <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                                    <input
+                                       id="fullName"
+                                       name="fullName"
+                                       type="text"
+                                       required
+                                       placeholder={t("fullNamePlaceholder")}
+                                       value={formData.fullName}
+                                       onChange={handleChange}
+                                       className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
+                                    />
+                                 </div>
+                              </div>
+                           )}
+
+                           <div>
+                              <label
+                                 htmlFor="email"
+                                 className="mb-1.5 block text-sm font-semibold text-zinc-700 cursor-pointer"
+                              >
+                                 {t("emailLabel")}
+                              </label>
+                              <div className="relative">
+                                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                                 <input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    required
+                                    placeholder="name@company.com"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
+                                 />
+                              </div>
+                           </div>
+
+                           <div>
+                              <div className="mb-1.5">
+                                 <label
+                                    htmlFor="password"
+                                    className="text-sm font-bold text-zinc-700 cursor-pointer"
+                                 >
+                                    {t("passwordLabel")}
+                                 </label>
+                              </div>
+                              <div className="relative">
+                                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                                 <input
+                                    id="password"
+                                    name="password"
+                                    type={showPassword ? "text" : "password"}
+                                    required
+                                    placeholder="••••••••"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
+                                 />
+                                 <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors cursor-pointer"
+                                 >
+                                    {showPassword ? (
+                                       <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                       <Eye className="h-4 w-4" />
+                                    )}
+                                 </button>
+                              </div>
+                              {!isLogin &&
+                                 formData.password &&
+                                 !isPasswordTyping &&
+                                 (() => {
+                                    const missingList = getMissingRequirements(debouncedPassword);
+                                    if (missingList.length === 0) return null;
+                                    return (
+                                       <div className="mt-2.5 text-xs text-red-500 bg-red-50/60 border border-red-100 rounded-xl p-3.5 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                          <span className="font-bold text-red-700">
+                                             {t("passwordMissingRequirements")}
+                                          </span>
+                                          <ul className="list-disc list-inside mt-1 space-y-1 pl-1 text-red-600 font-medium">
+                                             {missingList.map((reqKey) => (
+                                                <li key={reqKey}>{t(reqKey)}</li>
+                                             ))}
+                                          </ul>
+                                       </div>
+                                    );
+                                 })()}
+                           </div>
+
+                           <div className="flex items-center justify-between">
+                              <label className="flex items-center gap-2 cursor-pointer group">
+                                 <div className="relative flex items-center justify-center h-4.5 w-4.5 rounded border border-zinc-300 bg-zinc-50 transition-all group-hover:border-[#006ce4]">
+                                    <input
+                                       type="checkbox"
+                                       name="rememberMe"
+                                       checked={formData.rememberMe}
+                                       onChange={handleChange}
+                                       className="peer absolute inset-0 opacity-0 cursor-pointer"
+                                    />
+                                    <div className="h-2.5 w-2.5 rounded-[1px] bg-[#006ce4] opacity-0 transition-opacity peer-checked:opacity-100" />
+                                 </div>
+                                 <span className="text-sm font-medium text-zinc-600 group-hover:text-zinc-900 transition-colors">
+                                    {t("rememberMe")}
+                                 </span>
+                              </label>
+
+                              {isLogin && (
+                                 <Link
+                                    href={{
+                                       pathname: "/auth/forgot-password",
+                                       query: { email: formData.email },
+                                    }}
+                                    className="text-[11px] font-bold uppercase tracking-wider text-[#006ce4] hover:text-[#0057b7] cursor-pointer transition-colors"
+                                 >
+                                    {t("forgotPassword")}
+                                 </Link>
+                              )}
+                           </div>
+                        </>
                      )}
 
-                     <div>
-                        <label
-                           htmlFor="email"
-                           className="mb-1.5 block text-sm font-semibold text-zinc-700 cursor-pointer"
-                        >
-                           {t("emailLabel")}
-                        </label>
-                        <div className="relative">
-                           <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                           <input
-                              id="email"
-                              name="email"
-                              type="email"
-                              required
-                              placeholder="name@company.com"
-                              value={formData.email}
-                              onChange={handleChange}
-                              className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
-                           />
-                        </div>
-                     </div>
-
-                     <div>
-                        <div className="mb-1.5">
-                           <label
-                              htmlFor="password"
-                              className="text-sm font-bold text-zinc-700 cursor-pointer"
-                           >
-                              {t("passwordLabel")}
-                           </label>
-                        </div>
-                        <div className="relative">
-                           <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
-                           <input
-                              id="password"
-                              name="password"
-                              type={showPassword ? "text" : "password"}
-                              required
-                              placeholder="••••••••"
-                              value={formData.password}
-                              onChange={handleChange}
-                              className="w-full rounded-xl border border-zinc-200 bg-white px-10 py-3.5 text-sm outline-none transition-all focus:border-[#006ce4] focus:ring-4 focus:ring-blue-50"
-                           />
-                           <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors cursor-pointer"
-                           >
-                              {showPassword ? (
-                                 <EyeOff className="h-4 w-4" />
-                              ) : (
-                                 <Eye className="h-4 w-4" />
-                              )}
-                           </button>
-                        </div>
-                     </div>
-
-                     <div className="flex items-center justify-between">
-                        <label className="flex items-center gap-2 cursor-pointer group">
-                           <div className="relative flex items-center justify-center h-4.5 w-4.5 rounded border border-zinc-300 bg-zinc-50 transition-all group-hover:border-[#006ce4]">
-                              <input
-                                 type="checkbox"
-                                 name="rememberMe"
-                                 checked={formData.rememberMe}
-                                 onChange={handleChange}
-                                 className="peer absolute inset-0 opacity-0 cursor-pointer"
-                              />
-                              <div className="h-2.5 w-2.5 rounded-[1px] bg-[#006ce4] opacity-0 transition-opacity peer-checked:opacity-100" />
-                           </div>
-                           <span className="text-sm font-medium text-zinc-600 group-hover:text-zinc-900 transition-colors">
-                              {t("rememberMe")}
-                           </span>
-                        </label>
-
-                        {isLogin && (
-                           <Link
-                              href={{
-                                 pathname: "/auth/forgot-password",
-                                 query: { email: formData.email },
-                              }}
-                              className="text-[11px] font-bold uppercase tracking-wider text-[#006ce4] hover:text-[#0057b7] cursor-pointer transition-colors"
-                           >
-                              {t("forgotPassword")}
-                           </Link>
-                        )}
-                     </div>
+                     {!showOtp && (
+                        <Turnstile
+                           ref={turnstileRef}
+                           siteKey={env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                           onVerify={(token) => setTurnstileToken(token)}
+                           onError={() => setTurnstileToken(null)}
+                           onExpire={() => setTurnstileToken(null)}
+                           theme="light"
+                        />
+                     )}
 
                      <button
                         type="submit"
@@ -334,52 +484,74 @@ export default function AuthPage() {
                            <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
                            <>
-                              {isLogin ? t("loginButton") : t("registerButton")}
+                              {showOtp
+                                 ? t("verify2FAButton")
+                                 : isLogin
+                                   ? t("loginButton")
+                                   : t("registerButton")}
                               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                            </>
                         )}
                      </button>
+
+                     {showOtp && (
+                        <button
+                           type="button"
+                           onClick={() => {
+                              setShowOtp(false);
+                              setOtpCode("");
+                              setError("");
+                           }}
+                           className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white py-3.5 text-sm font-bold shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-[0.98] cursor-pointer"
+                        >
+                           {t("backToCredentials")}
+                        </button>
+                     )}
                   </form>
 
-                  <div className="relative my-8 text-center">
-                     <span className="relative z-10 bg-white px-4 text-xs font-bold uppercase tracking-widest text-zinc-400">
-                        {t("orContinueWith")}
-                     </span>
-                     <div className="absolute inset-0 top-1/2 border-t border-zinc-100"></div>
-                  </div>
+                  {!showOtp && (
+                     <>
+                        <div className="relative my-8 text-center">
+                           <span className="relative z-10 bg-white px-4 text-xs font-bold uppercase tracking-widest text-zinc-400">
+                              {t("orContinueWith")}
+                           </span>
+                           <div className="absolute inset-0 top-1/2 border-t border-zinc-100"></div>
+                        </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                     <button
-                        type="button"
-                        onClick={() => handleOAuthLogin("google")}
-                        disabled={loading}
-                        className="flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white py-3.5 text-sm font-bold shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-[0.98] disabled:opacity-70 cursor-pointer"
-                     >
-                        {loading ? (
-                           <Loader2 className="h-5 w-5 animate-spin text-[#006ce4]" />
-                        ) : (
-                           <>
-                              <GoogleIcon className="h-5 w-5" />
-                              Google
-                           </>
-                        )}
-                     </button>
-                     <button
-                        type="button"
-                        onClick={() => handleOAuthLogin("zalo")}
-                        disabled={loading}
-                        className="flex items-center justify-center gap-2 rounded-xl bg-[#0068ff] py-3.5 text-sm font-bold text-white shadow-sm hover:bg-[#0055d4] transition-all active:scale-[0.98] disabled:opacity-70 cursor-pointer"
-                     >
-                        {loading ? (
-                           <Loader2 className="h-5 w-5 animate-spin text-white" />
-                        ) : (
-                           <>
-                              <ZaloIcon className="h-5 w-5" />
-                              Zalo
-                           </>
-                        )}
-                     </button>
-                  </div>
+                        <div className="grid grid-cols-2 gap-4">
+                           <button
+                              type="button"
+                              onClick={() => handleOAuthLogin("google")}
+                              disabled={loading}
+                              className="flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white py-3.5 text-sm font-bold shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-[0.98] disabled:opacity-70 cursor-pointer"
+                           >
+                              {loading ? (
+                                 <Loader2 className="h-5 w-5 animate-spin text-[#006ce4]" />
+                              ) : (
+                                 <>
+                                    <GoogleIcon className="h-5 w-5" />
+                                    Google
+                                 </>
+                              )}
+                           </button>
+                           <button
+                              type="button"
+                              onClick={() => handleOAuthLogin("zalo")}
+                              disabled={loading}
+                              className="flex items-center justify-center gap-2 rounded-xl bg-[#0068ff] py-3.5 text-sm font-bold text-white shadow-sm hover:bg-[#0055d4] transition-all active:scale-[0.98] disabled:opacity-70 cursor-pointer"
+                           >
+                              {loading ? (
+                                 <Loader2 className="h-5 w-5 animate-spin text-white" />
+                              ) : (
+                                 <>
+                                    <ZaloIcon className="h-5 w-5" />
+                                    Zalo
+                                 </>
+                              )}
+                           </button>
+                        </div>
+                     </>
+                  )}
                </div>
             </div>
          </div>

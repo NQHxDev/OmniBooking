@@ -10,14 +10,24 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class DestinationSuggestionResponse {
+
    private String id;
+
    private String name;
+
    private String type; // CITY, LANDMARK, HOTEL
+
    private String country;
+
    private String countryCode;
+
    private LocationDto location;
+
    private String displayName;
+
    private String imageUrl;
+
+   private Long propertyCount;
 
    @Data
    @Builder
@@ -27,4 +37,5 @@ public class DestinationSuggestionResponse {
       private double lat;
       private double lon;
    }
+
 }

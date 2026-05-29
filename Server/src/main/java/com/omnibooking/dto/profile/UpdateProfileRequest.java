@@ -2,6 +2,7 @@ package com.omnibooking.dto.profile;
 
 import lombok.Data;
 import java.time.LocalDate;
+import com.omnibooking.validation.ValidPhoneNumber;
 
 @Data
 public class UpdateProfileRequest {
@@ -18,6 +19,7 @@ public class UpdateProfileRequest {
 
    private String avatarUrl;
 
+   @ValidPhoneNumber
    private String phoneNumber;
 
 }

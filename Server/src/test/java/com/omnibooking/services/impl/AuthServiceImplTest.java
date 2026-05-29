@@ -1,7 +1,5 @@
 package com.omnibooking.services.impl;
 
-import com.omnibooking.services.MailService;
-
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.dto.RegisterRequest;
@@ -13,11 +11,13 @@ import com.omnibooking.model.UserProfile;
 import com.omnibooking.repository.RoleRepository;
 import com.omnibooking.repository.UserProfileRepository;
 import com.omnibooking.repository.UserRepository;
-import com.omnibooking.services.BloomFilterService;
-import com.omnibooking.services.JWTService;
-import com.omnibooking.services.SessionService;
-import com.omnibooking.services.VerificationService;
-import com.omnibooking.services.OutboxService;
+import com.omnibooking.services.auth.JWTService;
+import com.omnibooking.services.auth.SessionService;
+import com.omnibooking.services.auth.impl.AuthServiceImpl;
+import com.omnibooking.services.communication.MailService;
+import com.omnibooking.services.core.BloomFilterService;
+import com.omnibooking.services.core.OutboxService;
+import com.omnibooking.services.user.VerificationService;
 import com.omnibooking.mapper.UserMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +80,8 @@ class AuthServiceImplTest {
    private MailService mailService;
    @Mock
    private OutboxService outboxService;
+   @Mock
+   private com.omnibooking.services.auth.TwoFactorAuthService twoFactorAuthService;
 
    @InjectMocks
    private AuthServiceImpl authService;
@@ -164,11 +166,11 @@ class AuthServiceImplTest {
       @DisplayName("Should login successfully with valid credentials")
       void shouldLogin_Success() {
          // Arrange
-      LoginRequest request = LoginRequest.builder()
-            .email("test@example.com")
-            .password("password123")
-            .rememberMe(false)
-            .build();
+         LoginRequest request = LoginRequest.builder()
+               .email("test@example.com")
+               .password("password123")
+               .rememberMe(false)
+               .build();
          Role role = Role.builder().name("ROLE_USER").build();
          User user = User.builder()
                .id(UUID.randomUUID())
@@ -180,6 +182,7 @@ class AuthServiceImplTest {
          when(bloomFilterService.mightContain(request.getEmail())).thenReturn(true);
          when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
          when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
+         when(twoFactorAuthService.is2FAEnabledForUser(user.getId())).thenReturn(false);
          when(jwtService.generateAccessToken(any(), any(), any(), any())).thenReturn("access_token");
          when(userMapper.toAuthResponse(any(), any(), any())).thenReturn(AuthResponse.builder()
                .email(request.getEmail())
@@ -230,6 +233,34 @@ class AuthServiceImplTest {
          assertThatThrownBy(() -> authService.login(request, "ip", "ua", response))
                .isInstanceOf(AppException.class)
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.INVALID_CREDENTIALS);
+      }
+
+      @Test
+      @DisplayName("Should throw TWO_FACTOR_REQUIRED when user has 2FA enabled")
+      void shouldThrowTwoFactorRequired_When2FAEnabled() {
+         // Arrange
+         LoginRequest request = LoginRequest.builder()
+               .email("test@example.com")
+               .password("password123")
+               .rememberMe(false)
+               .build();
+         Role role = Role.builder().name("ROLE_USER").build();
+         User user = User.builder()
+               .id(UUID.randomUUID())
+               .email(request.getEmail())
+               .password("hashed_password")
+               .roles(Set.of(role))
+               .build();
+
+         when(bloomFilterService.mightContain(request.getEmail())).thenReturn(true);
+         when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
+         when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
+         when(twoFactorAuthService.is2FAEnabledForUser(user.getId())).thenReturn(true);
+
+         // Act & Assert
+         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response))
+               .isInstanceOf(AppException.class)
+               .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.TWO_FACTOR_REQUIRED);
       }
    }
 

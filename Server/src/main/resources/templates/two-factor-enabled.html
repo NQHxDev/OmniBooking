@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+   <meta charset="UTF-8">
+   <title>Kích hoạt 2FA Thành công - OmniBooking</title>
+   <style>
+      body {
+         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+         line-height: 1.6;
+         color: #1a1a1a;
+         margin: 0;
+         padding: 0;
+         background-color: #f4f7f9;
+      }
+
+      .container {
+         max-width: 600px;
+         margin: 40px auto;
+         background: #ffffff;
+         border-radius: 12px;
+         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+         overflow: hidden;
+      }
+
+      .header {
+         background-color: #003580;
+         color: #ffffff;
+         padding: 30px;
+         text-align: center;
+      }
+
+      .header h1 {
+         margin: 0;
+         font-size: 24px;
+         letter-spacing: 1px;
+      }
+
+      .content {
+         padding: 40px;
+         text-align: center;
+      }
+
+      .content h2 {
+         color: #003580;
+         margin-top: 0;
+      }
+
+      .badge {
+         display: inline-block;
+         background-color: #10b981;
+         color: #ffffff;
+         padding: 8px 16px;
+         border-radius: 9999px;
+         font-weight: bold;
+         margin-bottom: 20px;
+      }
+
+      .footer {
+         background-color: #f8fafc;
+         padding: 20px;
+         text-align: center;
+         font-size: 12px;
+         color: #64748b;
+         border-top: 1px solid #e2e8f0;
+      }
+
+      .logo {
+         font-weight: bold;
+         font-size: 20px;
+         font-style: italic;
+      }
+   </style>
+</head>
+
+<body>
+   <div class="container">
+      <div class="header">
+         <div class="logo">OmniBooking.com</div>
+         <h1>Thông báo Bảo mật</h1>
+      </div>
+      <div class="content">
+         <div class="badge">Đã bật 2FA</div>
+         <h2>Chào <span th:text="${userName}">Khách hàng</span>,</h2>
+         <p>Tính năng Xác thực 2 yếu tố (2FA - TOTP) đã được kích hoạt thành công trên tài khoản của bạn.</p>
+         <p>Từ bây giờ, mỗi khi đăng nhập, hệ thống sẽ yêu cầu bạn cung cấp mã xác thực gồm 6 chữ số được tạo từ ứng dụng di động (Google Authenticator, Authy, v.v.).</p>
+         <p style="color: #64748b; font-size: 14px; margin-top: 20px;">Nếu bạn không thực hiện hành động này, vui lòng liên hệ ngay với Dịch vụ Khách hàng của chúng tôi để được hỗ trợ kịp thời bảo vệ tài khoản.</p>
+      </div>
+      <div class="footer">
+         <p>&copy; 2026 OmniBooking Team. Tất cả các quyền được bảo lưu.</p>
+         <p>Đây là email tự động, vui lòng không phản hồi email này.</p>
+      </div>
+   </div>
+</body>
+
+</html>

@@ -1,6 +1,8 @@
 package com.omnibooking.services.impl;
 
 import com.omnibooking.config.AppProperties;
+import com.omnibooking.services.core.impl.EncryptionServiceImpl;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,8 +26,8 @@ class EncryptionServiceImplTest {
    @InjectMocks
    private EncryptionServiceImpl encryptionService;
 
-   private static final String ENCRYPTION_SECRET = "12345678901234567890123456789012"; // 32 bytes
-   private static final String HASH_PEPPER = "random_pepper";
+   private static final String ENCRYPTION_SECRET = "3ba3e02fde331c85a69b6b4d778dad8795dd18880e3766fd2b93ec6babcf5e01";
+   private static final String HASH_PEPPER = "99eb73cbfbaa0963213c38d2c9bc0bae74ad6e4d4fef9cd667485709c54d5e97";
 
    @BeforeEach
    @SuppressWarnings("all")

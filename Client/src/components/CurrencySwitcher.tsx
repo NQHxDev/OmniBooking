@@ -2,10 +2,14 @@
 
 import { useSettingStore } from "@/store/useSettingStore";
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, DollarSign } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-export default function CurrencySwitcher() {
+interface CurrencySwitcherProps {
+   theme?: "blue-bg" | "white-bg";
+}
+
+export default function CurrencySwitcher({ theme = "blue-bg" }: CurrencySwitcherProps) {
    const { currency, setCurrency } = useSettingStore();
    const [isOpen, setIsOpen] = useState(false);
    const t = useTranslations("Common.Currency");
@@ -33,15 +37,23 @@ export default function CurrencySwitcher() {
       setIsOpen(false);
    };
 
+   const isBlueBg = theme === "blue-bg";
+
    return (
       <div className="relative" ref={dropdownRef}>
          <button
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 hover:bg-white/10 transition-all active:scale-95 text-white font-medium text-sm"
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 transition-all active:scale-95 font-medium text-sm ${
+               isBlueBg
+                  ? "text-white hover:bg-white/10"
+                  : "text-zinc-700 hover:bg-zinc-50 border border-zinc-100"
+            }`}
          >
             <span className="text-sm font-bold">{currentCurrency.code}</span>
             <ChevronDown
-               className={`h-3 w-3 text-white/70 transition-transform ${isOpen ? "rotate-180" : ""}`}
+               className={`h-3 w-3 transition-transform ${
+                  isBlueBg ? "text-white/70" : "text-zinc-500"
+               } ${isOpen ? "rotate-180" : ""}`}
             />
          </button>
 

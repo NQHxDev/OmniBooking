@@ -87,4 +87,13 @@ public class Property extends BaseEntity {
    @OneToMany(mappedBy = "property")
    private Set<RoomType> roomTypes;
 
+    @Column(name = "business_registration_number", length = 255)
+   private String businessRegistrationNumber;
+
+   @Column(name = "tax_code", length = 255)
+   private String taxCode;
+
+   @Column(name = "legal_owner_name", length = 255)
+   private String legalOwnerName;
+
 }

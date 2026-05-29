@@ -26,6 +26,37 @@ countries.registerLocale(viLocale);
 import { authService } from "@/lib/api/services/authService";
 import { profileService, UserProfile as UserProfileType } from "@/lib/api/services/profileService";
 import { toast } from "sonner";
+import axios from "axios";
+import type { CountryCode } from "libphonenumber-js";
+
+export const countriesList: {
+   code: CountryCode;
+   callingCode: string;
+   label: string;
+   flag: string;
+}[] = [
+   { code: "VN", callingCode: "+84", label: "Vietnam (+84)", flag: "🇻🇳" },
+   { code: "US", callingCode: "+1", label: "United States (+1)", flag: "🇺🇸" },
+   { code: "GB", callingCode: "+44", label: "United Kingdom (+44)", flag: "🇬🇧" },
+   { code: "SG", callingCode: "+65", label: "Singapore (+65)", flag: "🇸🇬" },
+   { code: "TH", callingCode: "+66", label: "Thailand (+66)", flag: "🇹🇭" },
+   { code: "MY", callingCode: "+60", label: "Malaysia (+60)", flag: "🇲🇾" },
+   { code: "ID", callingCode: "+62", label: "Indonesia (+62)", flag: "🇮🇩" },
+   { code: "JP", callingCode: "+81", label: "Japan (+81)", flag: "🇯🇵" },
+   { code: "KR", callingCode: "+82", label: "South Korea (+82)", flag: "🇰🇷" },
+   { code: "FR", callingCode: "+33", label: "France (+33)", flag: "🇫🇷" },
+   { code: "DE", callingCode: "+49", label: "Germany (+49)", flag: "🇩🇪" },
+   { code: "AU", callingCode: "+61", label: "Australia (+61)", flag: "🇦🇺" },
+   { code: "CN", callingCode: "+86", label: "China (+86)", flag: "🇨🇳" },
+   { code: "IN", callingCode: "+91", label: "India (+91)", flag: "🇮🇳" },
+];
+
+const maskPhoneNumber = (phone: string | null | undefined) => {
+   if (!phone) return "";
+   const lastThree = phone.slice(-3);
+   const maskedLength = Math.max(0, phone.length - 3);
+   return "*".repeat(maskedLength) + lastThree;
+};
 
 export default function PersonalDetailsPage() {
    const [isResending, setIsResending] = useState(false);
@@ -47,6 +78,39 @@ export default function PersonalDetailsPage() {
    const [isSaving, setIsSaving] = useState(false);
 
    const tDetails = useTranslations("Profile.details");
+
+   const [phoneDigits, setPhoneDigits] = useState("");
+   const [selectedCountry, setSelectedCountry] = useState(countriesList[0]);
+   const [isPhoneTyping, setIsPhoneTyping] = useState(false);
+   const [phoneError, setPhoneError] = useState<string | null>(null);
+   const [debouncedPhoneDigits, setDebouncedPhoneDigits] = useState("");
+
+   useEffect(() => {
+      if (editingField !== "phoneNumber" || !phoneDigits) return;
+
+      const timer = setTimeout(() => {
+         setIsPhoneTyping(false);
+         setDebouncedPhoneDigits(phoneDigits);
+      }, 500); // 500ms debounce
+      return () => clearTimeout(timer);
+   }, [phoneDigits, editingField]);
+
+   useEffect(() => {
+      if (editingField !== "phoneNumber") return;
+      if (!debouncedPhoneDigits) return;
+
+      const cleanDigits = debouncedPhoneDigits.replace(/\D/g, "");
+      const digitsToValidate = cleanDigits.startsWith("0") ? cleanDigits.slice(1) : cleanDigits;
+      const fullE164 = selectedCountry.callingCode + digitsToValidate;
+
+      import("libphonenumber-js").then(({ isValidPhoneNumber }) => {
+         if (!isValidPhoneNumber(fullE164, selectedCountry.code)) {
+            setPhoneError(tDetails("invalidPhoneNumber"));
+         } else {
+            setPhoneError(null);
+         }
+      });
+   }, [debouncedPhoneDigits, selectedCountry, editingField, tDetails]);
 
    const fetchProfile = useCallback(async () => {
       try {
@@ -96,9 +160,24 @@ export default function PersonalDetailsPage() {
 
    const handleUpdateField = async () => {
       if (!editingField || isSaving) return;
+
+      let valueToSave = editValue;
+      if (editingField === "phoneNumber") {
+         const cleanDigits = phoneDigits.replace(/\D/g, "");
+         const digitsToValidate = cleanDigits.startsWith("0") ? cleanDigits.slice(1) : cleanDigits;
+         const fullE164 = selectedCountry.callingCode + digitsToValidate;
+
+         const { isValidPhoneNumber } = await import("libphonenumber-js");
+         if (!isValidPhoneNumber(fullE164, selectedCountry.code)) {
+            toast.error(tDetails("invalidPhoneNumber"));
+            return;
+         }
+         valueToSave = fullE164;
+      }
+
       setIsSaving(true);
       try {
-         const updated = await profileService.updateMyProfile({ [editingField]: editValue });
+         const updated = await profileService.updateMyProfile({ [editingField]: valueToSave });
          setProfileData(updated);
          toast.success("Cập nhật thành công");
          setEditingField(null);
@@ -110,10 +189,27 @@ export default function PersonalDetailsPage() {
       }
    };
 
-   const startEditing = (field: keyof UserProfileType, value: string | null) => {
+   const startEditing = async (field: keyof UserProfileType, value: string | null) => {
       setEditingField(field);
       if (field === "gender" && !value) {
          setEditValue("MALE");
+      } else if (field === "phoneNumber") {
+         setPhoneDigits("");
+         setPhoneError(null);
+         setEditValue("");
+         // Try auto geolocation
+         try {
+            const res = await axios.get("/api/geolocation");
+            if (res.data && res.data.countryCode) {
+               const code = res.data.countryCode;
+               const matched = countriesList.find((c) => c.code === code);
+               if (matched) {
+                  setSelectedCountry(matched);
+               }
+            }
+         } catch (error) {
+            console.error("Auto-detect country code failed:", error);
+         }
       } else {
          setEditValue(value || "");
       }
@@ -143,6 +239,7 @@ export default function PersonalDetailsPage() {
                         src={profileData.avatarUrl}
                         alt="Avatar"
                         fill
+                        sizes="96px"
                         className="object-cover transition-transform group-hover:scale-110"
                         unoptimized
                      />
@@ -221,7 +318,9 @@ export default function PersonalDetailsPage() {
                            profileData?.phoneNumber ? "text-zinc-900" : "text-zinc-400 italic"
                         }
                      >
-                        {profileData?.phoneNumber || tDetails("notProvided")}
+                        {profileData?.phoneNumber
+                           ? maskPhoneNumber(profileData.phoneNumber)
+                           : tDetails("notProvided")}
                      </span>
                      <p className="text-[12px] text-zinc-500 mt-0.5">{tDetails("phoneDesc")}</p>
                   </div>
@@ -235,13 +334,54 @@ export default function PersonalDetailsPage() {
                cancelLabel={tDetails("cancel")}
                editLabel={tDetails("edit")}
                renderEditField={() => (
-                  <input
-                     type="text"
-                     value={editValue}
-                     onChange={(e) => setEditValue(e.target.value)}
-                     className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-[#006ce4] focus:outline-none text-[14px]"
-                     autoFocus
-                  />
+                  <div className="flex flex-col gap-2 w-full animate-in fade-in slide-in-from-top-1 duration-200">
+                     <div className="flex gap-2 items-center w-full">
+                        <div className="w-[145px] shrink-0">
+                           <Select
+                              options={countriesList}
+                              value={selectedCountry}
+                              onChange={(val) => {
+                                 if (val) setSelectedCountry(val);
+                              }}
+                              getOptionLabel={(option) =>
+                                 `${option.flag} ${option.code} (${option.callingCode})`
+                              }
+                              getOptionValue={(option) => option.code}
+                              className="text-[13px]"
+                              classNamePrefix="select"
+                              isSearchable={true}
+                              menuPortalTarget={
+                                 typeof document !== "undefined" ? document.body : null
+                              }
+                              styles={{
+                                 menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                              }}
+                           />
+                        </div>
+                        <input
+                           type="text"
+                           value={phoneDigits}
+                           onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, "");
+                              setPhoneDigits(val);
+                              if (!val) {
+                                 setPhoneError(null);
+                                 setIsPhoneTyping(false);
+                              } else {
+                                 setIsPhoneTyping(true);
+                              }
+                           }}
+                           className="flex-1 px-3 py-2 rounded-lg border border-zinc-200 focus:border-[#006ce4] focus:outline-none text-[14px]"
+                           placeholder={tDetails("phonePlaceholder")}
+                           autoFocus
+                        />
+                     </div>
+                     {!isPhoneTyping && phoneError && (
+                        <p className="text-xs text-red-500 font-semibold animate-in fade-in slide-in-from-top-1 duration-200">
+                           {phoneError}
+                        </p>
+                     )}
+                  </div>
                )}
             />
             <InfoRow

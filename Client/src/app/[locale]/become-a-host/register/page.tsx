@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Lock, ArrowLeft, ShieldCheck, FileText, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -8,12 +8,14 @@ import { partnerService } from "@/lib/api/services/partnerService";
 import PartnerNavbar from "@/components/PartnerNavbar";
 import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 type Step = "VERIFY" | "TERMS" | "SUCCESS";
 
 export default function PartnerRegisterPage() {
    const router = useRouter();
    const { isLoggedIn, setAuth } = useAuthStore();
+   const t = useTranslations("BecomeAHost.register");
    const [mounted, setMounted] = useState(false);
    const [step, setStep] = useState<Step>("VERIFY");
    const [code, setCode] = useState("");
@@ -23,28 +25,30 @@ export default function PartnerRegisterPage() {
    const [isResending, setIsResending] = useState(false);
    const hasRequestedOtp = useRef(false);
 
-   const handleSendOtp = async (isManual = false) => {
-      if (!isManual && hasRequestedOtp.current) return;
-      if (isManual) setIsResending(true);
-      else hasRequestedOtp.current = true;
+   const handleSendOtp = useCallback(
+      async (isManual = false) => {
+         if (!isManual && hasRequestedOtp.current) return;
+         if (isManual) setIsResending(true);
+         else hasRequestedOtp.current = true;
 
-      // Start countdown immediately to prevent spamming
-      setResendCountdown(30);
+         setResendCountdown(30);
 
-      try {
-         await partnerService.sendOtp();
-         toast.success("Mã xác thực đã được gửi đến email của bạn!", {
-            description: "Vui lòng kiểm tra hộp thư đến hoặc thư rác!",
-            duration: 5000,
-         });
-      } catch (err) {
-         console.error("Failed to send OTP", err);
-         if (!isManual) hasRequestedOtp.current = false;
-         toast.error("Không thể gửi mã xác thực. Vui lòng thử lại sau.");
-      } finally {
-         if (isManual) setIsResending(false);
-      }
-   };
+         try {
+            await partnerService.sendOtp();
+            toast.success(t("toasts.otpSent"), {
+               description: t("toasts.otpSentDesc"),
+               duration: 5000,
+            });
+         } catch (err) {
+            console.error("Failed to send OTP", err);
+            if (!isManual) hasRequestedOtp.current = false;
+            toast.error(t("toasts.otpSendError"));
+         } finally {
+            if (isManual) setIsResending(false);
+         }
+      },
+      [t]
+   );
 
    useEffect(() => {
       if (mounted && !isLoggedIn) {
@@ -55,13 +59,12 @@ export default function PartnerRegisterPage() {
    useEffect(() => {
       const timer = setTimeout(() => setMounted(true), 0);
 
-      // Initial send
       if (!hasRequestedOtp.current) {
          handleSendOtp(false);
       }
 
       return () => clearTimeout(timer);
-   }, []);
+   }, [handleSendOtp]);
 
    useEffect(() => {
       let timer: NodeJS.Timeout;
@@ -89,26 +92,25 @@ export default function PartnerRegisterPage() {
       try {
          await partnerService.verifyOtp(code);
          setStep("TERMS");
-         toast.success("Xác thực email thành công!");
+         toast.success(t("toasts.verifySuccess"));
       } catch {
-         toast.error("Mã xác thực không đúng hoặc đã hết hạn.");
+         toast.error(t("toasts.verifyError"));
       }
    };
 
    const handleComplete = async () => {
       if (!isAgreed) {
-         toast.error("Vui lòng đồng ý với điều khoản!");
+         toast.error(t("toasts.agreeRequired"));
          return;
       }
       try {
          const userData = await partnerService.completeRegistration();
-         // Cập nhật lại thông tin user trong store (bao gồm cả role mới)
          setAuth(userData);
          setStep("SUCCESS");
-         toast.success("Chúc mừng! Bạn đã trở thành đối tác của OmniBooking");
+         toast.success(t("toasts.registerSuccess"));
       } catch (err) {
          console.error("Failed to complete registration", err);
-         toast.error("Đã có lỗi xảy ra khi hoàn tất đăng ký. Vui lòng thử lại sau.");
+         toast.error(t("toasts.registerError"));
       }
    };
 
@@ -125,7 +127,7 @@ export default function PartnerRegisterPage() {
                   className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-[#006ce4] mb-8 transition-colors group"
                >
                   <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-                  Quay lại
+                  {t("back")}
                </Link>
             )}
 
@@ -148,21 +150,18 @@ export default function PartnerRegisterPage() {
                            <Lock className="h-6 w-6" />
                         </div>
                         <h1 className="text-2xl font-bold text-zinc-900 mb-2">
-                           Xác thực tài khoản của bạn
+                           {t("verifyTitle")}
                         </h1>
-                        <p className="text-zinc-500 mb-8">
-                           Chúng tôi đã gửi mã xác thực gồm 6 ký tự đến email của bạn. Vui lòng nhập
-                           mã đó bên dưới để tiếp tục.
-                        </p>
+                        <p className="text-zinc-500 mb-8">{t("verifySub")}</p>
 
                         <div className="space-y-6">
                            <div>
                               <label className="block text-sm font-bold text-zinc-700 mb-2">
-                                 Mã xác thực
+                                 {t("otpLabel")}
                               </label>
                               <input
                                  type="text"
-                                 placeholder="A0A000"
+                                 placeholder={t("otpPlaceholder")}
                                  value={code}
                                  onChange={(e) => setCode(e.target.value)}
                                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-[#006ce4] focus:bg-white outline-none transition-all font-mono tracking-[0.5em] uppercase text-center text-xl pl-[0.5em]"
@@ -173,21 +172,21 @@ export default function PartnerRegisterPage() {
                               onClick={handleVerify}
                               className="w-full bg-[#006ce4] text-white py-4 rounded-xl font-bold hover:bg-[#0057b7] transition-all shadow-lg shadow-blue-100 active:scale-[0.98]"
                            >
-                              Xác nhận email
+                              {t("verifyButton")}
                            </button>
 
                            <p className="text-center text-sm text-zinc-500">
-                              Không nhận được mã?{" "}
+                              {t("noCode")}{" "}
                               <button
                                  onClick={() => handleSendOtp(true)}
                                  disabled={isResending || resendCountdown > 0}
                                  className="text-[#006ce4] font-bold hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                  {isResending
-                                    ? "Đang gửi..."
+                                    ? t("sending")
                                     : resendCountdown > 0
-                                      ? `Gửi lại sau ${resendCountdown}s`
-                                      : "Gửi lại"}
+                                      ? t("resendCountdown", { count: resendCountdown })
+                                      : t("resend")}
                               </button>
                            </p>
                         </div>
@@ -199,52 +198,26 @@ export default function PartnerRegisterPage() {
                         <div className="h-12 w-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-6">
                            <FileText className="h-6 w-6" />
                         </div>
-                        <h1 className="text-2xl font-bold text-zinc-900 mb-2">
-                           Điều khoản & Điều kiện Đối tác
-                        </h1>
-                        <p className="text-zinc-500 mb-8">
-                           Vui lòng đọc kỹ các điều khoản dịch vụ dành cho đối tác trước khi bắt đầu
-                           kinh doanh trên nền tảng của chúng tôi.
-                        </p>
+                        <h1 className="text-2xl font-bold text-zinc-900 mb-2">{t("termsTitle")}</h1>
+                        <p className="text-zinc-500 mb-8">{t("termsSub")}</p>
 
                         <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-6 h-64 overflow-y-auto mb-8 text-sm text-zinc-600 leading-relaxed scrollbar-thin">
                            <div className="space-y-6">
                               <section>
-                                 <h3 className="font-bold text-zinc-900 mb-2">1. Định nghĩa</h3>
-                                 <p>
-                                    &quot;Đối tác&quot; là cá nhân hoặc tổ chức đăng ký cung cấp
-                                    dịch vụ lưu trú trên OmniBooking.com. &quot;Nền tảng&quot; là hệ
-                                    thống website và ứng dụng di động của OmniBooking.
-                                 </p>
+                                 <h3 className="font-bold text-zinc-900 mb-2">{t("term1Title")}</h3>
+                                 <p>{t("term1Content")}</p>
                               </section>
                               <section>
-                                 <h3 className="font-bold text-zinc-900 mb-2">
-                                    2. Quyền và nghĩa vụ
-                                 </h3>
-                                 <p>
-                                    Đối tác có quyền tự quyết định giá phòng và chính sách hủy. Đối
-                                    tác có nghĩa vụ đảm bảo chất lượng dịch vụ như đã mô tả và tuân
-                                    thủ các quy định pháp luật hiện hành.
-                                 </p>
+                                 <h3 className="font-bold text-zinc-900 mb-2">{t("term2Title")}</h3>
+                                 <p>{t("term2Content")}</p>
                               </section>
                               <section>
-                                 <h3 className="font-bold text-zinc-900 mb-2">
-                                    3. Phí hoa hồng và Thanh toán
-                                 </h3>
-                                 <p>
-                                    OmniBooking sẽ thu phí hoa hồng cố định trên mỗi đơn đặt phòng
-                                    thành công. Thanh toán sẽ được chuyển vào tài khoản đối tác định
-                                    kỳ sau khi trừ phí dịch vụ.
-                                 </p>
+                                 <h3 className="font-bold text-zinc-900 mb-2">{t("term3Title")}</h3>
+                                 <p>{t("term3Content")}</p>
                               </section>
                               <section>
-                                 <h3 className="font-bold text-zinc-900 mb-2">
-                                    4. Bảo mật dữ liệu
-                                 </h3>
-                                 <p>
-                                    Cả hai bên cam kết bảo mật thông tin khách hàng và không sử dụng
-                                    vào mục đích trái phép.
-                                 </p>
+                                 <h3 className="font-bold text-zinc-900 mb-2">{t("term4Title")}</h3>
+                                 <p>{t("term4Content")}</p>
                               </section>
                            </div>
                         </div>
@@ -260,13 +233,8 @@ export default function PartnerRegisterPage() {
                                  />
                               </div>
                               <div className="flex-1">
-                                 <p className="text-sm font-bold text-zinc-900">
-                                    Tôi đồng ý với tất cả điều khoản
-                                 </p>
-                                 <p className="text-xs text-zinc-500 mt-1">
-                                    Bằng cách tích vào đây, bạn xác nhận đã hiểu rõ các quy định của
-                                    hệ thống.
-                                 </p>
+                                 <p className="text-sm font-bold text-zinc-900">{t("agreeAll")}</p>
+                                 <p className="text-xs text-zinc-500 mt-1">{t("agreeSub")}</p>
                               </div>
                            </label>
 
@@ -275,7 +243,7 @@ export default function PartnerRegisterPage() {
                               onClick={handleComplete}
                               className="w-full bg-[#006ce4] text-white py-4 rounded-xl font-bold hover:bg-[#0057b7] transition-all disabled:opacity-50 disabled:hover:bg-[#006ce4] shadow-lg shadow-blue-100"
                            >
-                              Hoàn tất đăng ký
+                              {t("completeButton")}
                            </button>
                         </div>
                      </div>
@@ -289,10 +257,11 @@ export default function PartnerRegisterPage() {
                               <CheckCircle2 className="h-12 w-12" />
                            </div>
                         </div>
-                        <h1 className="text-3xl font-bold text-zinc-900 mb-4">Đăng ký hoàn tất!</h1>
+                        <h1 className="text-3xl font-bold text-zinc-900 mb-4">
+                           {t("successTitle")}
+                        </h1>
                         <p className="text-zinc-500 max-w-md mx-auto mb-6 leading-relaxed">
-                           Cảm ơn bạn đã lựa chọn OmniBooking.com. Hồ sơ của bạn đã được gửi đi và
-                           đang trong quá trình xét duyệt.
+                           {t("successSub")}
                         </p>
 
                         <div className="bg-blue-50 text-[#006ce4] py-3 px-6 rounded-full inline-flex items-center gap-2 text-sm font-bold mb-10 animate-pulse">
@@ -300,7 +269,7 @@ export default function PartnerRegisterPage() {
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                               <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                            </span>
-                           Hệ thống sẽ tự động chuyển đến Dashboard sau {countdown} giây...
+                           {t("redirectMessage", { count: countdown })}
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -308,13 +277,13 @@ export default function PartnerRegisterPage() {
                               href="/"
                               className="px-6 py-4 bg-zinc-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-lg"
                            >
-                              Về trang chủ
+                              {t("goHome")}
                            </Link>
                            <Link
                               href="/become-a-host"
                               className="px-6 py-4 bg-white border border-zinc-200 text-zinc-900 rounded-xl font-bold hover:bg-zinc-50 transition-all"
                            >
-                              Xem giới thiệu lại
+                              {t("viewIntro")}
                            </Link>
                         </div>
                      </div>
@@ -327,18 +296,20 @@ export default function PartnerRegisterPage() {
                <div className="mt-12 flex flex-wrap items-center justify-center gap-8 opacity-50 grayscale">
                   <div className="flex items-center gap-2">
                      <ShieldCheck className="h-5 w-5" />
-                     <span className="text-xs font-bold uppercase tracking-widest">Secure SSL</span>
+                     <span className="text-xs font-bold uppercase tracking-widest">
+                        {t("secureSsl")}
+                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                      <Lock className="h-5 w-5" />
                      <span className="text-xs font-bold uppercase tracking-widest">
-                        Private Data
+                        {t("privateData")}
                      </span>
                   </div>
                   <div className="flex items-center gap-2">
                      <FileText className="h-5 w-5" />
                      <span className="text-xs font-bold uppercase tracking-widest">
-                        Verified Partner
+                        {t("verifiedPartner")}
                      </span>
                   </div>
                </div>

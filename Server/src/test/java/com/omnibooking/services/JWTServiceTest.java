@@ -6,6 +6,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.omnibooking.services.auth.JWTService;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -18,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class JWTServiceTest {
 
    private JWTService jwtService;
-   private final String secret = "my-ultra-secure-and-long-enough-secret-key-for-testing-123456";
+   private final String secret = "8de4da3b84a9c41be141d312211360274f5264607945464f05e46d108ff7bd69";
    private final long expiration = 3600000; // 1 hour
 
    @BeforeEach

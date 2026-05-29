@@ -2,9 +2,9 @@ package com.omnibooking.consumer;
 
 import com.omnibooking.dto.event.EmailEvent;
 import com.omnibooking.dto.event.UserCreatedEvent;
-import com.omnibooking.services.MailService;
-import com.omnibooking.services.VerificationService;
-import com.omnibooking.services.OutboxService;
+import com.omnibooking.services.communication.MailService;
+import com.omnibooking.services.user.VerificationService;
+import com.omnibooking.services.core.OutboxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -51,4 +51,5 @@ public class UserCDCConsumer {
          throw e;
       }
    }
+
 }

@@ -43,4 +43,5 @@ public class DestinationDocument {
 
    @Field(type = FieldType.Keyword, index = false)
    private String imageUrl;
+
 }

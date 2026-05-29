@@ -2,7 +2,7 @@ package com.omnibooking.worker;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.dto.RegisterRequest;
-import com.omnibooking.services.RegistrationService;
+import com.omnibooking.services.user.RegistrationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;

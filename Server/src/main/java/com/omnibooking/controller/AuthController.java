@@ -9,10 +9,11 @@ import com.omnibooking.dto.RegisterRequest;
 import com.omnibooking.dto.ForgotPasswordRequest;
 import com.omnibooking.dto.ResetPasswordRequest;
 import com.omnibooking.dto.oauth.OAuth2UserInfo;
-import com.omnibooking.services.AuthService;
-import com.omnibooking.services.OAuth2ServiceFactory;
-import com.omnibooking.services.RegistrationQueueService;
-import com.omnibooking.services.SseNotificationService;
+import com.omnibooking.services.auth.AuthService;
+import com.omnibooking.services.auth.OAuth2ServiceFactory;
+import com.omnibooking.services.auth.TurnstileService;
+import com.omnibooking.services.user.RegistrationQueueService;
+import com.omnibooking.services.communication.SseNotificationService;
 import com.omnibooking.config.AppProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -58,11 +59,17 @@ public class AuthController {
 
    private final SseNotificationService sseNotificationService;
 
+   private final TurnstileService turnstileService;
+
    @Anonymous
    @Idempotent
    @PostMapping("/register")
    public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request,
          HttpServletRequest httpRequest) {
+
+      // Verify CAPTCHA
+      String ip = getClientIp(httpRequest);
+      turnstileService.verifyToken(request.getTurnstileToken(), ip);
 
       String requestId = (String) httpRequest.getAttribute("requestId");
       request.setRequestId(requestId);
@@ -71,7 +78,7 @@ public class AuthController {
       registrationQueueService.pushToQueue(request);
 
       return ResponseEntity.status(HttpStatus.ACCEPTED)
-            .body(ApiResponse.success(null, "Registration request received and is being processed.", requestId));
+            .body(ApiResponse.success(null, "Registration request received and is being processed", requestId));
    }
 
    @Anonymous
@@ -104,6 +111,10 @@ public class AuthController {
          HttpServletResponse httpResponse) {
 
       String ip = getClientIp(httpRequest);
+
+      // Verify CAPTCHA
+      turnstileService.verifyToken(request.getTurnstileToken(), ip);
+
       String userAgent = httpRequest.getHeader("User-Agent");
       String requestId = (String) httpRequest.getAttribute("requestId");
 

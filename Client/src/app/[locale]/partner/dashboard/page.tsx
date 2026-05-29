@@ -7,6 +7,7 @@ import DashboardStats from "@/components/partner/DashboardStats";
 import PropertyTable from "@/components/partner/PropertyTable";
 import DashboardHeader from "@/components/partner/DashboardHeader";
 import { propertyService } from "@/lib/api/propertyService";
+import { partnerService } from "@/lib/api/services/partnerService";
 import { getTranslations } from "next-intl/server";
 
 export default async function PartnerDashboard() {
@@ -21,7 +22,11 @@ export default async function PartnerDashboard() {
    const allCookies = cookieStore.getAll();
    const cookieHeader = allCookies.map((c) => `${c.name}=${c.value}`).join("; ");
    const fingerprint = cookieStore.get("x_fgp")?.value;
-   const properties = await propertyService.getMyPropertiesServer(cookieHeader, fingerprint);
+
+   const [properties, stats] = await Promise.all([
+      propertyService.getMyPropertiesServer(cookieHeader, fingerprint),
+      partnerService.getStatsServer(cookieHeader, fingerprint),
+   ]);
 
    if (properties === null) {
       redirect("/auth/login?callbackUrl=/partner/dashboard");
@@ -37,7 +42,7 @@ export default async function PartnerDashboard() {
                {/* Welcome & Action */}
                <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
                   <div>
-                     <h1 className="text-3xl font-black tracking-tight text-zinc-900">
+                     <h1 className="text-3xl font-bold tracking-normal text-zinc-900">
                         {t("title")}
                      </h1>
                      <p className="mt-1 text-zinc-500 font-medium">{t("welcome")}</p>
@@ -52,7 +57,7 @@ export default async function PartnerDashboard() {
                </div>
 
                {/* Stats Grid */}
-               <DashboardStats />
+               <DashboardStats stats={stats} />
 
                {/* Properties Table Section */}
                <div className="mt-12">

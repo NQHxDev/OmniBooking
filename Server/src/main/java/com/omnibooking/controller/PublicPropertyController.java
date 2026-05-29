@@ -2,7 +2,7 @@ package com.omnibooking.controller;
 
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.PropertyResponse;
-import com.omnibooking.services.PropertyService;
+import com.omnibooking.services.property.PropertyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +29,15 @@ public class PublicPropertyController {
          @RequestParam(defaultValue = "6") int limit) {
       log.info("Public API: Fetching {} featured properties", limit);
       List<PropertyResponse> response = propertyService.getFeaturedProperties(limit);
+      return ApiResponse.success(response);
+   }
+
+   @GetMapping("/new")
+   @Operation(summary = "Get newly added properties for homepage")
+   public ApiResponse<List<PropertyResponse>> getNewProperties(
+         @RequestParam(defaultValue = "15") int limit) {
+      log.info("Public API: Fetching {} new properties", limit);
+      List<PropertyResponse> response = propertyService.getNewProperties(limit);
       return ApiResponse.success(response);
    }
 

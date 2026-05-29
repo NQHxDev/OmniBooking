@@ -1,18 +1,18 @@
 import { getTranslations } from "next-intl/server";
 import { propertyService, PropertyResponse } from "@/services/propertyService";
-import PropertyCardClient from "./PropertyCardClient";
+import PropertyCarouselClient from "./PropertyCarouselClient";
 
 export default async function FeaturedProperties() {
    const t = await getTranslations("Home");
    let properties: PropertyResponse[] = [];
 
    try {
-      properties = await propertyService.getFeatured(4);
+      properties = await propertyService.getFeatured(15);
    } catch (error) {
       console.error("Failed to fetch featured properties", error);
    }
 
-   if (properties.length === 0) {
+   if (!properties || properties.length === 0) {
       return (
          <section className="mt-16 bg-zinc-50 rounded-[2rem] p-12 text-center border border-zinc-100">
             <div className="max-w-md mx-auto">
@@ -29,7 +29,7 @@ export default async function FeaturedProperties() {
    }
 
    return (
-      <section className="mt-16">
+      <section className="mt-6">
          <div className="flex items-center justify-between">
             <div>
                <h3 className="text-2xl font-bold text-black">
@@ -42,11 +42,7 @@ export default async function FeaturedProperties() {
             </div>
          </div>
 
-         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {properties.map((property: PropertyResponse, index: number) => (
-               <PropertyCardClient key={property.id} property={property} index={index} />
-            ))}
-         </div>
+         <PropertyCarouselClient properties={properties} />
       </section>
    );
 }

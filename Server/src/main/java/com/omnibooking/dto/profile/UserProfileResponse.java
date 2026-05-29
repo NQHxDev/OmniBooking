@@ -34,4 +34,6 @@ public class UserProfileResponse {
 
    private String rankName;
 
+   private boolean hasPassword;
+
 }

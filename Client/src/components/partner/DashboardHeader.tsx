@@ -3,6 +3,8 @@
 import { Bell, Search, CheckCircle, Star } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useTranslations } from "next-intl";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+import CurrencySwitcher from "@/components/CurrencySwitcher";
 
 export default function DashboardHeader() {
    const { user } = useAuthStore();
@@ -35,6 +37,11 @@ export default function DashboardHeader() {
          </div>
 
          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1">
+               <CurrencySwitcher theme="white-bg" />
+               <LanguageSwitcher theme="white-bg" />
+            </div>
+
             <button className="relative rounded-xl border border-zinc-100 p-2.5 text-zinc-500 hover:bg-zinc-50 transition-all">
                <Bell className="h-5 w-5" />
                <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-red-500 border-2 border-white" />
@@ -51,7 +58,7 @@ export default function DashboardHeader() {
                      )}
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 justify-end">
-                     <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
+                     <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
                         {getRankLabel(user?.rankName)}
                      </span>
                      <div className="flex items-center gap-0.5 text-zinc-500">
@@ -63,7 +70,7 @@ export default function DashboardHeader() {
                   </div>
                </div>
                <div className="h-10 w-10 rounded-full bg-linear-to-tr from-[#003580] to-blue-500 border-2 border-white shadow-sm flex items-center justify-center">
-                  <span className="text-white font-black text-sm">{getInitials()}</span>
+                  <span className="text-white font-bold text-sm">{getInitials()}</span>
                </div>
             </div>
          </div>
