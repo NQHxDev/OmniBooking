@@ -38,7 +38,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
          <SearchBar />
 
          {/* Main Content */}
-         <main className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+         <main className="mx-auto w-full max-w-7xl px-4 pt-16 pb-0 sm:px-6 lg:px-8">
             {/* Promo Section */}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                <div className="relative h-64 overflow-hidden rounded-lg bg-zinc-900 group cursor-pointer shadow-md">

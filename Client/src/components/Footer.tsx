@@ -39,7 +39,7 @@ export default function Footer() {
    );
 
    return (
-      <footer className="w-full bg-[#f5f5f5] text-zinc-700 mt-16 border-t border-zinc-200 pt-10 pb-8">
+      <footer className="w-full bg-[#f5f5f5] text-zinc-700 mt-2 border-t border-zinc-200 pt-10 pb-8">
          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             {/* Links Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 text-xs leading-normal">
