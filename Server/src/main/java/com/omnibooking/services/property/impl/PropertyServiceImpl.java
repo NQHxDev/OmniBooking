@@ -21,9 +21,6 @@ import com.omnibooking.repository.UserRepository;
 import com.omnibooking.repository.RoomAvailabilityRepository;
 import com.omnibooking.repository.AmenityRepository;
 import com.omnibooking.services.property.PropertyService;
-import com.omnibooking.services.property.PropertySyncProducer;
-import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
-import com.omnibooking.mapper.PropertyDocumentMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,15 +59,9 @@ public class PropertyServiceImpl implements PropertyService {
 
    private final AmenityRepository amenityRepository;
 
-   private final PropertySyncProducer propertySyncProducer;
-
    private final PartnerLegalProfileRepository partnerLegalProfileRepository;
 
    private final EncryptionService encryptionService;
-
-   private final PropertyElasticsearchRepository propertyElasticsearchRepository;
-
-   private final PropertyDocumentMapper propertyDocumentMapper;
 
    @Override
    @Transactional

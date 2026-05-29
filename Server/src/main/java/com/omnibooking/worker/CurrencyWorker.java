@@ -19,7 +19,23 @@ public class CurrencyWorker {
    @Scheduled(cron = "0 0 0,4,8,12,16,20 * * *")
    public void updateExchangeRates() {
       log.info("Starting scheduled exchange rate update...");
-      currencyService.updateRates();
-      log.info("Exchange rate update completed!");
+
+      io.sentry.protocol.SentryId checkInId = io.sentry.Sentry.captureCheckIn(
+            new io.sentry.CheckIn("currency-worker", io.sentry.CheckInStatus.IN_PROGRESS)
+      );
+
+      try {
+         currencyService.updateRates();
+         log.info("Exchange rate update completed!");
+         io.sentry.Sentry.captureCheckIn(
+               new io.sentry.CheckIn(checkInId, "currency-worker", io.sentry.CheckInStatus.OK)
+         );
+      } catch (Exception e) {
+         log.error("Failed to update exchange rates in CurrencyWorker", e);
+         io.sentry.Sentry.captureCheckIn(
+               new io.sentry.CheckIn(checkInId, "currency-worker", io.sentry.CheckInStatus.ERROR)
+         );
+      }
    }
 }
+

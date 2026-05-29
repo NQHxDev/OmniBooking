@@ -501,8 +501,8 @@ export default function SearchResultsPage() {
                         <p className="text-zinc-500 font-medium">{ts("searching")}</p>
                      </div>
                   ) : properties.length > 0 ? (
-                     properties.map((property: PropertyDocument) => (
-                        <PropertyCard key={property.id} property={property} />
+                     properties.map((property: PropertyDocument, index: number) => (
+                        <PropertyCard key={property.id} property={property} index={index} />
                      ))
                   ) : (
                      <div className="bg-white rounded-2xl border border-zinc-100 p-20 flex flex-col items-center justify-center text-center">

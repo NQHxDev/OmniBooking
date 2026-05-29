@@ -231,6 +231,7 @@ OmniBooking's search architecture is engineered to query millions of records in 
 
 - **CDC-like Pattern**: Any updates to hotel information or room rates in PostgreSQL trigger an event published to Kafka.
 - **Search Indexer**: A dedicated service consumes events from Kafka and immediately updates the Elasticsearch index, ensuring search data is perfectly synchronized with the primary database.
+- **Deferred Property Creation Sync**: Upon creation of a new property, immediate synchronization to Elasticsearch is bypassed. Instead, the property is indexed in Elasticsearch only after its main image upload successfully finishes and is processed by `MediaConsumer`. This ensures search results do not present newly created properties without valid main images.
 
 ### Interactive Map Engine (Leaflet)
 
@@ -305,4 +306,4 @@ To ensure financial safety and foster a highly interactive user experience, the 
 
 ---
 
-_Last Updated: 2026-05-18_
+_Last Updated: 2026-05-29_

@@ -9,9 +9,10 @@ import { useState } from "react";
 
 interface PropertyCardProps {
    property: PropertyDocument;
+   index?: number;
 }
 
-export default function PropertyCard({ property }: PropertyCardProps) {
+export default function PropertyCard({ property, index }: PropertyCardProps) {
    const t = useTranslations("Search");
    const tc = useTranslations("Common");
    const locale = useLocale();
@@ -45,6 +46,7 @@ export default function PropertyCard({ property }: PropertyCardProps) {
                }
                alt={property.name}
                fill
+               priority={index !== undefined && index < 2}
                sizes="(max-width: 768px) 100vw, 240px"
                className="object-cover hover:scale-105 transition-transform duration-500"
             />

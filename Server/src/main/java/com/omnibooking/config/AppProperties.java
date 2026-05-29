@@ -38,6 +38,17 @@ public class AppProperties {
 
    private final Turnstile turnstile = new Turnstile();
 
+   private final Sentry sentry = new Sentry();
+
+   @Data
+   public static class Sentry {
+      private String dsn;
+      private String environment = "development";
+      private String release;
+      private double tracesSampleRate = 1.0;
+      private boolean enabled = true;
+   }
+
    @Data
    public static class Webauthn {
       @NotBlank

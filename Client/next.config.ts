@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import path from "path";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n.ts");
 
@@ -34,4 +35,14 @@ const nextConfig: NextConfig = {
    },
 };
 
-export default withNextIntl(nextConfig);
+const sentryConfig = {
+   silent: true,
+   org: "omnibooking",
+   project: "omnibooking-client",
+   widenClientFileUpload: true,
+   tunnelRoute: "/monitoring",
+   hideSourceMaps: true,
+   disableLogger: true,
+};
+
+export default withSentryConfig(withNextIntl(nextConfig), sentryConfig);

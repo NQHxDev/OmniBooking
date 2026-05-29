@@ -64,6 +64,14 @@ public class GlobalExceptionHandler {
 
       log.error("[{}] UNEXPECTED ERROR: ", requestId, ex);
 
+      // Check if Sentry has already captured this exception (via LoggingAspect)
+      if (request.getAttribute("sentry_captured") == null) {
+         String module = com.omnibooking.config.observability.ModuleTagResolver.resolveModule(ex.getClass());
+         io.sentry.Sentry.setTag("module", module);
+         io.sentry.Sentry.captureException(ex);
+         request.setAttribute("sentry_captured", Boolean.TRUE);
+      }
+
       return ResponseEntity.status(Objects.requireNonNull(error.getStatus()))
             .body(ApiResponse.error(error.getMessage(), error.getCode(), ex.getMessage(),
                   requestId));

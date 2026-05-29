@@ -2,6 +2,7 @@ import axios from "axios";
 import { v7 as uuidv7 } from "uuid";
 import { toast } from "sonner";
 import { getBaseURL } from "./config";
+import * as Sentry from "@sentry/nextjs";
 
 const apiClient = axios.create({
    baseURL: getBaseURL(),
@@ -15,7 +16,22 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
    (config) => {
       // Inject Request ID for distributed tracing
-      config.headers["X-Request-ID"] = uuidv7();
+      const requestId = uuidv7();
+      config.headers["X-Request-ID"] = requestId;
+      config.headers["X-Correlation-ID"] = requestId;
+
+      // Inject Sentry trace and baggage headers if active span exists
+      const activeSpan = Sentry.getActiveSpan();
+      if (activeSpan) {
+         const traceHeader = Sentry.spanToTraceHeader(activeSpan);
+         const baggageHeader = Sentry.spanToBaggageHeader(activeSpan);
+         if (traceHeader) {
+            config.headers["sentry-trace"] = traceHeader;
+         }
+         if (baggageHeader) {
+            config.headers["baggage"] = baggageHeader;
+         }
+      }
 
       return config;
    },
@@ -107,6 +123,17 @@ apiClient.interceptors.response.use(
 
       if (typeof window !== "undefined" && !error.config?._skipToast && !errorCode) {
          toast.error(message);
+      }
+
+      // Sentry capture for 5xx or network errors
+      if (!status || status >= 500) {
+         Sentry.withScope((scope) => {
+            if (errorCode) {
+               scope.setTag("errorCode", errorCode);
+            }
+            scope.setTag("status", status ? String(status) : "network_error");
+            Sentry.captureException(error);
+         });
       }
 
       return Promise.reject(error.response?.data || { message: error.message });

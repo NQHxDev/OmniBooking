@@ -25,13 +25,23 @@ dev-client:
 # Docker Infrastructure Commands
 docker-infra:
 	@echo "Starting infrastructure..."
-	@docker-compose up -d db redis kafka kafdrop elasticsearch kibana
+	@docker-compose up -d db redis kafka kafdrop elasticsearch kibana prometheus grafana
 	@echo "Waiting for Elasticsearch to be ready..."
 	@until [ "$$(docker inspect --format='{{.State.Health.Status}}' omnibooking-elastic)" = "healthy" ]; do \
 		printf '.'; \
 		sleep 2; \
 	done
-	@echo "\nInfrastructure (DB, Redis, Kafka, ES) is Ready..."
+	@echo "\nInfrastructure (DB, Redis, Kafka, ES, Prometheus, Grafana) is Ready..."
+
+monitoring:
+	@echo "Starting Prometheus and Grafana..."
+	@docker-compose up -d prometheus grafana
+	@echo "Prometheus is running at http://localhost:9090"
+	@echo "Grafana is running at http://localhost:3001"
+
+test-server:
+	@echo "Running Server unit tests..."
+	@cd Server && ./mvnw test
 
 # Docker Full Stack Commands
 docker-up:
@@ -98,3 +108,5 @@ help:
 	@echo "    make install       - Install all dependencies"
 	@echo "    make clean         - Remove build artifacts"
 	@echo "    make logs          - Tail Docker logs"
+	@echo "    make monitoring    - Start Prometheus and Grafana"
+	@echo "    make test-server   - Run server unit tests"

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import axios from "axios";
 import { getBaseURL } from "@/lib/api/config";
+import * as Sentry from "@sentry/nextjs";
 
 export interface User {
    id: string;
@@ -31,7 +32,10 @@ export const useAuthStore = create<AuthState>()(
          user: null,
          isLoggedIn: false,
          isReady: false,
-         setAuth: (user) => set({ user, isLoggedIn: true }),
+         setAuth: (user) => {
+            set({ user, isLoggedIn: true });
+            Sentry.setUser({ id: user.id, email: user.email, username: user.username });
+         },
          setReady: (ready) => set({ isReady: ready }),
          logout: async () => {
             try {
@@ -40,6 +44,7 @@ export const useAuthStore = create<AuthState>()(
                console.error("Logout failed:", error);
             } finally {
                set({ user: null, isLoggedIn: false });
+               Sentry.setUser(null);
             }
          },
       }),
