@@ -27,22 +27,15 @@ const DESTINATION_IMAGES: Record<string, string> = {
    hochiminh: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780019498/TP-HCM_z1rn9m.jpg",
    dalat: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780019811/DaLat_toqzoy.png",
    danang: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780020710/DaNang_s8vktp.png",
-   hoian: "https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?q=80&w=600&auto=format&fit=crop",
-   phuquoc:
-      "https://images.unsplash.com/photo-1583212292454-1fe6229603b7?q=80&w=600&auto=format&fit=crop",
-   quangninh:
-      "https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=600&auto=format&fit=crop",
-   halong: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780020793/HaLong_hzznrp.jpg",
-   nhatrang:
-      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=600&auto=format&fit=crop",
-   vungtau:
-      "https://images.unsplash.com/photo-1519046904884-53103b34b206?q=80&w=600&auto=format&fit=crop",
-   sapa: "https://images.unsplash.com/photo-1508873696983-2df519f0397e?q=80&w=600&auto=format&fit=crop",
-   hue: "https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=600&auto=format&fit=crop",
-   haiphong:
-      "https://images.unsplash.com/photo-1566847438217-76e82d383f84?q=80&w=600&auto=format&fit=crop",
-   cantho:
-      "https://images.unsplash.com/photo-1543731068-7e0f5beff43a?q=80&w=600&auto=format&fit=crop",
+   phuquoc: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780021639/PhuQuoc_qx5m73.png",
+   hoian: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780022069/HoiAn_r5iwvs.png",
+   quangninh: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780020793/HaLong_hzznrp.jpg",
+   nhatrang: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780021782/NhaTrang_yzgfxa.jpg",
+   vungtau: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780022719/VungTau_wojsbl.jpg",
+   sapa: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780021850/Sapa_t5apez.webp",
+   hue: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780022143/Hue_acx9vq.jpg",
+   haiphong: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780022789/HaiPhong_corqgm.jpg",
+   cantho: "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780022854/CanTho_jgs1ay.jpg",
 
    // International
    paris: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=600&auto=format&fit=crop",
