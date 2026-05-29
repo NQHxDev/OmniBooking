@@ -1,9 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { Star, MapPin } from "lucide-react";
+import { Star, MapPin, Heart, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { PropertyResponse } from "@/services/propertyService";
+import { useLocale } from "next-intl";
+import PriceDisplay from "./PriceDisplay";
+import * as React from "react";
 
 export default function PropertyCardClient({
    property,
@@ -12,14 +15,44 @@ export default function PropertyCardClient({
    property: PropertyResponse;
    index: number;
 }) {
+   const locale = useLocale();
+   const isVi = locale === "vi";
+   const [isFavorite, setIsFavorite] = React.useState(false);
+
+   const getRatingText = (rating: number) => {
+      if (rating >= 9) return isVi ? "Xuất sắc" : "Exceptional";
+      if (rating >= 8) return isVi ? "Rất tốt" : "Excellent";
+      if (rating >= 7) return isVi ? "Tốt" : "Good";
+      return isVi ? "Tốt" : "Pleasant";
+   };
+
+   const formatPropertyType = (type: string) => {
+      if (!type) return "";
+      const lower = type.toLowerCase();
+      if (lower === "hotel") return isVi ? "Khách sạn" : "Hotel";
+      if (lower === "apartment") return isVi ? "Căn hộ" : "Apartment";
+      if (lower === "resort") return isVi ? "Khu nghỉ dưỡng" : "Resort";
+      if (lower === "villa") return isVi ? "Biệt thự" : "Villa";
+      return type.charAt(0).toUpperCase() + lower.slice(1);
+   };
+
+   // Deterministic rating, stars, & review count based on name length to make each card look unique
+   const rating = property.rating || 8.0 + (property.name.length % 15) / 10;
+   const starCount = 3 + (property.name.length % 3); // 3 to 5 stars
+   const reviewCount = 45 + ((property.name.length * 3) % 250);
+
+   const basePrice = property.price || 50;
+   const originalPrice = basePrice * 1.5;
+
    return (
       <motion.div
          initial={{ opacity: 0, y: 20 }}
          whileInView={{ opacity: 1, y: 0 }}
          transition={{ duration: 0.5, delay: index * 0.1 }}
          viewport={{ once: true }}
-         className="group cursor-pointer bg-white rounded-2xl overflow-hidden border border-zinc-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
+         className="group cursor-pointer bg-white rounded-2xl overflow-hidden border border-zinc-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 relative"
       >
+         {/* Image Section */}
          <div className="relative h-64 w-full">
             <Image
                src={
@@ -31,32 +64,92 @@ export default function PropertyCardClient({
                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                className="object-cover group-hover:scale-110 transition-transform duration-700"
             />
-            <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
-               <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
-               <span className="text-xs font-bold text-black">4.9</span>
-            </div>
+            {/* Heart Wishlist Button */}
+            <button
+               onClick={(e) => {
+                  e.stopPropagation();
+                  setIsFavorite(!isFavorite);
+               }}
+               className="absolute top-4 right-4 h-9 w-9 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-md hover:bg-white hover:scale-105 active:scale-95 transition-all z-10 cursor-pointer"
+            >
+               <Heart
+                  className={`h-4.5 w-4.5 transition-colors ${
+                     isFavorite
+                        ? "fill-red-500 text-red-500 animate-in zoom-in-75 duration-200"
+                        : "text-zinc-600 hover:text-red-500"
+                  }`}
+               />
+            </button>
          </div>
+
+         {/* Details Section */}
          <div className="p-5">
-            <div className="flex items-center gap-1 text-zinc-400 mb-2">
-               <MapPin className="h-3 w-3" />
-               <span className="text-[11px] font-bold uppercase tracking-wider">
+            {/* Name */}
+            <h4 className="text-lg font-bold text-black group-hover:text-[#006ce4] transition-colors line-clamp-1 leading-snug">
+               {property.name}
+            </h4>
+
+            {/* Location */}
+            <div className="flex items-center gap-1.5 text-zinc-500 mt-1">
+               <MapPin className="h-3.5 w-3.5 text-[#006ce4] shrink-0" />
+               <span className="text-xs font-medium text-zinc-600 hover:text-[#006ce4] hover:underline cursor-pointer transition-colors truncate">
                   {property.city}, {property.country}
                </span>
             </div>
-            <h4 className="text-base font-bold text-black group-hover:text-[#006ce4] transition-colors line-clamp-1">
-               {property.name}
-            </h4>
-            <p className="mt-1 text-xs text-zinc-500 font-medium">{property.propertyType}</p>
 
-            <div className="mt-4 pt-4 border-t border-zinc-50 flex items-center justify-between">
-               <div>
-                  <span className="text-[10px] text-zinc-400 font-bold uppercase block">
-                     Giá từ
-                  </span>
-                  <span className="text-lg font-black text-[#006ce4]">1.250.000₫</span>
+            {/* Property Type & Stars */}
+            <div className="flex items-center gap-2 mt-1.5">
+               <span className="inline-block bg-zinc-50 border border-zinc-200/80 text-zinc-500 text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wide">
+                  {formatPropertyType(property.propertyType)}
+               </span>
+               <div className="flex items-center gap-0.5 text-yellow-500">
+                  {Array.from({ length: starCount }).map((_, i) => (
+                     <Star key={i} className="h-3 w-3 fill-current" />
+                  ))}
                </div>
-               <div className="bg-[#006ce4] text-white px-4 py-2 rounded-xl text-xs font-bold group-hover:bg-[#0057b7] transition-colors">
-                  Đặt ngay
+            </div>
+
+            {/* Rating & Reviews */}
+            <div className="flex items-center gap-2 mt-2.5">
+               <div className="bg-[#003580] text-white font-bold h-5.5 w-5.5 rounded text-[10px] flex items-center justify-center shadow-sm shrink-0 leading-none">
+                  {rating.toFixed(1)}
+               </div>
+               <span className="text-xs font-bold text-zinc-800">{getRatingText(rating)}</span>
+               <span className="text-zinc-300 select-none">·</span>
+               <span className="text-[10px] text-zinc-500 font-medium">
+                  {reviewCount} {isVi ? "đánh giá" : "reviews"}
+               </span>
+            </div>
+
+            {/* Premium Badges & Policies */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2.5">
+               <span className="inline-flex items-center bg-[#003580] text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded tracking-wide leading-none">
+                  Genius
+               </span>
+               <span className="inline-flex items-center text-[#008009] text-[10px] font-bold leading-none">
+                  <Check className="h-3.5 w-3.5 mr-0.5 shrink-0" />
+                  {isVi ? "Miễn phí hủy" : "Free cancellation"}
+               </span>
+            </div>
+
+            {/* Pricing Section */}
+            <div className="mt-4 pt-4 border-t border-zinc-100">
+               <span className="text-[10px] text-zinc-400 font-bold uppercase block mb-1 leading-none">
+                  {isVi ? "Giá từ" : "Price from"}
+               </span>
+               <div className="flex items-baseline gap-2">
+                  <PriceDisplay
+                     amount={basePrice}
+                     size="custom"
+                     className="text-zinc-600 font-bold text-xl leading-none"
+                  />
+                  <span className="text-xs text-red-600 line-through font-medium leading-none">
+                     <PriceDisplay
+                        amount={originalPrice}
+                        size="sm"
+                        className="text-xs text-red-600 line-through font-medium"
+                     />
+                  </span>
                </div>
             </div>
          </div>

@@ -2,7 +2,8 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/routing";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { ChevronDown } from "lucide-react";
 
@@ -10,12 +11,13 @@ interface LanguageSwitcherProps {
    theme?: "blue-bg" | "white-bg";
 }
 
-export default function LanguageSwitcher({ theme = "blue-bg" }: LanguageSwitcherProps) {
+function LanguageSwitcherComponent({ theme = "blue-bg" }: LanguageSwitcherProps) {
    const locale = useLocale();
    const t = useTranslations("Common");
 
    const router = useRouter();
    const pathname = usePathname();
+   const searchParams = useSearchParams();
    const [isOpen, setIsOpen] = useState(false);
    const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -46,7 +48,9 @@ export default function LanguageSwitcher({ theme = "blue-bg" }: LanguageSwitcher
 
    const handleLanguageChange = (newLocale: string) => {
       setIsOpen(false);
-      router.replace(pathname, { locale: newLocale });
+      const params = searchParams.toString();
+      const targetPath = params ? `${pathname}?${params}` : pathname;
+      router.replace(targetPath, { locale: newLocale });
    };
 
    const isBlueBg = theme === "blue-bg";
@@ -108,5 +112,13 @@ export default function LanguageSwitcher({ theme = "blue-bg" }: LanguageSwitcher
             </div>
          )}
       </div>
+   );
+}
+
+export default function LanguageSwitcher(props: LanguageSwitcherProps) {
+   return (
+      <Suspense fallback={<div className="h-8 w-8 rounded-full bg-zinc-100/10 animate-pulse" />}>
+         <LanguageSwitcherComponent {...props} />
+      </Suspense>
    );
 }

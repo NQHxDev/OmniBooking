@@ -16,9 +16,12 @@ export interface DestinationSuggestionResponse {
 }
 
 export const destinationService = {
-   getTrending: async (): Promise<DestinationSuggestionResponse[]> => {
+   getTrending: async (locale: string = "vi"): Promise<DestinationSuggestionResponse[]> => {
       const response = await apiClient.get<unknown, ApiResponse<DestinationSuggestionResponse[]>>(
-         "/destinations/trending"
+         "/destinations/trending",
+         {
+            params: { locale },
+         }
       );
       return response.data || [];
    },

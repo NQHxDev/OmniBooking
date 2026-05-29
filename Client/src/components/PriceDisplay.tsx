@@ -9,7 +9,7 @@ import { Skeleton } from "./ui/skeleton";
 interface PriceDisplayProps {
    amount: number; // Base amount in USD
    className?: string;
-   size?: "sm" | "md" | "lg" | "xl";
+   size?: "sm" | "md" | "lg" | "xl" | "custom";
 }
 
 export default function PriceDisplay({ amount, className = "", size = "md" }: PriceDisplayProps) {
@@ -31,21 +31,38 @@ export default function PriceDisplay({ amount, className = "", size = "md" }: Pr
    }
 
    const rate = rates?.[targetCurrency] || 1;
-   const convertedAmount = amount * rate;
-
-   const formatter = new Intl.NumberFormat(locale === "vi" ? "vi-VN" : "en-US", {
-      style: "currency",
-      currency: targetCurrency,
-      minimumFractionDigits: targetCurrency === "VND" ? 0 : 2,
-      maximumFractionDigits: targetCurrency === "VND" ? 0 : 2,
-   });
+   let convertedAmount = amount * rate;
+   if (targetCurrency === "VND") {
+      convertedAmount = Math.round(convertedAmount / 1000) * 1000;
+   }
 
    const sizeClasses = {
       sm: "text-sm",
       md: "text-base font-bold",
       lg: "text-xl font-bold",
       xl: "text-2xl font-extrabold",
+      custom: "",
    };
+
+   if (targetCurrency === "VND") {
+      const numberFormatter = new Intl.NumberFormat("vi-VN", {
+         style: "decimal",
+         minimumFractionDigits: 0,
+         maximumFractionDigits: 0,
+      });
+      return (
+         <span className={`${sizeClasses[size]} ${className} transition-all duration-300`}>
+            VND {numberFormatter.format(convertedAmount)}
+         </span>
+      );
+   }
+
+   const formatter = new Intl.NumberFormat(locale === "vi" ? "vi-VN" : "en-US", {
+      style: "currency",
+      currency: targetCurrency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+   });
 
    return (
       <span className={`${sizeClasses[size]} ${className} transition-all duration-300`}>

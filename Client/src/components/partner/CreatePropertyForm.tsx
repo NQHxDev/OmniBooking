@@ -10,6 +10,10 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
+import { useSettingStore } from "@/store/useSettingStore";
+import { useQuery } from "@tanstack/react-query";
+import apiClient from "@/lib/api/apiClient";
+
 import Step1BasicInfo from "./steps/Step1BasicInfo";
 import Step2Location from "./steps/Step2Location";
 import Step3Setup from "./steps/Step3Setup";
@@ -83,6 +87,16 @@ export default function CreatePropertyForm() {
    const [isFlexibleTime, setIsFlexibleTime] = useState(false);
    const router = useRouter();
 
+   const { currency } = useSettingStore();
+   const { data: rates } = useQuery({
+      queryKey: ["currency-rates"],
+      queryFn: async () => {
+         const response = await apiClient.get<unknown, Record<string, number>>("/currencies/rates");
+         return response;
+      },
+      staleTime: 1000 * 60 * 60, // 1 hour
+   });
+
    const propertySchema = useMemo(() => getPropertySchema(tv), [tv]);
 
    const methods = useForm<PropertyFormValues>({
@@ -128,8 +142,20 @@ export default function CreatePropertyForm() {
          t("messages.uploading") || "Đang đăng tải thông tin chỗ nghỉ..."
       );
       try {
+         // Convert basePrice to USD before submitting
+         const rate = rates?.[currency] || 1;
+         const convertedRoomTypes = data.roomTypes?.map((room) => ({
+            ...room,
+            basePrice:
+               currency === "USD" ? room.basePrice : Number((room.basePrice / rate).toFixed(2)),
+         }));
+         const submissionData = {
+            ...data,
+            roomTypes: convertedRoomTypes,
+         };
+
          // 1. Create Property
-         const property = await propertyService.createProperty(data);
+         const property = await propertyService.createProperty(submissionData);
 
          // 2. Upload Images
          setImages((prev) => prev.map((img) => ({ ...img, isUploading: true })));

@@ -30,7 +30,7 @@ public class PropertySyncConsumer {
          return;
       }
 
-      propertyRepository.findById(event.getPropertyId()).ifPresent(property -> {
+      propertyRepository.findByIdWithAmenitiesAndRoomTypes(event.getPropertyId()).ifPresent(property -> {
          PropertyDocument document = propertyDocumentMapper.toDocument(property);
 
          // Set main image url

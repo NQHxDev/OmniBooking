@@ -1,9 +1,94 @@
 "use client";
 
-import { useFormContext, useFieldArray, useWatch } from "react-hook-form";
+import { useState, useEffect } from "react";
+import { useFormContext, useFieldArray, useWatch, Controller } from "react-hook-form";
 import { useTranslations } from "next-intl";
-import { Bed, Plus, Trash2, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Bed, Plus, Trash2, Check, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import type { PropertyFormValues } from "../CreatePropertyForm";
+import { useSettingStore } from "@/store/useSettingStore";
+
+const formatInputString = (str: string, curr: string) => {
+   const clean = str.replace(curr === "VND" ? /[^\d]/g : /[^\d,]/g, "");
+
+   if (curr === "VND") {
+      if (!clean) return "";
+      const num = parseInt(clean, 10);
+      return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(num);
+   } else {
+      if (!clean) return "";
+
+      const parts = clean.split(",");
+      const integerPart = parts[0];
+      const decimalPart = parts.slice(1).join("");
+
+      const formattedInt = integerPart
+         ? new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(
+              parseInt(integerPart, 10)
+           )
+         : "";
+
+      if (clean.includes(",")) {
+         return formattedInt + "," + decimalPart.slice(0, 2);
+      }
+      return formattedInt;
+   }
+};
+
+const parseFormattedValue = (str: string, curr: string) => {
+   if (curr === "VND") {
+      const clean = str.replace(/[^\d]/g, "");
+      return clean ? parseInt(clean, 10) : 0;
+   } else {
+      const noDots = str.replace(/\./g, "");
+      const clean = noDots.replace(/,/g, ".");
+      const num = parseFloat(clean);
+      return isNaN(num) ? 0 : num;
+   }
+};
+
+interface PriceInputProps {
+   value: number;
+   onChange: (val: number) => void;
+   currency: string;
+   className?: string;
+}
+
+function PriceInput({ value, onChange, currency, className }: PriceInputProps) {
+   const [prevValue, setPrevValue] = useState(value);
+   const [prevCurrency, setPrevCurrency] = useState(currency);
+   const [displayVal, setDisplayVal] = useState(() => {
+      return value ? formatInputString(String(value), currency) : "";
+   });
+
+   // Adjust state during render when props change
+   const parsedCurrent = parseFormattedValue(displayVal, currency);
+   if (value !== prevValue || currency !== prevCurrency) {
+      setPrevValue(value);
+      setPrevCurrency(currency);
+      if (parsedCurrent !== value) {
+         setDisplayVal(value ? formatInputString(String(value), currency) : "");
+      }
+   }
+
+   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const rawInput = e.target.value;
+      const formatted = formatInputString(rawInput, currency);
+      setDisplayVal(formatted);
+
+      const numVal = parseFormattedValue(rawInput, currency);
+      onChange(numVal);
+   };
+
+   return (
+      <input
+         type="text"
+         value={displayVal}
+         onChange={handleChange}
+         placeholder="0"
+         className={className}
+      />
+   );
+}
 
 const AMENITIES_BY_CATEGORY = {
    GENERAL: [
@@ -38,6 +123,7 @@ interface Step3SetupProps {
 
 export default function Step3Setup({ onBack, onNext }: Step3SetupProps) {
    const t = useTranslations("Partner.createPropertyForm");
+   const { currency } = useSettingStore();
    const {
       register,
       control,
@@ -52,6 +138,7 @@ export default function Step3Setup({ onBack, onNext }: Step3SetupProps) {
    });
 
    const selectedAmenities = useWatch({ name: "amenities" }) || [];
+   const roomTypesWatch = useWatch({ name: "roomTypes", control }) || [];
 
    const handleAmenityChange = (name: string, checked: boolean) => {
       const current = getValues("amenities") || [];
@@ -88,7 +175,7 @@ export default function Step3Setup({ onBack, onNext }: Step3SetupProps) {
                         capacityAdults: 2,
                         capacityChildren: 0,
                         totalRooms: 5,
-                        basePrice: 1000000,
+                        basePrice: 0,
                         description: "",
                      })
                   }
@@ -232,24 +319,65 @@ export default function Step3Setup({ onBack, onNext }: Step3SetupProps) {
                            </div>
                         </div>
 
-                        <div>
-                           <label className="block text-[11px] font-bold text-zinc-600 uppercase mb-1">
+                        <div className="space-y-1">
+                           <label className="block text-[11px] font-bold text-zinc-600 uppercase tracking-wider mb-1">
                               {t("basePrice")}
                            </label>
-                           <div className="relative">
-                              <span className="absolute left-3 top-2 text-zinc-400 text-sm font-semibold">
-                                 VND
-                              </span>
-                              <input
-                                 type="number"
-                                 {...register(`roomTypes.${index}.basePrice` as const, {
-                                    valueAsNumber: true,
-                                 })}
-                                 className="w-full pl-16 pr-3 py-2 rounded-lg border border-zinc-200 focus:border-[#003580] focus:ring-2 focus:ring-blue-50 outline-none text-sm transition-all text-zinc-800"
+                           <div className="relative flex items-center bg-zinc-50/20 backdrop-blur-md rounded-xl border border-zinc-200 hover:border-zinc-300 focus-within:border-[#003580] focus-within:ring-4 focus-within:ring-blue-100/50 transition-all duration-300 shadow-sm overflow-hidden">
+                              <div className="flex items-center gap-1.5 px-3 py-2.5 border-r border-zinc-200 bg-zinc-50/50 select-none shrink-0">
+                                 <span className="text-xs font-bold text-zinc-500 tracking-wider">
+                                    {currency}
+                                 </span>
+                              </div>
+                              <Controller
+                                 control={control}
+                                 name={`roomTypes.${index}.basePrice` as const}
+                                 render={({ field: { onChange, value } }) => (
+                                    <PriceInput
+                                       value={value}
+                                       onChange={onChange}
+                                       currency={currency}
+                                       className="w-full pl-3 pr-4 py-2.5 bg-transparent text-right outline-none text-base font-bold text-zinc-800 transition-colors"
+                                    />
+                                 )}
                               />
                            </div>
+
+                           {/* Real-time warnings */}
+                           {(() => {
+                              const basePriceVal = roomTypesWatch?.[index]?.basePrice;
+                              if (
+                                 typeof basePriceVal !== "number" ||
+                                 isNaN(basePriceVal) ||
+                                 basePriceVal <= 0
+                              )
+                                 return null;
+
+                              const isTooLow =
+                                 currency === "VND" ? basePriceVal < 50000 : basePriceVal < 2;
+                              const isTooHigh =
+                                 currency === "VND" ? basePriceVal > 50000000 : basePriceVal > 2000;
+
+                              return (
+                                 <div className="flex flex-col gap-1 mt-1 text-xs animate-in fade-in duration-200">
+                                    {isTooLow && (
+                                       <span className="text-amber-600 font-semibold mt-0.5 bg-amber-50/50 border border-amber-100 px-2 py-1 rounded-md animate-pulse flex items-center gap-1.5">
+                                          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                                          {t("priceTooLowWarning")}
+                                       </span>
+                                    )}
+                                    {isTooHigh && (
+                                       <span className="text-amber-600 font-semibold mt-0.5 bg-amber-50/50 border border-amber-100 px-2 py-1 rounded-md animate-pulse flex items-center gap-1.5">
+                                          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+                                          {t("priceTooHighWarning")}
+                                       </span>
+                                    )}
+                                 </div>
+                              );
+                           })()}
+
                            {errors.roomTypes?.[index]?.basePrice && (
-                              <p className="text-xs text-red-500 mt-1">
+                              <p className="text-xs text-red-500 mt-1 font-medium">
                                  {errors.roomTypes[index]?.basePrice?.message}
                               </p>
                            )}

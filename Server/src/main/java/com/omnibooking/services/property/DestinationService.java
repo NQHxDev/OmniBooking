@@ -5,5 +5,5 @@ import java.util.List;
 
 public interface DestinationService {
    List<DestinationSuggestionResponse> searchSuggestions(String query, String locale);
-   List<DestinationSuggestionResponse> getTrending(String countryCode);
+   List<DestinationSuggestionResponse> getTrending(String countryCode, String locale);
 }

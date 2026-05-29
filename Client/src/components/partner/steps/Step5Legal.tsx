@@ -8,6 +8,7 @@ import type { PropertyFormValues } from "../CreatePropertyForm";
 import { propertyService } from "@/lib/api/propertyService";
 import type { PartnerLegalProfileResponse } from "@/lib/api/propertyService";
 import Image from "next/image";
+import { useSettingStore } from "@/store/useSettingStore";
 
 interface Step5LegalProps {
    images: { file: File; preview: string; isUploading: boolean }[];
@@ -17,6 +18,7 @@ interface Step5LegalProps {
 
 export default function Step5Legal({ images, isSubmitting, onBack }: Step5LegalProps) {
    const t = useTranslations("Partner.createPropertyForm");
+   const { currency } = useSettingStore();
    const {
       register,
       setValue,
@@ -245,10 +247,18 @@ export default function Step5Legal({ images, isSubmitting, onBack }: Step5LegalP
                                        </p>
                                     </div>
                                     <span className="font-bold text-[#003580]">
-                                       {new Intl.NumberFormat("vi-VN", {
-                                          style: "currency",
-                                          currency: "VND",
-                                       }).format(room.basePrice || 0)}
+                                       {currency === "VND"
+                                          ? `VND ${new Intl.NumberFormat("vi-VN", {
+                                               style: "decimal",
+                                               minimumFractionDigits: 0,
+                                               maximumFractionDigits: 0,
+                                            }).format(room.basePrice || 0)}`
+                                          : new Intl.NumberFormat("en-US", {
+                                               style: "currency",
+                                               currency: currency,
+                                               minimumFractionDigits: 2,
+                                               maximumFractionDigits: 2,
+                                            }).format(room.basePrice || 0)}
                                     </span>
                                  </div>
                               );

@@ -292,6 +292,9 @@
          "capacityChildren": "Child Capacity",
          "totalRooms": "Number of Rooms",
          "basePrice": "Base Price per Night",
+         "formattedPrice": "Formatted value",
+         "priceTooLowWarning": "Price seems very low for a night",
+         "priceTooHighWarning": "Price is exceptionally high. Please review",
          "amenitiesTitle": "Property Amenities",
          "amenitiesSubtitle": "Select the facilities and services available at your property",
          "amenitiesCategories": {
@@ -400,7 +403,7 @@
       }
    },
    "Search": {
-      "resultsFor": "{destination}: {count} properties found",
+      "resultsFor": "We found {count} properties for you in {destination}",
       "sortBy": "Sort by:",
       "filterBy": "Filter by:",
       "budget": "Your budget (per night)",
@@ -535,6 +538,49 @@
          "privacy": "Privacy Policy",
          "help": "Help",
          "copyright": "© 1996-2026 OmniBooking.com™. All rights reserved."
+      },
+      "register": {
+         "back": "Back",
+         "verifyTitle": "Verify your account",
+         "verifySub": "We have sent a 6-character verification code to your email. Please enter the code below to continue.",
+         "otpLabel": "Verification code",
+         "otpPlaceholder": "A0A000",
+         "verifyButton": "Verify email",
+         "noCode": "Didn't receive code?",
+         "sending": "Sending...",
+         "resendCountdown": "Resend in {count}s",
+         "resend": "Resend",
+         "termsTitle": "Partner Terms & Conditions",
+         "termsSub": "Please read the partner terms of service carefully before starting your business on our platform.",
+         "term1Title": "1. Definitions",
+         "term1Content": "\"Partner\" refers to an individual or organization registering to provide accommodation services on OmniBooking.com. \"Platform\" refers to the website system and mobile application of OmniBooking.",
+         "term2Title": "2. Rights and Obligations",
+         "term2Content": "Partners have the right to set room prices and cancellation policies. Partners are obligated to ensure service quality as described and comply with current legal regulations.",
+         "term3Title": "3. Commission and Payment",
+         "term3Content": "OmniBooking will collect a fixed commission on each successful booking. Payment will be transferred to the partner's account periodically after deducting service fees.",
+         "term4Title": "4. Data Security",
+         "term4Content": "Both parties commit to keeping customer information secure and not using it for unauthorized purposes.",
+         "agreeAll": "I agree to all terms",
+         "agreeSub": "By ticking here, you confirm that you have clearly understood the system's regulations.",
+         "completeButton": "Complete registration",
+         "successTitle": "Registration complete!",
+         "successSub": "Thank you for choosing OmniBooking.com. Your profile has been submitted and is currently being reviewed.",
+         "redirectMessage": "System will automatically redirect to Dashboard in {count} seconds...",
+         "goHome": "Go home",
+         "viewIntro": "View introduction again",
+         "secureSsl": "Secure SSL",
+         "privateData": "Private Data",
+         "verifiedPartner": "Verified Partner",
+         "toasts": {
+            "otpSent": "Verification code has been sent to your email!",
+            "otpSentDesc": "Please check your inbox or spam folder!",
+            "otpSendError": "Failed to send verification code. Please try again later.",
+            "verifySuccess": "Email verification successful!",
+            "verifyError": "Incorrect or expired verification code.",
+            "agreeRequired": "Please agree to the terms!",
+            "registerSuccess": "Congratulations! You have become an OmniBooking partner",
+            "registerError": "An error occurred while completing registration. Please try again later."
+         }
       }
    },
    "Profile": {

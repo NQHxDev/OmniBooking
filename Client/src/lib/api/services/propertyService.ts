@@ -43,12 +43,11 @@ export interface SearchParams {
 
 export const propertyService = {
    search: async (params: SearchParams) => {
-      const response = await apiClient.get<ApiResponse<Page<PropertyDocument>>>(
-         "/properties/search",
-         { params }
-      );
+      const response = (await apiClient.get("/properties/search", {
+         params,
+      })) as unknown as ApiResponse<Page<PropertyDocument>>;
       return (
-         response.data.data || {
+         response.data || {
             content: [],
             totalElements: 0,
             totalPages: 0,

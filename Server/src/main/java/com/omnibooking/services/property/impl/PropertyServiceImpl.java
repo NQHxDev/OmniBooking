@@ -22,6 +22,8 @@ import com.omnibooking.repository.RoomAvailabilityRepository;
 import com.omnibooking.repository.AmenityRepository;
 import com.omnibooking.services.property.PropertyService;
 import com.omnibooking.services.property.PropertySyncProducer;
+import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
+import com.omnibooking.mapper.PropertyDocumentMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +67,10 @@ public class PropertyServiceImpl implements PropertyService {
    private final PartnerLegalProfileRepository partnerLegalProfileRepository;
 
    private final EncryptionService encryptionService;
+
+   private final PropertyElasticsearchRepository propertyElasticsearchRepository;
+
+   private final PropertyDocumentMapper propertyDocumentMapper;
 
    @Override
    @Transactional
@@ -161,6 +167,17 @@ public class PropertyServiceImpl implements PropertyService {
             .propertyId(saved.getId())
             .operation("CREATE")
             .build());
+ 
+      // Direct Sync Fallback to Elasticsearch (handles cases where Kafka is not running)
+      try {
+         com.omnibooking.document.PropertyDocument document = propertyDocumentMapper.toDocument(saved);
+         mediaRepository.findFirstByEntityIdAndEntityTypeAndIsMainTrue(saved.getId(), "PROPERTY")
+               .ifPresent(media -> document.setMainImageUrl(media.getUrl()));
+         propertyElasticsearchRepository.save(document);
+         log.info("Direct sync to Elasticsearch successful for property: {}", saved.getId());
+      } catch (Exception e) {
+         log.error("Failed to directly sync property to Elasticsearch, relying on Kafka consumer sync", e);
+      }
 
       return PropertyResponse.builder()
             .id(saved.getId())

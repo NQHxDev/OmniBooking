@@ -29,6 +29,179 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const RECENT_SEARCHES_KEY = "omni_recent_searches";
 
+const translateDestinationName = (name: string, id: string, locale: string): string => {
+   if (locale === "en") {
+      switch (id) {
+         case "1":
+            return "Hanoi";
+         case "2":
+            return "Ho Chi Minh City";
+         case "3":
+            return "Da Nang";
+         case "4":
+            return "Hoi An";
+         case "5":
+            return "Phu Quoc";
+         case "11":
+            return "Quang Ninh";
+         case "12":
+            return "Ha Long";
+         case "13":
+            return "Nha Trang";
+         case "14":
+            return "Da Lat";
+         case "15":
+            return "Vung Tau";
+         case "16":
+            return "Sapa";
+         case "17":
+            return "Hue";
+         case "18":
+            return "Hai Phong";
+         case "19":
+            return "Can Tho";
+      }
+      switch (name) {
+         case "Hà Nội":
+            return "Hanoi";
+         case "Hồ Chí Minh":
+            return "Ho Chi Minh City";
+         case "Đà Nẵng":
+            return "Da Nang";
+         case "Hội An":
+            return "Hoi An";
+         case "Phú Quốc":
+            return "Phu Quoc";
+         case "Quảng Ninh":
+            return "Quang Ninh";
+         case "Hạ Long":
+            return "Ha Long";
+         case "Nha Trang":
+            return "Nha Trang";
+         case "Đà Lạt":
+            return "Da Lat";
+         case "Vũng Tàu":
+            return "Vung Tau";
+         case "Sapa":
+            return "Sapa";
+         case "Huế":
+            return "Hue";
+         case "Hải Phòng":
+            return "Hai Phong";
+         case "Cần Thơ":
+            return "Can Tho";
+      }
+   } else {
+      switch (id) {
+         case "1":
+            return "Hà Nội";
+         case "2":
+            return "Hồ Chí Minh";
+         case "3":
+            return "Đà Nẵng";
+         case "4":
+            return "Hội An";
+         case "5":
+            return "Phú Quốc";
+         case "11":
+            return "Quảng Ninh";
+         case "12":
+            return "Hạ Long";
+         case "13":
+            return "Nha Trang";
+         case "14":
+            return "Đà Lạt";
+         case "15":
+            return "Vũng Tàu";
+         case "16":
+            return "Sapa";
+         case "17":
+            return "Huế";
+         case "18":
+            return "Hải Phòng";
+         case "19":
+            return "Cần Thơ";
+      }
+      switch (name) {
+         case "Hanoi":
+            return "Hà Nội";
+         case "Ho Chi Minh City":
+         case "Ho Chi Minh":
+            return "Hồ Chí Minh";
+         case "Da Nang":
+            return "Đà Nẵng";
+         case "Hoi An":
+            return "Hội An";
+         case "Phu Quoc":
+            return "Phú Quốc";
+         case "Quang Ninh":
+            return "Quảng Ninh";
+         case "Ha Long":
+            return "Hạ Long";
+         case "Nha Trang":
+            return "Nha Trang";
+         case "Da Lat":
+            return "Đà Lạt";
+         case "Vung Tau":
+            return "Vũng Tàu";
+         case "Hue":
+            return "Huế";
+         case "Hai Phong":
+            return "Hải Phòng";
+         case "Can Tho":
+            return "Cần Thơ";
+      }
+   }
+   return name;
+};
+
+const translateCountryName = (country: string, locale: string): string => {
+   if (locale === "en") {
+      switch (country) {
+         case "Việt Nam":
+         case "Vietnam":
+            return "Vietnam";
+         case "Pháp":
+         case "France":
+            return "France";
+         case "Vương quốc Anh":
+         case "United Kingdom":
+            return "United Kingdom";
+         case "Nhật Bản":
+         case "Japan":
+            return "Japan";
+         case "Hoa Kỳ":
+         case "United States":
+            return "United States";
+         case "Thái Lan":
+         case "Thailand":
+            return "Thailand";
+      }
+   } else {
+      switch (country) {
+         case "Vietnam":
+         case "Việt Nam":
+            return "Việt Nam";
+         case "France":
+         case "Pháp":
+            return "Pháp";
+         case "United Kingdom":
+         case "Vương quốc Anh":
+            return "Vương quốc Anh";
+         case "Japan":
+         case "Nhật Bản":
+            return "Nhật Bản";
+         case "United States":
+         case "Hoa Kỳ":
+            return "Hoa Kỳ";
+         case "Thailand":
+         case "Thái Lan":
+            return "Thái Lan";
+      }
+   }
+   return country;
+};
+
 export default function SearchBar() {
    const t = useTranslations("Common");
    const locale = useLocale();
@@ -76,11 +249,11 @@ export default function SearchBar() {
    const [isWorkTrip, setIsWorkTrip] = useState(false);
    const [isPets, setIsPets] = useState(false);
 
-   // Load recent searches & trending on mount/focus
+   // Load recent searches & trending on mount/focus/locale change
    useEffect(() => {
       const fetchTrending = async () => {
          try {
-            const data = await destinationService.getTrending();
+            const data = await destinationService.getTrending(locale);
             setTrending(data);
          } catch (e) {
             console.error("Failed to fetch trending", e);
@@ -88,7 +261,7 @@ export default function SearchBar() {
       };
 
       fetchTrending();
-   }, []);
+   }, [locale]);
 
    // Handle debounced search
    useEffect(() => {
@@ -120,7 +293,7 @@ export default function SearchBar() {
    }, [destination, suggestions, recentSearches, trending]);
 
    const handleSelect = (item: DestinationSuggestionResponse) => {
-      setDestination(item.name);
+      setDestination(translateDestinationName(item.name, item.id, locale));
       setIsLocationOpen(false);
 
       // Save to recent searches
@@ -580,6 +753,7 @@ function SearchItem({
    isActive: boolean;
 }) {
    const t = useTranslations("Common");
+   const locale = useLocale();
 
    const getTypeLabel = (type: string) => {
       switch (type) {
@@ -595,6 +769,9 @@ function SearchItem({
             return type;
       }
    };
+
+   const displayName = translateDestinationName(item.name, item.id, locale);
+   const displayCountry = translateCountryName(item.country, locale);
 
    return (
       <div
@@ -614,10 +791,10 @@ function SearchItem({
             <span
                className={`text-sm font-bold truncate ${isActive ? "text-[#006ce4]" : "text-zinc-900"}`}
             >
-               {item.name}
+               {displayName}
             </span>
             <span className="text-[10px] font-medium text-zinc-400 truncate">
-               {getTypeLabel(item.type)} · {item.country}
+               {getTypeLabel(item.type)} · {displayCountry}
             </span>
          </div>
       </div>

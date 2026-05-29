@@ -292,6 +292,9 @@
          "capacityChildren": "Sức chứa trẻ em",
          "totalRooms": "Số lượng phòng",
          "basePrice": "Giá cơ bản mỗi đêm",
+         "formattedPrice": "Giá trị hiển thị",
+         "priceTooLowWarning": "Giá phòng có vẻ hơi thấp cho một đêm",
+         "priceTooHighWarning": "Giá phòng rất cao, vui lòng kiểm tra lại",
          "amenitiesTitle": "Tiện ích chỗ nghỉ",
          "amenitiesSubtitle": "Chọn các cơ sở vật chất và dịch vụ có sẵn tại chỗ nghỉ của bạn",
          "amenitiesCategories": {
@@ -400,7 +403,7 @@
       }
    },
    "Search": {
-      "resultsFor": "{destination}: Tìm thấy {count} chỗ nghỉ",
+      "resultsFor": "Chúng tôi đã tìm thấy {count} nơi lưu trú cho bạn tại {destination}",
       "sortBy": "Sắp xếp theo:",
       "filterBy": "Chọn lọc theo:",
       "budget": "Ngân sách của bạn (mỗi đêm)",
@@ -413,7 +416,7 @@
       "allProperties": "Tất cả chỗ nghỉ",
       "night": "đêm",
       "taxesIncluded": "Đã bao gồm thuế và phí",
-      "viewAvailability": "Xem chỗ trống",
+      "viewAvailability": "Xem phòng trống",
       "rating": {
          "exceptional": "Xuất sắc",
          "excellent": "Rất tốt",
@@ -535,6 +538,49 @@
          "privacy": "Chính sách bảo mật",
          "help": "Trợ giúp",
          "copyright": "© 1996-2026 OmniBooking.com™. Bảo lưu mọi quyền."
+      },
+      "register": {
+         "back": "Quay lại",
+         "verifyTitle": "Xác thực tài khoản của bạn",
+         "verifySub": "Chúng tôi đã gửi mã xác thực gồm 6 ký tự đến email của bạn. Vui lòng nhập mã đó bên dưới để tiếp tục.",
+         "otpLabel": "Mã xác thực",
+         "otpPlaceholder": "A0A000",
+         "verifyButton": "Xác nhận email",
+         "noCode": "Không nhận được mã?",
+         "sending": "Đang gửi...",
+         "resendCountdown": "Gửi lại sau {count}s",
+         "resend": "Gửi lại",
+         "termsTitle": "Điều khoản & Điều kiện Đối tác",
+         "termsSub": "Vui lòng đọc kỹ các điều khoản dịch vụ dành cho đối tác trước khi bắt đầu kinh doanh trên nền tảng của chúng tôi.",
+         "term1Title": "1. Định nghĩa",
+         "term1Content": "\"Đối tác\" là cá nhân hoặc tổ chức đăng ký cung cấp dịch vụ lưu trú trên OmniBooking.com. \"Nền tảng\" là hệ thống website và ứng dụng di động của OmniBooking.",
+         "term2Title": "2. Quyền và nghĩa vụ",
+         "term2Content": "Đối tác có quyền tự quyết định giá phòng và chính sách hủy. Đối tác có nghĩa vụ đảm bảo chất lượng dịch vụ như đã mô tả và tuân thủ các quy định pháp luật hiện hành.",
+         "term3Title": "3. Phí hoa hồng và Thanh toán",
+         "term3Content": "OmniBooking sẽ thu phí hoa hồng cố định trên mỗi đơn đặt phòng thành công. Thanh toán sẽ được chuyển vào tài khoản đối tác định kỳ sau khi trừ phí dịch vụ.",
+         "term4Title": "4. Bảo mật dữ liệu",
+         "term4Content": "Cả hai bên cam kết bảo mật thông tin khách hàng và không sử dụng vào mục đích trái phép.",
+         "agreeAll": "Tôi đồng ý với tất cả điều khoản",
+         "agreeSub": "Bằng cách tích vào đây, bạn xác nhận đã hiểu rõ các quy định của hệ thống.",
+         "completeButton": "Hoàn tất đăng ký",
+         "successTitle": "Đăng ký hoàn tất!",
+         "successSub": "Cảm ơn bạn đã lựa chọn OmniBooking.com. Hồ sơ của bạn đã được gửi đi và đang trong quá trình xét duyệt.",
+         "redirectMessage": "Hệ thống sẽ tự động chuyển đến Dashboard sau {count} giây...",
+         "goHome": "Về trang chủ",
+         "viewIntro": "Xem giới thiệu lại",
+         "secureSsl": "Secure SSL",
+         "privateData": "Private Data",
+         "verifiedPartner": "Verified Partner",
+         "toasts": {
+            "otpSent": "Mã xác thực đã được gửi đến email của bạn!",
+            "otpSentDesc": "Vui lòng kiểm tra hộp thư đến hoặc thư rác!",
+            "otpSendError": "Không thể gửi mã xác thực. Vui lòng thử lại sau.",
+            "verifySuccess": "Xác thực email thành công!",
+            "verifyError": "Mã xác thực không đúng hoặc đã hết hạn.",
+            "agreeRequired": "Vui lòng đồng ý với điều khoản!",
+            "registerSuccess": "Chúc mừng! Bạn đã trở thành đối tác của OmniBooking",
+            "registerError": "Đã có lỗi xảy ra khi hoàn tất đăng ký. Vui lòng thử lại sau."
+         }
       }
    },
    "Profile": {
