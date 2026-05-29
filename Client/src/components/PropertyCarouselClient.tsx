@@ -11,6 +11,7 @@ interface PropertyCarouselClientProps {
 
 export default function PropertyCarouselClient({ properties }: PropertyCarouselClientProps) {
    const scrollerRef = useRef<HTMLDivElement>(null);
+   const innerRef = useRef<HTMLDivElement>(null);
    const [activeDot, setActiveDot] = useState(0);
    const [canScrollLeft, setCanScrollLeft] = useState(false);
    const [canScrollRight, setCanScrollRight] = useState(false);
@@ -46,6 +47,114 @@ export default function PropertyCarouselClient({ properties }: PropertyCarouselC
          };
       }
    }, [properties, totalPages]);
+
+   // Custom overscroll rubber-band bounce effect that prevents browser history jumps
+   useEffect(() => {
+      const scroller = scrollerRef.current;
+      const inner = innerRef.current;
+      if (!scroller || !inner) return;
+
+      let bounceOffset = 0;
+      let isDragging = false;
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let wheelTimeout: NodeJS.Timeout | null = null;
+
+      const applyTransform = (offset: number) => {
+         const resistance = 0.28;
+         const maxBounce = 70; // Maximum stretch in pixels
+         const elasticOffset =
+            Math.sign(offset) * Math.min(maxBounce, Math.abs(offset) * resistance);
+
+         inner.style.transition = "none";
+         inner.style.transform = `translateX(${elasticOffset}px)`;
+      };
+
+      const resetTransform = () => {
+         inner.style.transition = "transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+         inner.style.transform = "translateX(0px)";
+         bounceOffset = 0;
+      };
+
+      const handleWheel = (e: WheelEvent) => {
+         const { deltaX, deltaY } = e;
+
+         // Only intercept if gesture is primarily horizontal
+         if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            const { scrollLeft, scrollWidth, clientWidth } = scroller;
+            const atLeft = scrollLeft <= 2;
+            const atRight = scrollLeft >= scrollWidth - clientWidth - 2;
+
+            if ((deltaX < 0 && atLeft) || (deltaX > 0 && atRight)) {
+               // Prevent default browser history back/forward navigation
+               e.preventDefault();
+
+               bounceOffset -= deltaX;
+               applyTransform(bounceOffset);
+
+               if (wheelTimeout) clearTimeout(wheelTimeout);
+               wheelTimeout = setTimeout(resetTransform, 80);
+            }
+         }
+      };
+
+      const handleTouchStart = (e: TouchEvent) => {
+         if (e.touches.length === 1) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            isDragging = true;
+            inner.style.transition = "none";
+         }
+      };
+
+      const handleTouchMove = (e: TouchEvent) => {
+         if (!isDragging || e.touches.length !== 1) return;
+
+         const currentX = e.touches[0].clientX;
+         const currentY = e.touches[0].clientY;
+         const diffX = currentX - touchStartX;
+         const diffY = currentY - touchStartY;
+
+         if (Math.abs(diffX) > Math.abs(diffY)) {
+            const { scrollLeft, scrollWidth, clientWidth } = scroller;
+            const atLeft = scrollLeft <= 2;
+            const atRight = scrollLeft >= scrollWidth - clientWidth - 2;
+
+            if ((diffX > 0 && atLeft) || (diffX < 0 && atRight)) {
+               e.preventDefault();
+               bounceOffset = diffX;
+               applyTransform(bounceOffset);
+            } else {
+               if (bounceOffset !== 0) {
+                  bounceOffset = 0;
+                  inner.style.transform = "translateX(0px)";
+               }
+            }
+         }
+      };
+
+      const handleTouchEnd = () => {
+         if (isDragging) {
+            isDragging = false;
+            resetTransform();
+         }
+      };
+
+      scroller.addEventListener("wheel", handleWheel, { passive: false });
+      scroller.addEventListener("touchstart", handleTouchStart, { passive: true });
+      scroller.addEventListener("touchmove", handleTouchMove, { passive: false });
+      scroller.addEventListener("touchend", handleTouchEnd, { passive: true });
+      scroller.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+
+      return () => {
+         scroller.removeEventListener("wheel", handleWheel);
+         scroller.removeEventListener("touchstart", handleTouchStart);
+         scroller.removeEventListener("touchmove", handleTouchMove);
+         scroller.removeEventListener("touchend", handleTouchEnd);
+         scroller.removeEventListener("touchcancel", handleTouchEnd);
+         if (wheelTimeout) clearTimeout(wheelTimeout);
+      };
+   }, [properties]);
 
    const handleNext = () => {
       if (scrollerRef.current) {
@@ -104,16 +213,18 @@ export default function PropertyCarouselClient({ properties }: PropertyCarouselC
          {/* Properties Horizontal Scroller Container */}
          <div
             ref={scrollerRef}
-            className="flex gap-4 overflow-x-auto overflow-y-hidden touch-pan-y scroll-smooth snap-x snap-mandatory scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pt-4 pb-2"
+            className="overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y scroll-smooth snap-x snap-mandatory scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pt-4 pb-2"
          >
-            {properties.map((property, idx) => (
-               <div
-                  key={property.id}
-                  className="w-[88vw] sm:w-[calc(50%-8px)] lg:w-[calc(25%-12px)] shrink-0 snap-start"
-               >
-                  <PropertyCardClient property={property} index={idx} />
-               </div>
-            ))}
+            <div ref={innerRef} className="flex gap-4 w-max min-w-full">
+               {properties.map((property, idx) => (
+                  <div
+                     key={property.id}
+                     className="w-[88vw] sm:w-[calc(50%-8px)] lg:w-[calc(25%-12px)] shrink-0 snap-start"
+                  >
+                     <PropertyCardClient property={property} index={idx} />
+                  </div>
+               ))}
+            </div>
          </div>
 
          {/* Page Indicators */}

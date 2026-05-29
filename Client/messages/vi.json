@@ -456,7 +456,15 @@
       "promoSummerDesc": "Tiết kiệm 15% hoặc hơn khi đặt từ nay đến 30/9/2026",
       "promoSummerBtn": "Tìm ưu đãi",
       "promoHanoiTitle": "Khám phá Hà Nội",
-      "promoHanoiDesc": "Trải nghiệm nét cổ kính và ẩm thực đường phố tuyệt vời"
+      "promoHanoiDesc": "Trải nghiệm nét cổ kính và ẩm thực đường phố tuyệt vời",
+      "popularTravelersTitle": "Phổ biến với du khách từ {country}",
+      "tabDomesticCities": "Thành phố trong nước",
+      "tabInternationalCities": "Thành phố nước ngoài",
+      "tabRegions": "Khu vực",
+      "tabCountries": "Quốc gia",
+      "tabAccommodations": "Chỗ nghỉ",
+      "showMore": "Hiển thị thêm",
+      "showLess": "Hiển thị bớt"
    },
    "Genius": {
       "welcomeBack": "Chào mừng trở lại, {name}!",

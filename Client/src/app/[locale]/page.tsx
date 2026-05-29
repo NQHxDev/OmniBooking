@@ -7,6 +7,7 @@ import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { headers } from "next/headers";
 import DiscoverDestinations from "@/components/DiscoverDestinations";
+import PopularDestinationsLinks from "@/components/PopularDestinationsLinks";
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
    const { locale } = await params;
@@ -94,6 +95,9 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
 
             {/* Loyalty/Genius Section */}
             <GeniusBanner />
+
+            {/* Popular Destinations and SEO links */}
+            <PopularDestinationsLinks locale={locale} clientIp={clientIp} />
          </main>
 
          {/* Simple Footer */}

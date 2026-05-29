@@ -456,7 +456,15 @@
       "promoSummerDesc": "Save 15% or more when booking between now and September 30, 2026",
       "promoSummerBtn": "Find Deals",
       "promoHanoiTitle": "Explore Hanoi",
-      "promoHanoiDesc": "Experience the ancient charm and amazing street food"
+      "promoHanoiDesc": "Experience the ancient charm and amazing street food",
+      "popularTravelersTitle": "Popular with travelers from {country}",
+      "tabDomesticCities": "Domestic cities",
+      "tabInternationalCities": "International cities",
+      "tabRegions": "Regions",
+      "tabCountries": "Countries",
+      "tabAccommodations": "Places to stay",
+      "showMore": "Show more",
+      "showLess": "Show less"
    },
    "Genius": {
       "welcomeBack": "Welcome back, {name}!",
