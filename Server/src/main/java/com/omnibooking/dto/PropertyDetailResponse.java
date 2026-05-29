@@ -35,6 +35,8 @@ public class PropertyDetailResponse {
 
    private String imageUrl;
 
+   private List<String> imageUrls;
+
    private String businessRegistrationNumber;
 
    private String taxCode;

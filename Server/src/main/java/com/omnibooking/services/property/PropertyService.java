@@ -20,4 +20,6 @@ public interface PropertyService {
 
    PropertyDetailResponse getPropertyDetailForPartner(UUID propertyId, UUID ownerId);
 
+   PropertyDetailResponse getPropertyDetail(UUID propertyId);
+
 }

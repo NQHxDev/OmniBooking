@@ -7,6 +7,7 @@ import com.omnibooking.model.Media;
 import com.omnibooking.repository.MediaRepository;
 import com.omnibooking.dto.event.PropertySyncEvent;
 import com.omnibooking.services.property.PropertySyncProducer;
+import com.omnibooking.services.property.PropertyImagesCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
@@ -25,6 +26,7 @@ public class MediaConsumer {
    private final MediaRepository mediaRepository;
    private final CacheManager cacheManager;
    private final PropertySyncProducer propertySyncProducer;
+   private final PropertyImagesCacheService propertyImagesCacheService;
 
    @KafkaListener(topics = KafkaConfig.MEDIA_TOPIC, groupId = "omnibooking-media-group")
    public void consumeUploadEvent(MediaUploadEvent event) {
@@ -51,6 +53,17 @@ public class MediaConsumer {
          mediaRepository.save(Objects.requireNonNull(media));
          log.info("[Kafka Consumer] Successfully persisted media record for correlationId: {}",
                event.getCorrelationId());
+
+         // Evict property images cache
+         if ("PROPERTY".equals(event.getEntityType())) {
+            try {
+               UUID propertyId = UUID.fromString(event.getEntityId());
+               propertyImagesCacheService.evict(propertyId);
+               log.info("[Kafka Consumer] Evicted property images cache for property: {}", propertyId);
+            } catch (Exception e) {
+               log.error("[Kafka Consumer] Failed to evict property images cache for property: {}", event.getEntityId(), e);
+            }
+         }
 
          // Evict 'properties' cache so the home page updates immediately once the main image is ready
          if (event.isMain() && "PROPERTY".equals(event.getEntityType())) {

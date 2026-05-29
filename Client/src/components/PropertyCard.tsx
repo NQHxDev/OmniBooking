@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Star, Heart, Check, ChevronRight, Info, ThumbsUp, Plus } from "lucide-react";
 import { PropertyDocument } from "@/lib/api/services/propertyService";
 import { useTranslations, useLocale } from "next-intl";
@@ -40,10 +41,7 @@ export default function PropertyCard({ property, index }: PropertyCardProps) {
          {/* Image Section */}
          <div className="relative w-full md:w-[240px] h-[200px] shrink-0 rounded-lg overflow-hidden">
             <Image
-               src={
-                  property.mainImageUrl ||
-                  "https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop"
-               }
+               src={property.mainImageUrl || "/images/not_found.png"}
                alt={property.name}
                fill
                priority={index !== undefined && index < 2}
@@ -75,9 +73,13 @@ export default function PropertyCard({ property, index }: PropertyCardProps) {
                <div className="space-y-1">
                   {/* Name and Badges */}
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                     <h3 className="text-lg font-extrabold text-[#006ce4] hover:text-[#005bb8] transition-colors leading-tight cursor-pointer">
+                     <Link
+                        href={`/${locale}/properties/${property.id}`}
+                        target="_blank"
+                        className="text-lg font-extrabold text-[#006ce4] hover:text-[#005bb8] transition-colors leading-tight cursor-pointer"
+                     >
                         {property.name}
-                     </h3>
+                     </Link>
                      <div className="flex items-center gap-0.5">
                         {renderStars(property.starRating || 3)}
                      </div>
@@ -198,10 +200,14 @@ export default function PropertyCard({ property, index }: PropertyCardProps) {
                      {isVi ? "Đã bao gồm thuế và phí" : "Includes taxes and charges"}
                   </span>
 
-                  <button className="mt-3 bg-[#006ce4] hover:bg-[#0057b7] text-white px-4 py-2.5 rounded-md font-bold text-sm transition-all active:scale-[0.98] flex items-center gap-1 cursor-pointer">
+                  <Link
+                     href={`/${locale}/properties/${property.id}`}
+                     target="_blank"
+                     className="mt-3 bg-[#006ce4] hover:bg-[#0057b7] text-white px-4 py-2.5 rounded-md font-bold text-sm transition-all active:scale-[0.98] flex items-center gap-1 cursor-pointer"
+                  >
                      <span>{t("viewAvailability")}</span>
                      <ChevronRight className="h-4.5 w-4.5 shrink-0" />
-                  </button>
+                  </Link>
                </div>
             </div>
          </div>

@@ -21,6 +21,7 @@ import com.omnibooking.repository.UserRepository;
 import com.omnibooking.repository.RoomAvailabilityRepository;
 import com.omnibooking.repository.AmenityRepository;
 import com.omnibooking.services.property.PropertyService;
+import com.omnibooking.services.property.PropertyImagesCacheService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +63,8 @@ public class PropertyServiceImpl implements PropertyService {
    private final PartnerLegalProfileRepository partnerLegalProfileRepository;
 
    private final EncryptionService encryptionService;
+
+   private final PropertyImagesCacheService propertyImagesCacheService;
 
    @Override
    @Transactional
@@ -228,6 +231,10 @@ public class PropertyServiceImpl implements PropertyService {
             .orElse(null);
    }
 
+   private List<String> getAllImageUrls(UUID propertyId) {
+      return propertyImagesCacheService.getPropertyImageUrls(propertyId);
+   }
+
    @Override
    public List<PartnerLegalProfileResponse> getPartnerLegalProfiles(UUID partnerId) {
       log.info("Fetching active partner legal profiles for partner: {}", partnerId);
@@ -365,9 +372,52 @@ public class PropertyServiceImpl implements PropertyService {
             .checkInTime(property.getCheckInTime() != null ? property.getCheckInTime().toString() : null)
             .checkOutTime(property.getCheckOutTime() != null ? property.getCheckOutTime().toString() : null)
             .imageUrl(getMainImageUrl(property.getId()))
+            .imageUrls(getAllImageUrls(property.getId()))
             .businessRegistrationNumber(decryptedRegNum)
             .taxCode(decryptedTaxCode)
             .legalOwnerName(decryptedOwnerName)
+            .amenities(amenities)
+            .roomTypes(roomTypes)
+            .build();
+   }
+
+   @Override
+   @Transactional(readOnly = true)
+   public PropertyDetailResponse getPropertyDetail(UUID propertyId) {
+      Property property = propertyRepository.findById(propertyId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+      List<String> amenities = property.getAmenities() != null
+            ? property.getAmenities().stream().map(Amenity::getName).toList()
+            : List.of();
+
+      List<RoomTypeResponse> roomTypes = roomTypeRepository.findByPropertyId(propertyId).stream()
+            .map(r -> RoomTypeResponse.builder()
+                  .id(r.getId())
+                  .name(r.getName())
+                  .description(r.getDescription())
+                  .basePrice(r.getBasePrice())
+                  .capacityAdults(r.getCapacityAdults())
+                  .capacityChildren(r.getCapacityChildren())
+                  .totalRooms(r.getTotalRooms())
+                  .roomSizeSqm(r.getRoomSizeSqm())
+                  .bedType(r.getBedType())
+                  .build())
+            .toList();
+
+      return PropertyDetailResponse.builder()
+            .id(property.getId())
+            .name(property.getName())
+            .description(property.getDescription())
+            .propertyType(property.getPropertyType().name())
+            .address(property.getAddress())
+            .city(property.getCity())
+            .country(property.getCountry())
+            .starRating(property.getStarRating())
+            .checkInTime(property.getCheckInTime() != null ? property.getCheckInTime().toString() : null)
+            .checkOutTime(property.getCheckOutTime() != null ? property.getCheckOutTime().toString() : null)
+            .imageUrl(getMainImageUrl(property.getId()))
+            .imageUrls(getAllImageUrls(property.getId()))
             .amenities(amenities)
             .roomTypes(roomTypes)
             .build();

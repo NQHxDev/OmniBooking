@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Star, MapPin, Heart, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { PropertyResponse } from "@/services/propertyService";
@@ -50,110 +51,114 @@ export default function PropertyCardClient({
          whileInView={{ opacity: 1, y: 0 }}
          transition={{ duration: 0.5, delay: index * 0.1 }}
          viewport={{ once: true }}
-         className="group cursor-pointer bg-white rounded-2xl overflow-hidden border border-zinc-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] transition-all duration-300 hover:-translate-y-1 relative"
+         className="group bg-white rounded-2xl overflow-hidden border border-zinc-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] transition-all duration-300 hover:-translate-y-1 relative"
       >
-         {/* Image Section */}
-         <div className="relative h-64 w-full">
-            <Image
-               src={
-                  property.imageUrl ||
-                  "https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop"
-               }
-               alt={property.name}
-               fill
-               priority={index < 2}
-               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-               className="object-cover group-hover:scale-110 transition-transform duration-700"
-            />
-            {/* Heart Wishlist Button */}
-            <button
-               onClick={(e) => {
-                  e.stopPropagation();
-                  setIsFavorite(!isFavorite);
-               }}
-               className="absolute top-4 right-4 h-9 w-9 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-md hover:bg-white hover:scale-105 active:scale-95 transition-all z-10 cursor-pointer"
-            >
-               <Heart
-                  className={`h-4.5 w-4.5 transition-colors ${
-                     isFavorite
-                        ? "fill-red-500 text-red-500 animate-in zoom-in-75 duration-200"
-                        : "text-zinc-600 hover:text-red-500"
-                  }`}
+         <Link
+            href={`/${locale}/properties/${property.id}`}
+            target="_blank"
+            className="block h-full cursor-pointer select-none"
+         >
+            {/* Image Section */}
+            <div className="relative h-64 w-full">
+               <Image
+                  src={property.imageUrl || "/images/not_found.png"}
+                  alt={property.name}
+                  fill
+                  priority={index < 2}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                  className="object-cover group-hover:scale-110 transition-transform duration-700"
                />
-            </button>
-         </div>
-
-         {/* Details Section */}
-         <div className="p-5">
-            {/* Name */}
-            <h4 className="text-lg font-bold text-black group-hover:text-[#006ce4] transition-colors line-clamp-1 leading-snug">
-               {property.name}
-            </h4>
-
-            {/* Location */}
-            <div className="flex items-center gap-1.5 text-zinc-500 mt-1">
-               <MapPin className="h-3.5 w-3.5 text-[#006ce4] shrink-0" />
-               <span className="text-xs font-medium text-zinc-600 hover:text-[#006ce4] hover:underline cursor-pointer transition-colors truncate">
-                  {property.city}, {property.country}
-               </span>
-            </div>
-
-            {/* Property Type & Stars */}
-            <div className="flex items-center gap-2 mt-1.5">
-               <span className="inline-block bg-zinc-50 border border-zinc-200/80 text-zinc-500 text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wide">
-                  {formatPropertyType(property.propertyType)}
-               </span>
-               <div className="flex items-center gap-0.5 text-yellow-500">
-                  {Array.from({ length: starCount }).map((_, i) => (
-                     <Star key={i} className="h-3 w-3 fill-current" />
-                  ))}
-               </div>
-            </div>
-
-            {/* Rating & Reviews */}
-            <div className="flex items-center gap-2 mt-2.5">
-               <div className="bg-[#003580] text-white font-bold h-5.5 w-5.5 rounded text-[10px] flex items-center justify-center shadow-sm shrink-0 leading-none">
-                  {rating.toFixed(1)}
-               </div>
-               <span className="text-xs font-bold text-zinc-800">{getRatingText(rating)}</span>
-               <span className="text-zinc-300 select-none">·</span>
-               <span className="text-[10px] text-zinc-500 font-medium">
-                  {reviewCount} {isVi ? "đánh giá" : "reviews"}
-               </span>
-            </div>
-
-            {/* Premium Badges & Policies */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2.5">
-               <span className="inline-flex items-center bg-[#003580] text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded tracking-wide leading-none">
-                  Genius
-               </span>
-               <span className="inline-flex items-center text-[#008009] text-[10px] font-bold leading-none">
-                  <Check className="h-3.5 w-3.5 mr-0.5 shrink-0" />
-                  {isVi ? "Miễn phí hủy" : "Free cancellation"}
-               </span>
-            </div>
-
-            {/* Pricing Section */}
-            <div className="mt-4 pt-4 border-t border-zinc-100">
-               <span className="text-[10px] text-zinc-400 font-bold uppercase block mb-1 leading-none">
-                  {isVi ? "Giá từ" : "Price from"}
-               </span>
-               <div className="flex items-baseline gap-2">
-                  <PriceDisplay
-                     amount={basePrice}
-                     size="custom"
-                     className="text-zinc-600 font-bold text-xl leading-none"
+               {/* Heart Wishlist Button */}
+               <button
+                  onClick={(e) => {
+                     e.preventDefault();
+                     e.stopPropagation();
+                     setIsFavorite(!isFavorite);
+                  }}
+                  className="absolute top-4 right-4 h-9 w-9 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-md hover:bg-white hover:scale-105 active:scale-95 transition-all z-10 cursor-pointer"
+               >
+                  <Heart
+                     className={`h-4.5 w-4.5 transition-colors ${
+                        isFavorite
+                           ? "fill-red-500 text-red-500 animate-in zoom-in-75 duration-200"
+                           : "text-zinc-600 hover:text-red-500"
+                     }`}
                   />
-                  <span className="text-xs text-red-600 line-through font-medium leading-none">
-                     <PriceDisplay
-                        amount={originalPrice}
-                        size="sm"
-                        className="text-xs text-red-600 line-through font-medium"
-                     />
+               </button>
+            </div>
+
+            {/* Details Section */}
+            <div className="p-5">
+               {/* Name */}
+               <h4 className="text-lg font-bold text-black group-hover:text-[#006ce4] transition-colors line-clamp-1 leading-snug">
+                  {property.name}
+               </h4>
+
+               {/* Location */}
+               <div className="flex items-center gap-1.5 text-zinc-500 mt-1">
+                  <MapPin className="h-3.5 w-3.5 text-[#006ce4] shrink-0" />
+                  <span className="text-xs font-medium text-zinc-600 hover:text-[#006ce4] hover:underline cursor-pointer transition-colors truncate">
+                     {property.city}, {property.country}
                   </span>
                </div>
+
+               {/* Property Type & Stars */}
+               <div className="flex items-center gap-2 mt-1.5">
+                  <span className="inline-block bg-zinc-50 border border-zinc-200/80 text-zinc-500 text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wide">
+                     {formatPropertyType(property.propertyType)}
+                  </span>
+                  <div className="flex items-center gap-0.5 text-yellow-500">
+                     {Array.from({ length: starCount }).map((_, i) => (
+                        <Star key={i} className="h-3 w-3 fill-current" />
+                     ))}
+                  </div>
+               </div>
+
+               {/* Rating & Reviews */}
+               <div className="flex items-center gap-2 mt-2.5">
+                  <div className="bg-[#003580] text-white font-bold h-5.5 w-5.5 rounded text-[10px] flex items-center justify-center shadow-sm shrink-0 leading-none">
+                     {rating.toFixed(1)}
+                  </div>
+                  <span className="text-xs font-bold text-zinc-800">{getRatingText(rating)}</span>
+                  <span className="text-zinc-300 select-none">·</span>
+                  <span className="text-[10px] text-zinc-500 font-medium">
+                     {reviewCount} {isVi ? "đánh giá" : "reviews"}
+                  </span>
+               </div>
+
+               {/* Premium Badges & Policies */}
+               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2.5">
+                  <span className="inline-flex items-center bg-[#003580] text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded tracking-wide leading-none">
+                     Genius
+                  </span>
+                  <span className="inline-flex items-center text-[#008009] text-[10px] font-bold leading-none">
+                     <Check className="h-3.5 w-3.5 mr-0.5 shrink-0" />
+                     {isVi ? "Miễn phí hủy" : "Free cancellation"}
+                  </span>
+               </div>
+
+               {/* Pricing Section */}
+               <div className="mt-4 pt-4 border-t border-zinc-100">
+                  <span className="text-[10px] text-zinc-400 font-bold uppercase block mb-1 leading-none">
+                     {isVi ? "Giá từ" : "Price from"}
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                     <PriceDisplay
+                        amount={basePrice}
+                        size="custom"
+                        className="text-zinc-600 font-bold text-xl leading-none"
+                     />
+                     <span className="text-xs text-red-600 line-through font-medium leading-none">
+                        <PriceDisplay
+                           amount={originalPrice}
+                           size="sm"
+                           className="text-xs text-red-600 line-through font-medium"
+                        />
+                     </span>
+                  </div>
+               </div>
             </div>
-         </div>
+         </Link>
       </motion.div>
    );
 }
