@@ -31,7 +31,7 @@ export default function GeniusBanner({
    const userName = propUserName ?? (storeUser?.fullName || storeUser?.username || "");
 
    return (
-      <div className="mt-16 flex flex-col md:flex-row items-center gap-8 rounded-2xl border border-zinc-200 p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] bg-white transition-all hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden relative group min-h-[160px]">
+      <div className="mt-6 flex flex-col md:flex-row items-center gap-8 rounded-2xl border border-zinc-200 p-8 shadow-[0_4px_20px_rgba(0,0,0,0.03)] bg-white transition-all hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] overflow-hidden relative group min-h-[160px]">
          {/* Decorative Background Element */}
          <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl" />
 

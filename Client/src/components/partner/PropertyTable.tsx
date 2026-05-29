@@ -53,7 +53,7 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
    return (
       <div className="space-y-8">
          {/* Grid View - Smaller and more elegant cards */}
-         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
             {visibleProperties.map((property) => (
                <div
                   key={property.id}
@@ -67,7 +67,7 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
                               src={property.imageUrl}
                               alt={property.name}
                               fill
-                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                               className="object-cover transition-transform duration-700 group-hover:scale-110"
                            />
                            <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />

@@ -4,6 +4,7 @@ import com.omnibooking.document.PropertyDocument;
 import com.omnibooking.services.property.PropertySearchService;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.MultiMatchQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import co.elastic.clients.elasticsearch._types.query_dsl.TermQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.TextQueryType;
@@ -131,8 +132,9 @@ public class PropertySearchServiceImpl implements PropertySearchService {
    /**
     * Build a multi_match query that searches across name, city, address,
     * description fields.
-    * Uses "best_fields" type which finds the best matching field and uses its
-    * score.
+    * Uses "cross_fields" type with AND operator to ensure ALL search terms
+    * must match across the combined fields. The city field is boosted 5x
+    * so city-name searches strongly prefer city matches.
     * The vi_analyzer with icu_folding handles Vietnamese diacritics automatically,
     * so "Quang Ninh" will match "Quảng Ninh" and "Tỉnh Quảng Ninh".
     */
@@ -140,8 +142,9 @@ public class PropertySearchServiceImpl implements PropertySearchService {
       return new Query.Builder()
             .multiMatch(new MultiMatchQuery.Builder()
                   .query(queryText)
-                  .fields(List.of("name", "city", "address", "description"))
-                  .type(TextQueryType.BestFields)
+                  .fields(List.of("city^5", "name", "address", "description"))
+                  .type(TextQueryType.CrossFields)
+                  .operator(Operator.And)
                   .build())
             .build();
    }

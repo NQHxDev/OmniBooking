@@ -29,7 +29,7 @@ export default async function FeaturedProperties() {
    }
 
    return (
-      <section className="mt-16">
+      <section className="mt-6">
          <div className="flex items-center justify-between">
             <div>
                <h3 className="text-2xl font-bold text-black">

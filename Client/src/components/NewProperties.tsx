@@ -14,7 +14,7 @@ export default async function NewProperties() {
 
    if (!properties || properties.length === 0) {
       return (
-         <section className="mt-16 bg-zinc-50 rounded-[2rem] p-12 text-center border border-zinc-100">
+         <section className="mt-6 bg-zinc-50 rounded-[2rem] p-12 text-center border border-zinc-100">
             <div className="max-w-md mx-auto">
                <h3 className="text-xl font-bold text-black mb-2">
                   {t("newProperties") || "Chỗ nghỉ mới đăng"}
@@ -28,7 +28,7 @@ export default async function NewProperties() {
    }
 
    return (
-      <section className="mt-16">
+      <section className="mt-6">
          <div className="flex items-center justify-between">
             <div>
                <h3 className="text-2xl font-bold text-black">

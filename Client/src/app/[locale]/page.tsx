@@ -4,11 +4,17 @@ import SearchBar from "@/components/SearchBar";
 import FeaturedProperties from "@/components/FeaturedProperties";
 import NewProperties from "@/components/NewProperties";
 import Image from "next/image";
-import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
+import { headers } from "next/headers";
+import DiscoverDestinations from "@/components/DiscoverDestinations";
 
-export default function Home() {
-   const t = useTranslations("Common");
-   const tHome = useTranslations("Home");
+export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
+   const { locale } = await params;
+   const t = await getTranslations({ locale, namespace: "Common" });
+   const tHome = await getTranslations({ locale, namespace: "Home" });
+
+   const headerList = await headers();
+   const clientIp = headerList.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
 
    return (
       <div className="flex min-h-screen flex-col bg-white">
@@ -77,78 +83,8 @@ export default function Home() {
                </div>
             </div>
 
-            {/* Trending Destinations */}
-            <div className="mt-16">
-               <h3 className="text-2xl font-bold text-black">
-                  {tHome("trendingDestinations") || "Điểm đến đang thịnh hành"}
-               </h3>
-               <p className="mt-1 text-zinc-500">
-                  {tHome("trendingSub") || "Các lựa chọn phổ biến nhất cho du khách từ Việt Nam"}
-               </p>
-
-               <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-                  <div className="relative h-48 overflow-hidden rounded-lg group cursor-pointer shadow-sm">
-                     <Image
-                        src="/images/dalat.png"
-                        alt="Da Lat"
-                        fill
-                        sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
-                        className="object-cover group-hover:scale-110 transition-transform duration-500"
-                        priority
-                     />
-                     <div className="absolute top-4 left-4 flex items-center gap-2 text-white drop-shadow-md">
-                        <span className="text-xl font-bold">{tHome("dalat") || "Đà Lạt"}</span>
-                        <img
-                           src="https://flagcdn.com/vn.svg"
-                           alt="VN Flag"
-                           width={20}
-                           height={15}
-                           className="h-auto w-5"
-                        />
-                     </div>
-                  </div>
-                  <div className="relative h-48 overflow-hidden rounded-lg group cursor-pointer shadow-sm">
-                     <Image
-                        src="/images/hanoi.png"
-                        alt="Hanoi"
-                        fill
-                        sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
-                        className="object-cover group-hover:scale-110 transition-transform duration-500"
-                     />
-                     <div className="absolute top-4 left-4 flex items-center gap-2 text-white drop-shadow-md">
-                        <span className="text-xl font-bold">{tHome("hanoi") || "Hà Nội"}</span>
-                        <img
-                           src="https://flagcdn.com/vn.svg"
-                           alt="VN Flag"
-                           width={20}
-                           height={15}
-                           className="h-auto w-5"
-                        />
-                     </div>
-                  </div>
-                  <div className="relative h-48 overflow-hidden rounded-lg group cursor-pointer shadow-sm bg-zinc-100 flex items-center justify-center text-zinc-400">
-                     <Image
-                        src="https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=2070&auto=format&fit=crop"
-                        alt="Da Nang"
-                        fill
-                        sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
-                        className="object-cover group-hover:scale-110 transition-transform duration-500"
-                     />
-                     <div className="absolute top-4 left-4 flex items-center gap-2 text-white drop-shadow-md">
-                        <span className="text-xl font-bold">
-                           {tHome("quangninh") || "Quảng Ninh"}
-                        </span>
-                        <img
-                           src="https://flagcdn.com/vn.svg"
-                           alt="VN Flag"
-                           width={20}
-                           height={15}
-                           className="h-auto w-5"
-                        />
-                     </div>
-                  </div>
-               </div>
-            </div>
+            {/* Dynamic Discover Destinations based on client IP */}
+            <DiscoverDestinations locale={locale} clientIp={clientIp} />
 
             {/* Featured Properties from DB */}
             <FeaturedProperties />

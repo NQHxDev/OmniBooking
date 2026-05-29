@@ -5,6 +5,8 @@ import com.omnibooking.dto.CloudinaryResponse;
 import com.omnibooking.dto.event.MediaUploadEvent;
 import com.omnibooking.model.Media;
 import com.omnibooking.repository.MediaRepository;
+import com.omnibooking.dto.event.PropertySyncEvent;
+import com.omnibooking.services.property.PropertySyncProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
@@ -22,6 +24,7 @@ public class MediaConsumer {
    private final CloudinaryService cloudinaryService;
    private final MediaRepository mediaRepository;
    private final CacheManager cacheManager;
+   private final PropertySyncProducer propertySyncProducer;
 
    @KafkaListener(topics = KafkaConfig.MEDIA_TOPIC, groupId = "omnibooking-media-group")
    public void consumeUploadEvent(MediaUploadEvent event) {
@@ -55,6 +58,18 @@ public class MediaConsumer {
             if (propertiesCache != null) {
                propertiesCache.clear();
                log.info("[Kafka Consumer] Evicted 'properties' cache because main image for property {} is ready", event.getEntityId());
+            }
+
+            // Sync to Elasticsearch now that the main image URL is persisted in Postgres and uploaded to Cloudinary
+            try {
+               UUID propertyId = UUID.fromString(event.getEntityId());
+               propertySyncProducer.sendSyncEvent(PropertySyncEvent.builder()
+                     .propertyId(propertyId)
+                     .operation("CREATE")
+                     .build());
+               log.info("[Kafka Consumer] Triggered Elasticsearch sync for property: {} after main image upload completed", propertyId);
+            } catch (Exception e) {
+               log.error("[Kafka Consumer] Failed to trigger Elasticsearch sync for property: {}", event.getEntityId(), e);
             }
          }
 

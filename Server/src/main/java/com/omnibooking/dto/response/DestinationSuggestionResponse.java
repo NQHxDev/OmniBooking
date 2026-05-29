@@ -27,6 +27,8 @@ public class DestinationSuggestionResponse {
 
    private String imageUrl;
 
+   private Long propertyCount;
+
    @Data
    @Builder
    @NoArgsConstructor

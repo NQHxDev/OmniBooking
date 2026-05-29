@@ -440,6 +440,9 @@
    "Home": {
       "trendingDestinations": "Trending destinations",
       "trendingSub": "Most popular choices for travelers from Vietnam",
+      "discoverCountry": "Discover {country}",
+      "discoverCountrySub": "These popular destinations have a lot to offer",
+      "propertiesCount": "{count} properties",
       "dalat": "Da Lat",
       "hanoi": "Hanoi",
       "quangninh": "Quang Ninh",

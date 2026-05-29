@@ -10,6 +10,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
+import java.util.UUID;
+
 @Entity
 @Table(name = "search_logs")
 @Getter
@@ -26,7 +28,7 @@ public class SearchLog extends BaseEntity {
    private String countryCode;
 
    @Column(name = "user_id")
-   private String userId; // Optional, can be null for guests
+   private UUID userId; // Optional, can be null for guests
 
    @Builder.Default
    @Column(name = "is_boosted", nullable = false)

@@ -9,6 +9,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -24,10 +26,19 @@ public class SearchLogServiceImpl implements SearchLogService {
          return;
       }
 
+      UUID userUuid = null;
+      if (userId != null && !userId.trim().isEmpty()) {
+         try {
+            userUuid = UUID.fromString(userId.trim());
+         } catch (IllegalArgumentException e) {
+            log.warn("Invalid UUID format for userId in logSearch: {}", userId, e);
+         }
+      }
+
       SearchLog logEntry = SearchLog.builder()
             .queryText(query.trim())
             .countryCode(countryCode)
-            .userId(userId)
+            .userId(userUuid)
             .isBoosted(false)
             .build();
 

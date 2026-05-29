@@ -440,6 +440,9 @@
    "Home": {
       "trendingDestinations": "Điểm đến đang thịnh hành",
       "trendingSub": "Các lựa chọn phổ biến nhất cho du khách từ Việt Nam",
+      "discoverCountry": "Khám phá {country}",
+      "discoverCountrySub": "Các điểm đến phổ biến này có nhiều điều chờ đón bạn",
+      "propertiesCount": "{count} chỗ nghỉ",
       "dalat": "Đà Lạt",
       "hanoi": "Hà Nội",
       "quangninh": "Quảng Ninh",

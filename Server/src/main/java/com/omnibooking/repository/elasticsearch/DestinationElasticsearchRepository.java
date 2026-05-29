@@ -15,8 +15,8 @@ public interface DestinationElasticsearchRepository extends ElasticsearchReposit
          "]}}")
    List<DestinationDocument> searchByName(String name);
 
-   List<DestinationDocument> findTop5ByCountryCodeOrderByPopularityScoreDesc(String countryCode);
+   List<DestinationDocument> findTop15ByCountryCodeOrderByPopularityScoreDesc(String countryCode);
 
-   List<DestinationDocument> findTop5ByOrderByPopularityScoreDesc();
+   List<DestinationDocument> findTop15ByOrderByPopularityScoreDesc();
 
 }

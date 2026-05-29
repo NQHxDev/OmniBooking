@@ -162,22 +162,8 @@ public class PropertyServiceImpl implements PropertyService {
          }
       }
 
-      // Sync to Elasticsearch via Kafka
-      propertySyncProducer.sendSyncEvent(com.omnibooking.dto.event.PropertySyncEvent.builder()
-            .propertyId(saved.getId())
-            .operation("CREATE")
-            .build());
- 
-      // Direct Sync Fallback to Elasticsearch (handles cases where Kafka is not running)
-      try {
-         com.omnibooking.document.PropertyDocument document = propertyDocumentMapper.toDocument(saved);
-         mediaRepository.findFirstByEntityIdAndEntityTypeAndIsMainTrue(saved.getId(), "PROPERTY")
-               .ifPresent(media -> document.setMainImageUrl(media.getUrl()));
-         propertyElasticsearchRepository.save(document);
-         log.info("Direct sync to Elasticsearch successful for property: {}", saved.getId());
-      } catch (Exception e) {
-         log.error("Failed to directly sync property to Elasticsearch, relying on Kafka consumer sync", e);
-      }
+      // Immediate sync to Elasticsearch has been removed because property images are processed asynchronously.
+      // The property will be indexed in Elasticsearch once the main image upload finishes in MediaConsumer.
 
       return PropertyResponse.builder()
             .id(saved.getId())

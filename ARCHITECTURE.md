@@ -270,6 +270,13 @@ OmniBooking's search system is designed to provide a fast, accurate, and discove
 - **Dynamic Labels**: Location type labels are translated dynamically on the frontend using the `Common.Search` namespace within `vi.json` and `en.json`.
 - **Locale-aware Search**: Elasticsearch is configured to prioritize search results that match the user's active locale, ensuring a fully localized search experience.
 
+### 17.4. IP-Based Geolocation & Country Detection
+
+- **Client IP Extraction**: The backend extracts the client's public IP address via the `X-FORWARDED-FOR` request header (which is populated by reverse proxies or forwarded by the Next.js server). If not present, it falls back to `HttpServletRequest.getRemoteAddr()`.
+- **MaxMind GeoIP2 Resolution**: The `GeoLocationService` reads the client IP and queries a local MaxMind GeoIP2 city database (`GeoLite2-City.mmdb`) to resolve the user's ISO 3166-1 alpha-2 country code (e.g. `VN`, `FR`, `US`).
+- **Configurable Fallback**: If the IP is a local loopback address (`127.0.0.1`, `0:0:0:0:0:0:0:1`) or if the database is missing, it falls back to a default country configured via `app.geo.default-country` (defaults to `VN`).
+- **Next.js SSR Forwarding**: For Server-side Rendering (SSR) fetches where the request originates from the Next.js server itself, the client's original IP address is read from the incoming request's `x-forwarded-for` header and forwarded to the backend API inside the `X-Forwarded-For` HTTP header. This ensures correct location targeting.
+
 ## 18. Global Currency & Real-time Pricing System
 
 The OmniBooking system is designed to operate globally with flexible and highly precise multi-currency processing:

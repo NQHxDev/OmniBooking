@@ -50,7 +50,7 @@ export default function PropertyCardClient({
          whileInView={{ opacity: 1, y: 0 }}
          transition={{ duration: 0.5, delay: index * 0.1 }}
          viewport={{ once: true }}
-         className="group cursor-pointer bg-white rounded-2xl overflow-hidden border border-zinc-100 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 relative"
+         className="group cursor-pointer bg-white rounded-2xl overflow-hidden border border-zinc-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] transition-all duration-300 hover:-translate-y-1 relative"
       >
          {/* Image Section */}
          <div className="relative h-64 w-full">
