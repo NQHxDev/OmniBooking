@@ -822,5 +822,54 @@
       "hint": "Using VietMap helps guests find you more easily. You can drag and drop the pin to the exact location.",
       "continue": "Continue",
       "poweredBy": "Powered by VietMap"
+   },
+   "Footer": {
+      "support": "Support",
+      "supportItems": {
+         "manageTrips": "Manage your trips",
+         "customerService": "Customer Service Help",
+         "safetyCenter": "Safety Resource Center"
+      },
+      "explore": "Discover more",
+      "exploreItems": {
+         "genius": "Genius loyalty program",
+         "deals": "Seasonal and holiday deals",
+         "articles": "Travel articles",
+         "business": "OmniBooking.com for Business",
+         "awards": "Traveller Review Awards",
+         "carRentals": "Car rental",
+         "flights": "Flight finder",
+         "restaurants": "Restaurant reservations",
+         "agents": "OmniBooking.com for Travel Agents"
+      },
+      "terms": "Terms and settings",
+      "termsItems": {
+         "privacy": "Privacy Policy",
+         "terms": "Terms & Conditions",
+         "accessibility": "Accessibility Statement",
+         "disputes": "Partner dispute",
+         "slavery": "Modern Slavery Statement",
+         "humanRights": "Human Rights Policy"
+      },
+      "partners": "For partners",
+      "partnersItems": {
+         "extranet": "Extranet login",
+         "help": "Partner help",
+         "listProperty": "List your property",
+         "affiliate": "Become an affiliate partner"
+      },
+      "about": "About us",
+      "aboutItems": {
+         "aboutCompany": "About OmniBooking.com",
+         "howWeWork": "How we work",
+         "sustainability": "Sustainable travel",
+         "press": "Press center",
+         "careers": "Careers",
+         "investors": "Investor relations",
+         "contact": "Corporate contact",
+         "contentGuidelines": "Content guidelines and reporting"
+      },
+      "holdingsDesc": "OmniBooking.com is part of OmniBooking Holdings Inc., the world leader in online travel and related services.",
+      "copyright": "Copyright © 1996 - 2026 OmniBooking.com™. All rights reserved."
    }
 }

@@ -8,6 +8,7 @@ import { getTranslations } from "next-intl/server";
 import { headers } from "next/headers";
 import DiscoverDestinations from "@/components/DiscoverDestinations";
 import PopularDestinationsLinks from "@/components/PopularDestinationsLinks";
+import Footer from "@/components/Footer";
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
    const { locale } = await params;
@@ -100,60 +101,8 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             <PopularDestinationsLinks locale={locale} clientIp={clientIp} />
          </main>
 
-         {/* Simple Footer */}
-         <footer className="mt-auto bg-zinc-100 py-12">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-               <div className="flex flex-wrap justify-between gap-8">
-                  <div className="max-w-xs">
-                     <h4 className="text-sm font-bold text-black uppercase tracking-wider">
-                        {t("support") || "Hỗ trợ"}
-                     </h4>
-                     <ul className="mt-4 space-y-2 text-sm text-[#006ce4]">
-                        <li>
-                           <a href="#" className="hover:underline">
-                              {t("faqCovid") || "Câu hỏi thường gặp về virus corona (COVID-19)"}
-                           </a>
-                        </li>
-                        <li>
-                           <a href="#" className="hover:underline">
-                              {t("manageTrips") || "Quản lý các chuyến đi của bạn"}
-                           </a>
-                        </li>
-                        <li>
-                           <a href="#" className="hover:underline">
-                              {t("customerService") || "Dịch vụ khách hàng"}
-                           </a>
-                        </li>
-                     </ul>
-                  </div>
-                  <div>
-                     <h4 className="text-sm font-bold text-black uppercase tracking-wider">
-                        {t("explore") || "Khám phá"}
-                     </h4>
-                     <ul className="mt-4 space-y-2 text-sm text-[#006ce4]">
-                        <li>
-                           <a href="#" className="hover:underline">
-                              {t("countries") || "Các quốc gia"}
-                           </a>
-                        </li>
-                        <li>
-                           <a href="#" className="hover:underline">
-                              {t("regions") || "Khu vực"}
-                           </a>
-                        </li>
-                        <li>
-                           <a href="#" className="hover:underline">
-                              {t("cities") || "Thành phố"}
-                           </a>
-                        </li>
-                     </ul>
-                  </div>
-               </div>
-               <div className="mt-12 border-t border-zinc-200 pt-8 text-center text-xs text-zinc-500">
-                  <p>© 2026 OmniBooking.com. {t("allRightsReserved") || "Bảo lưu mọi quyền."}</p>
-               </div>
-            </div>
-         </footer>
+         {/* Redesigned Footer */}
+         <Footer />
       </div>
    );
 }

@@ -822,5 +822,54 @@
       "hint": "Sử dụng bản đồ VietMap giúp khách hàng tìm thấy bạn dễ dàng hơn. Bạn có thể kéo thả Pin đến vị trí chính xác nhất.",
       "continue": "Tiếp tục",
       "poweredBy": "Được cung cấp bởi VietMap"
+   },
+   "Footer": {
+      "support": "Hỗ trợ",
+      "supportItems": {
+         "manageTrips": "Quản lí các chuyến đi của bạn",
+         "customerService": "Liên hệ Dịch vụ Khách hàng",
+         "safetyCenter": "Trung tâm thông tin bảo mật"
+      },
+      "explore": "Khám phá thêm",
+      "exploreItems": {
+         "genius": "Chương trình khách hàng thân thiết Genius",
+         "deals": "Ưu đãi theo mùa và dịp lễ",
+         "articles": "Bài viết về du lịch",
+         "business": "OmniBooking.com dành cho Doanh Nghiệp",
+         "awards": "Traveller Review Awards",
+         "carRentals": "Cho thuê xe hơi",
+         "flights": "Tìm chuyến bay",
+         "restaurants": "Đặt nhà hàng",
+         "agents": "OmniBooking.com dành cho Đại Lý Du Lịch"
+      },
+      "terms": "Điều khoản và cài đặt",
+      "termsItems": {
+         "privacy": "Chính sách Bảo mật",
+         "terms": "Điều khoản dịch vụ",
+         "accessibility": "Chính sách về Khả năng tiếp cận",
+         "disputes": "Tranh chấp đối tác",
+         "slavery": "Chính sách chống Nô lệ Hiện đại",
+         "humanRights": "Chính sách về Quyền con người"
+      },
+      "partners": "Dành cho đối tác",
+      "partnersItems": {
+         "extranet": "Đăng nhập vào trang Extranet",
+         "help": "Trợ giúp đối tác",
+         "listProperty": "Đăng chỗ nghỉ của Quý vị",
+         "affiliate": "Trở thành đối tác phân phối"
+      },
+      "about": "Về chúng tôi",
+      "aboutItems": {
+         "aboutCompany": "Về OmniBooking.com",
+         "howWeWork": "Chúng tôi hoạt động như thế nào",
+         "sustainability": "Du lịch bền vững",
+         "press": "Truyền thông",
+         "careers": "Cơ hội việc làm",
+         "investors": "Quan hệ cổ đông",
+         "contact": "Liên hệ công ty",
+         "contentGuidelines": "Hướng dẫn và báo cáo nội dung"
+      },
+      "holdingsDesc": "OmniBooking.com là một phần của OmniBooking Holdings Inc., tập đoàn đứng đầu thế giới về du lịch trực tuyến và các dịch vụ liên quan.",
+      "copyright": "Bản quyền © 1996 - 2026 OmniBooking.com™. Bảo lưu mọi quyền."
    }
 }
