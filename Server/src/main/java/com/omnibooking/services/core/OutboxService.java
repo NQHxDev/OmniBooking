@@ -16,4 +16,8 @@ public interface OutboxService {
    void markAsProcessed(UUID eventId);
 
    List<OutboxEvent> lockAndFetchEventsToProcess(Pageable pageable);
+
+   void purgeOldOutboxEvents();
+
+   void rescheduleRetry(UUID eventId);
 }

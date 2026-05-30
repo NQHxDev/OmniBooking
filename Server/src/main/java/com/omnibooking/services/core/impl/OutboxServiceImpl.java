@@ -29,6 +29,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.omnibooking.services.core.EventUpcaster;
+import com.omnibooking.services.core.DistributedRateLimiter;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -38,6 +42,8 @@ public class OutboxServiceImpl implements OutboxService {
    private final ObjectMapper objectMapper;
    private final KafkaTemplate<String, Object> kafkaTemplate;
    private final MeterRegistry meterRegistry;
+   private final EventUpcaster eventUpcaster;
+   private final DistributedRateLimiter distributedRateLimiter;
    private final AtomicBoolean isProcessing = new AtomicBoolean(false);
    private OutboxService self;
 
@@ -92,31 +98,40 @@ public class OutboxServiceImpl implements OutboxService {
       }
    }
 
-   @Override
-   public void processOutbox() {
-      // 1. Thread-safety check inside JVM (still good as an optimization)
-      if (!isProcessing.compareAndSet(false, true)) {
-         return;
-      }
-
-      try {
-         // 2. Fetch & lock events in a short transaction
-         List<OutboxEvent> events = self.lockAndFetchEventsToProcess(PageRequest.of(0, 50));
-         if (events.isEmpty()) return;
-
-         log.info("Processing {} outbox events", events.size());
-         for (OutboxEvent event : events) {
-            if (self != null) {
-               try {
-                  self.processSingleEvent(event);
-               } catch (Exception e) {
-                  log.error("Failed to process outbox event: {}", event.getId(), e);
-               }
-            }
-         }
-      } finally {
-         isProcessing.set(false);
-      }
+    @Override
+    public void processOutbox() {
+       // 1. Thread-safety check inside JVM (still good as an optimization)
+       if (!isProcessing.compareAndSet(false, true)) {
+          return;
+       }
+ 
+       try {
+          // 2. Fetch & lock events in a short transaction
+          List<OutboxEvent> events = self.lockAndFetchEventsToProcess(PageRequest.of(0, 50));
+          if (events.isEmpty()) return;
+ 
+          log.info("Processing {} outbox events", events.size());
+          for (OutboxEvent event : events) {
+             if (event.getRetryCount() > 0) {
+                // Apply rate limit on retry attempts: max 2 retries per second dynamically
+                boolean allowed = distributedRateLimiter.isAllowed("outbox:retry", 10, 2);
+                if (!allowed) {
+                   log.warn("Throttling retry for outbox event: {} to prevent retry storm.", event.getId());
+                   self.rescheduleRetry(event.getId());
+                   continue;
+                }
+             }
+             if (self != null) {
+                try {
+                   self.processSingleEvent(event);
+                } catch (Exception e) {
+                   log.error("Failed to process outbox event: {}", event.getId(), e);
+                }
+             }
+          }
+       } finally {
+          isProcessing.set(false);
+       }
    }
 
    @Override
@@ -141,9 +156,15 @@ public class OutboxServiceImpl implements OutboxService {
       try {
          String topic = getTopicForEvent(event.getEventType());
 
-         // Deserialize back to original class using registry instead of payloadClass reflection
+         // Deserialize and dynamically upcast JSON payload before mapping
+         JsonNode payloadNode = objectMapper.readTree(event.getPayload());
+         int currentVersion = event.getEventVersion() != null ? event.getEventVersion() : 1;
+         int targetVersion = getTargetVersionForEvent(event.getEventType());
+         
+         JsonNode upcastedNode = eventUpcaster.upcast(event.getEventType(), payloadNode, currentVersion, targetVersion);
+         
          Class<?> clazz = OutboxEventRegistry.getEventClass(event.getEventType());
-         Object payload = objectMapper.readValue(event.getPayload(), clazz);
+         Object payload = objectMapper.treeToValue(upcastedNode, clazz);
 
          // Send to Kafka and WAIT for confirmation. Use aggregateId as partition key for ordering.
          kafkaTemplate.send(topic, event.getAggregateId().toString(), payload).get(5, java.util.concurrent.TimeUnit.SECONDS);
@@ -160,14 +181,32 @@ public class OutboxServiceImpl implements OutboxService {
       }
    }
 
-   @Override
-   @Transactional(propagation = Propagation.REQUIRES_NEW)
-   public void markAsProcessed(UUID eventId) {
-      outboxEventRepository.findById(eventId).ifPresent(event -> {
-         event.setStatus(OutboxStatus.PROCESSED);
-         outboxEventRepository.saveAndFlush(event);
-      });
+   private int getTargetVersionForEvent(String eventType) {
+      if ("USER_REGISTERED_MAIL".equals(eventType)) {
+         return 2;
+      }
+      return 1;
    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markAsProcessed(UUID eventId) {
+       outboxEventRepository.findById(eventId).ifPresent(event -> {
+          event.setStatus(OutboxStatus.PROCESSED);
+          outboxEventRepository.saveAndFlush(event);
+       });
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void rescheduleRetry(UUID eventId) {
+       outboxEventRepository.findById(eventId).ifPresent(event -> {
+          event.setStatus(OutboxStatus.PENDING);
+          event.setNextRetryAt(Instant.now().plus(Duration.ofSeconds(30)));
+          outboxEventRepository.saveAndFlush(event);
+          log.info("Rescheduled outbox event {} for retry in 30 seconds due to throttling", eventId);
+       });
+    }
 
    private void handleFailure(OutboxEvent event, Exception ex) {
       int nextRetryCount = event.getRetryCount() + 1;
@@ -218,6 +257,16 @@ public class OutboxServiceImpl implements OutboxService {
          return "omnibooking-property-sync";
       }
       return "omnibooking-default-topic";
+   }
+
+   @Override
+   @Transactional
+   public void purgeOldOutboxEvents() {
+      Instant threshold = Instant.now().minus(30, java.time.temporal.ChronoUnit.DAYS);
+      int deleted = outboxEventRepository.deleteProcessedEventsBefore(threshold);
+      if (deleted > 0) {
+         log.info("Purged {} processed outbox events older than 30 days", deleted);
+      }
    }
 
 }

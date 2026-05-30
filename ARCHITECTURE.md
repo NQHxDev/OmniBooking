@@ -271,6 +271,12 @@ To guarantee absolute consistency between the relational Database and the Messag
 - **Elasticsearch Sync Reliability (Outbox Sync)**:
    - **Outbox-based Synchronization**: To prevent Elasticsearch search indices from diverging from PostgreSQL (due to direct Kafka publish failures during network partitions), the `PropertySyncEvent` is routed through the Transactional Outbox.
    - **Transactional & Resilient Sync**: Synchronization requests are persisted in the same transaction as the media save. The outbox worker publishes the event to Kafka with retry capability and DLQ protection, and `search_sync_failure_count` tracks synchronization failures.
+- **Production-Grade Enhancements (Epic Reliability)**:
+   - **Outbox Queue Monitoring**: Dynamic Micrometer Gauges (exposed via `/actuator/prometheus`) track pending (`omnibooking.outbox.pending.count`), processing (`omnibooking.outbox.processing.count`), dead letter (`omnibooking.outbox.dead.count`), and total retry attempts (`omnibooking.outbox.retry.count`) for real-time queue health alerts.
+   - **Outbox Auto-Cleanup**: A scheduled pruning task runs daily at 3:00 AM, purging processed events older than 30 days (`PROCESSED` status) to prevent index bloat and ensure optimal database performance.
+   - **Event Schema Upcaster**: A schema evolution layer checks payload versioning. If the publisher pushes a v1 event but the consumer requires v2, the `EventUpcaster` dynamically transforms the JSON structure before broker dispatch (e.g. `USER_REGISTERED_MAIL` fields transformation), ensuring seamless backward compatibility.
+   - **Nightly Search Reconciliation**: A background reconciliation job audits data consistency daily at 1:00 AM. It compares PostgreSQL hotels against the Elasticsearch index, auto-detecting any missing/drifted items, and republishes correction events back to the outbox for automatic repair.
+   - **Distributed Token Bucket Rate Limiter**: To prevent failure cascading or "retry storms" on external services (e.g. Cloudinary, Resend) during network recovery, retry dispatches are throttled using a Redis-backed Distributed Rate Limiter. Exceeded retries are rescheduled 30 seconds later, safely yielding database lock leases.
 
 ## 17. Global Search & Discovery Engine
 

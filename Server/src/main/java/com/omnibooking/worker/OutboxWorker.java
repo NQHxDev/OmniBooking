@@ -32,5 +32,15 @@ public class OutboxWorker {
       }
    }
 
-}
+   @Scheduled(cron = "0 0 3 * * *") // Daily at 3 AM
+   public void purgeOldEvents() {
+      log.info("Starting scheduled Outbox events cleanup job...");
+      try {
+         outboxService.purgeOldOutboxEvents();
+         log.info("Scheduled Outbox cleanup job finished successfully.");
+      } catch (Exception e) {
+         log.error("Error running Outbox events cleanup job", e);
+      }
+   }
 
+}
