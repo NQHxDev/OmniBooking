@@ -10,4 +10,6 @@ public interface IdempotencyService {
 
    void releaseClaim(UUID eventId, String consumerGroup);
 
+   void renewLease(UUID eventId, String consumerGroup, java.time.Duration extension);
+
 }

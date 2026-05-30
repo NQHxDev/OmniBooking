@@ -13,6 +13,8 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.omnibooking.services.core.LeaseRenewer;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -41,7 +43,7 @@ public class UserCDCConsumer {
 
       log.info("CDC Event received: New user created with ID: {} (eventId: {})", event.getUserId(), event.getEventId());
 
-      try {
+      try (LeaseRenewer ignored = new LeaseRenewer(idempotencyService, event.getEventId(), consumerGroup)) {
          // Create Verification Token
          String token = verificationService.createVerificationToken(event.getUserId());
 

@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.omnibooking.services.core.LeaseRenewer;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -52,7 +54,7 @@ public class MediaConsumer {
             event.getEntityType(), event.getEventId());
 
       CloudinaryResponse response = null;
-      try {
+      try (LeaseRenewer ignored = new LeaseRenewer(idempotencyService, event.getEventId(), consumerGroup)) {
          // 1. Upload to Cloudinary
          response = cloudinaryService.upload(event.getFileBytes(), event.getFolder());
          log.info("[Kafka Consumer] Uploaded to Cloudinary. URL: {}", response.url());

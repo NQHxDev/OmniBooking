@@ -42,6 +42,9 @@ public class ProcessedEvent {
    @Builder.Default
    private Instant updatedAt = Instant.now();
 
+   @Column(name = "lease_until")
+   private Instant leaseUntil;
+
    @Data
    @NoArgsConstructor
    @AllArgsConstructor

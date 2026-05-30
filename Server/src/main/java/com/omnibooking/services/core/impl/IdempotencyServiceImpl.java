@@ -37,6 +37,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
                   .consumerGroup(consumerGroup)
                   .processedAt(Instant.now())
                   .updatedAt(Instant.now())
+                  .leaseUntil(Instant.now().plus(java.time.Duration.ofMinutes(5)))
                   .status("PROCESSING")
                   .build();
             processedEventRepository.saveAndFlush(processedEvent);
@@ -53,6 +54,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
       if ("FAILED".equals(existing.getStatus())) {
          existing.setStatus("PROCESSING");
          existing.setUpdatedAt(Instant.now());
+         existing.setLeaseUntil(Instant.now().plus(java.time.Duration.ofMinutes(5)));
          processedEventRepository.saveAndFlush(existing);
          log.info("Retrying previously failed event: eventId={}, consumerGroup={}", eventId, consumerGroup);
          return true;
@@ -73,6 +75,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
       processedEventRepository.findById(id).ifPresent(processedEvent -> {
          processedEvent.setStatus("COMPLETED");
          processedEvent.setUpdatedAt(Instant.now());
+         processedEvent.setLeaseUntil(Instant.now().plus(365, java.time.temporal.ChronoUnit.DAYS));
          processedEventRepository.saveAndFlush(processedEvent);
          log.info("Successfully marked event as COMPLETED: eventId={}, consumerGroup={}", eventId, consumerGroup);
       });
@@ -89,12 +92,31 @@ public class IdempotencyServiceImpl implements IdempotencyService {
          processedEventRepository.findById(id).ifPresent(processedEvent -> {
             processedEvent.setStatus("FAILED");
             processedEvent.setUpdatedAt(Instant.now());
+            processedEvent.setLeaseUntil(Instant.now());
             processedEventRepository.saveAndFlush(processedEvent);
             log.info("Successfully released claim (marked as FAILED): eventId={}, consumerGroup={}", eventId, consumerGroup);
          });
       } catch (Exception e) {
          log.error("Failed to release claim: eventId={}, consumerGroup={}", eventId, consumerGroup, e);
       }
+   }
+
+   @Override
+   @Transactional(propagation = Propagation.REQUIRES_NEW)
+   public void renewLease(UUID eventId, String consumerGroup, java.time.Duration extension) {
+      if (eventId == null) {
+         return;
+      }
+      ProcessedEvent.ProcessedEventId id = new ProcessedEvent.ProcessedEventId(eventId, consumerGroup);
+      processedEventRepository.findById(id).ifPresent(processedEvent -> {
+         if ("PROCESSING".equals(processedEvent.getStatus())) {
+            processedEvent.setLeaseUntil(Instant.now().plus(extension));
+            processedEvent.setUpdatedAt(Instant.now());
+            processedEventRepository.saveAndFlush(processedEvent);
+            log.info("Successfully renewed lease for event: eventId={}, consumerGroup={}, leaseUntil={}", 
+                  eventId, consumerGroup, processedEvent.getLeaseUntil());
+         }
+      });
    }
 
 }

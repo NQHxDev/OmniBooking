@@ -26,16 +26,17 @@ public class IdempotencyRecoveryWorker {
    @Scheduled(fixedDelay = 60000) // Every 1 minute
    @Transactional
    public void recoverStaleClaims() {
-      Instant threshold = Instant.now().minus(5, ChronoUnit.MINUTES);
-      List<ProcessedEvent> staleEvents = processedEventRepository.findByStatusAndUpdatedAtBefore("PROCESSING", threshold);
+      Instant now = Instant.now();
+      List<ProcessedEvent> staleEvents = processedEventRepository.findByStatusAndLeaseUntilBefore("PROCESSING", now);
       
       if (!staleEvents.isEmpty()) {
-         log.warn("Found {} stale idempotency claims stuck in PROCESSING. Recovering them to FAILED...", staleEvents.size());
+         log.warn("Found {} stale idempotency claims with expired leases in PROCESSING. Recovering them to FAILED...", staleEvents.size());
          for (ProcessedEvent event : staleEvents) {
-            log.warn("Recovering stale claim: eventId={}, consumerGroup={}, claimedAt={}", 
-                  event.getEventId(), event.getConsumerGroup(), event.getProcessedAt());
+            log.warn("Recovering stale claim: eventId={}, consumerGroup={}, leaseUntil={}", 
+                  event.getEventId(), event.getConsumerGroup(), event.getLeaseUntil());
             event.setStatus("FAILED");
             event.setUpdatedAt(Instant.now());
+            event.setLeaseUntil(Instant.now());
             processedEventRepository.save(event);
          }
          processedEventRepository.flush();

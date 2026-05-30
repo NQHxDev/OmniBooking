@@ -9,6 +9,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
+import com.omnibooking.services.core.LeaseRenewer;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -34,7 +36,7 @@ public class EmailConsumer {
 
       log.info("[Kafka Consumer] Processing email event for {} (eventId: {})", event.getTo(), event.getEventId());
 
-      try {
+      try (LeaseRenewer ignored = new LeaseRenewer(idempotencyService, event.getEventId(), consumerGroup)) {
          resendEmailService.sendHtmlEmail(event.getTo(), event.getSubject(), event.getContent());
          if (event.getEventId() != null) {
             idempotencyService.completeEvent(event.getEventId(), consumerGroup);

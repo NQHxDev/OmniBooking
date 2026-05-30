@@ -7,6 +7,7 @@ import com.omnibooking.repository.MediaRepository;
 import com.omnibooking.repository.PropertyRepository;
 import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
 import com.omnibooking.services.core.IdempotencyService;
+import com.omnibooking.services.core.LeaseRenewer;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +43,7 @@ public class PropertySyncConsumer {
       log.info("Received property sync event: {} for property: {} (eventId: {})", 
             event.getOperation(), event.getPropertyId(), event.getEventId());
 
-      try {
+      try (LeaseRenewer ignored = new LeaseRenewer(idempotencyService, event.getEventId(), consumerGroup)) {
          if ("DELETE".equals(event.getOperation())) {
             propertyElasticsearchRepository.deleteById(event.getPropertyId().toString());
             if (event.getEventId() != null) {

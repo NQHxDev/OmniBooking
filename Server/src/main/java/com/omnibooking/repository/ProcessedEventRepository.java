@@ -23,6 +23,8 @@ public interface ProcessedEventRepository extends JpaRepository<ProcessedEvent, 
 
    List<ProcessedEvent> findByStatusAndUpdatedAtBefore(String status, Instant threshold);
 
+   List<ProcessedEvent> findByStatusAndLeaseUntilBefore(String status, Instant threshold);
+
    @Modifying
    @Query("DELETE FROM ProcessedEvent p WHERE p.status IN :statuses AND p.updatedAt < :threshold")
    int deleteOldEvents(@Param("statuses") List<String> statuses, @Param("threshold") Instant threshold);

@@ -1,18 +1,25 @@
 package com.omnibooking.services.core;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
+/**
+ * Registry and router for event schema migrations.
+ * Scans all registered implementations of {@link EventUpcasterStrategy} and executes them sequentially.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class EventUpcaster {
 
+   private final List<EventUpcasterStrategy> strategies;
+
    /**
-    * Upcasts event JSON payload from currentVersion to targetVersion.
+    * Sequentially migrates an event payload from currentVersion to targetVersion.
     */
    public JsonNode upcast(String eventType, JsonNode payload, int currentVersion, int targetVersion) {
       if (currentVersion >= targetVersion) {
@@ -21,25 +28,23 @@ public class EventUpcaster {
 
       JsonNode upcasted = payload;
       for (int v = currentVersion; v < targetVersion; v++) {
-         upcasted = upcastStep(eventType, upcasted, v, v + 1);
-      }
-      return upcasted;
-   }
-
-   private JsonNode upcastStep(String eventType, JsonNode payload, int sourceVer, int targetVer) {
-      log.info("Upcasting event {} from v{} to v{}", eventType, sourceVer, targetVer);
-      if (payload instanceof ObjectNode objectNode) {
-         // Example upcast rule for USER_REGISTERED_MAIL v1 to v2
-         if ("USER_REGISTERED_MAIL".equals(eventType) && sourceVer == 1 && targetVer == 2) {
-            if (objectNode.has("content") && !objectNode.has("htmlContent")) {
-               objectNode.set("htmlContent", objectNode.get("content"));
-            }
-            if (!objectNode.has("tenantId")) {
-               objectNode.put("tenantId", "default");
+         boolean strategyApplied = false;
+         for (EventUpcasterStrategy strategy : strategies) {
+            if (strategy.canUpcast(eventType, v)) {
+               upcasted = strategy.upcast(upcasted);
+               strategyApplied = true;
+               log.info("Successfully applied upcast strategy for event: {}, from v{} to v{}", 
+                     eventType, v, v + 1);
+               break;
             }
          }
+         if (!strategyApplied) {
+            log.warn("No upcast strategy found for event: {}, source version: v{}. Aborting chain.", 
+                  eventType, v);
+            break; // Stop migration if any intermediate step is missing
+         }
       }
-      return payload;
+      return upcasted;
    }
 
 }
