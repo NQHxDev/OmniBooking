@@ -8,6 +8,8 @@ import com.omnibooking.repository.MediaRepository;
 import com.omnibooking.dto.event.PropertySyncEvent;
 import com.omnibooking.services.property.PropertySyncProducer;
 import com.omnibooking.services.property.PropertyImagesCacheService;
+import com.omnibooking.services.core.IdempotencyService;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
@@ -27,11 +29,24 @@ public class MediaConsumer {
    private final CacheManager cacheManager;
    private final PropertySyncProducer propertySyncProducer;
    private final PropertyImagesCacheService propertyImagesCacheService;
+   private final IdempotencyService idempotencyService;
+   private final MeterRegistry meterRegistry;
 
    @KafkaListener(topics = KafkaConfig.MEDIA_TOPIC, groupId = "omnibooking-media-group")
    public void consumeUploadEvent(MediaUploadEvent event) {
-      log.info("[Kafka Consumer] Processing media upload for entity: {} ({})", event.getEntityId(),
-            event.getEntityType());
+      String consumerGroup = "omnibooking-media-group";
+      if (event.getEventId() != null) {
+         if (idempotencyService.isProcessed(event.getEventId(), consumerGroup)) {
+            log.warn("[Kafka Consumer] Duplicate media upload event detected and skipped: eventId={}, entityId={}", 
+                  event.getEventId(), event.getEntityId());
+            meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
+            meterRegistry.counter("omnibooking.kafka.consumer.skipped").increment();
+            return;
+         }
+      }
+
+      log.info("[Kafka Consumer] Processing media upload for entity: {} ({}) (eventId: {})", event.getEntityId(),
+            event.getEntityType(), event.getEventId());
 
       try {
          // 1. Upload to Cloudinary
@@ -84,6 +99,11 @@ public class MediaConsumer {
             } catch (Exception e) {
                log.error("[Kafka Consumer] Failed to trigger Elasticsearch sync for property: {}", event.getEntityId(), e);
             }
+         }
+
+         // Mark event as processed successfully
+         if (event.getEventId() != null) {
+            idempotencyService.markProcessed(event.getEventId(), consumerGroup);
          }
 
       } catch (Exception e) {

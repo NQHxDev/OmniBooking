@@ -13,6 +13,8 @@ import java.util.UUID;
 @AllArgsConstructor
 public class UserCreatedEvent {
 
+   private UUID eventId;
+
    private UUID userId;
 
    private String email;

@@ -49,15 +49,28 @@ public class OutboxServiceImpl implements OutboxService {
    @Transactional(propagation = Propagation.MANDATORY)
    public void saveEvent(UUID aggregateId, String aggregateType, String eventType, Object payload) {
       try {
+         // Generate eventId beforehand using time-ordered UUID v7
+         UUID eventId = com.github.f4b6a3.uuid.UuidCreator.getTimeOrderedEpoch();
+
+         // Set eventId on DTO event payloads if they match known classes
+         if (payload instanceof com.omnibooking.dto.event.EmailEvent) {
+            ((com.omnibooking.dto.event.EmailEvent) payload).setEventId(eventId);
+         } else if (payload instanceof com.omnibooking.dto.event.MediaUploadEvent) {
+            ((com.omnibooking.dto.event.MediaUploadEvent) payload).setEventId(eventId);
+         } else if (payload instanceof com.omnibooking.dto.event.PropertySyncEvent) {
+            ((com.omnibooking.dto.event.PropertySyncEvent) payload).setEventId(eventId);
+         }
+
          String jsonPayload = objectMapper.writeValueAsString(payload);
          OutboxEvent event = OutboxEvent.builder()
+               .id(eventId) // Align OutboxEvent entity ID with eventId
                .aggregateId(aggregateId)
                .aggregateType(aggregateType)
                .eventType(eventType)
                .payload(jsonPayload)
                .build();
          outboxEventRepository.save(event);
-         log.info("Saved outbox event: {} for aggregate: {}", eventType, aggregateId);
+         log.info("Saved outbox event: {} for aggregate: {} (eventId: {})", eventType, aggregateId, eventId);
 
          // Register synchronization to wake up worker AFTER commit
          if (TransactionSynchronizationManager.isActualTransactionActive()) {

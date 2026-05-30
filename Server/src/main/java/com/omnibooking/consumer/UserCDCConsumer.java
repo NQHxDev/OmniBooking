@@ -5,6 +5,8 @@ import com.omnibooking.dto.event.UserCreatedEvent;
 import com.omnibooking.services.communication.MailService;
 import com.omnibooking.services.user.VerificationService;
 import com.omnibooking.services.core.OutboxService;
+import com.omnibooking.services.core.IdempotencyService;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -17,15 +19,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserCDCConsumer {
 
    private final VerificationService verificationService;
-
    private final MailService mailService;
-
    private final OutboxService outboxService;
+   private final IdempotencyService idempotencyService;
+   private final MeterRegistry meterRegistry;
 
    @Transactional
    @KafkaListener(topics = "omnibooking-user-cdc", groupId = "omnibooking-cdc-group")
    public void handleUserCreated(UserCreatedEvent event) {
-      log.info("CDC Event received: New user created with ID: {}", event.getUserId());
+      String consumerGroup = "omnibooking-cdc-group";
+      if (event.getEventId() != null) {
+         if (idempotencyService.isProcessed(event.getEventId(), consumerGroup)) {
+            log.warn("[Kafka Consumer] Duplicate UserCreated CDC event detected and skipped: eventId={}, userId={}", 
+                  event.getEventId(), event.getUserId());
+            meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
+            meterRegistry.counter("omnibooking.kafka.consumer.skipped").increment();
+            return;
+         }
+      }
+
+      log.info("CDC Event received: New user created with ID: {} (eventId: {})", event.getUserId(), event.getEventId());
 
       try {
          // Create Verification Token
@@ -45,6 +58,11 @@ public class UserCDCConsumer {
                emailEvent);
 
          log.info("CDC Side-effects completed for user: {}", event.getEmail());
+
+         // Mark event as processed successfully
+         if (event.getEventId() != null) {
+            idempotencyService.markProcessed(event.getEventId(), consumerGroup);
+         }
       } catch (Exception e) {
          log.error("Failed to process CDC side-effects for user: {}", event.getUserId(), e);
          // Kafka will retry based on configuration

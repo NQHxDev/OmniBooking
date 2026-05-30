@@ -6,6 +6,8 @@ import com.omnibooking.mapper.PropertyDocumentMapper;
 import com.omnibooking.repository.MediaRepository;
 import com.omnibooking.repository.PropertyRepository;
 import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
+import com.omnibooking.services.core.IdempotencyService;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -20,13 +22,30 @@ public class PropertySyncConsumer {
    private final PropertyElasticsearchRepository propertyElasticsearchRepository;
    private final PropertyDocumentMapper propertyDocumentMapper;
    private final MediaRepository mediaRepository;
+   private final IdempotencyService idempotencyService;
+   private final MeterRegistry meterRegistry;
 
    @KafkaListener(topics = "${app.kafka.topics.property-sync}", groupId = "omnibooking-property-sync-group")
    public void consumePropertySync(PropertySyncEvent event) {
-      log.info("Received property sync event: {} for property: {}", event.getOperation(), event.getPropertyId());
+      String consumerGroup = "omnibooking-property-sync-group";
+      if (event.getEventId() != null) {
+         if (idempotencyService.isProcessed(event.getEventId(), consumerGroup)) {
+            log.warn("[Kafka Consumer] Duplicate PropertySync event detected and skipped: eventId={}, propertyId={}", 
+                  event.getEventId(), event.getPropertyId());
+            meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
+            meterRegistry.counter("omnibooking.kafka.consumer.skipped").increment();
+            return;
+         }
+      }
+
+      log.info("Received property sync event: {} for property: {} (eventId: {})", 
+            event.getOperation(), event.getPropertyId(), event.getEventId());
 
       if ("DELETE".equals(event.getOperation())) {
          propertyElasticsearchRepository.deleteById(event.getPropertyId().toString());
+         if (event.getEventId() != null) {
+            idempotencyService.markProcessed(event.getEventId(), consumerGroup);
+         }
          return;
       }
 
@@ -39,6 +58,11 @@ public class PropertySyncConsumer {
 
          propertyElasticsearchRepository.save(document);
          log.info("Successfully synced property to Elasticsearch: {}", property.getId());
+
+         // Mark event as processed successfully
+         if (event.getEventId() != null) {
+            idempotencyService.markProcessed(event.getEventId(), consumerGroup);
+         }
       });
    }
 }

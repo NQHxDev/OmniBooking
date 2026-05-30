@@ -103,6 +103,7 @@ public class RegistrationService {
 
          // 1. Emit Kafka Event for other services (Async)
          UserCreatedEvent event = UserCreatedEvent.builder()
+               .eventId(com.github.f4b6a3.uuid.UuidCreator.getTimeOrderedEpoch())
                .userId(user.getId())
                .email(user.getEmail())
                .fullName(req.getFullName())

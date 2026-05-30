@@ -46,4 +46,18 @@ public class MetricsConfig {
             .publishPercentileHistogram()
             .register(registry);
    }
+
+   @Bean
+   public Counter kafkaConsumerDuplicateCounter(MeterRegistry registry) {
+      return Counter.builder("omnibooking.kafka.consumer.duplicate")
+            .description("Total number of duplicate Kafka events detected")
+            .register(registry);
+   }
+
+   @Bean
+   public Counter kafkaConsumerSkippedCounter(MeterRegistry registry) {
+      return Counter.builder("omnibooking.kafka.consumer.skipped")
+            .description("Total number of skipped Kafka events due to idempotency")
+            .register(registry);
+   }
 }

@@ -252,6 +252,11 @@ To guarantee absolute consistency between the relational Database and the Messag
    - **Automatic Retries**: If sending to Kafka fails, the event is rolled back to `PENDING` and scheduled for retry using an exponential backoff strategy (1 min, 5 min, 15 min, 1 hour).
    - **Dead Letter Handling**: If an event fails 5 times, it is marked as `DEAD` (Dead Letter Queue) to prevent infinite retry loops and head-of-line blocking, allowing operators to inspect the failure reason stored in `last_error`.
 - **Data Integrity & Schema Evolution**: The event payload is stored as JSON. The system utilizes an `OutboxEventRegistry` to explicitly map the `event_type` string to its corresponding Java class type (e.g. `EmailEvent.class`), avoiding fragile reflection practices (like `Class.forName()`) which can break during package refactoring or class renames.
+- **End-to-End Idempotency (Idempotent Consumer)**:
+   - **Unique Event Identity**: Every event transmitted via Kafka is assigned a unique, time-ordered UUID (`eventId`). When events are generated via the Outbox, the `eventId` matches the primary key `id` of the `outbox_events` table, ensuring absolute correlation.
+   - **Deduplication Store (`processed_events`)**: A centralized database table `processed_events` tracks processed event IDs per consumer group. It uses a composite primary key `(event_id, consumer_group)` to allow different consumer groups to consume the same event while preventing duplicate executions within the same group.
+   - **Check-and-Commit Pattern**: Before executing any side effects, consumers (e.g., `EmailConsumer`, `MediaConsumer`, `UserCDCConsumer`, `PropertySyncConsumer`) verify if the `eventId` is already recorded in the deduplication store. If it exists, they skip execution. If not, they execute the side effects and insert the key to mark it as processed, ensuring exactly-once execution semantics even under Kafka message redelivery or rebalances.
+   - **Idempotency Metrics**: The system registers Prometheus counter metrics `duplicate_event_count` and `skipped_event_count` to monitor and alert on duplicate message delivery in real-time.
 
 ## 17. Global Search & Discovery Engine
 
