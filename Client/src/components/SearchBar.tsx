@@ -289,7 +289,7 @@ export default function SearchBar() {
 
    const combinedResults = useMemo(() => {
       if (destination.trim().length > 1) return suggestions.slice(0, 5);
-      return [...recentSearches, ...trending];
+      return [...recentSearches, ...trending.slice(0, 5)];
    }, [destination, suggestions, recentSearches, trending]);
 
    const handleSelect = (item: DestinationSuggestionResponse) => {
@@ -467,7 +467,7 @@ export default function SearchBar() {
                                              {t("trendingNow") || "Xu hướng hàng đầu"}
                                           </span>
                                        </div>
-                                       {trending.map((item, idx) => (
+                                       {trending.slice(0, 5).map((item, idx) => (
                                           <SearchItem
                                              key={`trending-${item.id}`}
                                              item={item}

@@ -34,6 +34,7 @@ Client/coverage/
 Client/next-env.d.ts
 Client/.pnp*
 Client/.pnp.js
+*.tsbuildinfo
 
 # --- Docker ---
 .docker/

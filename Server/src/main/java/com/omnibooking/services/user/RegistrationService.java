@@ -103,11 +103,12 @@ public class RegistrationService {
 
          // 1. Emit Kafka Event for other services (Async)
          UserCreatedEvent event = UserCreatedEvent.builder()
+               .eventId(com.github.f4b6a3.uuid.UuidCreator.getTimeOrderedEpoch())
                .userId(user.getId())
                .email(user.getEmail())
                .fullName(req.getFullName())
                .build();
-         kafkaTemplate.send(USER_CDC_TOPIC, event);
+         kafkaTemplate.send(USER_CDC_TOPIC, event.getUserId().toString(), event);
 
          // 2. Notify SSE via Redis Pub/Sub (Real-time) - ONLY AFTER TRANSACTION COMMITS
          final String finalRequestId = req.getRequestId();

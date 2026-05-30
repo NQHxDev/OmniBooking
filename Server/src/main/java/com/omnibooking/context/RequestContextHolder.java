@@ -2,7 +2,7 @@ package com.omnibooking.context;
 
 public class RequestContextHolder {
 
-   private static final ThreadLocal<RequestContext> CONTEXT = new ThreadLocal<>();
+   private static final ThreadLocal<RequestContext> CONTEXT = new InheritableThreadLocal<>();
 
    public static void setContext(RequestContext context) {
       CONTEXT.set(context);
@@ -17,3 +17,4 @@ public class RequestContextHolder {
    }
 
 }
+

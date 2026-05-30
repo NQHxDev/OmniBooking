@@ -46,6 +46,9 @@ public class LoggingAspect {
       } catch (Throwable e) {
          long duration = System.currentTimeMillis() - start;
 
+         String module = com.omnibooking.config.observability.ModuleTagResolver.resolveModule(className);
+         org.slf4j.MDC.put("module", module);
+
          if (e instanceof AppException ||
                e instanceof MethodArgumentNotValidException ||
                e instanceof MissingRequestCookieException) {
@@ -54,9 +57,23 @@ public class LoggingAspect {
          } else {
             requestErrorLogger.error("FAILED [{}ms]: {}.{}() - Exception: {} - Message: {}",
                   duration, className, methodName, e.getClass().getSimpleName(), e.getMessage());
+
+            // Set tag module and capture to Sentry
+            io.sentry.Sentry.setTag("module", module);
+            io.sentry.Sentry.captureException(e);
+
+            // Set flag to prevent duplicate capture in GlobalExceptionHandler
+            org.springframework.web.context.request.RequestAttributes attrs =
+                  org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+            if (attrs instanceof org.springframework.web.context.request.ServletRequestAttributes) {
+               jakarta.servlet.http.HttpServletRequest request =
+                     ((org.springframework.web.context.request.ServletRequestAttributes) attrs).getRequest();
+               request.setAttribute("sentry_captured", Boolean.TRUE);
+            }
          }
 
          throw e;
       }
    }
 }
+

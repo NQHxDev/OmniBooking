@@ -12,6 +12,35 @@ export interface PropertyResponse {
    rating?: number; // Optional if available
 }
 
+export interface RoomTypeResponse {
+   id: string;
+   name: string;
+   description: string;
+   basePrice: number;
+   capacityAdults: number;
+   capacityChildren: number;
+   totalRooms: number;
+   roomSizeSqm?: number;
+   bedType?: string;
+}
+
+export interface PropertyDetailResponse {
+   id: string;
+   name: string;
+   description: string;
+   propertyType: string;
+   address: string;
+   city: string;
+   country: string;
+   starRating: number;
+   checkInTime?: string;
+   checkOutTime?: string;
+   imageUrl?: string;
+   imageUrls?: string[];
+   amenities?: string[];
+   roomTypes?: RoomTypeResponse[];
+}
+
 export const propertyService = {
    getFeatured: async (limit: number = 6): Promise<PropertyResponse[]> => {
       const response = await apiClient.get<unknown, ApiResponse<PropertyResponse[]>>(
@@ -25,5 +54,17 @@ export const propertyService = {
          `/properties/new?limit=${limit}`
       );
       return response.data || [];
+   },
+
+   getPropertyDetail: async (id: string): Promise<PropertyDetailResponse | null> => {
+      try {
+         const response = await apiClient.get<unknown, ApiResponse<PropertyDetailResponse>>(
+            `/properties/${id}`
+         );
+         return response.data || null;
+      } catch (error) {
+         console.error("Failed to fetch property detail", error);
+         return null;
+      }
    },
 };

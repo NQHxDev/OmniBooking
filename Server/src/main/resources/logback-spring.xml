@@ -9,8 +9,8 @@
    <conversionRule conversionWord="wex" converterClass="org.springframework.boot.logging.logback.WhitespaceThrowableProxyConverter" />
    <conversionRule conversionWord="wEx" converterClass="org.springframework.boot.logging.logback.ExtendedWhitespaceThrowableProxyConverter" />
 
-   <property name="CONSOLE_LOG_PATTERN" value="${CONSOLE_LOG_PATTERN:-%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"/>
-   <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId}] %-5level [%thread] %logger{36} - %m%n" />
+   <property name="CONSOLE_LOG_PATTERN" value="${CONSOLE_LOG_PATTERN:-%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %clr([%X{requestId}]){yellow} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"/>
+   <property name="FILE_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{requestId}] [%X{traceId}] [%X{spanId}] %-5level [%thread] %logger{36} - %m%n" />
 
    <!-- Console Appender -->
    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -19,11 +19,48 @@
       </encoder>
    </appender>
 
+   <!-- JSON Console Appender (Production/Staging) -->
+   <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+      <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+         <providers>
+            <timestamp>
+               <timeZone>UTC</timeZone>
+            </timestamp>
+            <pattern>
+               <pattern>
+                  {
+                     "timestamp": "%date{yyyy-MM-dd'T'HH:mm:ss.SSSZ}",
+                     "level": "%level",
+                     "service": "omnibooking-server",
+                     "environment": "${SENTRY_ENVIRONMENT:-development}",
+                     "traceId": "%mdc{traceId}",
+                     "spanId": "%mdc{spanId}",
+                     "requestId": "%mdc{requestId}",
+                     "userId": "%mdc{userId}",
+                     "tenantId": "%mdc{tenantId}",
+                     "module": "%mdc{module}",
+                     "thread": "%thread",
+                     "class": "%logger{36}",
+                     "message": "%message",
+                     "exception": "%ex"
+                  }
+               </pattern>
+            </pattern>
+         </providers>
+      </encoder>
+   </appender>
+
+   <!-- Sentry Appender -->
+   <appender name="Sentry" class="io.sentry.logback.SentryAppender">
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+         <level>WARN</level>
+      </filter>
+   </appender>
+
    <!-- System Log (Framework & General App) -->
    <appender name="SYSTEM_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
       <file>${LOG_PATH}/system.log</file>
       <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-         <!-- Move to archive folder and compress daily -->
          <fileNamePattern>${ARCHIVE_PATH}/%d{yyyy-MM, aux}/%d{yyyy-MM-dd, aux}/system.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
          <maxHistory>30</maxHistory>
       </rollingPolicy>
@@ -71,34 +108,68 @@
       </encoder>
    </appender>
 
-   <!-- Loggers -->
+   <!-- Profile-specific Configurations -->
+   <springProfile name="production,staging">
+      <!-- Request Success Logger -->
+      <logger name="com.omnibooking.request.success" level="INFO" additivity="false">
+         <appender-ref ref="REQUEST_SUCCESS_FILE" />
+         <appender-ref ref="JSON_CONSOLE" />
+         <appender-ref ref="Sentry" />
+      </logger>
 
-   <!-- Request Success Logger -->
-   <logger name="com.omnibooking.request.success" level="INFO" additivity="false">
-      <appender-ref ref="REQUEST_SUCCESS_FILE" />
-      <appender-ref ref="CONSOLE" />
-   </logger>
+      <!-- Request Error Logger -->
+      <logger name="com.omnibooking.request.error" level="INFO" additivity="false">
+         <appender-ref ref="REQUEST_ERROR_FILE" />
+         <appender-ref ref="ERROR_FILE" />
+         <appender-ref ref="JSON_CONSOLE" />
+         <appender-ref ref="Sentry" />
+      </logger>
 
-   <!-- Request Error Logger -->
-   <logger name="com.omnibooking.request.error" level="INFO" additivity="false">
-      <appender-ref ref="REQUEST_ERROR_FILE" />
-      <appender-ref ref="ERROR_FILE" />
-      <appender-ref ref="CONSOLE" />
-   </logger>
+      <!-- App Logic Logger (com.omnibooking) -->
+      <logger name="com.omnibooking" level="INFO" additivity="false">
+         <appender-ref ref="SYSTEM_FILE" />
+         <appender-ref ref="ERROR_FILE" />
+         <appender-ref ref="JSON_CONSOLE" />
+         <appender-ref ref="Sentry" />
+      </logger>
 
-   <!-- App Logic Logger (com.omnibooking) -->
-   <logger name="com.omnibooking" level="DEBUG" additivity="false">
-      <appender-ref ref="SYSTEM_FILE" />
-      <appender-ref ref="ERROR_FILE" />
-      <appender-ref ref="CONSOLE" />
-   </logger>
+      <!-- Root Logger -->
+      <root level="INFO">
+         <appender-ref ref="JSON_CONSOLE" />
+         <appender-ref ref="SYSTEM_FILE" />
+         <appender-ref ref="ERROR_FILE" />
+         <appender-ref ref="Sentry" />
+      </root>
+   </springProfile>
 
-   <!-- Root Logger (Spring, Hibernate, etc) -->
-   <root level="INFO">
-      <appender-ref ref="CONSOLE" />
-      <appender-ref ref="SYSTEM_FILE" />
-      <appender-ref ref="ERROR_FILE" />
-   </root>
+   <springProfile name="!production &amp; !staging">
+      <!-- Request Success Logger -->
+      <logger name="com.omnibooking.request.success" level="INFO" additivity="false">
+         <appender-ref ref="REQUEST_SUCCESS_FILE" />
+         <appender-ref ref="CONSOLE" />
+      </logger>
+
+      <!-- Request Error Logger -->
+      <logger name="com.omnibooking.request.error" level="INFO" additivity="false">
+         <appender-ref ref="REQUEST_ERROR_FILE" />
+         <appender-ref ref="ERROR_FILE" />
+         <appender-ref ref="CONSOLE" />
+      </logger>
+
+      <!-- App Logic Logger (com.omnibooking) -->
+      <logger name="com.omnibooking" level="DEBUG" additivity="false">
+         <appender-ref ref="SYSTEM_FILE" />
+         <appender-ref ref="ERROR_FILE" />
+         <appender-ref ref="CONSOLE" />
+      </logger>
+
+      <!-- Root Logger -->
+      <root level="INFO">
+         <appender-ref ref="CONSOLE" />
+         <appender-ref ref="SYSTEM_FILE" />
+         <appender-ref ref="ERROR_FILE" />
+      </root>
+   </springProfile>
 
    <!-- Silence noisy libraries -->
    <logger name="org.apache.kafka" level="ERROR" />
@@ -106,3 +177,4 @@
    <logger name="org.springframework.web" level="INFO" />
 
 </configuration>
+

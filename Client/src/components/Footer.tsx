@@ -1,187 +1,322 @@
-"use client";
-
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 
 export default function Footer() {
    const t = useTranslations("Footer");
    const locale = useLocale();
-   const isVi = locale === "vi";
-
-   // Vector flags for premium rendering
-   const VietnamFlag = (
-      <svg
-         viewBox="0 0 30 20"
-         className="h-4.5 w-6 rounded-xs shadow-sm inline-block shrink-0 border border-zinc-200"
-      >
-         <rect width="30" height="20" fill="#da251d" />
-         <polygon
-            points="15,4 16.2,8.5 21,8.5 17.1,11.3 18.6,15.8 15,13 11.4,15.8 12.9,11.3 9,8.5 13.8,8.5"
-            fill="#ffff00"
-         />
-      </svg>
-   );
-
-   const UKFlag = (
-      <svg
-         viewBox="0 0 60 30"
-         className="h-4.5 w-6 rounded-xs shadow-sm inline-block shrink-0 border border-zinc-200"
-      >
-         <clipPath id="s">
-            <path d="M0,0 L60,0 L60,30 L0,30 Z" />
-         </clipPath>
-         <path d="M0,0 L60,30 M60,0 L0,30" stroke="#fff" strokeWidth="6" />
-         <path d="M0,0 L60,30 M60,0 L0,30" stroke="#012169" strokeWidth="4" />
-         <path d="M0,0 L60,30 M60,0 L0,30" stroke="#c8102e" strokeWidth="2" clipPath="url(#s)" />
-         <path d="M30,0 L30,30 M0,15 L60,15" stroke="#fff" strokeWidth="10" />
-         <path d="M30,0 L30,30 M0,15 L60,15" stroke="#c8102e" strokeWidth="6" />
-      </svg>
-   );
 
    return (
-      <footer className="w-full bg-[#f5f5f5] text-zinc-700 mt-2 border-t border-zinc-200 pt-10 pb-8">
+      <footer
+         className="w-full bg-[#f5f5f5] text-zinc-700 mt-2 border-t border-zinc-200 pt-10 pb-8"
+         aria-label="Footer"
+      >
          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            {/* Links Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 text-xs leading-normal">
+            {/* Links Grid with Semantic Navigation */}
+            <nav
+               className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-8 text-xs leading-normal"
+               aria-label="Footer navigation links"
+            >
                {/* Column 1: Support */}
                <div className="flex flex-col gap-2.5">
                   <h4 className="font-bold text-zinc-900 text-sm mb-1">{t("support")}</h4>
-                  <Link
-                     href={`/${locale}/profile`}
-                     className="hover:underline hover:text-[#006ce4] transition-colors"
-                  >
-                     {t("supportItems.manageTrips")}
-                  </Link>
-                  <Link
-                     href={`/${locale}/customer-service`}
-                     className="hover:underline hover:text-[#006ce4] transition-colors"
-                  >
-                     {t("supportItems.customerService")}
-                  </Link>
-                  <Link
-                     href={`/${locale}/safety-center`}
-                     className="hover:underline hover:text-[#006ce4] transition-colors"
-                  >
-                     {t("supportItems.safetyCenter")}
-                  </Link>
+                  <ul className="flex flex-col gap-2.5">
+                     <li>
+                        <Link
+                           href={`/${locale}/profile`}
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("supportItems.manageTrips")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href={`/${locale}/customer-service`}
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("supportItems.customerService")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href={`/${locale}/safety-center`}
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("supportItems.safetyCenter")}
+                        </Link>
+                     </li>
+                  </ul>
                </div>
 
                {/* Column 2: Discover More */}
                <div className="flex flex-col gap-2.5">
                   <h4 className="font-bold text-zinc-900 text-sm mb-1">{t("explore")}</h4>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("exploreItems.genius")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("exploreItems.deals")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("exploreItems.articles")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("exploreItems.business")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("exploreItems.awards")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("exploreItems.carRentals")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("exploreItems.flights")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("exploreItems.restaurants")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("exploreItems.agents")}
-                  </Link>
+                  <ul className="flex flex-col gap-2.5">
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("exploreItems.genius")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("exploreItems.deals")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("exploreItems.articles")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("exploreItems.business")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("exploreItems.awards")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("exploreItems.carRentals")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("exploreItems.flights")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("exploreItems.restaurants")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("exploreItems.agents")}
+                        </Link>
+                     </li>
+                  </ul>
                </div>
 
                {/* Column 3: Terms and Settings */}
                <div className="flex flex-col gap-2.5">
                   <h4 className="font-bold text-zinc-900 text-sm mb-1">{t("terms")}</h4>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("termsItems.privacy")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("termsItems.terms")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("termsItems.accessibility")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("termsItems.disputes")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("termsItems.slavery")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("termsItems.humanRights")}
-                  </Link>
+                  <ul className="flex flex-col gap-2.5">
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("termsItems.privacy")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("termsItems.terms")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("termsItems.accessibility")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("termsItems.disputes")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("termsItems.slavery")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("termsItems.humanRights")}
+                        </Link>
+                     </li>
+                  </ul>
                </div>
 
                {/* Column 4: Partners */}
                <div className="flex flex-col gap-2.5">
                   <h4 className="font-bold text-zinc-900 text-sm mb-1">{t("partners")}</h4>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("partnersItems.extranet")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("partnersItems.help")}
-                  </Link>
-                  <Link
-                     href={`/${locale}/become-a-host`}
-                     className="hover:underline hover:text-[#006ce4] transition-colors font-semibold"
-                  >
-                     {t("partnersItems.listProperty")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("partnersItems.affiliate")}
-                  </Link>
+                  <ul className="flex flex-col gap-2.5">
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("partnersItems.extranet")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("partnersItems.help")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href={`/${locale}/become-a-host`}
+                           className="hover:underline hover:text-[#006ce4] transition-colors font-semibold"
+                        >
+                           {t("partnersItems.listProperty")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("partnersItems.affiliate")}
+                        </Link>
+                     </li>
+                  </ul>
                </div>
 
                {/* Column 5: About Us */}
                <div className="flex flex-col gap-2.5">
                   <h4 className="font-bold text-zinc-900 text-sm mb-1">{t("about")}</h4>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("aboutItems.aboutCompany")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("aboutItems.howWeWork")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("aboutItems.sustainability")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("aboutItems.press")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("aboutItems.careers")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("aboutItems.investors")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("aboutItems.contact")}
-                  </Link>
-                  <Link href="#" className="hover:underline hover:text-[#006ce4] transition-colors">
-                     {t("aboutItems.contentGuidelines")}
-                  </Link>
+                  <ul className="flex flex-col gap-2.5">
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("aboutItems.aboutCompany")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("aboutItems.howWeWork")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("aboutItems.sustainability")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("aboutItems.press")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("aboutItems.careers")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("aboutItems.investors")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("aboutItems.contact")}
+                        </Link>
+                     </li>
+                     <li>
+                        <Link
+                           href="#"
+                           rel="nofollow"
+                           className="hover:underline hover:text-[#006ce4] transition-colors"
+                        >
+                           {t("aboutItems.contentGuidelines")}
+                        </Link>
+                     </li>
+                  </ul>
                </div>
-            </div>
-
-            {/* Language & Currency Indicator */}
-            <div className="mt-10 flex flex-wrap items-center gap-6 text-sm font-semibold text-zinc-800">
-               <div className="flex items-center gap-2 cursor-pointer hover:bg-zinc-200/50 px-2.5 py-1.5 rounded-md transition-colors select-none">
-                  {isVi ? VietnamFlag : UKFlag}
-                  <span>{isVi ? "Tiếng Việt" : "English (US)"}</span>
-               </div>
-               <div className="flex items-center gap-1.5 cursor-pointer hover:bg-zinc-200/50 px-2.5 py-1.5 rounded-md transition-colors select-none">
-                  <span className="font-bold text-zinc-700">{isVi ? "₫" : "$"}</span>
-                  <span>{isVi ? "VND" : "USD"}</span>
-               </div>
-            </div>
+            </nav>
 
             {/* Separator line */}
             <div className="my-8 border-t border-zinc-200" />

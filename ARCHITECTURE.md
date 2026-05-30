@@ -231,6 +231,7 @@ OmniBooking's search architecture is engineered to query millions of records in 
 
 - **CDC-like Pattern**: Any updates to hotel information or room rates in PostgreSQL trigger an event published to Kafka.
 - **Search Indexer**: A dedicated service consumes events from Kafka and immediately updates the Elasticsearch index, ensuring search data is perfectly synchronized with the primary database.
+- **Deferred Property Creation Sync**: Upon creation of a new property, immediate synchronization to Elasticsearch is bypassed. Instead, the property is indexed in Elasticsearch only after its main image upload successfully finishes and is processed by `MediaConsumer`. This ensures search results do not present newly created properties without valid main images.
 
 ### Interactive Map Engine (Leaflet)
 
@@ -239,15 +240,47 @@ OmniBooking's search architecture is engineered to query millions of records in 
 
 ## 16. Reliable Messaging (Transactional Outbox Pattern)
 
-To guarantee absolute consistency between the relational Database and the Message Broker (Kafka), the system implements the Transactional Outbox Pattern:
+To guarantee absolute consistency between the relational Database and the Message Broker (Kafka), the system implements a highly resilient, distributed-safe Transactional Outbox Pattern:
 
 - **Atomic Operations**: Critical events (such as User Registration or Password Reset) are not published directly to Kafka. Instead, they are persisted to the `outbox_events` table in the exact same database transaction as the business state change.
 - **Guaranteed Delivery**: An `OutboxWorker` (Scheduled Task) periodically polls unprocessed events and publishes them to Kafka. This ensures that once a user is successfully created, the welcome/verification email is guaranteed to be sent, even if Kafka is temporarily offline.
 - **Hybrid Wake-Up Mechanism**: To optimize latency, the system utilizes a real-time wake-up mechanism. As soon as the business transaction commits successfully, an internal signal immediately wakes up the Outbox worker to process the event, bypassing the standard polling delay.
-- **Concurrency & Safety**:
-   - **Instance Level**: Uses an `AtomicBoolean` lock flag to ensure that only one processing thread runs per server instance at a time, avoiding wasted system resources.
-   - **Cluster Level**: Uses the `SELECT ... FOR UPDATE SKIP LOCKED` SQL query to enable multiple distributed instances to run concurrently without lock contention or duplicate event processing.
-- **Data Integrity**: The event payload is stored as JSON alongside a `payload_class` metadata column to guarantee highly accurate deserialization at the worker level prior to dispatch.
+- **Concurrency & Cluster-Level Safety**:
+   - **Distributed Lock & Release**: To safely support multiple instances (pods) scaling horizontally, the scheduler fetches events using `SELECT ... FOR UPDATE SKIP LOCKED` where `status IN ('PENDING', 'PROCESSING') AND next_retry_at <= :now`.
+   - **Short-Lived Transactions**: In a separate transaction (`REQUIRES_NEW`), the worker immediately marks the fetched batch as `PROCESSING` and sets `next_retry_at = now + 5 minutes` (serving as a lock lease time) before committing. This releases the database locks immediately, preventing other instances from processing the same events while avoiding self-deadlocks and keeping database transaction times extremely short.
+- **Resilience & Exponential Backoff**:
+   - **Automatic Retries**: If sending to Kafka fails, the event is rolled back to `PENDING` and scheduled for retry using an exponential backoff strategy (1 min, 5 min, 15 min, 1 hour).
+   - **Dead Letter Handling**: If an event fails 5 times, it is marked as `DEAD` (Dead Letter Queue) to prevent infinite retry loops and head-of-line blocking, allowing operators to inspect the failure reason stored in `last_error`.
+- **Data Integrity & Schema Evolution**: The event payload is stored as JSON. The system utilizes an `OutboxEventRegistry` to explicitly map the `event_type` string to its corresponding Java class type (e.g. `EmailEvent.class`), avoiding fragile reflection practices (like `Class.forName()`) which can break during package refactoring or class renames.
+- **End-to-End Idempotency (Idempotent Consumer)**:
+   - **Unique Event Identity**: Every event transmitted via Kafka is assigned a unique, time-ordered UUID (`eventId`). When events are generated via the Outbox, the `eventId` matches the primary key `id` of the `outbox_events` table, ensuring absolute correlation.
+   - **Deduplication Store (`processed_events`)**: A centralized database table `processed_events` tracks processed event IDs per consumer group. It uses a composite primary key `(event_id, consumer_group)` to allow different consumer groups to consume the same event while preventing duplicate executions within the same group.
+   - **Atomic Claim-then-Process State Machine**: To prevent race conditions in highly concurrent environments (e.g., when partition rebalancing or parallel execution triggers duplicate consumption simultaneously), the check-then-act pattern has been upgraded to a transactional "Claim-then-Process" state machine with recovery:
+      - **State Machine Definition**: Tracks event processing statuses: `PROCESSING` (currently handled), `COMPLETED` (processing succeeded), and `FAILED` (processing failed) using `status` and `updated_at` columns in the database.
+      - **Pessimistic Locking Claim**: Before processing, the consumer calls `claimEvent` which queries the event record with a pessimistic write lock (`SELECT ... FOR UPDATE`). If it's a new event, it inserts it with status `PROCESSING`. If it already exists in the `FAILED` state, it updates status back to `PROCESSING` to allow retries. If it is already `COMPLETED` or actively `PROCESSING`, the duplicate claim is rejected and skipped safely.
+      - **Completion & Failure Transition**: Upon successful completion of business logic, the consumer updates the status to `COMPLETED`. If processing fails, it catches the exception and updates the status to `FAILED` instead of deleting the record, capturing the state accurately.
+      - **Stale Claim Recovery Worker**: A background worker (`IdempotencyRecoveryWorker`) runs every minute, scanning for events stuck in the `PROCESSING` state where the `lease_until` timestamp has expired (e.g., due to sudden consumer crash or JVM OOM) and resets them to `FAILED` to allow subsequent retries.
+      - **Heartbeat & Lease Renewal**: To prevent heavy operations (such as media processing or slow database queries) from being prematurely marked as `FAILED` while still running, a dynamic lease renewal is used. When claiming, a `lease_until` timestamp is set (default +5 minutes). The consumer runs a background daemon thread (`LeaseRenewer`) to periodically extend this lease as long as it is actively processing, preventing double execution.
+      - **History Purging Job**: To keep database sizes optimal, a scheduled job automatically deletes completed/failed logs older than 30 days every day at 2:00 AM.
+   - **Idempotency Metrics**: The system registers Prometheus counter metrics `duplicate_event_count` and `skipped_event_count` to monitor and alert on duplicate message delivery in real-time.
+- **Kafka Event Ordering (Partition Key)**:
+   - **Aggregate Isolation**: To preserve message ordering for events related to the same resource, all domain events published from the Outbox are sent using the `aggregateId` or `entityId` as the Kafka partition key.
+   - **Ordering Guarantee**: In the `RegistrationService`, the `userId` is used as the key for `UserCreatedEvent`. This ensures that all updates/deletions for a specific entity are routed to the same partition, avoiding race conditions and processing events in strict chronological order.
+- **Cloudinary Compensation (Orphan Prevention)**:
+   - **Rollback Compensation Pattern**: In the `MediaConsumer`, files are uploaded to Cloudinary before being saved to PostgreSQL. If the database transaction fails (e.g., connection timed out or database constraint error), the consumer catches the exception and immediately invokes a rollback compensation query calling `cloudinaryService.delete(publicId)`.
+   - **Orphan Cleanup Metric**: The system monitors rollback events via the counter `orphaned_media_cleanup_count` to detect database failures during media upload processing.
+- **Elasticsearch Sync Reliability (Outbox Sync)**:
+   - **Outbox-based Synchronization**: To prevent Elasticsearch search indices from diverging from PostgreSQL (due to direct Kafka publish failures during network partitions), the `PropertySyncEvent` is routed through the Transactional Outbox.
+   - **Transactional & Resilient Sync**: Synchronization requests are persisted in the same transaction as the media save. The outbox worker publishes the event to Kafka with retry capability and DLQ protection, and `search_sync_failure_count` tracks synchronization failures.
+- **Production-Grade Enhancements (Epic Reliability)**:
+   - **Outbox Queue Monitoring**: Dynamic Micrometer Gauges (exposed via `/actuator/prometheus`) track pending (`omnibooking.outbox.pending.count`), processing (`omnibooking.outbox.processing.count`), dead letter (`omnibooking.outbox.dead.count`), and total retry attempts (`omnibooking.outbox.retry.count`) for real-time queue health alerts.
+   - **Outbox Auto-Cleanup**: A scheduled pruning task runs daily at 3:00 AM, purging processed events older than 30 days (`PROCESSED` status) to prevent index bloat and ensure optimal database performance.
+   - **Event Schema Upcaster**: A schema evolution layer checks payload versioning. If the publisher pushes a v1 event but the consumer requires v2, the `EventUpcaster` dynamically transforms the JSON structure before broker dispatch (e.g. `USER_REGISTERED_MAIL` fields transformation), ensuring seamless backward compatibility. The upcasting routing logic is decoupled using the **Strategy Pattern** for scalable event schema evolution.
+   - **Nightly Search Reconciliation**: A background reconciliation job audits data consistency daily at 1:00 AM. It compares PostgreSQL hotels against the Elasticsearch index, auto-detecting any missing/drifted items, and republishes correction events back to the outbox for automatic repair.
+   - **Distributed Token Bucket Rate Limiter**: To prevent failure cascading or "retry storms" on external services (e.g. Cloudinary, Resend) during network recovery, retry dispatches are throttled using a Redis-backed Distributed Rate Limiter. The Token Bucket algorithm is executed atomically via a Redis Lua script to eliminate concurrency race conditions. Exceeded retries are rescheduled 30 seconds later, safely yielding database lock leases.
+   - **Event Ingestion (Metadata Abstraction)**: To prevent Open-Closed Principle violations in the outbox event saving path (`saveEvent`), the system decouples metadata extraction and entity mapping using the **Strategy Pattern** via `EventMetadataProvider` and wraps events in a generic `EventEnvelope`. This avoids hardcoded `instanceof` blocks, allowing new event types to be introduced dynamically by registering provider beans.
+   - **Throttled Transactional Commit Wake-Up**: To support extreme write throughput without thread pool exhaustion or CPU spikes, the transactional `afterCommit` hook utilizes a lock-free signaling flag (`AtomicBoolean wakeUpPending`). Wake-up notifications are throttled so that at most one asynchronous outbox processing worker (`processOutboxAsync` with `@Async`) is active at a time. The worker executes a batch drain loop to consume all pending outbox records cleanly, minimizing JVM context switches and eliminating redundant logger noise.
+   - **At-Least-Once Delivery & Idempotency Tradeoff**: The Outbox pattern guarantees **At-Least-Once** delivery of events. If Kafka successfully publishes the message but database updates to mark the outbox status as `PROCESSED` fail, the event is re-delivered. Since all consumers implement idempotency checks via `processed_events` deduplication store, duplicate messages are safely skipped, maintaining strict system consistency without exactly-once overhead.
 
 ## 17. Global Search & Discovery Engine
 
@@ -305,4 +338,4 @@ To ensure financial safety and foster a highly interactive user experience, the 
 
 ---
 
-_Last Updated: 2026-05-18_
+_Last Updated: 2026-05-29_

@@ -13,6 +13,8 @@ import java.util.UUID;
 @AllArgsConstructor
 public class PropertySyncEvent {
 
+   private UUID eventId;
+
    private UUID propertyId;
 
    private String operation; // CREATE, UPDATE, DELETE

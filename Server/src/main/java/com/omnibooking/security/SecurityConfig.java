@@ -61,12 +61,17 @@ public class SecurityConfig {
             "X-CSRF-Token",
             "X-Requested-With",
             "X-Request-ID",
+            "X-Correlation-ID",
+            "X-User-ID",
+            "X-Tenant-ID",
+            "sentry-trace",
+            "baggage",
             "x-fgp",
             "Accept",
             "Origin",
             "X-Idempotency-Key"));
       config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-      config.setExposedHeaders(List.of("Set-Cookie"));
+      config.setExposedHeaders(List.of("Set-Cookie", "X-Request-ID", "X-Correlation-ID"));
       config.setMaxAge(3600L);
       source.registerCorsConfiguration("/**", config);
       return source;

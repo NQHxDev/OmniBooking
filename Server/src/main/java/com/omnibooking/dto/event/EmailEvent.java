@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 import java.util.Map;
+import java.util.UUID;
 import java.io.Serializable;
 
 @Data
@@ -13,6 +14,8 @@ import java.io.Serializable;
 @AllArgsConstructor
 @NoArgsConstructor
 public class EmailEvent implements Serializable {
+
+   private UUID eventId;
 
    private String to;
 

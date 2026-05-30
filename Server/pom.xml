@@ -231,6 +231,37 @@
 			<artifactId>libphonenumber</artifactId>
 			<version>8.13.35</version>
 		</dependency>
+
+		<!-- Sentry -->
+		<dependency>
+			<groupId>io.sentry</groupId>
+			<artifactId>sentry-spring-boot-starter-jakarta</artifactId>
+			<version>8.42.0</version>
+		</dependency>
+		<dependency>
+			<groupId>io.sentry</groupId>
+			<artifactId>sentry-logback</artifactId>
+			<version>8.42.0</version>
+		</dependency>
+
+		<!-- OpenTelemetry Sentry Integration -->
+		<dependency>
+			<groupId>io.sentry</groupId>
+			<artifactId>sentry-opentelemetry-agent</artifactId>
+			<version>8.42.0</version>
+		</dependency>
+
+		<!-- Prometheus Metrics -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-registry-prometheus</artifactId>
+		</dependency>
+
+		<!-- Micrometer Tracing Bridge -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-tracing-bridge-otel</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>

@@ -114,7 +114,31 @@ services:
     depends_on:
       - server
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: omnibooking-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: omnibooking-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    depends_on:
+      - prometheus
+
 volumes:
   postgres_data:
   redis_data:
   elastic_data:
+  prometheus_data:
+  grafana_data:
