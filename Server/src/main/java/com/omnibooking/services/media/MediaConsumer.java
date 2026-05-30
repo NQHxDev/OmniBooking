@@ -106,6 +106,9 @@ public class MediaConsumer {
             log.info("[Kafka Consumer] Recorded Elasticsearch sync event in outbox for property: {} after main image upload completed", propertyId);
          }
 
+         if (event.getEventId() != null) {
+            idempotencyService.completeEvent(event.getEventId(), consumerGroup);
+         }
       } catch (Exception e) {
          log.error("[Kafka Consumer] Error processing media for correlationId: {}. Error: {}",
                event.getCorrelationId(), e.getMessage());

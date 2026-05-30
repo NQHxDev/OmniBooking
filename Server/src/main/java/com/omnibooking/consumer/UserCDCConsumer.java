@@ -60,6 +60,9 @@ public class UserCDCConsumer {
 
          log.info("CDC Side-effects completed for user: {}", event.getEmail());
 
+         if (event.getEventId() != null) {
+            idempotencyService.completeEvent(event.getEventId(), consumerGroup);
+         }
       } catch (Exception e) {
          log.error("Failed to process CDC side-effects for user: {}", event.getUserId(), e);
          if (event.getEventId() != null) {

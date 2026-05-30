@@ -36,6 +36,9 @@ public class EmailConsumer {
 
       try {
          resendEmailService.sendHtmlEmail(event.getTo(), event.getSubject(), event.getContent());
+         if (event.getEventId() != null) {
+            idempotencyService.completeEvent(event.getEventId(), consumerGroup);
+         }
       } catch (Exception e) {
          log.error("[Kafka Consumer] Failed to process email event: {}", event.getEventId(), e);
          if (event.getEventId() != null) {

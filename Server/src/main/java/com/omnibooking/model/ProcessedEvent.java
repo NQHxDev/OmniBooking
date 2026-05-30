@@ -34,6 +34,14 @@ public class ProcessedEvent {
    @Builder.Default
    private Instant processedAt = Instant.now();
 
+   @Column(name = "status", nullable = false, length = 20)
+   @Builder.Default
+   private String status = "PROCESSING";
+
+   @Column(name = "updated_at", nullable = false)
+   @Builder.Default
+   private Instant updatedAt = Instant.now();
+
    @Data
    @NoArgsConstructor
    @AllArgsConstructor
