@@ -11,6 +11,8 @@ public interface OutboxService {
 
    void processOutbox();
 
+   void processOutboxAsync();
+
    void processSingleEvent(OutboxEvent event);
 
    void markAsProcessed(UUID eventId);

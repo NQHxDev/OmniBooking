@@ -8,6 +8,8 @@ import com.omnibooking.model.enums.OutboxStatus;
 import com.omnibooking.repository.OutboxEventRepository;
 import com.omnibooking.services.core.OutboxEventRegistry;
 import com.omnibooking.services.core.OutboxService;
+import com.omnibooking.services.core.EventMetadataProvider;
+import com.omnibooking.services.core.EventEnvelope;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.scheduling.annotation.Async;
 
 import java.time.Instant;
 import java.time.Duration;
@@ -44,7 +47,9 @@ public class OutboxServiceImpl implements OutboxService {
    private final MeterRegistry meterRegistry;
    private final EventUpcaster eventUpcaster;
    private final DistributedRateLimiter distributedRateLimiter;
+   private final List<EventMetadataProvider> metadataProviders;
    private final AtomicBoolean isProcessing = new AtomicBoolean(false);
+   private final AtomicBoolean wakeUpPending = new AtomicBoolean(false);
    private OutboxService self;
 
    @Lazy
@@ -60,16 +65,15 @@ public class OutboxServiceImpl implements OutboxService {
          // Generate eventId beforehand using time-ordered UUID v7
          UUID eventId = com.github.f4b6a3.uuid.UuidCreator.getTimeOrderedEpoch();
 
-         // Set eventId on DTO event payloads if they match known classes
-         if (payload instanceof com.omnibooking.dto.event.EmailEvent) {
-            ((com.omnibooking.dto.event.EmailEvent) payload).setEventId(eventId);
-         } else if (payload instanceof com.omnibooking.dto.event.MediaUploadEvent) {
-            ((com.omnibooking.dto.event.MediaUploadEvent) payload).setEventId(eventId);
-         } else if (payload instanceof com.omnibooking.dto.event.PropertySyncEvent) {
-            ((com.omnibooking.dto.event.PropertySyncEvent) payload).setEventId(eventId);
-         }
+         // Set eventId on DTO event payloads using matched EventMetadataProvider and wrap in EventEnvelope
+         EventMetadataProvider matchedProvider = metadataProviders.stream()
+               .filter(p -> p.supports(payload))
+               .findFirst()
+               .orElse(null);
 
-         String jsonPayload = objectMapper.writeValueAsString(payload);
+         EventEnvelope envelope = new EventEnvelope(eventId, eventType, payload, matchedProvider);
+
+         String jsonPayload = objectMapper.writeValueAsString(envelope.getPayload());
          OutboxEvent event = OutboxEvent.builder()
                .id(eventId) // Align OutboxEvent entity ID with eventId
                .aggregateId(aggregateId)
@@ -85,9 +89,11 @@ public class OutboxServiceImpl implements OutboxService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                @Override
                public void afterCommit() {
-                  log.info("Transaction committed, triggering outbox processing immediately.");
-                  if (self != null) {
-                     self.processOutbox();
+                  if (wakeUpPending.compareAndSet(false, true)) {
+                     log.info("Transaction committed, triggering outbox processing asynchronously.");
+                     if (self != null) {
+                        self.processOutboxAsync();
+                     }
                   }
                }
             });
@@ -98,40 +104,58 @@ public class OutboxServiceImpl implements OutboxService {
       }
    }
 
-    @Override
-    public void processOutbox() {
-       // 1. Thread-safety check inside JVM (still good as an optimization)
-       if (!isProcessing.compareAndSet(false, true)) {
-          return;
-       }
- 
-       try {
-          // 2. Fetch & lock events in a short transaction
-          List<OutboxEvent> events = self.lockAndFetchEventsToProcess(PageRequest.of(0, 50));
-          if (events.isEmpty()) return;
- 
-          log.info("Processing {} outbox events", events.size());
-          for (OutboxEvent event : events) {
-             if (event.getRetryCount() > 0) {
-                // Apply rate limit on retry attempts: max 2 retries per second dynamically
-                boolean allowed = distributedRateLimiter.isAllowed("outbox:retry", 10, 2);
-                if (!allowed) {
-                   log.warn("Throttling retry for outbox event: {} to prevent retry storm.", event.getId());
-                   self.rescheduleRetry(event.getId());
-                   continue;
-                }
-             }
-             if (self != null) {
-                try {
-                   self.processSingleEvent(event);
-                } catch (Exception e) {
-                   log.error("Failed to process outbox event: {}", event.getId(), e);
-                }
-             }
-          }
-       } finally {
-          isProcessing.set(false);
-       }
+   @Override
+   public void processOutbox() {
+      // 1. Thread-safety check inside JVM (still good as an optimization)
+      if (!isProcessing.compareAndSet(false, true)) {
+         return;
+      }
+
+      try {
+         boolean hasMore = true;
+         int batchCount = 0;
+         while (hasMore && batchCount < 20) {
+            // Reset wakeUpPending before querying the DB.
+            // If any transaction commits after this point, it will see wakeUpPending as false
+            // and successfully trigger another asynchronous run.
+            wakeUpPending.set(false);
+
+            List<OutboxEvent> events = self.lockAndFetchEventsToProcess(PageRequest.of(0, 50));
+            if (events.isEmpty()) {
+               hasMore = false;
+            } else {
+               batchCount++;
+               log.info("Processing {} outbox events (batch {})", events.size(), batchCount);
+               for (OutboxEvent event : events) {
+                  if (event.getRetryCount() > 0) {
+                     // Apply rate limit on retry attempts: max 2 retries per second dynamically
+                     boolean allowed = distributedRateLimiter.isAllowed("outbox:retry", 10, 2);
+                     if (!allowed) {
+                        log.warn("Throttling retry for outbox event: {} to prevent retry storm.", event.getId());
+                        self.rescheduleRetry(event.getId());
+                        continue;
+                     }
+                  }
+                  if (self != null) {
+                     try {
+                        self.processSingleEvent(event);
+                     } catch (Exception e) {
+                        log.error("Failed to process outbox event: {}", event.getId(), e);
+                     }
+                  }
+               }
+            }
+         }
+      } finally {
+         isProcessing.set(false);
+         wakeUpPending.set(false); // Safeguard
+      }
+   }
+
+   @Async
+   @Override
+   public void processOutboxAsync() {
+      processOutbox();
    }
 
    @Override
