@@ -16,7 +16,7 @@ public class MetricsConfig {
       return registry -> Gauge.builder("omnibooking.outbox.queue.size", () -> {
          try {
             return jdbcTemplate.queryForObject(
-                  "SELECT COUNT(*) FROM outbox_events WHERE processed = false", Integer.class);
+                  "SELECT COUNT(*) FROM outbox_events WHERE status IN ('PENDING', 'PROCESSING')", Integer.class);
          } catch (Exception e) {
             return 0;
          }

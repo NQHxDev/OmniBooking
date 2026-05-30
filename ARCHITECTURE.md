@@ -240,15 +240,18 @@ OmniBooking's search architecture is engineered to query millions of records in 
 
 ## 16. Reliable Messaging (Transactional Outbox Pattern)
 
-To guarantee absolute consistency between the relational Database and the Message Broker (Kafka), the system implements the Transactional Outbox Pattern:
+To guarantee absolute consistency between the relational Database and the Message Broker (Kafka), the system implements a highly resilient, distributed-safe Transactional Outbox Pattern:
 
 - **Atomic Operations**: Critical events (such as User Registration or Password Reset) are not published directly to Kafka. Instead, they are persisted to the `outbox_events` table in the exact same database transaction as the business state change.
 - **Guaranteed Delivery**: An `OutboxWorker` (Scheduled Task) periodically polls unprocessed events and publishes them to Kafka. This ensures that once a user is successfully created, the welcome/verification email is guaranteed to be sent, even if Kafka is temporarily offline.
 - **Hybrid Wake-Up Mechanism**: To optimize latency, the system utilizes a real-time wake-up mechanism. As soon as the business transaction commits successfully, an internal signal immediately wakes up the Outbox worker to process the event, bypassing the standard polling delay.
-- **Concurrency & Safety**:
-   - **Instance Level**: Uses an `AtomicBoolean` lock flag to ensure that only one processing thread runs per server instance at a time, avoiding wasted system resources.
-   - **Cluster Level**: Uses the `SELECT ... FOR UPDATE SKIP LOCKED` SQL query to enable multiple distributed instances to run concurrently without lock contention or duplicate event processing.
-- **Data Integrity**: The event payload is stored as JSON alongside a `payload_class` metadata column to guarantee highly accurate deserialization at the worker level prior to dispatch.
+- **Concurrency & Cluster-Level Safety**:
+   - **Distributed Lock & Release**: To safely support multiple instances (pods) scaling horizontally, the scheduler fetches events using `SELECT ... FOR UPDATE SKIP LOCKED` where `status IN ('PENDING', 'PROCESSING') AND next_retry_at <= :now`.
+   - **Short-Lived Transactions**: In a separate transaction (`REQUIRES_NEW`), the worker immediately marks the fetched batch as `PROCESSING` and sets `next_retry_at = now + 5 minutes` (serving as a lock lease time) before committing. This releases the database locks immediately, preventing other instances from processing the same events while avoiding self-deadlocks and keeping database transaction times extremely short.
+- **Resilience & Exponential Backoff**:
+   - **Automatic Retries**: If sending to Kafka fails, the event is rolled back to `PENDING` and scheduled for retry using an exponential backoff strategy (1 min, 5 min, 15 min, 1 hour).
+   - **Dead Letter Handling**: If an event fails 5 times, it is marked as `DEAD` (Dead Letter Queue) to prevent infinite retry loops and head-of-line blocking, allowing operators to inspect the failure reason stored in `last_error`.
+- **Data Integrity & Schema Evolution**: The event payload is stored as JSON. The system utilizes an `OutboxEventRegistry` to explicitly map the `event_type` string to its corresponding Java class type (e.g. `EmailEvent.class`), avoiding fragile reflection practices (like `Class.forName()`) which can break during package refactoring or class renames.
 
 ## 17. Global Search & Discovery Engine
 

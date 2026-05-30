@@ -1,5 +1,8 @@
 package com.omnibooking.services.core;
 
+import com.omnibooking.model.OutboxEvent;
+import org.springframework.data.domain.Pageable;
+import java.util.List;
 import java.util.UUID;
 
 public interface OutboxService {
@@ -8,8 +11,9 @@ public interface OutboxService {
 
    void processOutbox();
 
-   void processSingleEvent(com.omnibooking.model.OutboxEvent event);
+   void processSingleEvent(OutboxEvent event);
 
    void markAsProcessed(UUID eventId);
 
+   List<OutboxEvent> lockAndFetchEventsToProcess(Pageable pageable);
 }
