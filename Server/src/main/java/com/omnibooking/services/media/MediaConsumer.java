@@ -6,8 +6,8 @@ import com.omnibooking.dto.event.MediaUploadEvent;
 import com.omnibooking.model.Media;
 import com.omnibooking.repository.MediaRepository;
 import com.omnibooking.dto.event.PropertySyncEvent;
-import com.omnibooking.services.property.PropertySyncProducer;
 import com.omnibooking.services.property.PropertyImagesCacheService;
+import com.omnibooking.services.core.OutboxService;
 import com.omnibooking.services.core.IdempotencyService;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -27,11 +28,12 @@ public class MediaConsumer {
    private final CloudinaryService cloudinaryService;
    private final MediaRepository mediaRepository;
    private final CacheManager cacheManager;
-   private final PropertySyncProducer propertySyncProducer;
    private final PropertyImagesCacheService propertyImagesCacheService;
+   private final OutboxService outboxService;
    private final IdempotencyService idempotencyService;
    private final MeterRegistry meterRegistry;
 
+   @Transactional
    @KafkaListener(topics = KafkaConfig.MEDIA_TOPIC, groupId = "omnibooking-media-group")
    public void consumeUploadEvent(MediaUploadEvent event) {
       String consumerGroup = "omnibooking-media-group";
@@ -48,9 +50,10 @@ public class MediaConsumer {
       log.info("[Kafka Consumer] Processing media upload for entity: {} ({}) (eventId: {})", event.getEntityId(),
             event.getEntityType(), event.getEventId());
 
+      CloudinaryResponse response = null;
       try {
          // 1. Upload to Cloudinary
-         CloudinaryResponse response = cloudinaryService.upload(event.getFileBytes(), event.getFolder());
+         response = cloudinaryService.upload(event.getFileBytes(), event.getFolder());
          log.info("[Kafka Consumer] Uploaded to Cloudinary. URL: {}", response.url());
 
          // 2. Persist to Database
@@ -88,17 +91,18 @@ public class MediaConsumer {
                log.info("[Kafka Consumer] Evicted 'properties' cache because main image for property {} is ready", event.getEntityId());
             }
 
-            // Sync to Elasticsearch now that the main image URL is persisted in Postgres and uploaded to Cloudinary
-            try {
-               UUID propertyId = UUID.fromString(event.getEntityId());
-               propertySyncProducer.sendSyncEvent(PropertySyncEvent.builder()
-                     .propertyId(propertyId)
-                     .operation("CREATE")
-                     .build());
-               log.info("[Kafka Consumer] Triggered Elasticsearch sync for property: {} after main image upload completed", propertyId);
-            } catch (Exception e) {
-               log.error("[Kafka Consumer] Failed to trigger Elasticsearch sync for property: {}", event.getEntityId(), e);
-            }
+            // Sync to Elasticsearch via Transactional Outbox to guarantee delivery
+            UUID propertyId = UUID.fromString(event.getEntityId());
+            outboxService.saveEvent(
+                  propertyId,
+                  "PROPERTY",
+                  "PROPERTY_SYNC",
+                  PropertySyncEvent.builder()
+                        .propertyId(propertyId)
+                        .operation("CREATE")
+                        .build()
+            );
+            log.info("[Kafka Consumer] Recorded Elasticsearch sync event in outbox for property: {} after main image upload completed", propertyId);
          }
 
          // Mark event as processed successfully
@@ -109,6 +113,20 @@ public class MediaConsumer {
       } catch (Exception e) {
          log.error("[Kafka Consumer] Error processing media for correlationId: {}. Error: {}",
                event.getCorrelationId(), e.getMessage());
+
+         // Rollback compensation for Cloudinary resource leakage prevention
+         if (response != null && response.publicId() != null) {
+            try {
+               log.warn("[Kafka Consumer] Database persistence failed. Performing rollback compensation: deleting uploaded asset {} from Cloudinary", response.publicId());
+               cloudinaryService.delete(response.publicId());
+               meterRegistry.counter("omnibooking.media.orphaned.cleanup").increment();
+            } catch (Exception deleteEx) {
+               log.error("[Kafka Consumer] Failed to delete orphaned Cloudinary asset: {}", response.publicId(), deleteEx);
+            }
+         }
+
+         // Propagate exception to trigger transaction rollback and Kafka retry
+         throw new RuntimeException("Media processing failed, rolled back changes", e);
       }
    }
 }

@@ -1,6 +1,7 @@
 package com.omnibooking.services.core;
 
 import com.omnibooking.dto.event.EmailEvent;
+import com.omnibooking.dto.event.PropertySyncEvent;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,6 +16,7 @@ public class OutboxEventRegistry {
       REGISTRY.put("SECURITY_OTP_SEND", EmailEvent.class);
       REGISTRY.put("2FA_OTP_SEND", EmailEvent.class);
       REGISTRY.put("PARTNER_OTP_SEND", EmailEvent.class);
+      REGISTRY.put("PROPERTY_SYNC", PropertySyncEvent.class);
    }
 
    public static Class<?> getEventClass(String eventType) {

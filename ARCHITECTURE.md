@@ -257,6 +257,15 @@ To guarantee absolute consistency between the relational Database and the Messag
    - **Deduplication Store (`processed_events`)**: A centralized database table `processed_events` tracks processed event IDs per consumer group. It uses a composite primary key `(event_id, consumer_group)` to allow different consumer groups to consume the same event while preventing duplicate executions within the same group.
    - **Check-and-Commit Pattern**: Before executing any side effects, consumers (e.g., `EmailConsumer`, `MediaConsumer`, `UserCDCConsumer`, `PropertySyncConsumer`) verify if the `eventId` is already recorded in the deduplication store. If it exists, they skip execution. If not, they execute the side effects and insert the key to mark it as processed, ensuring exactly-once execution semantics even under Kafka message redelivery or rebalances.
    - **Idempotency Metrics**: The system registers Prometheus counter metrics `duplicate_event_count` and `skipped_event_count` to monitor and alert on duplicate message delivery in real-time.
+- **Kafka Event Ordering (Partition Key)**:
+   - **Aggregate Isolation**: To preserve message ordering for events related to the same resource, all domain events published from the Outbox are sent using the `aggregateId` or `entityId` as the Kafka partition key.
+   - **Ordering Guarantee**: In the `RegistrationService`, the `userId` is used as the key for `UserCreatedEvent`. This ensures that all updates/deletions for a specific entity are routed to the same partition, avoiding race conditions and processing events in strict chronological order.
+- **Cloudinary Compensation (Orphan Prevention)**:
+   - **Rollback Compensation Pattern**: In the `MediaConsumer`, files are uploaded to Cloudinary before being saved to PostgreSQL. If the database transaction fails (e.g., connection timed out or database constraint error), the consumer catches the exception and immediately invokes a rollback compensation query calling `cloudinaryService.delete(publicId)`.
+   - **Orphan Cleanup Metric**: The system monitors rollback events via the counter `orphaned_media_cleanup_count` to detect database failures during media upload processing.
+- **Elasticsearch Sync Reliability (Outbox Sync)**:
+   - **Outbox-based Synchronization**: To prevent Elasticsearch search indices from diverging from PostgreSQL (due to direct Kafka publish failures during network partitions), the `PropertySyncEvent` is routed through the Transactional Outbox.
+   - **Transactional & Resilient Sync**: Synchronization requests are persisted in the same transaction as the media save. The outbox worker publishes the event to Kafka with retry capability and DLQ protection, and `search_sync_failure_count` tracks synchronization failures.
 
 ## 17. Global Search & Discovery Engine
 

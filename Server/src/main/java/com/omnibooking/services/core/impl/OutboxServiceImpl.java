@@ -8,6 +8,7 @@ import com.omnibooking.model.enums.OutboxStatus;
 import com.omnibooking.repository.OutboxEventRepository;
 import com.omnibooking.services.core.OutboxEventRegistry;
 import com.omnibooking.services.core.OutboxService;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -36,6 +37,7 @@ public class OutboxServiceImpl implements OutboxService {
    private final OutboxEventRepository outboxEventRepository;
    private final ObjectMapper objectMapper;
    private final KafkaTemplate<String, Object> kafkaTemplate;
+   private final MeterRegistry meterRegistry;
    private final AtomicBoolean isProcessing = new AtomicBoolean(false);
    private OutboxService self;
 
@@ -143,15 +145,17 @@ public class OutboxServiceImpl implements OutboxService {
          Class<?> clazz = OutboxEventRegistry.getEventClass(event.getEventType());
          Object payload = objectMapper.readValue(event.getPayload(), clazz);
 
-         // Send to Kafka and WAIT for confirmation
-         kafkaTemplate.send(topic, payload).get(5, java.util.concurrent.TimeUnit.SECONDS);
-         log.info("Successfully pushed outbox event {} to Kafka topic {}", event.getId(), topic);
+         // Send to Kafka and WAIT for confirmation. Use aggregateId as partition key for ordering.
+         kafkaTemplate.send(topic, event.getAggregateId().toString(), payload).get(5, java.util.concurrent.TimeUnit.SECONDS);
+         log.info("Successfully pushed outbox event {} to Kafka topic {} with partition key {}", 
+               event.getId(), topic, event.getAggregateId());
 
          // Mark as processed (within transaction)
          event.setStatus(OutboxStatus.PROCESSED);
          outboxEventRepository.saveAndFlush(event);
       } catch (Exception e) {
          log.error("Error processing single outbox event: {}", event.getId(), e);
+         meterRegistry.counter("omnibooking.kafka.publish.failure").increment();
          handleFailure(event, e);
       }
    }
@@ -209,6 +213,9 @@ public class OutboxServiceImpl implements OutboxService {
       }
       if (eventType.contains("MEDIA")) {
          return KafkaConfig.MEDIA_TOPIC;
+      }
+      if (eventType.contains("PROPERTY_SYNC")) {
+         return "omnibooking-property-sync";
       }
       return "omnibooking-default-topic";
    }

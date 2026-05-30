@@ -108,7 +108,7 @@ public class RegistrationService {
                .email(user.getEmail())
                .fullName(req.getFullName())
                .build();
-         kafkaTemplate.send(USER_CDC_TOPIC, event);
+         kafkaTemplate.send(USER_CDC_TOPIC, event.getUserId().toString(), event);
 
          // 2. Notify SSE via Redis Pub/Sub (Real-time) - ONLY AFTER TRANSACTION COMMITS
          final String finalRequestId = req.getRequestId();
