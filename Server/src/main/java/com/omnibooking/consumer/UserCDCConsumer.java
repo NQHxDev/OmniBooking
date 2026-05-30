@@ -29,7 +29,8 @@ public class UserCDCConsumer {
    public void handleUserCreated(UserCreatedEvent event) {
       String consumerGroup = "omnibooking-cdc-group";
       if (event.getEventId() != null) {
-         if (idempotencyService.isProcessed(event.getEventId(), consumerGroup)) {
+         boolean claimed = idempotencyService.claimEvent(event.getEventId(), consumerGroup);
+         if (!claimed) {
             log.warn("[Kafka Consumer] Duplicate UserCreated CDC event detected and skipped: eventId={}, userId={}", 
                   event.getEventId(), event.getUserId());
             meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
@@ -59,12 +60,15 @@ public class UserCDCConsumer {
 
          log.info("CDC Side-effects completed for user: {}", event.getEmail());
 
-         // Mark event as processed successfully
-         if (event.getEventId() != null) {
-            idempotencyService.markProcessed(event.getEventId(), consumerGroup);
-         }
       } catch (Exception e) {
          log.error("Failed to process CDC side-effects for user: {}", event.getUserId(), e);
+         if (event.getEventId() != null) {
+            try {
+               idempotencyService.releaseClaim(event.getEventId(), consumerGroup);
+            } catch (Exception releaseEx) {
+               log.error("Failed to release claim for event: {}", event.getEventId(), releaseEx);
+            }
+         }
          // Kafka will retry based on configuration
          throw e;
       }

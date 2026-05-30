@@ -29,7 +29,8 @@ public class PropertySyncConsumer {
    public void consumePropertySync(PropertySyncEvent event) {
       String consumerGroup = "omnibooking-property-sync-group";
       if (event.getEventId() != null) {
-         if (idempotencyService.isProcessed(event.getEventId(), consumerGroup)) {
+         boolean claimed = idempotencyService.claimEvent(event.getEventId(), consumerGroup);
+         if (!claimed) {
             log.warn("[Kafka Consumer] Duplicate PropertySync event detected and skipped: eventId={}, propertyId={}", 
                   event.getEventId(), event.getPropertyId());
             meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
@@ -44,9 +45,6 @@ public class PropertySyncConsumer {
       try {
          if ("DELETE".equals(event.getOperation())) {
             propertyElasticsearchRepository.deleteById(event.getPropertyId().toString());
-            if (event.getEventId() != null) {
-               idempotencyService.markProcessed(event.getEventId(), consumerGroup);
-            }
             return;
          }
 
@@ -59,11 +57,6 @@ public class PropertySyncConsumer {
 
             propertyElasticsearchRepository.save(document);
             log.info("Successfully synced property to Elasticsearch: {}", property.getId());
-
-            // Mark event as processed successfully
-            if (event.getEventId() != null) {
-               idempotencyService.markProcessed(event.getEventId(), consumerGroup);
-            }
          }, () -> {
             log.error("Property not found for sync: {}", event.getPropertyId());
             meterRegistry.counter("omnibooking.search.sync.failure").increment();
@@ -71,6 +64,13 @@ public class PropertySyncConsumer {
       } catch (Exception e) {
          log.error("Failed to process property sync: {}", event.getPropertyId(), e);
          meterRegistry.counter("omnibooking.search.sync.failure").increment();
+         if (event.getEventId() != null) {
+            try {
+               idempotencyService.releaseClaim(event.getEventId(), consumerGroup);
+            } catch (Exception releaseEx) {
+               log.error("Failed to release claim for event: {}", event.getEventId(), releaseEx);
+            }
+         }
          throw e; // Propagate exception to trigger Kafka retry
       }
    }

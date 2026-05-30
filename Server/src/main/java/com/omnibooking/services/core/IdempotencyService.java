@@ -4,8 +4,8 @@ import java.util.UUID;
 
 public interface IdempotencyService {
 
-   boolean isProcessed(UUID eventId, String consumerGroup);
+   boolean claimEvent(UUID eventId, String consumerGroup);
 
-   void markProcessed(UUID eventId, String consumerGroup);
+   void releaseClaim(UUID eventId, String consumerGroup);
 
 }

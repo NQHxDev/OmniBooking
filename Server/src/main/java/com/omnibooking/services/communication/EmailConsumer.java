@@ -22,7 +22,8 @@ public class EmailConsumer {
    public void consumeEmailEvent(EmailEvent event) {
       String consumerGroup = "omnibooking-mail-group";
       if (event.getEventId() != null) {
-         if (idempotencyService.isProcessed(event.getEventId(), consumerGroup)) {
+         boolean claimed = idempotencyService.claimEvent(event.getEventId(), consumerGroup);
+         if (!claimed) {
             log.warn("[Kafka Consumer] Duplicate email event detected and skipped: eventId={}, to={}", 
                   event.getEventId(), event.getTo());
             meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
@@ -32,10 +33,15 @@ public class EmailConsumer {
       }
 
       log.info("[Kafka Consumer] Processing email event for {} (eventId: {})", event.getTo(), event.getEventId());
-      resendEmailService.sendHtmlEmail(event.getTo(), event.getSubject(), event.getContent());
 
-      if (event.getEventId() != null) {
-         idempotencyService.markProcessed(event.getEventId(), consumerGroup);
+      try {
+         resendEmailService.sendHtmlEmail(event.getTo(), event.getSubject(), event.getContent());
+      } catch (Exception e) {
+         log.error("[Kafka Consumer] Failed to process email event: {}", event.getEventId(), e);
+         if (event.getEventId() != null) {
+            idempotencyService.releaseClaim(event.getEventId(), consumerGroup);
+         }
+         throw e;
       }
    }
 

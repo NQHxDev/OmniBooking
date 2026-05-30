@@ -38,7 +38,8 @@ public class MediaConsumer {
    public void consumeUploadEvent(MediaUploadEvent event) {
       String consumerGroup = "omnibooking-media-group";
       if (event.getEventId() != null) {
-         if (idempotencyService.isProcessed(event.getEventId(), consumerGroup)) {
+         boolean claimed = idempotencyService.claimEvent(event.getEventId(), consumerGroup);
+         if (!claimed) {
             log.warn("[Kafka Consumer] Duplicate media upload event detected and skipped: eventId={}, entityId={}", 
                   event.getEventId(), event.getEntityId());
             meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
@@ -105,11 +106,6 @@ public class MediaConsumer {
             log.info("[Kafka Consumer] Recorded Elasticsearch sync event in outbox for property: {} after main image upload completed", propertyId);
          }
 
-         // Mark event as processed successfully
-         if (event.getEventId() != null) {
-            idempotencyService.markProcessed(event.getEventId(), consumerGroup);
-         }
-
       } catch (Exception e) {
          log.error("[Kafka Consumer] Error processing media for correlationId: {}. Error: {}",
                event.getCorrelationId(), e.getMessage());
@@ -122,6 +118,15 @@ public class MediaConsumer {
                meterRegistry.counter("omnibooking.media.orphaned.cleanup").increment();
             } catch (Exception deleteEx) {
                log.error("[Kafka Consumer] Failed to delete orphaned Cloudinary asset: {}", response.publicId(), deleteEx);
+            }
+         }
+
+         // Release claim to allow retry
+         if (event.getEventId() != null) {
+            try {
+               idempotencyService.releaseClaim(event.getEventId(), consumerGroup);
+            } catch (Exception releaseEx) {
+               log.error("[Kafka Consumer] Failed to release claim: {}", event.getEventId(), releaseEx);
             }
          }
 
