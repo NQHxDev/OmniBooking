@@ -27,6 +27,7 @@ import org.springframework.http.MediaType;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 @Configuration
 @EnableWebSecurity
@@ -34,10 +35,10 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
    private final JWTService jwtService;
-
    private final CustomUserDetailsService userDetailsService;
-
    private final StringRedisTemplate redisTemplate;
+   private final ObjectMapper objectMapper;
+   private final RequestMappingHandlerMapping requestMappingHandlerMapping;
 
    @Bean
    public PasswordEncoder passwordEncoder() {
@@ -80,6 +81,7 @@ public class SecurityConfig {
    @Bean
    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
       JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, userDetailsService, redisTemplate);
+      CustomCsrfFilter csrfFilter = new CustomCsrfFilter(objectMapper, requestMappingHandlerMapping);
 
       http
             .csrf(AbstractHttpConfigurer::disable)
@@ -102,6 +104,7 @@ public class SecurityConfig {
                   .requestMatchers(HttpMethod.GET, "/properties/**").permitAll()
                   .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(csrfFilter, JwtAuthenticationFilter.class)
             .exceptionHandling(exceptions -> exceptions
                   .authenticationEntryPoint((request, response, authException) -> {
                      String requestId = (String) request.getAttribute("requestId");

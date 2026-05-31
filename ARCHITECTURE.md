@@ -101,7 +101,7 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 
 ## 6. Security Architecture
 
-- **Security Foundation**: Robust `SecurityConfig` set up with CSRF protection disabled (for tokens), CORS enabled, and stateless session policy.
+- **Security Foundation**: Robust `SecurityConfig` set up with CORS enabled, stateless session policy, and CSRF protection enabled for cookie-based authentication via `CustomCsrfFilter` (state-changing requests check matching `csrf_token` cookie and `X-CSRF-Token` header, bypassing public endpoints).
 - **Public/Private Split**: Clear separation between public metadata/swagger endpoints and secured API routes.
 - **RBAC (Role-Based Access Control)**: Comprehensive system with `roles` (Admin, Partner, Driver, User) and granular `permissions` (e.g., `property:write`, `ride:manage`). Managed via `SecurityConstants` for type-safety.
 - **Security Standard**: All API security checks must use constants from `SecurityConstants` via SpEL (e.g., `T(com.omnibooking.constant.SecurityConstants.Roles).ADMIN`) to ensure consistency and avoid hardcoded strings.

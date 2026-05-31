@@ -145,4 +145,36 @@ Sếp của bạn **hoàn toàn chính xác (100% đúng)**.
   - [x] Tối ưu hóa `processOutbox()` để drain sạch hàng đợi trong vòng lặp batching (drain loop) và tự động đặt lại cờ `wakeUpPending = false` trước khi fetch batch tiếp theo.
   - [x] Sửa đổi `afterCommit` chỉ đánh thức bất đồng bộ khi `wakeUpPending.compareAndSet(false, true)` thành công.
 
+---
+
+## VIII. Phân Tích & Kế Hoạch Triển Khai Kích Hoạt Bảo Vệ CSRF (Issue #17)
+
+### 1. Đánh giá tính chính xác của ý kiến từ Sếp
+Sếp của bạn **hoàn toàn chính xác (100% đúng)**.
+*   **Vấn đề:** Hệ thống lưu trữ Access & Refresh tokens trong HttpOnly Cookies để tăng tính bảo mật nhưng lại vô hiệu hóa bảo vệ CSRF (`.csrf(AbstractHttpConfigurer::disable)`). Điều này dẫn đến lỗ hổng bảo mật nghiêm trọng (CSRF) cho phép kẻ tấn công thực hiện các thao tác thay đổi trạng thái trái phép thay người dùng (như gửi OTP, đổi mật khẩu, hoặc đặt phòng/huỷ phòng).
+*   **Giải pháp:** Kích hoạt `CustomCsrfFilter` trong Security Filter Chain để kiểm tra trùng khớp giữa Cookie `csrf_token` và HTTP Header `X-CSRF-Token` cho toàn bộ các request thay đổi trạng thái (POST, PUT, DELETE, PATCH) ngoại trừ các endpoint công khai (được bypass qua annotation `@Anonymous`).
+
+---
+
+### 2. Kế hoạch triển khai kỹ thuật (Todo Checklist cho Issue #17)
+
+#### Pha 1: Cấu hình Spring Security
+- [x] **Đăng ký `CustomCsrfFilter`**:
+  - [x] Inject `ObjectMapper` và `RequestMappingHandlerMapping` vào `SecurityConfig`.
+  - [x] Đăng ký `CustomCsrfFilter` chạy ngay sau `JwtAuthenticationFilter` trong Security Filter Chain.
+
+#### Pha 2: Định nghĩa các Endpoint Bypassed & Public
+- [x] **Xác định các endpoint công khai**: Các endpoint công khai thay đổi trạng thái (như `/auth/login`, `/auth/register`) đã được gắn annotation `@Anonymous` và sẽ được `CustomCsrfFilter` tự động bỏ qua.
+
+#### Pha 3: Viết Integration Tests
+- [x] **Viết bộ kiểm thử tích hợp `CsrfIntegrationTest.java`**:
+  - [x] Test case: Cho phép các request công khai (như `/auth/login`) bỏ qua kiểm tra CSRF.
+  - [x] Test case: Từ chối các request thay đổi trạng thái được bảo vệ khi thiếu CSRF token (trả về lỗi `SEC_001` - 403 Forbidden).
+  - [x] Test case: Từ chối các request thay đổi trạng thái được bảo vệ khi CSRF token không khớp hoặc sai.
+  - [x] Test case: Xử lý bình thường khi CSRF token hợp lệ (vượt qua bộ lọc CSRF).
+
+#### Pha 4: Cập nhật tài liệu kỹ thuật
+- [x] **Cập nhật `ARCHITECTURE.md`**: Cập nhật phần Security Architecture xác nhận CSRF đã được kích hoạt thông qua `CustomCsrfFilter`.
+
+
 
