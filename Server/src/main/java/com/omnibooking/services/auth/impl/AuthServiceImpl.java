@@ -134,7 +134,7 @@ public class AuthServiceImpl implements AuthService {
       Set<String> roles = Collections.singleton(userRole.getName());
       long now = System.currentTimeMillis();
 
-      return issueTokensAndBuildResponse(savedUser, roles, profile, ip, userAgent, response, rememberMe, now, now);
+      return issueTokensAndBuildResponse(savedUser, roles, profile, ip, userAgent, response, rememberMe, now, now, null);
    }
 
    @Override
@@ -163,7 +163,7 @@ public class AuthServiceImpl implements AuthService {
       long now = System.currentTimeMillis();
 
       return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
-            now);
+            now, null);
    }
 
    @Override
@@ -217,12 +217,10 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.INVALID_SESSION);
          }
 
-         // ROTATION: Thu hồi session cũ trước khi cấp mới
-         sessionService.deleteSession(sId);
          log.info("Rotating session for user: {}", user.getEmail());
 
          return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, info.isRememberMe(),
-               info.getCreatedAt(), info.getLastAccessedAt());
+               info.getCreatedAt(), info.getLastAccessedAt(), sId);
       } finally {
          redisTemplate.delete(lockKey);
       }
@@ -295,7 +293,7 @@ public class AuthServiceImpl implements AuthService {
     */
    private AuthResponse issueTokensAndBuildResponse(User user, Set<String> roles, UserProfile profile,
          String ip, String userAgent, HttpServletResponse response, boolean rememberMe, long createdAt,
-         long lastAccessedAt) {
+         long lastAccessedAt, UUID oldSessionId) {
       UUID sessionId = UuidCreator.getTimeOrderedEpoch();
       UUID refreshToken = UuidCreator.getTimeOrderedEpoch();
 
@@ -352,7 +350,49 @@ public class AuthServiceImpl implements AuthService {
             .rememberMe(rememberMe)
             .build();
 
-      sessionService.saveSession(sessionId, sessionInfo, finalTtlMs);
+      // 1. Create and Save New Session
+      try {
+         sessionService.saveSession(sessionId, sessionInfo, finalTtlMs);
+      } catch (Exception e) {
+         log.error("Failed to save new session in Redis for user: {}", user.getEmail(), e);
+         throw new AppException(ErrorCode.INVALID_SESSION);
+      }
+
+      // 2. Verify Success
+      try {
+         RedisSessionInfo savedInfo = sessionService.getSession(sessionId);
+         if (savedInfo == null || !user.getId().equals(savedInfo.getUserId())) {
+            log.error("Verification failed for newly saved session: {}", sessionId);
+            try {
+               sessionService.deleteSession(sessionId);
+            } catch (Exception ex) {
+               log.error("Rollback: Failed to delete invalid new session {}", sessionId, ex);
+            }
+            throw new AppException(ErrorCode.INVALID_SESSION);
+         }
+      } catch (Exception e) {
+         log.error("Failed to verify saved session or rollback: {}", sessionId, e);
+         if (e instanceof AppException) {
+            throw (AppException) e;
+         }
+         throw new AppException(ErrorCode.INVALID_SESSION);
+      }
+
+      // 3. Delete Old Session
+      if (oldSessionId != null) {
+         try {
+            sessionService.deleteSession(oldSessionId);
+            log.info("Successfully rotated session: deleted old session {} and issued new session {}", oldSessionId, sessionId);
+         } catch (Exception e) {
+            log.error("Failed to delete old session {} during rotation. Rolling back new session {}", oldSessionId, sessionId, e);
+            try {
+               sessionService.deleteSession(sessionId);
+            } catch (Exception ex) {
+               log.error("Rollback: Failed to clean up new session {} after old session deletion failure", sessionId, ex);
+            }
+            throw new AppException(ErrorCode.INVALID_SESSION);
+         }
+      }
 
       CookieUtils.setAuthCookies(response, accessToken, sessionId.toString(), refreshToken.toString(), fingerprint,
             cookieSecure, (int) (finalTtlMs / 1000));
@@ -388,7 +428,7 @@ public class AuthServiceImpl implements AuthService {
             .collect(Collectors.toSet());
 
       long now = System.currentTimeMillis();
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now);
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now, null);
    }
 
    @Override
@@ -546,7 +586,7 @@ public class AuthServiceImpl implements AuthService {
       }
 
       long now = System.currentTimeMillis();
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now);
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now, null);
    }
 
    @Override
@@ -574,7 +614,7 @@ public class AuthServiceImpl implements AuthService {
          // For finalize registration, we don't have 'rememberMe' info from the original
          // request yet,
          // defaulting to false or we could pass it. Let's default to false for safety.
-         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now);
+         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now, null);
       } catch (AppException e) {
          throw e;
       } catch (Exception e) {
@@ -609,6 +649,6 @@ public class AuthServiceImpl implements AuthService {
       UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
       long now = System.currentTimeMillis();
       return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
-            now);
+            now, null);
    }
 }
