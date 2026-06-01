@@ -33,11 +33,20 @@ public class JWTService {
     */
    public String generateAccessToken(UUID userId, java.util.Collection<String> roles, UUID sessionId,
          String fingerprintHash) {
+      return generateAccessToken(userId, roles, sessionId, fingerprintHash, 0);
+   }
+
+   /**
+    * Generate an Access Token with userId, roles, sessionId, and tokenVersion.
+    */
+   public String generateAccessToken(UUID userId, java.util.Collection<String> roles, UUID sessionId,
+         String fingerprintHash, Integer tokenVersion) {
       return Jwts.builder()
             .subject(userId.toString())
             .claim("roles", roles)
             .claim("sessionId", sessionId.toString())
             .claim("fgh", fingerprintHash)
+            .claim("tokenVersion", tokenVersion != null ? tokenVersion : 0)
             .issuedAt(new Date())
             .expiration(new Date(System.currentTimeMillis() + expiration))
             .signWith(getSigningKey())
@@ -75,6 +84,10 @@ public class JWTService {
     */
    public String extractFingerprintHash(String token) {
       return extractAllClaims(token).get("fgh", String.class);
+   }
+
+   public Integer extractTokenVersion(String token) {
+      return extractAllClaims(token).get("tokenVersion", Integer.class);
    }
 
    public Set<String> extractRoles(String token) {

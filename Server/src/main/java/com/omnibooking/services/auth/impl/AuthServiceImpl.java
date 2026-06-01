@@ -181,7 +181,7 @@ public class AuthServiceImpl implements AuthService {
       }
 
       String lockKey = "lock:refresh:" + sId;
-      Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "L", 5, TimeUnit.SECONDS);
+      Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "L", 2, TimeUnit.SECONDS);
 
       if (Boolean.FALSE.equals(acquired)) {
          log.warn("Refresh already in progress for session: {}", sId);
@@ -306,7 +306,7 @@ public class AuthServiceImpl implements AuthService {
       String fingerprint = UuidCreator.getTimeOrderedEpoch().toString();
       String fgpHash = SecurityUtils.hashFingerprint(fingerprint);
 
-      String accessToken = jwtService.generateAccessToken(user.getId(), roles, sessionId, fgpHash);
+      String accessToken = jwtService.generateAccessToken(user.getId(), roles, sessionId, fgpHash, user.getTokenVersion());
 
       String fullName;
       if (profile != null && profile.getDisplayName() != null) {
