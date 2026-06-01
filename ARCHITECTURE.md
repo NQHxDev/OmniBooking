@@ -111,9 +111,10 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 
 The system implements a robust, secure authentication mechanism designed for production environments:
 
-- **JWT with HttpOnly Cookies**: Access and Refresh tokens are stored in secure, HttpOnly, SameSite=Lax cookies to mitigate XSS attacks.
+- **JWT with HttpOnly Cookies & SameSite Lax**: Access and Refresh tokens, along with `session_id` and `x_fgp`, are stored in secure, HttpOnly, SameSite=Lax cookies (using Spring's `ResponseCookie` builder) to mitigate XSS and CSRF attacks.
+- **CSRF Cookie Integration**: The `csrf_token` cookie is also managed with SameSite=Lax but is configured with `httpOnly(false)`. This allows Next.js/client-side JS to read the cookie value and send it back as the `X-CSRF-Token` header, matching the backend's Double Submit Cookie verification strategy perfectly.
 - **Fingerprinting & Security Header**: To prevent JWT theft/hijacking, the system uses a dual-key verification. The backend compares a hash in the JWT with a raw `x_fgp` value. For Server-side fetches in Next.js (Server Components), this header must be manually extracted from cookies and propagated to the backend fetch call.
-- **Refresh Token Logic**: Automated token rotation. When a request fails with `AUTH_006` (Token Expired), the client transparently attempts to refresh the session before retrying the original request.
+- **Harden Refresh Token Rotation (Atomic & Resilient)**: Automated token rotation is implemented with atomic execution. The backend saves and verifies the new session in Redis _before_ revoking the old session. A transactional rollback strategy is deployed so that if any step of saving, verifying, or revoking fails, the newly generated session is cleaned up and the old session is kept active, preventing unintended user lockouts.
 - **Stateless Verification**: The backend validates JWTs without DB lookups for primary access, using Redis for session invalidation (Logout).
 
 ## 8. Partner Onboarding Lifecycle

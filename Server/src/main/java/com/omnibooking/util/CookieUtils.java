@@ -4,6 +4,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
+import org.springframework.http.ResponseCookie;
 
 public class CookieUtils {
 
@@ -22,6 +23,10 @@ public class CookieUtils {
       addCookie(response, SESSION_ID, sessionId, expiry, secure);
       addCookie(response, REFRESH_TOKEN, refreshToken, expiry, secure);
       addCookie(response, FINGERPRINT, fingerprint, expiry, secure);
+      
+      // Set csrf_token cookie for double submit cookie verification (not HttpOnly so client JS can read it)
+      String csrfToken = java.util.UUID.randomUUID().toString();
+      addCookie(response, "csrf_token", csrfToken, expiry, secure);
    }
 
    /**
@@ -36,21 +41,27 @@ public class CookieUtils {
    }
 
    public static void addCookie(HttpServletResponse response, String name, String value, int maxAge, boolean secure) {
-      Cookie cookie = new Cookie(name, value);
-      cookie.setHttpOnly(true);
-      cookie.setSecure(secure);
-      cookie.setPath("/");
-      cookie.setMaxAge(maxAge);
-      response.addCookie(cookie);
+      boolean httpOnly = !name.equals("csrf_token");
+      ResponseCookie cookie = ResponseCookie.from(name, value)
+            .httpOnly(httpOnly)
+            .secure(secure)
+            .path("/")
+            .maxAge(maxAge)
+            .sameSite("Lax")
+            .build();
+      response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString());
    }
 
    public static void deleteCookie(HttpServletResponse response, String name, boolean secure) {
-      Cookie cookie = new Cookie(name, "");
-      cookie.setHttpOnly(true);
-      cookie.setSecure(secure);
-      cookie.setPath("/");
-      cookie.setMaxAge(0);
-      response.addCookie(cookie);
+      boolean httpOnly = !name.equals("csrf_token");
+      ResponseCookie cookie = ResponseCookie.from(name, "")
+            .httpOnly(httpOnly)
+            .secure(secure)
+            .path("/")
+            .maxAge(0)
+            .sameSite("Lax")
+            .build();
+      response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString());
    }
 
    public static String getCookieValue(HttpServletRequest request, String name) {
