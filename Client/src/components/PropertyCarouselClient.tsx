@@ -110,7 +110,7 @@ export default function PropertyCarouselClient({ properties }: PropertyCarouselC
                {properties.map((property, idx) => (
                   <div
                      key={property.id}
-                     className="w-[88vw] sm:w-[calc(50%-8px)] lg:w-[calc(25%-12px)] shrink-0 snap-start"
+                     className="w-[260px] xs:w-[280px] sm:w-[calc(50%-8px)] md:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)] xl:w-[calc(20%-12.8px)] max-w-[270px] shrink-0 snap-start"
                   >
                      <PropertyCardClient property={property} index={idx} />
                   </div>

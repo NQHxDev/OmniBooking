@@ -8,7 +8,6 @@ import {
    Shield,
    Coffee,
    Wifi,
-   User,
    Clock,
    Heart,
    Sparkles,
@@ -17,22 +16,148 @@ import {
    Utensils,
    Waves,
    ChevronRight,
+   Car,
+   Bus,
+   Dumbbell,
+   Bell,
+   ArrowUpDown,
+   Users,
+   PawPrint,
+   Wind,
+   Tv,
+   Sunset,
+   Wine,
+   Lock,
+   Laptop,
+   Shirt,
+   Bath,
+   Droplet,
+   Refrigerator,
+   Microwave,
+   Table,
+   LucideIcon,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import PriceDisplay from "@/components/PriceDisplay";
 import { propertyService, PropertyDetailResponse } from "@/services/propertyService";
 import { getTranslations } from "next-intl/server";
+import RoomPricingSection from "@/components/RoomPricingSection";
+
+const AMENITY_CONFIGS: Record<
+   string,
+   { translationKey: string; icon: LucideIcon; iconColor: string }
+> = {
+   // General
+   "free wi-fi": { translationKey: "freeWifi", icon: Wifi, iconColor: "#006ce4" },
+   "swimming pool": { translationKey: "swimmingPool", icon: Waves, iconColor: "#006ce4" },
+   parking: { translationKey: "parking", icon: Car, iconColor: "#006ce4" },
+   "airport shuttle": { translationKey: "airportShuttle", icon: Bus, iconColor: "#006ce4" },
+   "gym / fitness center": { translationKey: "gym", icon: Dumbbell, iconColor: "#006ce4" },
+   "spa & wellness center": { translationKey: "spa", icon: Sparkles, iconColor: "#006ce4" },
+   "24-hour front desk": { translationKey: "frontDesk24h", icon: Bell, iconColor: "#006ce4" },
+   elevator: { translationKey: "elevator", icon: ArrowUpDown, iconColor: "#006ce4" },
+   "family rooms": { translationKey: "familyRooms", icon: Users, iconColor: "#006ce4" },
+   "pet friendly": { translationKey: "petFriendly", icon: PawPrint, iconColor: "#006ce4" },
+
+   // Room
+   "air conditioning": { translationKey: "airConditioning", icon: Wind, iconColor: "#006ce4" },
+   "flat-screen tv": { translationKey: "flatScreenTv", icon: Tv, iconColor: "#006ce4" },
+   balcony: { translationKey: "balcony", icon: Sunset, iconColor: "#006ce4" },
+   minibar: { translationKey: "minibar", icon: Wine, iconColor: "#006ce4" },
+   safe: { translationKey: "safe", icon: Lock, iconColor: "#006ce4" },
+   "work desk": { translationKey: "workDesk", icon: Laptop, iconColor: "#006ce4" },
+   "ironing facilities": { translationKey: "ironingFacilities", icon: Shirt, iconColor: "#006ce4" },
+
+   // Bathroom
+   "private bathroom": { translationKey: "privateBathroom", icon: Bath, iconColor: "#006ce4" },
+   hairdryer: { translationKey: "hairdryer", icon: Wind, iconColor: "#006ce4" },
+   "free toiletries": { translationKey: "freeToiletries", icon: Sparkles, iconColor: "#006ce4" },
+   bathrobe: { translationKey: "bathrobe", icon: Shirt, iconColor: "#006ce4" },
+   shower: { translationKey: "shower", icon: Droplet, iconColor: "#006ce4" },
+   bathtub: { translationKey: "bathtub", icon: Bath, iconColor: "#006ce4" },
+
+   // Kitchen
+   refrigerator: { translationKey: "refrigerator", icon: Refrigerator, iconColor: "#006ce4" },
+   microwave: { translationKey: "microwave", icon: Microwave, iconColor: "#006ce4" },
+   "electric kettle": { translationKey: "electricKettle", icon: Coffee, iconColor: "#006ce4" },
+   kitchenware: { translationKey: "kitchenware", icon: Utensils, iconColor: "#006ce4" },
+   "dining table": { translationKey: "diningTable", icon: Table, iconColor: "#006ce4" },
+
+   // Custom / Extras from screens
+   restaurant: { translationKey: "restaurant", icon: Utensils, iconColor: "#006ce4" },
+   bar: { translationKey: "bar", icon: Wine, iconColor: "#006ce4" },
+   "room service": { translationKey: "roomService", icon: Bell, iconColor: "#006ce4" },
+   breakfast: { translationKey: "breakfast", icon: Coffee, iconColor: "#006ce4" },
+   "good breakfast": { translationKey: "breakfast", icon: Coffee, iconColor: "#006ce4" },
+   "non-smoking rooms": { translationKey: "nonSmoking", icon: Wind, iconColor: "#006ce4" },
+   "non-smoking room": { translationKey: "nonSmoking", icon: Wind, iconColor: "#006ce4" },
+};
+
+const getAmenityConfig = (amenityName: string) => {
+   const lower = amenityName.toLowerCase().trim();
+   if (AMENITY_CONFIGS[lower]) {
+      return AMENITY_CONFIGS[lower];
+   }
+
+   // Fallback checks
+   if (lower.includes("pool") || lower.includes("bể bơi") || lower.includes("hồ bơi")) {
+      return { translationKey: "swimmingPool", icon: Waves, iconColor: "#006ce4" };
+   }
+   if (lower.includes("wifi") || lower.includes("wi-fi") || lower.includes("internet")) {
+      return { translationKey: "freeWifi", icon: Wifi, iconColor: "#006ce4" };
+   }
+   if (lower.includes("spa") || lower.includes("massage") || lower.includes("trị liệu")) {
+      return { translationKey: "spa", icon: Sparkles, iconColor: "#006ce4" };
+   }
+   if (lower.includes("nhà hàng") || lower.includes("restaurant") || lower.includes("ăn uống")) {
+      return { translationKey: "restaurant", icon: Utensils, iconColor: "#006ce4" };
+   }
+   if (lower.includes("đưa đón") || lower.includes("shuttle") || lower.includes("transfer")) {
+      return { translationKey: "airportShuttle", icon: Bus, iconColor: "#006ce4" };
+   }
+   if (lower.includes("đỗ xe") || lower.includes("bãi xe") || lower.includes("parking")) {
+      return { translationKey: "parking", icon: Car, iconColor: "#006ce4" };
+   }
+   if (lower.includes("gym") || lower.includes("thể hình") || lower.includes("fitness")) {
+      return { translationKey: "gym", icon: Dumbbell, iconColor: "#006ce4" };
+   }
+   if (lower.includes("bar") || lower.includes("rượu") || lower.includes("quầy nước")) {
+      return { translationKey: "bar", icon: Wine, iconColor: "#006ce4" };
+   }
+   if (lower.includes("lễ tân") || lower.includes("reception") || lower.includes("front desk")) {
+      return { translationKey: "frontDesk24h", icon: Bell, iconColor: "#006ce4" };
+   }
+   if (lower.includes("thú cưng") || lower.includes("pet")) {
+      return { translationKey: "petFriendly", icon: PawPrint, iconColor: "#006ce4" };
+   }
+   if (lower.includes("điều hòa") || lower.includes("máy lạnh") || lower.includes("conditioning")) {
+      return { translationKey: "airConditioning", icon: Wind, iconColor: "#006ce4" };
+   }
+   if (lower.includes("bữa sáng") || lower.includes("breakfast") || lower.includes("ăn sáng")) {
+      return { translationKey: "breakfast", icon: Coffee, iconColor: "#006ce4" };
+   }
+   if (lower.includes("hút thuốc") || lower.includes("smoking")) {
+      return { translationKey: "nonSmoking", icon: Wind, iconColor: "#006ce4" };
+   }
+
+   return {
+      translationKey: "",
+      icon: Check,
+      iconColor: "#008009",
+   };
+};
 
 interface PageProps {
    params: Promise<{
       locale: string;
       id: string;
    }>;
+   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function PropertyDetailPage({ params }: PageProps) {
+export default async function PropertyDetailPage({ params, searchParams }: PageProps) {
    const { locale, id } = await params;
+   await searchParams; // Await to satisfy Next.js dynamic APIs requirement
    const isVi = locale === "vi";
 
    let property: PropertyDetailResponse | null = null;
@@ -437,141 +562,38 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                            <span>{t("amenities")}</span>
                         </h2>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                           {finalProperty.amenities.map((amenity, index) => (
-                              <div
-                                 key={index}
-                                 className="flex items-center gap-3 text-sm text-zinc-700 hover:text-zinc-900 transition-colors"
-                              >
-                                 <div className="h-8 w-8 rounded-full bg-zinc-50 flex items-center justify-center shrink-0 border border-zinc-100">
-                                    {amenity.toLowerCase().includes("pool") ||
-                                    amenity.toLowerCase().includes("bể bơi") ? (
-                                       <Waves className="h-4 w-4 text-[#006ce4]" />
-                                    ) : amenity.toLowerCase().includes("wifi") ? (
-                                       <Wifi className="h-4 w-4 text-[#006ce4]" />
-                                    ) : amenity.toLowerCase().includes("spa") ||
-                                      amenity.toLowerCase().includes("massage") ? (
-                                       <Sparkles className="h-4 w-4 text-[#006ce4]" />
-                                    ) : amenity.toLowerCase().includes("nhà hàng") ||
-                                      amenity.toLowerCase().includes("restaurant") ||
-                                      amenity.toLowerCase().includes("bar") ? (
-                                       <Utensils className="h-4 w-4 text-[#006ce4]" />
-                                    ) : amenity.toLowerCase().includes("đưa đón") ||
-                                      amenity.toLowerCase().includes("transfer") ? (
-                                       <Clock className="h-4 w-4 text-[#006ce4]" />
-                                    ) : (
-                                       <Check className="h-4 w-4 text-[#008009]" />
-                                    )}
+                           {finalProperty.amenities.map((amenity, index) => {
+                              const config = getAmenityConfig(amenity);
+                              const IconComponent = config.icon;
+                              const translatedText = config.translationKey
+                                 ? t(`amenitiesList.${config.translationKey}`)
+                                 : amenity;
+                              return (
+                                 <div
+                                    key={index}
+                                    className="flex items-center gap-3 text-sm text-zinc-700 hover:text-zinc-900 transition-colors"
+                                 >
+                                    <div className="h-8 w-8 rounded-full bg-zinc-50 flex items-center justify-center shrink-0 border border-zinc-100">
+                                       <IconComponent
+                                          className="h-4 w-4"
+                                          style={{ color: config.iconColor }}
+                                       />
+                                    </div>
+                                    <span className="font-semibold text-zinc-800">
+                                       {translatedText}
+                                    </span>
                                  </div>
-                                 <span className="font-semibold text-zinc-800">{amenity}</span>
-                              </div>
-                           ))}
+                              );
+                           })}
                         </div>
                      </section>
                   )}
 
                   {/* Rooms Selection */}
-                  <section className="bg-white rounded-2xl p-6 md:p-8 border border-zinc-200/80 shadow-xs">
-                     <h2 className="text-xl font-bold text-zinc-900 mb-6 pb-2 border-b border-zinc-100 flex items-center gap-2">
-                        <Coffee className="h-5 w-5 text-[#006ce4]" />
-                        <span>{t("selectRoom")}</span>
-                     </h2>
-
-                     <div className="space-y-6">
-                        {finalProperty.roomTypes &&
-                           finalProperty.roomTypes.map((room) => {
-                              const originalRoomPrice = room.basePrice * 1.5;
-                              return (
-                                 <div
-                                    key={room.id}
-                                    className="border border-zinc-200 rounded-xl p-5 hover:border-[#006ce4] transition-all duration-300 hover:shadow-xs"
-                                 >
-                                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                                       <div className="space-y-2 flex-1">
-                                          <h3 className="text-lg font-bold text-zinc-900 hover:text-[#006ce4] transition-colors leading-tight">
-                                             {room.name}
-                                          </h3>
-                                          <p className="text-xs text-zinc-500 font-medium leading-relaxed">
-                                             {room.description}
-                                          </p>
-
-                                          {/* Badges/Configurations */}
-                                          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2 text-xs font-semibold text-zinc-700">
-                                             {room.roomSizeSqm && (
-                                                <span className="flex items-center gap-1 bg-zinc-50 px-2 py-1 rounded border border-zinc-200">
-                                                   <Compass className="h-3.5 w-3.5 text-zinc-500" />
-                                                   {room.roomSizeSqm} {t("sqm")}
-                                                </span>
-                                             )}
-                                             {room.bedType && (
-                                                <span className="flex items-center gap-1 bg-zinc-50 px-2 py-1 rounded border border-zinc-200">
-                                                   <User className="h-3.5 w-3.5 text-zinc-500" />
-                                                   {room.bedType}
-                                                </span>
-                                             )}
-                                             <span className="flex items-center gap-1 bg-zinc-50 px-2 py-1 rounded border border-zinc-200">
-                                                <User className="h-3.5 w-3.5 text-zinc-500" />
-                                                {room.capacityAdults}{" "}
-                                                {isVi ? "Người lớn" : "Adults"}
-                                                {room.capacityChildren > 0 &&
-                                                   ` + ${room.capacityChildren} ${isVi ? "Trẻ em" : "Children"}`}
-                                             </span>
-                                          </div>
-
-                                          {/* Policies info */}
-                                          <div className="space-y-1 pt-3 text-xs">
-                                             <div className="flex items-center gap-1.5 text-[#008009] font-bold">
-                                                <Check className="h-4 w-4" />
-                                                <span>{t("freeCancel")}</span>
-                                             </div>
-                                             <div className="flex items-center gap-1.5 text-[#008009] font-bold">
-                                                <Check className="h-4 w-4" />
-                                                <span>
-                                                   {t("noPrepay")} -{" "}
-                                                   <span className="text-zinc-500 font-medium">
-                                                      {t("payAtProperty")}
-                                                   </span>
-                                                </span>
-                                             </div>
-                                          </div>
-                                       </div>
-
-                                       {/* Pricing & CTA */}
-                                       <div className="flex flex-col items-end justify-between shrink-0 text-right self-stretch md:self-auto border-t md:border-t-0 md:border-l border-zinc-100 pt-4 md:pt-0 md:pl-6">
-                                          <div className="space-y-1 mb-4 md:mb-0">
-                                             <span className="text-xs text-zinc-400 block font-semibold uppercase">
-                                                {t("priceNight")}
-                                             </span>
-                                             {/* Original price */}
-                                             <span className="text-xs text-red-600 line-through block font-medium">
-                                                <PriceDisplay
-                                                   amount={originalRoomPrice}
-                                                   size="sm"
-                                                   className="text-xs text-red-600 line-through font-medium"
-                                                />
-                                             </span>
-                                             {/* Price */}
-                                             <div className="flex items-baseline justify-end gap-1.5">
-                                                <PriceDisplay
-                                                   amount={room.basePrice}
-                                                   size="lg"
-                                                   className="text-[#006ce4] font-extrabold text-2xl leading-none"
-                                                />
-                                             </div>
-                                             <span className="text-[10px] text-zinc-500 block font-medium">
-                                                {t("included")}
-                                             </span>
-                                          </div>
-
-                                          <button className="bg-[#006ce4] hover:bg-[#0057b7] text-white px-5 py-3 rounded-lg font-bold text-xs transition-all active:scale-[0.98] cursor-pointer shadow-md hover:shadow-lg w-full md:w-auto mt-auto">
-                                             {t("reserve")}
-                                          </button>
-                                       </div>
-                                    </div>
-                                 </div>
-                              );
-                           })}
-                     </div>
-                  </section>
+                  <RoomPricingSection
+                     propertyId={finalProperty.id}
+                     roomTypes={finalProperty.roomTypes || []}
+                  />
 
                   {/* Real Reviews Mockup */}
                   <section className="bg-white rounded-2xl p-6 md:p-8 border border-zinc-200/80 shadow-xs">

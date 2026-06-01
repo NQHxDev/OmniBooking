@@ -7,6 +7,7 @@ import { PropertyDocument } from "@/lib/api/services/propertyService";
 import { useTranslations, useLocale } from "next-intl";
 import PriceDisplay from "./PriceDisplay";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 interface PropertyCardProps {
    property: PropertyDocument;
@@ -19,6 +20,23 @@ export default function PropertyCard({ property, index }: PropertyCardProps) {
    const locale = useLocale();
    const isVi = locale === "vi";
    const [isFavorite, setIsFavorite] = useState(false);
+   const searchParams = useSearchParams();
+   const queryStr = searchParams.toString();
+   const detailUrl = `/${locale}/properties/${property.id}${queryStr ? `?${queryStr}` : ""}`;
+
+   const checkinParam = searchParams.get("checkin");
+   const checkoutParam = searchParams.get("checkout");
+   let nights = 1;
+   if (checkinParam && checkoutParam) {
+      try {
+         const checkinDate = new Date(checkinParam);
+         const checkoutDate = new Date(checkoutParam);
+         const timeDiff = checkoutDate.getTime() - checkinDate.getTime();
+         nights = Math.max(1, Math.round(timeDiff / (1000 * 60 * 60 * 24)));
+      } catch (e) {
+         nights = 1;
+      }
+   }
 
    const renderStars = (count: number) => {
       return Array.from({ length: count }).map((_, i) => (
@@ -74,7 +92,7 @@ export default function PropertyCard({ property, index }: PropertyCardProps) {
                   {/* Name and Badges */}
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                      <Link
-                        href={`/${locale}/properties/${property.id}`}
+                        href={detailUrl}
                         target="_blank"
                         className="text-lg font-extrabold text-[#006ce4] hover:text-[#005bb8] transition-colors leading-tight cursor-pointer"
                      >
@@ -174,34 +192,30 @@ export default function PropertyCard({ property, index }: PropertyCardProps) {
                {/* Right side: Prices and Call to Action */}
                <div className="flex flex-col items-end shrink-0 text-right">
                   <span className="text-[11px] text-zinc-500 font-medium">
-                     1 {t("night")}, 2 {tc("Search.adults" as const)}
+                     {nights} {isVi ? "đêm" : nights > 1 ? "nights" : "night"}, 2{" "}
+                     {tc("Search.adults" as const)}
                   </span>
 
-                  {/* Original price (strikethrough) */}
-                  <span className="text-sm text-red-600 line-through font-medium mt-1">
+                  {/* Prices (Original & Final side-by-side) */}
+                  <div className="flex items-baseline gap-2 mt-2.5 justify-end">
                      <PriceDisplay
                         amount={originalPrice}
                         size="sm"
-                        className="text-sm text-red-600 line-through font-medium"
+                        className="text-xs text-red-500/70 line-through font-medium leading-none"
                      />
-                  </span>
-
-                  {/* Final Price */}
-                  <div className="flex items-center gap-1 mt-0.5">
                      <PriceDisplay
                         amount={property.minPrice}
                         size="custom"
-                        className="text-zinc-600 font-bold text-xl"
+                        className="text-zinc-800 font-bold text-lg leading-none"
                      />
-                     <Info className="h-3.5 w-3.5 text-zinc-400 cursor-pointer hover:text-zinc-600 transition-colors" />
                   </div>
 
-                  <span className="text-[10px] text-zinc-500 font-medium">
-                     {isVi ? "Đã bao gồm thuế và phí" : "Includes taxes and charges"}
+                  <span className="text-[10px] text-zinc-400 font-medium leading-none mt-1">
+                     {isVi ? "Đã gồm thuế & phí" : "Includes taxes & fees"}
                   </span>
 
                   <Link
-                     href={`/${locale}/properties/${property.id}`}
+                     href={detailUrl}
                      target="_blank"
                      className="mt-3 bg-[#006ce4] hover:bg-[#0057b7] text-white px-4 py-2.5 rounded-md font-bold text-sm transition-all active:scale-[0.98] flex items-center gap-1 cursor-pointer"
                   >

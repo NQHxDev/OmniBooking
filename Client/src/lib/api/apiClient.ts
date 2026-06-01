@@ -11,7 +11,17 @@ const apiClient = axios.create({
    headers: {
       "Content-Type": "application/json",
    },
+   xsrfCookieName: "csrf_token",
+   xsrfHeaderName: "X-CSRF-Token",
 });
+
+function getCookie(name: string): string | null {
+   if (typeof document === "undefined") return null;
+   const value = `; ${document.cookie}`;
+   const parts = value.split(`; ${name}=`);
+   if (parts.length === 2) return parts.pop()?.split(";").shift() || null;
+   return null;
+}
 
 apiClient.interceptors.request.use(
    (config) => {
@@ -19,6 +29,12 @@ apiClient.interceptors.request.use(
       const requestId = uuidv7();
       config.headers["X-Request-ID"] = requestId;
       config.headers["X-Correlation-ID"] = requestId;
+
+      // Inject CSRF token manually since backend is on a different port (cross-origin)
+      const csrfToken = getCookie("csrf_token");
+      if (csrfToken) {
+         config.headers["X-CSRF-Token"] = csrfToken;
+      }
 
       // Inject Sentry trace and baggage headers if active span exists
       const activeSpan = Sentry.getActiveSpan();

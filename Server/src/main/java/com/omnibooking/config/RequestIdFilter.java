@@ -108,6 +108,9 @@ public class RequestIdFilter implements Filter {
       MDC.put(MdcKeys.SERVICE_NAME, ObservabilityConstants.SERVICE_NAME);
       MDC.put(MdcKeys.MODULE, module);
 
+      // Save to ServletRequest attributes so controllers/filters can access
+      request.setAttribute("requestId", requestId);
+
       // Configure Sentry Scope
       final String finalUserId = userId;
       final String finalRequestId = requestId;

@@ -8,6 +8,7 @@ import { PropertyResponse } from "@/services/propertyService";
 import { useLocale } from "next-intl";
 import PriceDisplay from "./PriceDisplay";
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 
 export default function PropertyCardClient({
    property,
@@ -19,6 +20,23 @@ export default function PropertyCardClient({
    const locale = useLocale();
    const isVi = locale === "vi";
    const [isFavorite, setIsFavorite] = React.useState(false);
+   const searchParams = useSearchParams();
+   const queryStr = searchParams.toString();
+   const detailUrl = `/${locale}/properties/${property.id}${queryStr ? `?${queryStr}` : ""}`;
+
+   const checkinParam = searchParams.get("checkin");
+   const checkoutParam = searchParams.get("checkout");
+   let nights = 1;
+   if (checkinParam && checkoutParam) {
+      try {
+         const checkinDate = new Date(checkinParam);
+         const checkoutDate = new Date(checkoutParam);
+         const timeDiff = checkoutDate.getTime() - checkinDate.getTime();
+         nights = Math.max(1, Math.round(timeDiff / (1000 * 60 * 60 * 24)));
+      } catch (e) {
+         nights = 1;
+      }
+   }
 
    const getRatingText = (rating: number) => {
       if (rating >= 9) return isVi ? "Xuất sắc" : "Exceptional";
@@ -53,13 +71,9 @@ export default function PropertyCardClient({
          viewport={{ once: true }}
          className="group bg-white rounded-2xl overflow-hidden border border-zinc-100/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.08)] transition-all duration-300 hover:-translate-y-1 relative"
       >
-         <Link
-            href={`/${locale}/properties/${property.id}`}
-            target="_blank"
-            className="block h-full cursor-pointer select-none"
-         >
+         <Link href={detailUrl} target="_blank" className="block h-full cursor-pointer select-none">
             {/* Image Section */}
-            <div className="relative h-64 w-full">
+            <div className="relative aspect-4/3 w-full">
                <Image
                   src={property.imageUrl || "/images/not_found.png"}
                   alt={property.name}
@@ -90,7 +104,7 @@ export default function PropertyCardClient({
             {/* Details Section */}
             <div className="p-5">
                {/* Name */}
-               <h4 className="text-lg font-bold text-black group-hover:text-[#006ce4] transition-colors line-clamp-1 leading-snug">
+               <h4 className="text-base font-bold text-black group-hover:text-[#006ce4] transition-colors line-clamp-1 leading-snug">
                   {property.name}
                </h4>
 
@@ -138,24 +152,26 @@ export default function PropertyCardClient({
                </div>
 
                {/* Pricing Section */}
-               <div className="mt-4 pt-4 border-t border-zinc-100">
-                  <span className="text-[10px] text-zinc-400 font-bold uppercase block mb-1 leading-none">
-                     {isVi ? "Giá từ" : "Price from"}
-                  </span>
+               <div className="mt-4 pt-3 border-t border-zinc-100/80 flex flex-col gap-1">
                   <div className="flex items-baseline gap-2">
+                     {/* Original Price (pale red strike-through) */}
+                     <PriceDisplay
+                        amount={originalPrice}
+                        size="sm"
+                        className="text-xs text-red-500/70 line-through font-medium leading-none"
+                     />
+                     {/* Final Price (modern bold grayish black) */}
                      <PriceDisplay
                         amount={basePrice}
                         size="custom"
-                        className="text-zinc-600 font-bold text-xl leading-none"
+                        className="text-zinc-700 font-bold text-lg tracking-tight leading-none"
                      />
-                     <span className="text-xs text-red-600 line-through font-medium leading-none">
-                        <PriceDisplay
-                           amount={originalPrice}
-                           size="sm"
-                           className="text-xs text-red-600 line-through font-medium"
-                        />
-                     </span>
                   </div>
+                  {/* Stay duration & Taxes info */}
+                  <span className="text-[10px] text-zinc-400 font-medium leading-none mt-0.5">
+                     {nights} {isVi ? "đêm" : nights > 1 ? "nights" : "night"} ·{" "}
+                     {isVi ? "Đã gồm thuế & phí" : "Includes taxes & fees"}
+                  </span>
                </div>
             </div>
          </Link>
