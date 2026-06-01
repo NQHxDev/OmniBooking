@@ -197,4 +197,61 @@ public class SessionRotationIntegrationTest {
       // Ensure invalid new session was cleaned up/deleted
       verify(sessionService, times(1)).deleteSession(argThat(id -> !id.equals(oldSessionId)));
    }
+
+   @Test
+   void shouldLogoutSuccessfullyWhenSessionOwnedByUser() {
+      UUID sessionId = UUID.randomUUID();
+      UUID userId = UUID.randomUUID();
+
+      // Mock session owned by the user
+      RedisSessionInfo sessionInfo = RedisSessionInfo.builder()
+            .userId(userId)
+            .username("test@example.com")
+            .build();
+      doReturn(sessionInfo).when(sessionService).getSession(sessionId);
+      doNothing().when(sessionService).deleteSession(sessionId);
+
+      // Act
+      authService.logout(sessionId, userId, response);
+
+      // Assert
+      verify(sessionService, times(1)).deleteSession(sessionId);
+   }
+
+   @Test
+   void shouldFailLogoutWhenSessionOwnedByAnotherUser() {
+      UUID sessionId = UUID.randomUUID();
+      UUID userId = UUID.randomUUID();
+      UUID otherUserId = UUID.randomUUID();
+
+      // Mock session owned by another user
+      RedisSessionInfo sessionInfo = RedisSessionInfo.builder()
+            .userId(otherUserId)
+            .username("other@example.com")
+            .build();
+      doReturn(sessionInfo).when(sessionService).getSession(sessionId);
+
+      // Act & Assert
+      assertThatThrownBy(() -> authService.logout(sessionId, userId, response))
+            .isInstanceOf(AppException.class)
+            .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.UNAUTHORIZED);
+
+      // Ensure deleteSession was NEVER called
+      verify(sessionService, never()).deleteSession(sessionId);
+   }
+
+   @Test
+   void shouldLogoutGracefullyWhenSessionDoesNotExist() {
+      UUID sessionId = UUID.randomUUID();
+      UUID userId = UUID.randomUUID();
+
+      // Mock session does not exist (returns null)
+      doReturn(null).when(sessionService).getSession(sessionId);
+
+      // Act
+      authService.logout(sessionId, userId, response);
+
+      // Assert - should not throw and should not call deleteSession
+      verify(sessionService, never()).deleteSession(sessionId);
+   }
 }

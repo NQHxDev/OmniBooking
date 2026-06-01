@@ -306,7 +306,7 @@ OmniBooking's search system is designed to provide a fast, accurate, and discove
 
 ### 17.4. IP-Based Geolocation & Country Detection
 
-- **Client IP Extraction**: The backend extracts the client's public IP address via the `X-FORWARDED-FOR` request header (which is populated by reverse proxies or forwarded by the Next.js server). If not present, it falls back to `HttpServletRequest.getRemoteAddr()`.
+- **Client IP Extraction (Trusted & Secure)**: The backend utilizes Spring Boot's native forward headers strategy (`server.forward-headers-strategy=native`) to securely process forwarded headers (such as `X-Forwarded-For` and `X-Forwarded-Proto`) sent by trusted reverse proxies. The client IP is extracted directly using `HttpServletRequest.getRemoteAddr()`, which is automatically populated by the servlet container with the validated client IP, preventing IP spoofing attacks.
 - **MaxMind GeoIP2 Resolution**: The `GeoLocationService` reads the client IP and queries a local MaxMind GeoIP2 city database (`GeoLite2-City.mmdb`) to resolve the user's ISO 3166-1 alpha-2 country code (e.g. `VN`, `FR`, `US`).
 - **Configurable Fallback**: If the IP is a local loopback address (`127.0.0.1`, `0:0:0:0:0:0:0:1`) or if the database is missing, it falls back to a default country configured via `app.geo.default-country` (defaults to `VN`).
 - **Next.js SSR Forwarding**: For Server-side Rendering (SSR) fetches where the request originates from the Next.js server itself, the client's original IP address is read from the incoming request's `x-forwarded-for` header and forwarded to the backend API inside the `X-Forwarded-For` HTTP header. This ensures correct location targeting.

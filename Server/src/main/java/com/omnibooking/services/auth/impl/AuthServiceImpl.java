@@ -228,7 +228,13 @@ public class AuthServiceImpl implements AuthService {
 
    @Override
    public void logout(UUID sessionId, UUID userId, HttpServletResponse response) {
-      sessionService.deleteSession(sessionId);
+      RedisSessionInfo info = sessionService.getSession(sessionId);
+      if (info != null) {
+         if (!userId.equals(info.getUserId())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+         }
+         sessionService.deleteSession(sessionId);
+      }
       CookieUtils.clearAuthCookies(response, cookieSecure);
    }
 
