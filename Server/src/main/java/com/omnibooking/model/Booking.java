@@ -52,6 +52,10 @@ public class Booking extends BaseEntity {
    @Column(name = "final_price", nullable = false)
    private BigDecimal finalPrice;
 
+   @Builder.Default
+   @Column(name = "currency", nullable = false, length = 3)
+   private String currency = "USD";
+
    @ManyToOne
    @JoinColumn(name = "coupon_id")
    private Coupon coupon;

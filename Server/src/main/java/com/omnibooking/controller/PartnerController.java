@@ -21,10 +21,13 @@ import org.springframework.web.bind.annotation.RestController;
 import com.omnibooking.services.auth.AuthService;
 import com.omnibooking.services.partner.PartnerService;
 import com.omnibooking.dto.PartnerStatsResponse;
+import com.omnibooking.dto.PartnerBookingResponse;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.util.OtpUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
+import java.util.List;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -174,6 +177,20 @@ public class PartnerController {
 
       return ResponseEntity
             .ok(ApiResponse.success(authResponse, "Chúc mừng! Bạn đã trở thành đối tác của OmniBooking", requestId));
+   }
+
+   @GetMapping("/bookings")
+   public ResponseEntity<ApiResponse<List<PartnerBookingResponse>>> getBookings(
+         @AuthenticationPrincipal UserPrincipal principal,
+         HttpServletRequest request) {
+
+      String requestIdAttr = (String) request.getAttribute("requestId");
+      String requestId = requestIdAttr != null ? requestIdAttr : "N/A";
+
+      UUID userId = Objects.requireNonNull(principal.getId(), "User ID cannot be null");
+      List<PartnerBookingResponse> bookings = partnerService.getPartnerBookings(userId);
+
+      return ResponseEntity.ok(ApiResponse.success(bookings, "Lấy danh sách đặt phòng đối tác thành công", requestId));
    }
 
 }

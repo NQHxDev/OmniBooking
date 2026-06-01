@@ -657,4 +657,47 @@ public class AuthServiceImpl implements AuthService {
       return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
             now, null);
    }
+
+   @Override
+   public boolean checkEmail(String email) {
+      if (email == null || email.isBlank()) {
+         return false;
+      }
+      String cleanEmail = email.trim().toLowerCase();
+      if (bloomFilterService.mightContain(cleanEmail)) {
+         return userRepository.findByEmail(cleanEmail)
+               .map(User::getIsActive)
+               .orElse(false);
+      }
+      return false;
+   }
+
+   @Override
+   @Transactional
+   public AuthResponse activateGuest(String token, String password, String ip, String userAgent, HttpServletResponse response) {
+      UUID userId = verificationService.verifyToken(token);
+      if (userId == null) {
+         throw new AppException(ErrorCode.INVALID_TOKEN);
+      }
+
+      User user = userRepository.findById(userId)
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+      user.setPassword(passwordEncoder.encode(password));
+      user.setIsActive(true);
+      userRepository.save(user);
+
+      UserProfile profile = userProfileRepository.findById(userId).orElse(null);
+      if (profile != null) {
+         profile.setIsVerified(true);
+         userProfileRepository.save(profile);
+      }
+
+      Set<String> roles = user.getRoles().stream()
+            .map(Role::getName)
+            .collect(Collectors.toSet());
+
+      long now = System.currentTimeMillis();
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now, null);
+   }
 }

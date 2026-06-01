@@ -160,4 +160,35 @@ export const authService = {
       )) as unknown as ApiResponse<User>;
       return response.data;
    },
+
+   /**
+    * Checks if an email is registered and active.
+    */
+   checkEmail: async (email: string): Promise<boolean> => {
+      const response = (await apiClient.get(
+         `/auth/check-email?email=${encodeURIComponent(email)}`,
+         {
+            withCredentials: true,
+            // @ts-expect-error - Custom axios config flag for interceptor
+            _skipToast: true,
+         }
+      )) as unknown as ApiResponse<boolean>;
+      return response.data;
+   },
+
+   /**
+    * Activates a guest account and logs them in.
+    */
+   activateGuest: async (token: string, password: string): Promise<User> => {
+      const response = (await apiClient.post(
+         "/auth/activate-guest",
+         { token, password },
+         {
+            withCredentials: true,
+            // @ts-expect-error - Custom axios config flag for interceptor
+            _skipToast: true,
+         }
+      )) as unknown as ApiResponse<User>;
+      return response.data;
+   },
 };

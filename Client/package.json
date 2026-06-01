@@ -22,6 +22,7 @@
       "date-fns": "^4.1.0",
       "framer-motion": "^12.38.0",
       "i18n-iso-countries": "^7.14.0",
+      "jsbarcode": "^3.12.3",
       "leaflet": "^1.9.4",
       "libphonenumber-js": "^1.13.3",
       "lucide-react": "^1.14.0",
@@ -45,6 +46,7 @@
    },
    "devDependencies": {
       "@tailwindcss/postcss": "^4",
+      "@types/jsbarcode": "^3.11.4",
       "@types/node": "^20",
       "@types/react": "^19",
       "@types/react-dom": "^19",

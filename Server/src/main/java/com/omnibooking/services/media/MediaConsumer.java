@@ -5,14 +5,15 @@ import com.omnibooking.dto.CloudinaryResponse;
 import com.omnibooking.dto.event.MediaUploadEvent;
 import com.omnibooking.model.Media;
 import com.omnibooking.repository.MediaRepository;
+import com.omnibooking.repository.PropertyRepository;
 import com.omnibooking.dto.event.PropertySyncEvent;
+import com.omnibooking.services.property.PropertyService;
 import com.omnibooking.services.property.PropertyImagesCacheService;
 import com.omnibooking.services.core.OutboxService;
 import com.omnibooking.services.core.IdempotencyService;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.CacheManager;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,11 +29,19 @@ import com.omnibooking.services.core.LeaseRenewer;
 public class MediaConsumer {
 
    private final CloudinaryService cloudinaryService;
+
    private final MediaRepository mediaRepository;
-   private final CacheManager cacheManager;
+
+   private final PropertyRepository propertyRepository;
+
+   private final PropertyService propertyService;
+
    private final PropertyImagesCacheService propertyImagesCacheService;
+
    private final OutboxService outboxService;
+
    private final IdempotencyService idempotencyService;
+
    private final MeterRegistry meterRegistry;
 
    @Transactional
@@ -42,7 +51,7 @@ public class MediaConsumer {
       if (event.getEventId() != null) {
          boolean claimed = idempotencyService.claimEvent(event.getEventId(), consumerGroup);
          if (!claimed) {
-            log.warn("[Kafka Consumer] Duplicate media upload event detected and skipped: eventId={}, entityId={}", 
+            log.warn("[Kafka Consumer] Duplicate media upload event detected and skipped: eventId={}, entityId={}",
                   event.getEventId(), event.getEntityId());
             meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
             meterRegistry.counter("omnibooking.kafka.consumer.skipped").increment();
@@ -82,16 +91,30 @@ public class MediaConsumer {
                propertyImagesCacheService.evict(propertyId);
                log.info("[Kafka Consumer] Evicted property images cache for property: {}", propertyId);
             } catch (Exception e) {
-               log.error("[Kafka Consumer] Failed to evict property images cache for property: {}", event.getEntityId(), e);
+               log.error("[Kafka Consumer] Failed to evict property images cache for property: {}", event.getEntityId(),
+                     e);
             }
          }
 
-         // Evict 'properties' cache so the home page updates immediately once the main image is ready
+         // Evict 'properties' cache so the home page updates immediately once the main
+         // image is ready
          if (event.isMain() && "PROPERTY".equals(event.getEntityType())) {
-            org.springframework.cache.Cache propertiesCache = cacheManager.getCache("properties");
-            if (propertiesCache != null) {
-               propertiesCache.clear();
-               log.info("[Kafka Consumer] Evicted 'properties' cache because main image for property {} is ready", event.getEntityId());
+            // Evict public homepage cache region via PropertyService to avoid proxy
+            // limitations
+            try {
+               propertyService.evictPublicPropertiesCache();
+            } catch (Exception e) {
+               log.error("[Kafka Consumer] Failed to evict public properties cache", e);
+            }
+
+            // Evict the partner_properties cache for the owner
+            try {
+               UUID propertyId = UUID.fromString(event.getEntityId());
+               propertyRepository.findById(propertyId).ifPresent(property -> {
+                  propertyService.evictPartnerPropertiesCache(property.getOwner().getId());
+               });
+            } catch (Exception e) {
+               log.error("[Kafka Consumer] Failed to evict partner properties cache", e);
             }
 
             // Sync to Elasticsearch via Transactional Outbox to guarantee delivery
@@ -103,9 +126,10 @@ public class MediaConsumer {
                   PropertySyncEvent.builder()
                         .propertyId(propertyId)
                         .operation("CREATE")
-                        .build()
-            );
-            log.info("[Kafka Consumer] Recorded Elasticsearch sync event in outbox for property: {} after main image upload completed", propertyId);
+                        .build());
+            log.info(
+                  "[Kafka Consumer] Recorded Elasticsearch sync event in outbox for property: {} after main image upload completed",
+                  propertyId);
          }
 
          if (event.getEventId() != null) {
@@ -118,11 +142,14 @@ public class MediaConsumer {
          // Rollback compensation for Cloudinary resource leakage prevention
          if (response != null && response.publicId() != null) {
             try {
-               log.warn("[Kafka Consumer] Database persistence failed. Performing rollback compensation: deleting uploaded asset {} from Cloudinary", response.publicId());
+               log.warn(
+                     "[Kafka Consumer] Database persistence failed. Performing rollback compensation: deleting uploaded asset {} from Cloudinary",
+                     response.publicId());
                cloudinaryService.delete(response.publicId());
                meterRegistry.counter("omnibooking.media.orphaned.cleanup").increment();
             } catch (Exception deleteEx) {
-               log.error("[Kafka Consumer] Failed to delete orphaned Cloudinary asset: {}", response.publicId(), deleteEx);
+               log.error("[Kafka Consumer] Failed to delete orphaned Cloudinary asset: {}", response.publicId(),
+                     deleteEx);
             }
          }
 

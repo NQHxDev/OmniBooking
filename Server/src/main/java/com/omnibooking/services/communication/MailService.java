@@ -29,6 +29,33 @@ public class MailService {
             .build();
    }
 
+   public EmailEvent buildBookingConfirmationEmailEvent(
+         String toEmail, String userName, String token, String bookingCode,
+         String propertyName, String roomTypeName, String checkInDate, String checkOutDate,
+         String totalPrice, String finalPrice, String secondaryTotalPrice, String secondaryFinalPrice) {
+      String activateLink = token != null ? (appProperties.getClientUrl() + "/auth/activate?token=" + token) : null;
+      Map<String, Object> variables = new HashMap<>();
+      variables.put("userName", userName);
+      variables.put("activateLink", activateLink);
+      variables.put("bookingCode", bookingCode);
+      variables.put("propertyName", propertyName);
+      variables.put("roomTypeName", roomTypeName);
+      variables.put("checkInDate", checkInDate);
+      variables.put("checkOutDate", checkOutDate);
+      variables.put("totalPrice", totalPrice);
+      variables.put("finalPrice", finalPrice);
+      variables.put("secondaryTotalPrice", secondaryTotalPrice);
+      variables.put("secondaryFinalPrice", secondaryFinalPrice);
+
+      String htmlContent = mailTemplateService.buildHtmlContent("booking-confirmation", variables);
+
+      return EmailEvent.builder()
+            .to(toEmail)
+            .subject("Xác nhận đặt phòng thành công - OmniBooking")
+            .content(htmlContent)
+            .build();
+   }
+
    public EmailEvent buildPartnerOtpEmailEvent(String toEmail, String userName, String otpCode) {
       Map<String, Object> variables = new HashMap<>();
       variables.put("userName", userName);

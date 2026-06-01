@@ -8,6 +8,7 @@
 *.swp
 node_modules/
 .antigravity/
+.codegraph/
 
 .env
 .env.local
@@ -17,8 +18,9 @@ Todo.md
 NOTE.md
 
 # --- Backend (Server - Spring Boot / Maven) ---
-Server/target/
 Server/bin/
+Server/target/
+Server/target_test-classes/
 Server/.settings/
 Server/.project
 Server/.classpath

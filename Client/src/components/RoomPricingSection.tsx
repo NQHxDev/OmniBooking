@@ -38,7 +38,7 @@ interface RoomPricingSectionProps {
    roomTypes: RoomType[];
 }
 
-export default function RoomPricingSection({ roomTypes }: RoomPricingSectionProps) {
+export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricingSectionProps) {
    const t = useTranslations("PropertyDetail");
    const tc = useTranslations("Common");
    const locale = useLocale();
@@ -515,7 +515,14 @@ export default function RoomPricingSection({ roomTypes }: RoomPricingSectionProp
                                        </div>
                                     )}
 
-                                    <button className="bg-[#006ce4] hover:bg-[#0057b7] text-white px-5 py-3 rounded-lg font-bold text-xs transition-all active:scale-[0.98] cursor-pointer shadow-md hover:shadow-lg w-full md:w-auto mt-4">
+                                    <button
+                                       onClick={() => {
+                                          router.push(
+                                             `/${locale}/booking?propertyId=${propertyId}&roomTypeId=${room.id}&checkin=${checkinParam}&checkout=${checkoutParam}&rooms=${roomsParam}`
+                                          );
+                                       }}
+                                       className="bg-[#006ce4] hover:bg-[#0057b7] text-white px-5 py-3 rounded-lg font-bold text-xs transition-all active:scale-[0.98] cursor-pointer shadow-md hover:shadow-lg w-full md:w-auto mt-4"
+                                    >
                                        {t("reserve")}
                                     </button>
                                  </div>
