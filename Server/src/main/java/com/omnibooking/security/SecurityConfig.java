@@ -40,6 +40,9 @@ public class SecurityConfig {
    private final ObjectMapper objectMapper;
    private final RequestMappingHandlerMapping requestMappingHandlerMapping;
 
+   @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:3000}")
+   private String allowedOrigins;
+
    @Bean
    public PasswordEncoder passwordEncoder() {
       return Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
@@ -55,7 +58,12 @@ public class SecurityConfig {
       UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
       CorsConfiguration config = new CorsConfiguration();
       config.setAllowCredentials(true);
-      config.setAllowedOrigins(List.of("http://localhost:3000"));
+      if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+         config.setAllowedOrigins(java.util.Arrays.stream(allowedOrigins.split(","))
+               .map(String::trim)
+               .filter(s -> !s.isEmpty())
+               .collect(java.util.stream.Collectors.toList()));
+      }
       config.setAllowedHeaders(List.of(
             "Authorization",
             "Content-Type",
@@ -81,7 +89,7 @@ public class SecurityConfig {
    @Bean
    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
       JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, userDetailsService, redisTemplate);
-      CustomCsrfFilter csrfFilter = new CustomCsrfFilter(objectMapper, requestMappingHandlerMapping);
+      CustomCsrfFilter csrfFilter = new CustomCsrfFilter(objectMapper, requestMappingHandlerMapping, allowedOrigins);
 
       http
             .csrf(AbstractHttpConfigurer::disable)

@@ -28,6 +28,8 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
 
    private final RequestMappingHandlerMapping requestMappingHandlerMapping;
 
+   private final String allowedOrigins;
+
    private static final List<String> STATE_CHANGING_METHODS = Arrays.asList("POST", "PUT", "DELETE", "PATCH");
 
    @Override
@@ -49,11 +51,26 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
             return;
          }
 
+         // Origin Header validation for browser state-changing requests
+         String origin = request.getHeader("Origin");
+         if (origin != null && !origin.isBlank()) {
+            boolean matched = false;
+            if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+               matched = Arrays.stream(allowedOrigins.split(","))
+                     .map(String::trim)
+                     .anyMatch(allowed -> allowed.equalsIgnoreCase(origin));
+            }
+            if (!matched) {
+               handleError(request, response, ErrorCode.CSRF_ORIGIN_INVALID);
+               return;
+            }
+         }
+
          String csrfCookie = getCookieValue(request, "csrf_token");
          String csrfHeader = request.getHeader("X-CSRF-Token");
 
          if (csrfCookie == null || csrfHeader == null || !csrfCookie.equals(csrfHeader)) {
-            handleError(request, response);
+            handleError(request, response, ErrorCode.CSRF_TOKEN_INVALID);
             return;
          }
       }
@@ -79,9 +96,8 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
       return false;
    }
 
-   private void handleError(HttpServletRequest request, HttpServletResponse response) throws IOException {
+   private void handleError(HttpServletRequest request, HttpServletResponse response, ErrorCode error) throws IOException {
       String requestId = (String) request.getAttribute("requestId");
-      ErrorCode error = ErrorCode.CSRF_TOKEN_INVALID;
       ApiResponse<Object> apiResponse = ApiResponse.error(
             error.getMessage(),
             error.getCode(),

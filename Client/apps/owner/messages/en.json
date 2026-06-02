@@ -1,0 +1,58 @@
+{
+   "Common": {
+      "title": "OmniBooking Admin Panel",
+      "verifying": "Verifying Admin rights...",
+      "waiting": "Please wait a moment...",
+      "denied": "Access Denied",
+      "noPermission": "Your account does not have permission to access the Admin panel.",
+      "backToHome": "Back to Home",
+      "Currency": {
+         "USD": "US Dollar",
+         "VND": "Vietnamese Dong"
+      }
+   },
+   "Owner": {
+      "sidebar": {
+         "overview": "Overview",
+         "properties": "Approve Properties",
+         "users": "Manage Users",
+         "reports": "Revenue Reports",
+         "settings": "System Settings",
+         "backToHome": "Back to Home"
+      },
+      "header": {
+         "searchPlaceholder": "Search accounts, invoices, properties...",
+         "adminRole": "System Administrator",
+         "ownerRole": "System Owner"
+      },
+      "dashboard": {
+         "title": "Admin Dashboard",
+         "welcome": "Welcome back! Here is the overall activity of the OmniBooking system",
+         "stats": {
+            "totalUsers": "Total Users",
+            "totalProperties": "Total Properties",
+            "systemRevenue": "System Revenue",
+            "activeBookings": "Active Bookings"
+         },
+         "pendingApproval": {
+            "title": "Accommodations Awaiting Approval",
+            "subtitle": "Review legal profiles and approve operations for new partners",
+            "viewAll": "View all properties",
+            "propertyColumn": "Property / Partner",
+            "typeColumn": "Type",
+            "dateColumn": "Registration Date",
+            "actionColumn": "Action",
+            "approveBtn": "Approve",
+            "rejectBtn": "Reject",
+            "approvedSuccess": "Property approved successfully!",
+            "rejectedSuccess": "Property rejected!"
+         }
+      },
+      "authGuard": {
+         "denied": "Access Denied",
+         "noPermission": "Your account does not have Admin privileges.",
+         "verifying": "Verifying access rights...",
+         "waiting": "Please wait..."
+      }
+   }
+}

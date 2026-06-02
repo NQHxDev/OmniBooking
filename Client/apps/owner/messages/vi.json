@@ -1,0 +1,58 @@
+{
+   "Common": {
+      "title": "Bảng quản trị OmniBooking",
+      "verifying": "Đang xác thực quyền Admin...",
+      "waiting": "Vui lòng đợi trong giây lát...",
+      "denied": "Từ chối truy cập",
+      "noPermission": "Tài khoản của bạn không có quyền truy cập vào trang Admin.",
+      "backToHome": "Quay lại trang chủ",
+      "Currency": {
+         "USD": "Đô la Mỹ",
+         "VND": "Việt Nam Đồng"
+      }
+   },
+   "Owner": {
+      "sidebar": {
+         "overview": "Tổng quan",
+         "properties": "Duyệt chỗ nghỉ",
+         "users": "Quản lý người dùng",
+         "reports": "Báo cáo doanh thu",
+         "settings": "Cài đặt hệ thống",
+         "backToHome": "Quay lại trang chủ"
+      },
+      "header": {
+         "searchPlaceholder": "Tìm kiếm tài khoản, mã hóa đơn, chỗ nghỉ...",
+         "adminRole": "Quản trị viên Hệ thống",
+         "ownerRole": "Chủ sở hữu Hệ thống"
+      },
+      "dashboard": {
+         "title": "Bảng quản trị Admin",
+         "welcome": "Chào mừng quay trở lại! Dưới đây là tình hình hoạt động của toàn hệ thống OmniBooking",
+         "stats": {
+            "totalUsers": "Tổng người dùng",
+            "totalProperties": "Tổng chỗ nghỉ",
+            "systemRevenue": "Doanh thu hệ thống",
+            "activeBookings": "Đơn đặt phòng hoạt động"
+         },
+         "pendingApproval": {
+            "title": "Cơ sở lưu trú chờ phê duyệt",
+            "subtitle": "Xem xét hồ sơ pháp lý và phê duyệt hoạt động cho các đối tác mới",
+            "viewAll": "Xem tất cả cơ sở",
+            "propertyColumn": "Chỗ nghỉ / Đối tác",
+            "typeColumn": "Loại hình",
+            "dateColumn": "Ngày đăng ký",
+            "actionColumn": "Thao tác",
+            "approveBtn": "Phê duyệt",
+            "rejectBtn": "Từ chối",
+            "approvedSuccess": "Phê duyệt chỗ nghỉ thành công!",
+            "rejectedSuccess": "Đã từ chối chỗ nghỉ!"
+         }
+      },
+      "authGuard": {
+         "denied": "Truy cập bị từ chối",
+         "noPermission": "Tài khoản của bạn không có quyền Admin.",
+         "verifying": "Đang xác thực quyền truy cập...",
+         "waiting": "Vui lòng chờ..."
+      }
+   }
+}

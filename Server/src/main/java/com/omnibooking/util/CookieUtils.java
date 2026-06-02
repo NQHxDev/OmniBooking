@@ -5,6 +5,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
 import org.springframework.http.ResponseCookie;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 public class CookieUtils {
 
@@ -12,6 +14,39 @@ public class CookieUtils {
    public static final String SESSION_ID = "session_id";
    public static final String REFRESH_TOKEN = "refresh_token";
    public static final String FINGERPRINT = "x_fgp";
+
+   public static String cookieDomain;
+
+   /**
+    * Resolves the cookie domain dynamically based on request host.
+    */
+   private static String resolveCookieDomain() {
+      if (cookieDomain != null && !cookieDomain.isBlank()) {
+         return cookieDomain;
+      }
+      try {
+         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+         if (attributes != null) {
+            HttpServletRequest request = attributes.getRequest();
+            String host = request.getHeader("X-Forwarded-Host");
+            if (host == null || host.isBlank()) {
+               host = request.getHeader("Host");
+            }
+            if (host != null && !host.isBlank()) {
+               String hostname = host.split(":")[0].toLowerCase();
+               if (hostname.equals("localhost") || hostname.equals("127.0.0.1") || hostname.startsWith("192.168.")) {
+                  return null; // Omit domain for local loopback/IP testing so it defaults to request host
+               }
+               if (hostname.endsWith("zeion.online")) {
+                  return ".zeion.online";
+               }
+            }
+         }
+      } catch (Exception e) {
+         // Fallback if request context is not available
+      }
+      return null;
+   }
 
    /**
     * Sets auth cookies in the response.
@@ -42,26 +77,32 @@ public class CookieUtils {
 
    public static void addCookie(HttpServletResponse response, String name, String value, int maxAge, boolean secure) {
       boolean httpOnly = !name.equals("csrf_token");
-      ResponseCookie cookie = ResponseCookie.from(name, value)
+      ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, value)
             .httpOnly(httpOnly)
             .secure(secure)
             .path("/")
             .maxAge(maxAge)
-            .sameSite("Lax")
-            .build();
-      response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString());
+            .sameSite("Lax");
+      String resolvedDomain = resolveCookieDomain();
+      if (resolvedDomain != null && !resolvedDomain.isBlank()) {
+         builder.domain(resolvedDomain);
+      }
+      response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, builder.build().toString());
    }
 
    public static void deleteCookie(HttpServletResponse response, String name, boolean secure) {
       boolean httpOnly = !name.equals("csrf_token");
-      ResponseCookie cookie = ResponseCookie.from(name, "")
+      ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, "")
             .httpOnly(httpOnly)
             .secure(secure)
             .path("/")
             .maxAge(0)
-            .sameSite("Lax")
-            .build();
-      response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString());
+            .sameSite("Lax");
+      String resolvedDomain = resolveCookieDomain();
+      if (resolvedDomain != null && !resolvedDomain.isBlank()) {
+         builder.domain(resolvedDomain);
+      }
+      response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, builder.build().toString());
    }
 
    public static String getCookieValue(HttpServletRequest request, String name) {
