@@ -18,7 +18,6 @@ import com.omnibooking.model.enums.DiscountType;
 import com.omnibooking.repository.BookingRepository;
 import com.omnibooking.repository.BookingStatusLogRepository;
 import com.omnibooking.repository.CouponRepository;
-import com.omnibooking.repository.RoleRepository;
 import com.omnibooking.repository.RoomAvailabilityRepository;
 import com.omnibooking.repository.RoomTypeRepository;
 import com.omnibooking.repository.UserRepository;
@@ -33,6 +32,7 @@ import com.omnibooking.services.core.CurrencyService;
 import com.omnibooking.services.core.EncryptionService;
 import com.omnibooking.services.core.OutboxService;
 import com.omnibooking.services.user.VerificationService;
+import com.omnibooking.services.auth.CachedRoleService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
@@ -55,28 +55,44 @@ import org.springframework.transaction.annotation.Transactional;
 public class BookingServiceImpl implements BookingService {
 
    private final BookingRepository bookingRepository;
+
    private final RoomTypeRepository roomTypeRepository;
+
    private final RoomAvailabilityRepository roomAvailabilityRepository;
+
    private final UserRepository userRepository;
+
    private final UserProfileRepository userProfileRepository;
-   private final RoleRepository roleRepository;
+
+   private final CachedRoleService cachedRoleService;
+
    private final CouponRepository couponRepository;
+
    private final BookingStatusLogRepository bookingStatusLogRepository;
+
    private final TransactionRepository transactionRepository;
 
    private final EncryptionService encryptionService;
+
    private final BloomFilterService bloomFilterService;
+
    private final VerificationService verificationService;
+
    private final MailService mailService;
+
    private final OutboxService outboxService;
+
    private final CurrencyService currencyService;
+
    private final PasswordEncoder passwordEncoder;
+
    private final org.springframework.cache.CacheManager cacheManager;
 
    @Override
    @Transactional
    public BookingResponse createBooking(CreateBookingRequest request, UserPrincipal principal) {
-      log.info("Creating booking for email: {}, RoomType: {}", request.getGuestEmail(), request.getRoomTypeId());
+      // log.info("Creating booking for email: {}, RoomType: {}",
+      // request.getGuestEmail(), request.getRoomTypeId());
 
       if (request.getCheckInDate().isAfter(request.getCheckOutDate())
             || request.getCheckInDate().isEqual(request.getCheckOutDate())) {
@@ -86,7 +102,7 @@ public class BookingServiceImpl implements BookingService {
       RoomType roomType = roomTypeRepository.findById(request.getRoomTypeId())
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Room type not found"));
 
-      // 1. Resolve User (Logged in vs. Guest)
+      // Resolve User (Logged in vs. Guest)
       User user = null;
       boolean isNewGuest = false;
       boolean isInactiveGuest = false;
@@ -104,8 +120,7 @@ public class BookingServiceImpl implements BookingService {
             }
          } else {
             isNewGuest = true;
-            Role userRole = roleRepository.findByName("ROLE_USER")
-                  .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+            Role userRole = cachedRoleService.getRoleByName("ROLE_USER");
 
             String username = "guest_" + UUID.randomUUID().toString().substring(0, 8);
             String rawPassword = UUID.randomUUID().toString();
@@ -135,7 +150,7 @@ public class BookingServiceImpl implements BookingService {
          }
       }
 
-      // 2. Room Availability Check & Locks (Pessimistic write locks for each day)
+      // Room Availability Check & Locks (Pessimistic write locks for each day)
       BigDecimal basePriceSum = BigDecimal.ZERO;
       LocalDate date = request.getCheckInDate();
       while (date.isBefore(request.getCheckOutDate())) {
@@ -173,7 +188,7 @@ public class BookingServiceImpl implements BookingService {
       BigDecimal totalPrice = basePriceSum.multiply(BigDecimal.valueOf(request.getNumRooms()));
       BigDecimal finalPrice = totalPrice;
 
-      // 3. Coupon processing
+      // Coupon processing
       Coupon coupon = null;
       if (request.getCouponId() != null) {
          coupon = couponRepository.findById(request.getCouponId())
@@ -213,7 +228,7 @@ public class BookingServiceImpl implements BookingService {
          couponRepository.save(coupon);
       }
 
-      // 4. Calculate Deposit Requirements
+      // Calculate Deposit Requirements
       boolean requiresDeposit = false;
       if (principal == null) {
          requiresDeposit = true;
@@ -271,12 +286,14 @@ public class BookingServiceImpl implements BookingService {
             .booking(booking)
             .oldStatus(null)
             .newStatus(initialStatus)
-            .reason(isPendingMomo ? "Initial booking created, pending MoMo deposit payment" : "Initial booking created and confirmed")
+            .reason(isPendingMomo ? "Initial booking created, pending MoMo deposit payment"
+                  : "Initial booking created and confirmed")
             .changedBy(user)
             .build();
       bookingStatusLogRepository.save(logEntry);
 
-      // 5. Send outbox confirmation email & activation token if guest is new or inactive
+      // 5. Send outbox confirmation email & activation token if guest is new or
+      // inactive
       String token = null;
       if (isNewGuest || isInactiveGuest) {
          token = verificationService.createVerificationToken(user.getId());
@@ -319,7 +336,8 @@ public class BookingServiceImpl implements BookingService {
                "BOOKING_CONFIRMED_MAIL",
                emailEvent);
 
-         // Evict partner bookings list cache to show the new booking on their management page
+         // Evict partner bookings list cache to show the new booking on their management
+         // page
          try {
             org.springframework.cache.Cache cache = cacheManager.getCache("partner_bookings");
             if (cache != null) {
@@ -355,7 +373,8 @@ public class BookingServiceImpl implements BookingService {
    @Override
    @Transactional
    public void confirmBooking(UUID bookingId, String paymentMethod, String providerTransactionId, String metadata) {
-      log.info("Confirming booking: {} via paymentMethod: {}, providerTransactionId: {}", bookingId, paymentMethod, providerTransactionId);
+      log.info("Confirming booking: {} via paymentMethod: {}, providerTransactionId: {}", bookingId, paymentMethod,
+            providerTransactionId);
       Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Booking not found"));
 
@@ -431,12 +450,14 @@ public class BookingServiceImpl implements BookingService {
             "BOOKING_CONFIRMED_MAIL",
             emailEvent);
 
-      // Evict partner bookings list cache to show the new booking on their management page
+      // Evict partner bookings list cache to show the new booking on their management
+      // page
       try {
          org.springframework.cache.Cache cache = cacheManager.getCache("partner_bookings");
          if (cache != null) {
             cache.evict(booking.getRoomType().getProperty().getOwner().getId());
-            log.info("Evicted partner_bookings cache for partner: {}", booking.getRoomType().getProperty().getOwner().getId());
+            log.info("Evicted partner_bookings cache for partner: {}",
+                  booking.getRoomType().getProperty().getOwner().getId());
          }
       } catch (Exception e) {
          log.error("Failed to evict partner_bookings cache", e);
@@ -444,7 +465,7 @@ public class BookingServiceImpl implements BookingService {
    }
 
    @Override
-   @org.springframework.transaction.annotation.Transactional(readOnly = true)
+   @Transactional(readOnly = true)
    public BookingResponse getBookingById(UUID bookingId) {
       log.info("Fetching booking details for ID: {}", bookingId);
       Booking booking = bookingRepository.findById(bookingId)
@@ -487,4 +508,5 @@ public class BookingServiceImpl implements BookingService {
          return nf.format(amount.setScale(2, RoundingMode.HALF_UP));
       }
    }
+
 }

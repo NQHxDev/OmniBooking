@@ -22,11 +22,15 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
 @EnableWebSecurity
@@ -39,7 +43,7 @@ public class SecurityConfig {
    private final ObjectMapper objectMapper;
    private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
 
-   @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:3000}")
+   @Value("${app.cors.allowed-origins:http://localhost:3000}")
    private String allowedOrigins;
 
    @Bean
@@ -58,10 +62,10 @@ public class SecurityConfig {
       CorsConfiguration config = new CorsConfiguration();
       config.setAllowCredentials(true);
       if (allowedOrigins != null && !allowedOrigins.isBlank()) {
-         config.setAllowedOrigins(java.util.Arrays.stream(allowedOrigins.split(","))
+         config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
                .map(String::trim)
                .filter(s -> !s.isEmpty())
-               .collect(java.util.stream.Collectors.toList()));
+               .collect(Collectors.toList()));
       }
       config.setAllowedHeaders(List.of(
             "Authorization",

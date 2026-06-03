@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -31,7 +32,7 @@ public class JWTService {
    /**
     * Generate an Access Token with userId, roles, and sessionId.
     */
-   public String generateAccessToken(UUID userId, java.util.Collection<String> roles, UUID sessionId,
+   public String generateAccessToken(UUID userId, Collection<String> roles, UUID sessionId,
          String fingerprintHash) {
       return generateAccessToken(userId, roles, sessionId, fingerprintHash, 0);
    }
@@ -39,7 +40,7 @@ public class JWTService {
    /**
     * Generate an Access Token with userId, roles, sessionId, and tokenVersion.
     */
-   public String generateAccessToken(UUID userId, java.util.Collection<String> roles, UUID sessionId,
+   public String generateAccessToken(UUID userId, Collection<String> roles, UUID sessionId,
          String fingerprintHash, Integer tokenVersion) {
       return Jwts.builder()
             .subject(userId.toString())

@@ -77,4 +77,5 @@ public class SessionServiceImpl implements SessionService {
       RedisSessionInfo info = getSession(sessionId);
       return info != null && passwordEncoder.matches(refreshToken.toString(), info.getHashedRefreshToken());
    }
+
 }

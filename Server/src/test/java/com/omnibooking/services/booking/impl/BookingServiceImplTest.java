@@ -28,6 +28,7 @@ import com.omnibooking.services.user.VerificationService;
 import com.omnibooking.repository.TransactionRepository;
 import com.omnibooking.model.Transaction;
 import com.omnibooking.model.enums.BookingStatus;
+import com.omnibooking.services.auth.CachedRoleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,6 +68,8 @@ class BookingServiceImplTest {
    private UserProfileRepository userProfileRepository;
    @Mock
    private RoleRepository roleRepository;
+   @Mock
+   private CachedRoleService cachedRoleService;
    @Mock
    private CouponRepository couponRepository;
    @Mock
@@ -190,7 +193,7 @@ class BookingServiceImplTest {
 
       mockRoomAvailability(checkIn, checkOut, null);
       when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
-      when(roleRepository.findByName("ROLE_USER")).thenReturn(Optional.of(mockRole));
+      when(cachedRoleService.getRoleByName("ROLE_USER")).thenReturn(mockRole);
       when(passwordEncoder.encode(anyString())).thenReturn("hashed_pass");
       when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
          User u = invocation.getArgument(0);
@@ -231,7 +234,7 @@ class BookingServiceImplTest {
 
       mockRoomAvailability(checkIn, checkOut, null);
       when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
-      when(roleRepository.findByName("ROLE_USER")).thenReturn(Optional.of(mockRole));
+      when(cachedRoleService.getRoleByName("ROLE_USER")).thenReturn(mockRole);
       when(passwordEncoder.encode(anyString())).thenReturn("hashed_pass");
       when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
          User u = invocation.getArgument(0);

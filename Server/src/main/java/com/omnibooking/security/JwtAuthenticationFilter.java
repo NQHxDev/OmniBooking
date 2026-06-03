@@ -3,6 +3,7 @@ package com.omnibooking.security;
 import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.util.CookieUtils;
 import com.omnibooking.util.SecurityUtils;
+import com.omnibooking.dto.ApiResponse;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,6 +19,13 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.micrometer.common.lang.NonNull;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.QueryTimeoutException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -29,13 +37,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
    private final StringRedisTemplate redisTemplate;
 
-   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+   private final MeterRegistry meterRegistry;
 
    @Override
    protected void doFilterInternal(
-         @org.springframework.lang.NonNull HttpServletRequest request,
-         @org.springframework.lang.NonNull HttpServletResponse response,
-         @org.springframework.lang.NonNull FilterChain filterChain)
+         @NonNull HttpServletRequest request,
+         @NonNull HttpServletResponse response,
+         @NonNull FilterChain filterChain)
          throws ServletException, IOException {
 
       if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
@@ -56,14 +64,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                fingerprintFromCookie = request.getHeader("x-fgp");
             }
 
-            // 1. Verify SessionID consistency
+            // Verify SessionID consistency
             if (sessionIdFromCookie == null || !sessionIdFromJwt.toString().equals(sessionIdFromCookie)) {
                log.warn("Session ID mismatch detected for user: {}", userId);
                filterChain.doFilter(request, response);
                return;
             }
 
-            // 2. Verify Fingerprint consistency
+            // Verify Fingerprint consistency
             if (fingerprintFromCookie == null || fgpHashFromJwt == null ||
                   !SecurityUtils.hashFingerprint(fingerprintFromCookie).equals(fgpHashFromJwt)) {
                log.warn("Fingerprint mismatch or missing for user: {}. Possible token theft.", userId);
@@ -71,7 +79,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                return;
             }
 
-            // 3. Stateful Verification: Check Redis
+            // Stateful Verification: Check Redis
             String redisKey = "refresh:" + sessionIdFromJwt;
             try {
                if (Boolean.FALSE.equals(redisTemplate.hasKey(redisKey))) {
@@ -85,14 +93,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                return;
             }
 
-            // 4. Set Authentication
+            // Set Authentication
             if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                UserDetails userDetails = userDetailsService.loadUserById(userId.toString());
 
                if (userDetails instanceof UserPrincipal userPrincipal) {
                   Integer tokenVersionFromJwt = jwtService.extractTokenVersion(accessToken);
                   if (tokenVersionFromJwt == null || !tokenVersionFromJwt.equals(userPrincipal.getTokenVersion())) {
-                     log.warn("Token version mismatch for user: {}. Expected {}, got {}", userId, userPrincipal.getTokenVersion(), tokenVersionFromJwt);
+                     log.warn("Token version mismatch for user: {}. Expected {}, got {}", userId,
+                           userPrincipal.getTokenVersion(), tokenVersionFromJwt);
                      filterChain.doFilter(request, response);
                      return;
                   }
@@ -114,31 +123,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
    }
 
-   private void handleRedisFailure(HttpServletRequest request, HttpServletResponse response, Exception ex) throws IOException {
+   private void handleRedisFailure(HttpServletRequest request, HttpServletResponse response, Exception ex)
+         throws IOException {
       String requestId = (String) request.getAttribute("requestId");
-      
+
       // Classify Redis exception reason
       String reason = "lookup_failure";
-      if (ex instanceof org.springframework.dao.QueryTimeoutException || ex.getMessage().toLowerCase().contains("timeout")) {
+      if (ex instanceof QueryTimeoutException || ex.getMessage().toLowerCase().contains("timeout")) {
          reason = "timeout";
-      } else if (ex instanceof org.springframework.data.redis.RedisConnectionFailureException ||
-                 ex instanceof org.springframework.dao.DataAccessResourceFailureException) {
+      } else if (ex instanceof RedisConnectionFailureException || ex instanceof DataAccessResourceFailureException) {
          reason = "connection_failure";
       }
-      
+
       meterRegistry.counter("omnibooking.auth.redis.failures", "reason", reason).increment();
       meterRegistry.counter("omnibooking.auth.rejections", "reason", "redis_unavailable").increment();
-      
-      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE); // HTTP 503
-      response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
+
+      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      response.setContentType(MediaType.APPLICATION_JSON_VALUE);
       response.setCharacterEncoding("UTF-8");
 
-      com.omnibooking.dto.ApiResponse<Object> apiResponse = com.omnibooking.dto.ApiResponse.error(
+      ApiResponse<Object> apiResponse = ApiResponse.error(
             "Authentication service is temporarily unavailable. Please try again later.",
             "SERVICE_UNAVAILABLE",
             ex.getMessage(),
             requestId);
-      response.getWriter().write(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(apiResponse));
+      response.getWriter().write(new ObjectMapper().writeValueAsString(apiResponse));
    }
 
 }

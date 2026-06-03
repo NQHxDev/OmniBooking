@@ -19,11 +19,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class RegistrationBatchWorker {
 
    private final StringRedisTemplate redisTemplate;
+
    private final ObjectMapper objectMapper;
+
    private final RegistrationService registrationService;
+
    private final AtomicBoolean isProcessing = new AtomicBoolean(false);
 
    private static final String REGISTRATION_QUEUE_KEY = "registration_queue";
+
    private static final int BATCH_SIZE = 100;
 
    /**
@@ -31,7 +35,6 @@ public class RegistrationBatchWorker {
     */
    public void trigger() {
       if (isProcessing.compareAndSet(false, true)) {
-         log.debug("Worker woken up by trigger.");
          Thread.ofVirtual().start(this::processBatchLoop);
       }
    }
@@ -39,7 +42,6 @@ public class RegistrationBatchWorker {
    @Scheduled(fixedDelay = 30000) // Fallback every 30 seconds
    public void scheduledFallback() {
       if (isProcessing.compareAndSet(false, true)) {
-         log.debug("Worker triggered by scheduled fallback.");
          processBatchLoop();
       }
    }
@@ -52,8 +54,6 @@ public class RegistrationBatchWorker {
             if (rawRequests == null || rawRequests.isEmpty()) {
                break;
             }
-
-            log.info("Processing registration batch of size: {}", rawRequests.size());
 
             List<RegisterRequest> requests = new ArrayList<>();
             for (String raw : rawRequests) {
@@ -74,7 +74,6 @@ public class RegistrationBatchWorker {
          }
       } finally {
          isProcessing.set(false);
-         log.debug("Worker finished processing and is now sleeping.");
       }
    }
 

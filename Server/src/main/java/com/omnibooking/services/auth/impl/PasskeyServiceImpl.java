@@ -31,8 +31,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class PasskeyServiceImpl implements PasskeyService {
 
    private final AppProperties appProperties;
+
    private final StringRedisTemplate redisTemplate;
+
    private final UserRepository userRepository;
+
    private final UserPasskeyRepository userPasskeyRepository;
 
    private static final String CHALLENGE_PREFIX = "passkey_challenge:";

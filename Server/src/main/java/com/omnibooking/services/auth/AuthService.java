@@ -3,6 +3,8 @@ package com.omnibooking.services.auth;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.dto.RegisterRequest;
+import com.omnibooking.dto.TwoFactorLoginRequest;
+import com.omnibooking.dto.oauth.OAuth2UserInfo;
 import com.omnibooking.security.RedisSessionInfo;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -15,9 +17,9 @@ public interface AuthService {
 
    AuthResponse login(LoginRequest request, String ip, String userAgent, HttpServletResponse response);
 
-   AuthResponse loginWith2FA(com.omnibooking.dto.TwoFactorLoginRequest request, String ip, String userAgent, HttpServletResponse response);
+   AuthResponse loginWith2FA(TwoFactorLoginRequest request, String ip, String userAgent, HttpServletResponse response);
 
-   AuthResponse loginWithOAuth2(String provider, com.omnibooking.dto.oauth.OAuth2UserInfo userInfo, String ip,
+   AuthResponse loginWithOAuth2(String provider, OAuth2UserInfo userInfo, String ip,
          String userAgent, HttpServletResponse response, boolean rememberMe);
 
    AuthResponse refresh(String sessionId, String refreshToken, String ip, String userAgent,

@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.omnibooking.dto.event.EmailEvent;
 import com.omnibooking.util.OtpUtils;
 
 import java.util.UUID;
@@ -26,8 +27,11 @@ public class SecurityVerificationServiceImpl implements SecurityVerificationServ
    private final OutboxService outboxService;
 
    private static final String OTP_KEY_PREFIX = "SECURITY_OTP:";
+
    private static final String TRUSTED_SESSION_PREFIX = "TRUSTED_SESSION:";
+
    private static final int OTP_EXPIRY_MINUTES = 5;
+
    private static final int TRUSTED_EXPIRY_MINUTES = 30;
 
    @Override
@@ -39,7 +43,7 @@ public class SecurityVerificationServiceImpl implements SecurityVerificationServ
       redisTemplate.opsForValue().set(key, otp, OTP_EXPIRY_MINUTES, TimeUnit.MINUTES);
 
       // Use Outbox Pattern for reliable email delivery
-      com.omnibooking.dto.event.EmailEvent emailEvent = mailService.buildSecurityOtpEmailEvent(email, email, otp);
+      EmailEvent emailEvent = mailService.buildSecurityOtpEmailEvent(email, email, otp);
       outboxService.saveEvent(
             userId,
             "SECURITY",

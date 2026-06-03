@@ -68,6 +68,24 @@ public class SessionRotationIntegrationTest {
    @MockitoBean
    private HttpServletResponse response;
 
+   @MockitoBean
+   private org.springframework.data.elasticsearch.core.ElasticsearchOperations elasticsearchOperations;
+
+   @MockitoBean
+   private com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository propertyElasticsearchRepository;
+
+   @MockitoBean
+   private com.omnibooking.repository.elasticsearch.DestinationElasticsearchRepository destinationElasticsearchRepository;
+
+   @MockitoBean
+   private org.springframework.kafka.core.KafkaTemplate<String, Object> kafkaTemplate;
+
+   @MockitoBean
+   private org.springframework.kafka.core.KafkaAdmin kafkaAdmin;
+
+   @MockitoBean
+   private org.springframework.data.redis.listener.RedisMessageListenerContainer redisMessageListenerContainer;
+
    @Mock
    private ValueOperations<String, String> valueOperations;
 

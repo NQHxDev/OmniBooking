@@ -10,7 +10,6 @@ import com.omnibooking.mapper.UserMapper;
 import com.omnibooking.model.Role;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
-import com.omnibooking.repository.RoleRepository;
 import com.omnibooking.repository.UserProfileRepository;
 import com.omnibooking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +28,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import com.omnibooking.services.auth.JWTService;
+import com.omnibooking.services.auth.CachedRoleService;
 import com.omnibooking.services.core.BloomFilterService;
 
 @Service
@@ -38,7 +38,7 @@ public class RegistrationService {
 
    private final UserRepository userRepository;
    private final UserProfileRepository userProfileRepository;
-   private final RoleRepository roleRepository;
+   private final CachedRoleService cachedRoleService;
    private final PasswordEncoder passwordEncoder;
    private final UserMapper userMapper;
    private final KafkaTemplate<String, Object> kafkaTemplate;
@@ -51,18 +51,12 @@ public class RegistrationService {
 
    @Transactional
    public void saveBatch(List<RegisterRequest> requests) {
-      Object roleObj = roleRepository.findByName("ROLE_USER").orElse(null);
-      if (roleObj == null) {
-         log.error("ROLE_USER not found, cannot process batch");
-         return;
-      }
-
-      // Handle cases where Spring Cache/Redis might return a LinkedHashMap
       Role userRole;
-      if (roleObj instanceof Role) {
-         userRole = (Role) roleObj;
-      } else {
-         userRole = objectMapper.convertValue(roleObj, Role.class);
+      try {
+         userRole = cachedRoleService.getRoleByName("ROLE_USER");
+      } catch (Exception e) {
+         log.error("ROLE_USER not found, cannot process batch", e);
+         return;
       }
 
       List<User> usersToSave = new ArrayList<>();

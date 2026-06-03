@@ -21,9 +21,13 @@ import com.omnibooking.services.core.LeaseRenewer;
 public class UserCDCConsumer {
 
    private final VerificationService verificationService;
+
    private final MailService mailService;
+
    private final OutboxService outboxService;
+
    private final IdempotencyService idempotencyService;
+
    private final MeterRegistry meterRegistry;
 
    @Transactional
@@ -33,7 +37,7 @@ public class UserCDCConsumer {
       if (event.getEventId() != null) {
          boolean claimed = idempotencyService.claimEvent(event.getEventId(), consumerGroup);
          if (!claimed) {
-            log.warn("[Kafka Consumer] Duplicate UserCreated CDC event detected and skipped: eventId={}, userId={}", 
+            log.warn("[Kafka Consumer] Duplicate UserCreated CDC event detected and skipped: eventId={}, userId={}",
                   event.getEventId(), event.getUserId());
             meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
             meterRegistry.counter("omnibooking.kafka.consumer.skipped").increment();
@@ -41,7 +45,8 @@ public class UserCDCConsumer {
          }
       }
 
-      log.info("CDC Event received: New user created with ID: {} (eventId: {})", event.getUserId(), event.getEventId());
+      log.info("CDC Event received: New user created with ID: {} (eventId: {})",
+            event.getUserId(), event.getEventId());
 
       try (LeaseRenewer ignored = new LeaseRenewer(idempotencyService, event.getEventId(), consumerGroup)) {
          // Create Verification Token

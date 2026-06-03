@@ -11,8 +11,10 @@ import com.omnibooking.model.UserProfile;
 import com.omnibooking.repository.RoleRepository;
 import com.omnibooking.repository.UserProfileRepository;
 import com.omnibooking.repository.UserRepository;
+import com.omnibooking.config.AppProperties;
 import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.services.auth.SessionService;
+import com.omnibooking.services.auth.CachedRoleService;
 import com.omnibooking.services.auth.impl.AuthServiceImpl;
 import com.omnibooking.services.communication.MailService;
 import com.omnibooking.services.core.BloomFilterService;
@@ -32,7 +34,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
 import java.util.Objects;
@@ -54,33 +55,56 @@ import static org.mockito.Mockito.*;
 class AuthServiceImplTest {
 
    @Mock
+   private AppProperties appProperties;
+
+   @Mock
+   private AppProperties.Security securityProperties;
+
+   @Mock
    private UserRepository userRepository;
+
    @Mock
    private RoleRepository roleRepository;
+
+   @Mock
+   private CachedRoleService cachedRoleService;
+
    @Mock
    private UserProfileRepository userProfileRepository;
+
    @Mock
    private PasswordEncoder passwordEncoder;
+
    @Mock
    private JWTService jwtService;
+
    @Mock
    private SessionService sessionService;
+
    @Mock
    private ApplicationEventPublisher eventPublisher;
+
    @Mock
    private VerificationService verificationService;
+
    @Mock
    private StringRedisTemplate redisTemplate;
+
    @Mock
    private BloomFilterService bloomFilterService;
+
    @Mock
    private HttpServletResponse response;
+
    @Mock
    private UserMapper userMapper;
+
    @Mock
    private MailService mailService;
+
    @Mock
    private OutboxService outboxService;
+
    @Mock
    private com.omnibooking.services.auth.TwoFactorAuthService twoFactorAuthService;
 
@@ -92,7 +116,8 @@ class AuthServiceImplTest {
 
    @BeforeEach
    void setUp() {
-      ReflectionTestUtils.setField(Objects.requireNonNull(authService), "cookieSecure", false);
+      lenient().when(appProperties.getSecurity()).thenReturn(securityProperties);
+      lenient().when(securityProperties.isCookieSecure()).thenReturn(false);
       lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
    }
 
@@ -118,7 +143,7 @@ class AuthServiceImplTest {
                .build();
 
          when(bloomFilterService.mightContain(request.getEmail())).thenReturn(false);
-         when(roleRepository.findByName("ROLE_USER")).thenReturn(Optional.of(userRole));
+         when(cachedRoleService.getRoleByName("ROLE_USER")).thenReturn(userRole);
          when(passwordEncoder.encode(anyString())).thenReturn("hashed_password");
          when(userMapper.toUser(any())).thenReturn(user);
          when(userRepository.save(any(User.class))).thenReturn(user);
