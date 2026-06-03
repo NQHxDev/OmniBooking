@@ -29,6 +29,8 @@ public class UserPrincipal implements UserDetails {
 
    private final boolean active;
 
+   private final Integer tokenVersion;
+
    public static UserPrincipal create(User user) {
       List<GrantedAuthority> authorities = user.getRoles().stream()
             .map(role -> new SimpleGrantedAuthority(role.getName()))
@@ -41,6 +43,7 @@ public class UserPrincipal implements UserDetails {
             .email(user.getEmail())
             .authorities(authorities)
             .active(user.getIsActive())
+            .tokenVersion(user.getTokenVersion())
             .build();
    }
 

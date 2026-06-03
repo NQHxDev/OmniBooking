@@ -49,6 +49,7 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 ### Performance & Scalability
 
 - **Distributed Caching**: Integrated Spring Cache with Redis to reduce DB load and improve response times.
+- **N+1 Query Optimization & Cache Consistency (Partner Properties)**: Optimized retrieval of property listing endpoints (`getPropertiesByOwner`, `getFeaturedProperties`, `getNewProperties`) to fetch properties and their main images via a batch select `findMainImagesByEntityIds` (reducing database hits from $N+1$ to exactly $2$ queries). A dedicated Redis cache region `partner_properties` caches the partner properties list. To bypass Spring AOP self-invocation caching proxy limitations, public eviction methods are exposed in `PropertyService` and triggered externally by `MediaConsumer` when a main image is processed via Kafka, ensuring both partner and homepage caches are evicted instantly. Defensive stream grouping in mapping avoids structure crashes on database image duplicates.
 - **MapStruct for DTO Mapping**: Automated DTO-Entity conversion using MapStruct to reduce boilerplate, improve type safety, and maintain a clean Service layer.
 - **Idempotency Framework (X-Idempotency-Key)**: Custom `@Idempotent` annotation and AOP-based interceptor using Redis to prevent duplicate request processing (Double-submit) for critical operations.
 - **Resilience Layer (Fault Tolerance)**: Integration of **Resilience4j** implementing Circuit Breaker and Retry patterns for third-party service calls (Cloudinary, Resend) to prevent cascading failures.
@@ -101,7 +102,7 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 
 ## 6. Security Architecture
 
-- **Security Foundation**: Robust `SecurityConfig` set up with CSRF protection disabled (for tokens), CORS enabled, and stateless session policy.
+- **Security Foundation**: Robust `SecurityConfig` set up with CORS enabled, stateless session policy, and CSRF protection enabled for cookie-based authentication via `CustomCsrfFilter` (state-changing requests check matching `csrf_token` cookie and `X-CSRF-Token` header, bypassing public endpoints).
 - **Public/Private Split**: Clear separation between public metadata/swagger endpoints and secured API routes.
 - **RBAC (Role-Based Access Control)**: Comprehensive system with `roles` (Admin, Partner, Driver, User) and granular `permissions` (e.g., `property:write`, `ride:manage`). Managed via `SecurityConstants` for type-safety.
 - **Security Standard**: All API security checks must use constants from `SecurityConstants` via SpEL (e.g., `T(com.omnibooking.constant.SecurityConstants.Roles).ADMIN`) to ensure consistency and avoid hardcoded strings.
@@ -111,9 +112,13 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 
 The system implements a robust, secure authentication mechanism designed for production environments:
 
-- **JWT with HttpOnly Cookies**: Access and Refresh tokens are stored in secure, HttpOnly, SameSite=Lax cookies to mitigate XSS attacks.
+- **JWT with HttpOnly Cookies & SameSite Lax**: Access and Refresh tokens, along with `session_id` and `x_fgp`, are stored in secure, HttpOnly, SameSite=Lax cookies (using Spring's `ResponseCookie` builder) to mitigate XSS and CSRF attacks.
+- **CSRF Cookie Integration**: The `csrf_token` cookie is also managed with SameSite=Lax but is configured with `httpOnly(false)`. This allows Next.js/client-side JS to read the cookie value and send it back as the `X-CSRF-Token` header, matching the backend's Double Submit Cookie verification strategy perfectly.
 - **Fingerprinting & Security Header**: To prevent JWT theft/hijacking, the system uses a dual-key verification. The backend compares a hash in the JWT with a raw `x_fgp` value. For Server-side fetches in Next.js (Server Components), this header must be manually extracted from cookies and propagated to the backend fetch call.
-- **Refresh Token Logic**: Automated token rotation. When a request fails with `AUTH_006` (Token Expired), the client transparently attempts to refresh the session before retrying the original request.
+- **Harden Refresh Token Rotation (Atomic & Resilient)**: Automated token rotation is implemented with atomic execution. The backend saves and verifies the new session in Redis _before_ revoking the old session. A transactional rollback strategy is deployed so that if any step of saving, verifying, or revoking fails, the newly generated session is cleaned up and the old session is kept active, preventing unintended user lockouts.
+- **Refresh Session DoS Prevention**: The distributed lock TTL on refresh operations is set to a short duration of 2 seconds (originally 5 seconds) to prevent prolonged session lockups and protect against Denial of Service (DoS) attacks on session refresh.
+- **JWT Revocation & Revocation Gap Mitigation**: The backend mitigates the JWT revocation gap by maintaining a `token_version` on the `User` entity (synced in the database and embedded as a claim in the JWT). During authentication in `JwtAuthenticationFilter`, the `token_version` extracted from the JWT is compared against the database-loaded `UserPrincipal`. Any mismatch immediately invalidates the authentication context, allowing instant global token revocation upon critical events (e.g., password change, explicit token revocation).
+- **OAuth2 CSRF Protection**: Both Google and Zalo OAuth2 providers implement secure `state` parameter validation. A unique UUID state is dynamically generated and stored in Redis with a 15-minute expiration before initiating the authorization flow. Upon callback execution, the state parameter returned by the provider is matched against Redis, mitigating OAuth CSRF and session hijacking attempts.
 - **Stateless Verification**: The backend validates JWTs without DB lookups for primary access, using Redis for session invalidation (Logout).
 
 ## 8. Partner Onboarding Lifecycle
@@ -305,7 +310,7 @@ OmniBooking's search system is designed to provide a fast, accurate, and discove
 
 ### 17.4. IP-Based Geolocation & Country Detection
 
-- **Client IP Extraction**: The backend extracts the client's public IP address via the `X-FORWARDED-FOR` request header (which is populated by reverse proxies or forwarded by the Next.js server). If not present, it falls back to `HttpServletRequest.getRemoteAddr()`.
+- **Client IP Extraction (Trusted & Secure)**: The backend utilizes Spring Boot's native forward headers strategy (`server.forward-headers-strategy=native`) to securely process forwarded headers (such as `X-Forwarded-For` and `X-Forwarded-Proto`) sent by trusted reverse proxies. The client IP is extracted directly using `HttpServletRequest.getRemoteAddr()`, which is automatically populated by the servlet container with the validated client IP, preventing IP spoofing attacks.
 - **MaxMind GeoIP2 Resolution**: The `GeoLocationService` reads the client IP and queries a local MaxMind GeoIP2 city database (`GeoLite2-City.mmdb`) to resolve the user's ISO 3166-1 alpha-2 country code (e.g. `VN`, `FR`, `US`).
 - **Configurable Fallback**: If the IP is a local loopback address (`127.0.0.1`, `0:0:0:0:0:0:0:1`) or if the database is missing, it falls back to a default country configured via `app.geo.default-country` (defaults to `VN`).
 - **Next.js SSR Forwarding**: For Server-side Rendering (SSR) fetches where the request originates from the Next.js server itself, the client's original IP address is read from the incoming request's `x-forwarded-for` header and forwarded to the backend API inside the `X-Forwarded-For` HTTP header. This ensures correct location targeting.

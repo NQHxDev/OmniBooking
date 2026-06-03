@@ -31,6 +31,7 @@ public enum ErrorCode {
    NOT_FOUND("GEN_003", "Resource not found", HttpStatus.NOT_FOUND),
    INTERNAL_SERVER_ERROR("GEN_500", "Internal server error", HttpStatus.INTERNAL_SERVER_ERROR),
    CSRF_TOKEN_INVALID("SEC_001", "CSRF token mismatch or missing", HttpStatus.FORBIDDEN),
+   CSRF_ORIGIN_INVALID("SEC_002", "CSRF origin header invalid or untrusted", HttpStatus.FORBIDDEN),
 
    // Idempotency Errors
    IDEMPOTENCY_KEY_REQUIRED("IDEM_001", "X-Idempotency-Key header is required", HttpStatus.BAD_REQUEST),

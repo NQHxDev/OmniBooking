@@ -86,4 +86,22 @@ class JWTServiceTest {
       assertThatThrownBy(() -> jwtService.extractAllClaims(token))
             .isInstanceOf(io.jsonwebtoken.ExpiredJwtException.class);
    }
+
+   @Test
+   @DisplayName("Should generate token with tokenVersion and extract it correctly")
+   void shouldGenerateAndExtractTokenVersion() {
+      // Arrange
+      UUID userId = UUID.randomUUID();
+      UUID sessionId = UUID.randomUUID();
+      List<String> roles = List.of("ROLE_USER");
+      String fingerprintHash = "sample_hash";
+      Integer tokenVersion = 3;
+
+      // Act
+      String token = jwtService.generateAccessToken(userId, roles, sessionId, fingerprintHash, tokenVersion);
+
+      // Assert
+      assertThat(token).isNotBlank();
+      assertThat(jwtService.extractTokenVersion(token)).isEqualTo(tokenVersion);
+   }
 }

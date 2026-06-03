@@ -186,6 +186,36 @@ public class AuthController {
    }
 
    @Anonymous
+   @GetMapping("/check-email")
+   public ResponseEntity<ApiResponse<Boolean>> checkEmail(
+         @RequestParam String email,
+         HttpServletRequest httpRequest) {
+      String requestId = (String) httpRequest.getAttribute("requestId");
+      boolean exists = authService.checkEmail(email);
+      return ResponseEntity.ok(ApiResponse.success(exists, "Email check completed", requestId));
+   }
+
+   @Anonymous
+   @PostMapping("/activate-guest")
+   public ResponseEntity<ApiResponse<AuthResponse>> activateGuest(
+         @RequestBody java.util.Map<String, String> body,
+         HttpServletRequest httpRequest,
+         HttpServletResponse httpResponse) {
+      String token = body.get("token");
+      String password = body.get("password");
+      String ip = getClientIp(httpRequest);
+      String userAgent = httpRequest.getHeader("User-Agent");
+      String requestId = (String) httpRequest.getAttribute("requestId");
+
+      if (token == null || password == null) {
+         throw new com.omnibooking.exception.AppException(com.omnibooking.exception.ErrorCode.INVALID_TOKEN, "Token and password are required");
+      }
+
+      AuthResponse authResponse = authService.activateGuest(token, password, ip, userAgent, httpResponse);
+      return ResponseEntity.ok(ApiResponse.success(authResponse, "Account activated and logged in successfully", requestId));
+   }
+
+   @Anonymous
    @PostMapping("/forgot-password")
    public ResponseEntity<ApiResponse<Void>> forgotPassword(
          @Valid @RequestBody ForgotPasswordRequest request,
@@ -245,10 +275,6 @@ public class AuthController {
    }
 
    private String getClientIp(HttpServletRequest request) {
-      String xForwardedFor = request.getHeader("X-Forwarded-For");
-      if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-         return xForwardedFor.split(",")[0];
-      }
       return request.getRemoteAddr();
    }
 

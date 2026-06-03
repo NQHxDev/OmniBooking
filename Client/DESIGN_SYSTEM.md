@@ -227,6 +227,23 @@ Quy chuẩn hiển thị giá tiền đồng nhất trên toàn hệ thống đ�
    - _Lý do_: Tỉ giá hệ thống thay đổi mỗi 4 tiếng. Nếu không lưu lại tỉ giá lúc khách đặt, tổng tiền khách phải trả có thể bị thay đổi khi họ xem lại đơn hàng sau này, gây khiếu nại.
 - **Markup Visibility**: Người dùng chỉ nhìn thấy giá cuối cùng đã bao gồm Profit Margin. Tuyệt đối không hiển thị giá gốc từ API.
 
+### 13.3. Cơ chế hiển thị giá theo thời gian đặt phòng (Date-Based Price Display)
+
+Để bảo đảm trải nghiệm đặt phòng nhất quán và chuẩn bị cho việc tích hợp tính năng kiểm tra phòng trống của đối tác (Partner Availability) sau này, hệ thống áp dụng quy chuẩn hiển thị giá dựa trên thời gian lưu trú:
+
+- **Nguyên tắc**:
+   - Chỉ hiển thị giá phòng và nút "Đặt phòng ngay" trên trang chi tiết chỗ nghỉ khi URL đã được thiết lập đầy đủ các tham số ngày nhận/trả phòng và số khách.
+   - Khi chưa chọn ngày, hệ thống sẽ ẩn giá phòng, thay thế bằng thông báo yêu cầu người dùng chọn ngày và vô hiệu hóa nút đặt phòng.
+- **Tham số URL chuẩn**:
+   - `checkin`: Ngày nhận phòng (định dạng `YYYY-MM-DD`).
+   - `checkout`: Ngày trả phòng (định dạng `YYYY-MM-DD`).
+   - `group_adults`: Số lượng người lớn (mặc định: `2`).
+   - `group_children`: Số lượng trẻ em (mặc định: `0`).
+   - `no_rooms`: Số lượng phòng đặt (mặc định: `1`).
+- **Đồng bộ hóa URL (URL State Synchronization)**:
+   - Sử dụng component `<RoomPricingSection>` quản lý tương tác chọn ngày và khách.
+   - Khi người dùng cập nhật ngày/khách và nhấn "Kiểm tra giá & phòng trống", component sẽ cập nhật URL thông qua `router.push`, kích hoạt tải lại dữ liệu trang chi tiết từ server.
+
 ---
 
-_Last Updated: 2026-05-13_
+_Last Updated: 2026-06-01_

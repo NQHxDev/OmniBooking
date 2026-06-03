@@ -17,6 +17,7 @@ public class OutboxEventRegistry {
       REGISTRY.put("2FA_OTP_SEND", EmailEvent.class);
       REGISTRY.put("PARTNER_OTP_SEND", EmailEvent.class);
       REGISTRY.put("PROPERTY_SYNC", PropertySyncEvent.class);
+      REGISTRY.put("BOOKING_CONFIRMED_MAIL", EmailEvent.class);
    }
 
    public static Class<?> getEventClass(String eventType) {

@@ -18,6 +18,8 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import org.springframework.data.redis.core.StringRedisTemplate;
+
 import java.util.Map;
 import java.util.Objects;
 
@@ -28,23 +30,36 @@ public class ZaloOAuth2ServiceImpl implements OAuth2ProviderService {
 
    private final AppProperties appProperties;
    private final RestTemplate restTemplate;
+   private final StringRedisTemplate redisTemplate;
 
    private static final String ZALO_AUTH_URL = "https://oauth.zaloapp.com/v4/permission";
    private static final String ZALO_TOKEN_URL = "https://oauth.zaloapp.com/v4/access_token";
    private static final String ZALO_USER_INFO_URL = "https://graph.zalo.me/v2.0/me";
+   private static final String STATE_PREFIX = "oauth2:state:";
 
    @Override
    public String generateAuthUrl() {
+      String state = java.util.UUID.randomUUID().toString();
+      redisTemplate.opsForValue().set(STATE_PREFIX + state, "valid", 15, java.util.concurrent.TimeUnit.MINUTES);
+
       return UriComponentsBuilder.fromUriString(ZALO_AUTH_URL)
             .queryParam("app_id", appProperties.getOauth2().getZalo().getClientId())
             .queryParam("redirect_uri", appProperties.getOauth2().getZalo().getRedirectUri())
-            .queryParam("state", "zalo_auth") // You might want to generate a random state
+            .queryParam("state", state)
             .build().encode().toUriString();
    }
 
    @Override
    public OAuth2UserInfo exchangeCodeForUserInfo(String code, String state) {
-      log.info("[OAuth2] Fetching Zalo user info for code: {}", code);
+      log.info("[OAuth2] Fetching Zalo user info for code: {} and state: {}", code, state);
+
+      // Validate state
+      String stateKey = STATE_PREFIX + state;
+      if (Boolean.FALSE.equals(redisTemplate.hasKey(stateKey))) {
+         log.error("[OAuth2] Invalid state for Zalo: {}", state);
+         throw new RuntimeException("Invalid state parameter");
+      }
+      redisTemplate.delete(stateKey);
 
       String accessToken = exchangeCodeForToken(code);
       return fetchUserInfoFromZalo(accessToken);

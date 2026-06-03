@@ -38,6 +38,10 @@ public class User extends BaseEntity {
    @Column(name = "is_active")
    private Boolean isActive = true;
 
+   @Builder.Default
+   @Column(name = "token_version", nullable = false)
+   private Integer tokenVersion = 0;
+
    @ManyToMany(fetch = FetchType.EAGER)
    @JoinTable(name = "users_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
    private Set<Role> roles;

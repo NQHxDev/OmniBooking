@@ -1,6 +1,6 @@
 # --- General & OS ---
 .DS_Store
-.vscode/
+.vscode/*
 .idea/
 *.log
 *.gz
@@ -8,6 +8,7 @@
 *.swp
 node_modules/
 .antigravity/
+.codegraph/
 
 .env
 .env.local
@@ -16,9 +17,15 @@ node_modules/
 Todo.md
 NOTE.md
 
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
 # --- Backend (Server - Spring Boot / Maven) ---
-Server/target/
 Server/bin/
+Server/target/
+Server/target_test-classes/
 Server/.settings/
 Server/.project
 Server/.classpath
@@ -27,14 +34,35 @@ Server/.mvn/wrapper/*.jar
 !Server/.mvn/wrapper/maven-wrapper.jar
 
 # --- Frontend (Client - Next.js / Node) ---
-Client/.next/
-Client/out/
-Client/build/
-Client/coverage/
-Client/next-env.d.ts
-Client/.pnp*
-Client/.pnp.js
 *.tsbuildinfo
+Client/apps/partner/.next/
+Client/apps/partner/out/
+Client/apps/partner/build/
+Client/apps/partner/coverage/
+Client/apps/partner/next-env.d.ts
+Client/apps/partner/.pnp*
+Client/apps/partner/.pnp.js
+Client/apps/owner/.next/
+Client/apps/owner/out/
+Client/apps/owner/build/
+Client/apps/owner/coverage/
+Client/apps/owner/next-env.d.ts
+Client/apps/owner/.pnp*
+Client/apps/owner/.pnp.js
+Client/apps/web/.next/
+Client/apps/web/out/
+Client/apps/web/build/
+Client/apps/web/coverage/
+Client/apps/web/next-env.d.ts
+Client/apps/web/.pnp*
+Client/apps/web/.pnp.js
+Client/apps/booking-widget/.next/
+Client/apps/booking-widget/out/
+Client/apps/booking-widget/build/
+Client/apps/booking-widget/coverage/
+Client/apps/booking-widget/next-env.d.ts
+Client/apps/booking-widget/.pnp*
+Client/apps/booking-widget/.pnp.js
 
 # --- Docker ---
 .docker/

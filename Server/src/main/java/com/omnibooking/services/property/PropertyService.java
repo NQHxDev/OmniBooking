@@ -22,4 +22,8 @@ public interface PropertyService {
 
    PropertyDetailResponse getPropertyDetail(UUID propertyId);
 
+   void evictPartnerPropertiesCache(UUID ownerId);
+
+   void evictPublicPropertiesCache();
+
 }

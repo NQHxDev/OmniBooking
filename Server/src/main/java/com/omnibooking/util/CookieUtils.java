@@ -4,6 +4,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
+import org.springframework.http.ResponseCookie;
 
 public class CookieUtils {
 
@@ -12,16 +13,33 @@ public class CookieUtils {
    public static final String REFRESH_TOKEN = "refresh_token";
    public static final String FINGERPRINT = "x_fgp";
 
+   public static String cookieDomain;
+
+   /**
+    * Resolves the cookie domain dynamically based on request host.
+    */
+   private static String resolveCookieDomain() {
+      if (cookieDomain != null && !cookieDomain.isBlank()) {
+         return cookieDomain;
+      }
+      return null;
+   }
+
    /**
     * Sets auth cookies in the response.
     */
    public static void setAuthCookies(HttpServletResponse response, String accessToken, String sessionId,
          String refreshToken, String fingerprint, boolean secure, int expiry) {
-      
+
       addCookie(response, ACCESS_TOKEN, accessToken, 15 * 60, secure); // Access token always 15 mins
       addCookie(response, SESSION_ID, sessionId, expiry, secure);
       addCookie(response, REFRESH_TOKEN, refreshToken, expiry, secure);
       addCookie(response, FINGERPRINT, fingerprint, expiry, secure);
+
+      // Set csrf_token cookie for double submit cookie verification (not HttpOnly so
+      // client JS can read it)
+      String csrfToken = java.util.UUID.randomUUID().toString();
+      addCookie(response, "csrf_token", csrfToken, expiry, secure);
    }
 
    /**
@@ -36,21 +54,33 @@ public class CookieUtils {
    }
 
    public static void addCookie(HttpServletResponse response, String name, String value, int maxAge, boolean secure) {
-      Cookie cookie = new Cookie(name, value);
-      cookie.setHttpOnly(true);
-      cookie.setSecure(secure);
-      cookie.setPath("/");
-      cookie.setMaxAge(maxAge);
-      response.addCookie(cookie);
+      boolean httpOnly = !name.equals("csrf_token");
+      ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, value)
+            .httpOnly(httpOnly)
+            .secure(secure)
+            .path("/")
+            .maxAge(maxAge)
+            .sameSite("Lax");
+      String resolvedDomain = resolveCookieDomain();
+      if (resolvedDomain != null && !resolvedDomain.isBlank()) {
+         builder.domain(resolvedDomain);
+      }
+      response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, builder.build().toString());
    }
 
    public static void deleteCookie(HttpServletResponse response, String name, boolean secure) {
-      Cookie cookie = new Cookie(name, "");
-      cookie.setHttpOnly(true);
-      cookie.setSecure(secure);
-      cookie.setPath("/");
-      cookie.setMaxAge(0);
-      response.addCookie(cookie);
+      boolean httpOnly = !name.equals("csrf_token");
+      ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, "")
+            .httpOnly(httpOnly)
+            .secure(secure)
+            .path("/")
+            .maxAge(0)
+            .sameSite("Lax");
+      String resolvedDomain = resolveCookieDomain();
+      if (resolvedDomain != null && !resolvedDomain.isBlank()) {
+         builder.domain(resolvedDomain);
+      }
+      response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, builder.build().toString());
    }
 
    public static String getCookieValue(HttpServletRequest request, String name) {

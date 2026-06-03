@@ -34,10 +34,13 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
    private final JWTService jwtService;
-
    private final CustomUserDetailsService userDetailsService;
-
    private final StringRedisTemplate redisTemplate;
+   private final ObjectMapper objectMapper;
+   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
+   @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:3000}")
+   private String allowedOrigins;
 
    @Bean
    public PasswordEncoder passwordEncoder() {
@@ -54,7 +57,12 @@ public class SecurityConfig {
       UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
       CorsConfiguration config = new CorsConfiguration();
       config.setAllowCredentials(true);
-      config.setAllowedOrigins(List.of("http://localhost:3000"));
+      if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+         config.setAllowedOrigins(java.util.Arrays.stream(allowedOrigins.split(","))
+               .map(String::trim)
+               .filter(s -> !s.isEmpty())
+               .collect(java.util.stream.Collectors.toList()));
+      }
       config.setAllowedHeaders(List.of(
             "Authorization",
             "Content-Type",
@@ -79,7 +87,10 @@ public class SecurityConfig {
 
    @Bean
    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-      JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, userDetailsService, redisTemplate);
+      JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, userDetailsService, redisTemplate,
+            meterRegistry);
+      CustomCsrfFilter csrfFilter = new CustomCsrfFilter(objectMapper, allowedOrigins,
+            meterRegistry);
 
       http
             .csrf(AbstractHttpConfigurer::disable)
@@ -88,9 +99,13 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                   .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                   .requestMatchers("/auth/passkey/**").authenticated()
-                  .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh", "/auth/logout", "/auth/2fa/login",
-                        "/auth/forgot-password", "/auth/reset-password", "/auth/google/**", "/auth/subscribe/**", "/auth/finalize-registration")
+                  .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh", "/auth/logout",
+                        "/auth/2fa/login",
+                        "/auth/forgot-password", "/auth/reset-password", "/auth/google/**", "/auth/subscribe/**",
+                        "/auth/finalize-registration",
+                        "/auth/check-email", "/auth/activate-guest")
                   .permitAll()
+                  .requestMatchers(HttpMethod.POST, "/bookings").permitAll()
                   .requestMatchers("/properties/search", "/properties/search/**").permitAll()
                   .requestMatchers("/destinations", "/destinations/**").permitAll()
                   .requestMatchers("/health/**").permitAll()
@@ -102,6 +117,7 @@ public class SecurityConfig {
                   .requestMatchers(HttpMethod.GET, "/properties/**").permitAll()
                   .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(csrfFilter, JwtAuthenticationFilter.class)
             .exceptionHandling(exceptions -> exceptions
                   .authenticationEntryPoint((request, response, authException) -> {
                      String requestId = (String) request.getAttribute("requestId");

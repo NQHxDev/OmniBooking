@@ -40,11 +40,11 @@ public class CloudinaryServiceImpl implements CloudinaryService {
    }
 
    @Override
-   @SuppressWarnings("unchecked")
    @CircuitBreaker(name = "externalService")
    @Retry(name = "externalService")
-   public Map<String, Object> delete(String publicId) throws IOException {
+   public Map<?, ?> delete(String publicId) throws IOException {
       log.info("Deleting file from Cloudinary: {}", publicId);
-      return (Map<String, Object>) cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+      return cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
    }
+
 }

@@ -18,6 +18,10 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
 
+import com.omnibooking.dto.PartnerBookingResponse;
+import com.omnibooking.services.core.EncryptionService;
+import org.springframework.cache.annotation.Cacheable;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -25,6 +29,7 @@ public class PartnerServiceImpl implements PartnerService {
 
    private final BookingRepository bookingRepository;
    private final PropertyRepository propertyRepository;
+   private final EncryptionService encryptionService;
 
    @Override
    @Transactional(readOnly = true)
@@ -166,5 +171,47 @@ public class PartnerServiceImpl implements PartnerService {
       double change = ((double)(current - previous) / previous) * 100;
       String prefix = change >= 0 ? "+" : "";
       return prefix + String.format(Locale.US, "%.1f", change) + "%";
+   }
+
+   @Override
+   @Transactional(readOnly = true)
+   @Cacheable(value = "partner_bookings", key = "#partnerId")
+   public List<PartnerBookingResponse> getPartnerBookings(UUID partnerId) {
+      log.info("Fetching and caching bookings list for partner: {}", partnerId);
+
+      List<Booking> bookings = bookingRepository.findAllByPartnerId(partnerId);
+
+      // Sort bookings: newest bookings first (using createdAt, fallback to checkInDate)
+      bookings.sort((b1, b2) -> {
+         if (b1.getCreatedAt() != null && b2.getCreatedAt() != null) {
+            return b2.getCreatedAt().compareTo(b1.getCreatedAt()); // Descending
+         }
+         return b2.getCheckInDate().compareTo(b1.getCheckInDate());
+      });
+
+      List<PartnerBookingResponse> response = new ArrayList<>();
+      for (Booking b : bookings) {
+         String decryptedPhone = b.getGuestPhoneEncrypted() != null 
+               ? encryptionService.decrypt(b.getGuestPhoneEncrypted()) 
+               : null;
+
+         response.add(PartnerBookingResponse.builder()
+               .id(b.getId())
+               .propertyName(b.getRoomType().getProperty().getName())
+               .roomTypeName(b.getRoomType().getName())
+               .checkInDate(b.getCheckInDate())
+               .checkOutDate(b.getCheckOutDate())
+               .numRooms(b.getNumRooms())
+               .totalPrice(b.getTotalPrice())
+               .finalPrice(b.getFinalPrice())
+               .status(b.getStatus())
+               .guestName(b.getGuestName())
+               .guestEmail(b.getGuestEmail())
+               .guestPhone(decryptedPhone)
+               .specialRequests(b.getSpecialRequests())
+               .createdAt(b.getCreatedAt())
+               .build());
+      }
+      return response;
    }
 }

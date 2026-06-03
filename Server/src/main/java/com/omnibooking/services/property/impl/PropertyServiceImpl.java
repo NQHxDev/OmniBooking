@@ -27,7 +27,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
+import com.omnibooking.model.Media;
 import org.springframework.transaction.annotation.Transactional;
 import com.omnibooking.dto.PartnerLegalProfileResponse;
 import com.omnibooking.model.PartnerLegalProfile;
@@ -68,7 +70,10 @@ public class PropertyServiceImpl implements PropertyService {
 
    @Override
    @Transactional
-   @CacheEvict(value = "properties", allEntries = true)
+   @Caching(evict = {
+         @CacheEvict(value = "properties", allEntries = true),
+         @CacheEvict(value = "partner_properties", key = "#ownerId")
+   })
    public PropertyResponse createProperty(PropertyRequest request, UUID ownerId) {
       User owner = userRepository.findById(Objects.requireNonNull(ownerId))
             .orElseThrow(
@@ -170,20 +175,23 @@ public class PropertyServiceImpl implements PropertyService {
    }
 
    @Override
+   @Cacheable(value = "partner_properties", key = "#ownerId")
    public List<PropertyResponse> getPropertiesByOwner(UUID ownerId) {
       List<Property> properties = propertyRepository.findByOwnerId(ownerId);
       log.info("Found {} properties for owner: {}", properties.size(), ownerId);
+      return mapToPropertyResponses(properties);
+   }
 
-      return properties.stream()
-            .map(p -> PropertyResponse.builder()
-                  .id(p.getId())
-                  .name(p.getName())
-                  .propertyType(p.getPropertyType().name())
-                  .city(p.getCity())
-                  .country(p.getCountry())
-                  .imageUrl(getMainImageUrl(p.getId()))
-                  .build())
-            .toList();
+   @Override
+   @CacheEvict(value = "partner_properties", key = "#ownerId")
+   public void evictPartnerPropertiesCache(UUID ownerId) {
+      log.info("Evicting partner properties cache for owner: {}", ownerId);
+   }
+
+   @Override
+   @CacheEvict(value = "properties", allEntries = true)
+   public void evictPublicPropertiesCache() {
+      log.info("Evicting all public properties cache");
    }
 
     @Override
@@ -193,17 +201,7 @@ public class PropertyServiceImpl implements PropertyService {
        Instant startDate = Instant.now().minus(30, ChronoUnit.DAYS);
        List<Property> properties = propertyRepository
              .findFeaturedProperties(startDate, org.springframework.data.domain.PageRequest.of(0, limit));
-
-       return properties.stream()
-             .map(p -> PropertyResponse.builder()
-                   .id(p.getId())
-                   .name(p.getName())
-                   .propertyType(p.getPropertyType().name())
-                   .city(p.getCity())
-                   .country(p.getCountry())
-                   .imageUrl(getMainImageUrl(p.getId()))
-                   .build())
-             .toList();
+       return mapToPropertyResponses(properties);
     }
 
     @Override
@@ -212,16 +210,37 @@ public class PropertyServiceImpl implements PropertyService {
        log.info("Fetching {} new properties", limit);
        List<Property> properties = propertyRepository
              .findNewProperties(org.springframework.data.domain.PageRequest.of(0, limit));
+       return mapToPropertyResponses(properties);
+    }
+
+    private List<PropertyResponse> mapToPropertyResponses(List<Property> properties) {
+       if (properties.isEmpty()) {
+          return List.of();
+       }
+
+       List<UUID> propertyIds = properties.stream().map(Property::getId).toList();
+       List<Media> mainImages = mediaRepository.findMainImagesByEntityIds(propertyIds);
+
+       // Defensive mapping: pick the first main image if duplicates exist
+       java.util.Map<UUID, Media> mainImageMap = mainImages.stream()
+             .collect(java.util.stream.Collectors.toMap(
+                   Media::getEntityId,
+                   m -> m,
+                   (existing, replacement) -> existing
+             ));
 
        return properties.stream()
-             .map(p -> PropertyResponse.builder()
-                   .id(p.getId())
-                   .name(p.getName())
-                   .propertyType(p.getPropertyType().name())
-                   .city(p.getCity())
-                   .country(p.getCountry())
-                   .imageUrl(getMainImageUrl(p.getId()))
-                   .build())
+             .map(p -> {
+                Media mainMedia = mainImageMap.get(p.getId());
+                return PropertyResponse.builder()
+                      .id(p.getId())
+                      .name(p.getName())
+                      .propertyType(p.getPropertyType().name())
+                      .city(p.getCity())
+                      .country(p.getCountry())
+                      .imageUrl(mainMedia != null ? mainMedia.getUrl() : null)
+                      .build();
+             })
              .toList();
     }
 

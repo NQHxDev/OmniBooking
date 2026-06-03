@@ -113,6 +113,8 @@ public class AppProperties {
       @NotBlank
       private String hashPepper;
       private boolean twoFactorEnabled = true;
+      private boolean cookieSecure;
+      private String cookieDomain;
    }
 
    @Data

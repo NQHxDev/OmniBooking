@@ -77,6 +77,8 @@ public class AuthServiceImpl implements AuthService {
 
    private final com.omnibooking.services.auth.TwoFactorAuthService twoFactorAuthService;
 
+   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
    private static final long SESSION_SLIDING_NORMAL_MS = 1 * 24 * 60 * 60 * 1000L;
    private static final long SESSION_SLIDING_REMEMBER_ME_MS = 7 * 24 * 60 * 60 * 1000L;
    private static final long SESSION_HARD_CAP_NORMAL_MS = 3 * 24 * 60 * 60 * 1000L;
@@ -134,7 +136,7 @@ public class AuthServiceImpl implements AuthService {
       Set<String> roles = Collections.singleton(userRole.getName());
       long now = System.currentTimeMillis();
 
-      return issueTokensAndBuildResponse(savedUser, roles, profile, ip, userAgent, response, rememberMe, now, now);
+      return issueTokensAndBuildResponse(savedUser, roles, profile, ip, userAgent, response, rememberMe, now, now, null);
    }
 
    @Override
@@ -163,7 +165,7 @@ public class AuthServiceImpl implements AuthService {
       long now = System.currentTimeMillis();
 
       return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
-            now);
+            now, null);
    }
 
    @Override
@@ -181,10 +183,12 @@ public class AuthServiceImpl implements AuthService {
       }
 
       String lockKey = "lock:refresh:" + sId;
-      Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "L", 5, TimeUnit.SECONDS);
+      String lockValue = UUID.randomUUID().toString();
+      Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, 5, TimeUnit.SECONDS);
 
       if (Boolean.FALSE.equals(acquired)) {
          log.warn("Refresh already in progress for session: {}", sId);
+         meterRegistry.counter("omnibooking.auth.lock.contention").increment();
          throw new AppException(ErrorCode.INVALID_SESSION);
       }
 
@@ -217,20 +221,29 @@ public class AuthServiceImpl implements AuthService {
             throw new AppException(ErrorCode.INVALID_SESSION);
          }
 
-         // ROTATION: Thu hồi session cũ trước khi cấp mới
-         sessionService.deleteSession(sId);
          log.info("Rotating session for user: {}", user.getEmail());
 
          return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, info.isRememberMe(),
-               info.getCreatedAt(), info.getLastAccessedAt());
+               info.getCreatedAt(), info.getLastAccessedAt(), sId);
       } finally {
-         redisTemplate.delete(lockKey);
+         String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+         redisTemplate.execute(
+               new org.springframework.data.redis.core.script.DefaultRedisScript<>(script, Long.class),
+               java.util.Collections.singletonList(lockKey),
+               lockValue
+         );
       }
    }
 
    @Override
    public void logout(UUID sessionId, UUID userId, HttpServletResponse response) {
-      sessionService.deleteSession(sessionId);
+      RedisSessionInfo info = sessionService.getSession(sessionId);
+      if (info != null) {
+         if (!userId.equals(info.getUserId())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+         }
+         sessionService.deleteSession(sessionId);
+      }
       CookieUtils.clearAuthCookies(response, cookieSecure);
    }
 
@@ -295,14 +308,14 @@ public class AuthServiceImpl implements AuthService {
     */
    private AuthResponse issueTokensAndBuildResponse(User user, Set<String> roles, UserProfile profile,
          String ip, String userAgent, HttpServletResponse response, boolean rememberMe, long createdAt,
-         long lastAccessedAt) {
+         long lastAccessedAt, UUID oldSessionId) {
       UUID sessionId = UuidCreator.getTimeOrderedEpoch();
       UUID refreshToken = UuidCreator.getTimeOrderedEpoch();
 
       String fingerprint = UuidCreator.getTimeOrderedEpoch().toString();
       String fgpHash = SecurityUtils.hashFingerprint(fingerprint);
 
-      String accessToken = jwtService.generateAccessToken(user.getId(), roles, sessionId, fgpHash);
+      String accessToken = jwtService.generateAccessToken(user.getId(), roles, sessionId, fgpHash, user.getTokenVersion());
 
       String fullName;
       if (profile != null && profile.getDisplayName() != null) {
@@ -352,7 +365,49 @@ public class AuthServiceImpl implements AuthService {
             .rememberMe(rememberMe)
             .build();
 
-      sessionService.saveSession(sessionId, sessionInfo, finalTtlMs);
+      // 1. Create and Save New Session
+      try {
+         sessionService.saveSession(sessionId, sessionInfo, finalTtlMs);
+      } catch (Exception e) {
+         log.error("Failed to save new session in Redis for user: {}", user.getEmail(), e);
+         throw new AppException(ErrorCode.INVALID_SESSION);
+      }
+
+      // 2. Verify Success
+      try {
+         RedisSessionInfo savedInfo = sessionService.getSession(sessionId);
+         if (savedInfo == null || !user.getId().equals(savedInfo.getUserId())) {
+            log.error("Verification failed for newly saved session: {}", sessionId);
+            try {
+               sessionService.deleteSession(sessionId);
+            } catch (Exception ex) {
+               log.error("Rollback: Failed to delete invalid new session {}", sessionId, ex);
+            }
+            throw new AppException(ErrorCode.INVALID_SESSION);
+         }
+      } catch (Exception e) {
+         log.error("Failed to verify saved session or rollback: {}", sessionId, e);
+         if (e instanceof AppException) {
+            throw (AppException) e;
+         }
+         throw new AppException(ErrorCode.INVALID_SESSION);
+      }
+
+      // 3. Delete Old Session
+      if (oldSessionId != null) {
+         try {
+            sessionService.deleteSession(oldSessionId);
+            log.info("Successfully rotated session: deleted old session {} and issued new session {}", oldSessionId, sessionId);
+         } catch (Exception e) {
+            log.error("Failed to delete old session {} during rotation. Rolling back new session {}", oldSessionId, sessionId, e);
+            try {
+               sessionService.deleteSession(sessionId);
+            } catch (Exception ex) {
+               log.error("Rollback: Failed to clean up new session {} after old session deletion failure", sessionId, ex);
+            }
+            throw new AppException(ErrorCode.INVALID_SESSION);
+         }
+      }
 
       CookieUtils.setAuthCookies(response, accessToken, sessionId.toString(), refreshToken.toString(), fingerprint,
             cookieSecure, (int) (finalTtlMs / 1000));
@@ -388,7 +443,7 @@ public class AuthServiceImpl implements AuthService {
             .collect(Collectors.toSet());
 
       long now = System.currentTimeMillis();
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now);
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now, null);
    }
 
    @Override
@@ -546,7 +601,7 @@ public class AuthServiceImpl implements AuthService {
       }
 
       long now = System.currentTimeMillis();
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now);
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now, null);
    }
 
    @Override
@@ -574,7 +629,7 @@ public class AuthServiceImpl implements AuthService {
          // For finalize registration, we don't have 'rememberMe' info from the original
          // request yet,
          // defaulting to false or we could pass it. Let's default to false for safety.
-         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now);
+         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now, null);
       } catch (AppException e) {
          throw e;
       } catch (Exception e) {
@@ -609,6 +664,49 @@ public class AuthServiceImpl implements AuthService {
       UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
       long now = System.currentTimeMillis();
       return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
-            now);
+            now, null);
+   }
+
+   @Override
+   public boolean checkEmail(String email) {
+      if (email == null || email.isBlank()) {
+         return false;
+      }
+      String cleanEmail = email.trim().toLowerCase();
+      if (bloomFilterService.mightContain(cleanEmail)) {
+         return userRepository.findByEmail(cleanEmail)
+               .map(User::getIsActive)
+               .orElse(false);
+      }
+      return false;
+   }
+
+   @Override
+   @Transactional
+   public AuthResponse activateGuest(String token, String password, String ip, String userAgent, HttpServletResponse response) {
+      UUID userId = verificationService.verifyToken(token);
+      if (userId == null) {
+         throw new AppException(ErrorCode.INVALID_TOKEN);
+      }
+
+      User user = userRepository.findById(userId)
+            .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+      user.setPassword(passwordEncoder.encode(password));
+      user.setIsActive(true);
+      userRepository.save(user);
+
+      UserProfile profile = userProfileRepository.findById(userId).orElse(null);
+      if (profile != null) {
+         profile.setIsVerified(true);
+         userProfileRepository.save(profile);
+      }
+
+      Set<String> roles = user.getRoles().stream()
+            .map(Role::getName)
+            .collect(Collectors.toSet());
+
+      long now = System.currentTimeMillis();
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now, null);
    }
 }

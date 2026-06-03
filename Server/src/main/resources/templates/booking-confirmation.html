@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+   <meta charset="UTF-8">
+   <title>Đặt phòng thành công - OmniBooking</title>
+   <style>
+      body {
+         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+         line-height: 1.6;
+         color: #1a1a1a;
+         margin: 0;
+         padding: 0;
+         background-color: #f4f7f9;
+      }
+
+      .container {
+         max-width: 600px;
+         margin: 40px auto;
+         background: #ffffff;
+         border-radius: 12px;
+         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+         overflow: hidden;
+      }
+
+      .header {
+         background-color: #003580;
+         color: #ffffff;
+         padding: 30px;
+         text-align: center;
+      }
+
+      .header h1 {
+         margin: 0;
+         font-size: 24px;
+         letter-spacing: 1px;
+      }
+
+      .content {
+         padding: 40px;
+      }
+
+      .content h2 {
+         color: #003580;
+         margin-top: 0;
+         text-align: center;
+      }
+
+      .booking-details {
+         background-color: #f8fafc;
+         border: 1px solid #e2e8f0;
+         border-radius: 8px;
+         padding: 20px;
+         margin: 20px 0;
+      }
+
+      .booking-details table {
+         width: 100%;
+         border-collapse: collapse;
+      }
+
+      .booking-details td {
+         padding: 8px 0;
+      }
+
+      .booking-details td.label {
+         font-weight: bold;
+         color: #475569;
+         width: 40%;
+      }
+
+      .booking-details td.value {
+         color: #0f172a;
+      }
+
+      .activation-section {
+         background-color: #eff6ff;
+         border: 1px solid #bfdbfe;
+         border-radius: 8px;
+         padding: 25px;
+         margin: 30px 0 10px 0;
+         text-align: center;
+      }
+
+      .activation-section h3 {
+         margin-top: 0;
+         color: #1e3a8a;
+      }
+
+      .btn {
+         display: inline-block;
+         background-color: #006ce4;
+         color: #ffffff !important;
+         padding: 12px 30px;
+         text-decoration: none;
+         border-radius: 8px;
+         font-weight: bold;
+         margin-top: 15px;
+         box-shadow: 0 4px 14px rgba(0, 108, 228, 0.2);
+      }
+
+      .footer {
+         background-color: #f8fafc;
+         padding: 20px;
+         text-align: center;
+         font-size: 12px;
+         color: #64748b;
+         border-top: 1px solid #e2e8f0;
+      }
+
+      .logo {
+         font-weight: bold;
+         font-size: 20px;
+         font-style: italic;
+      }
+   </style>
+</head>
+
+<body>
+   <div class="container">
+      <div class="header">
+         <div class="logo">OmniBooking.com</div>
+         <h1>Xác nhận đặt phòng của bạn</h1>
+      </div>
+      <div class="content">
+         <h2>Chào <span th:text="${userName}">Khách hàng</span>,</h2>
+         <p>Chúc mừng! Đơn đặt phòng của bạn tại OmniBooking đã được xác nhận thành công. Dưới đây là thông tin chi tiết:</p>
+
+         <div class="booking-details">
+            <table>
+               <tr>
+                  <td class="label">Mã đặt phòng:</td>
+                  <td class="value" style="font-weight: bold; color: #003580;" th:text="${bookingCode}">CODE</td>
+               </tr>
+               <tr>
+                  <td class="label">Khách sạn:</td>
+                  <td class="value" th:text="${propertyName}">Property Name</td>
+               </tr>
+               <tr>
+                  <td class="label">Loại phòng:</td>
+                  <td class="value" th:text="${roomTypeName}">Room Type</td>
+               </tr>
+               <tr>
+                  <td class="label">Ngày nhận phòng:</td>
+                  <td class="value" th:text="${checkInDate}">Check-in</td>
+               </tr>
+               <tr>
+                  <td class="label">Ngày trả phòng:</td>
+                  <td class="value" th:text="${checkOutDate}">Check-out</td>
+               </tr>
+               <tr>
+                  <td class="label">Tổng giá trị:</td>
+                  <td class="value">
+                     <span th:text="${totalPrice}" style="font-weight: bold;">Total Price</span>
+                     <span th:if="${secondaryTotalPrice != null}" th:text="${secondaryTotalPrice}" style="font-size: 12px; color: #64748b; margin-left: 6px;">Secondary Total Price</span>
+                  </td>
+               </tr>
+               <tr>
+                  <td class="label">Số tiền phải thanh toán:</td>
+                  <td class="value">
+                     <span th:text="${finalPrice}" style="font-weight: bold; color: #16a34a;">Final Price</span>
+                     <span th:if="${secondaryFinalPrice != null}" th:text="${secondaryFinalPrice}" style="font-size: 12px; color: #64748b; margin-left: 6px; font-weight: normal;">Secondary Final Price</span>
+                  </td>
+               </tr>
+            </table>
+         </div>
+
+         <!-- Vé điện tử tích hợp Mã vạch / Boarding Pass Barcode -->
+         <div style="background-color: #ffffff; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px; text-align: center; margin: 25px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+            <div style="font-size: 11px; font-weight: bold; color: #64748b; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">Mã vé điện tử / E-Ticket Barcode</div>
+            <div style="display: inline-block; padding: 8px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px;">
+               <img th:src="'https://bwipjs-api.metafloor.com/?bcid=code128&text=' + ${bookingCode} + '&scale=2&height=10&includetext'" 
+                    th:alt="${bookingCode}" 
+                    style="display: block; max-width: 100%; height: auto; min-height: 50px;" />
+            </div>
+            <p style="margin: 12px 0 0 0; font-size: 11px; color: #94a3b8; font-style: italic; line-height: 1.4;">
+               * Quét mã vạch này tại quầy lễ tân khi nhận phòng để hoàn tất thủ tục check-in nhanh.
+            </p>
+         </div>
+
+         <!-- Hiển thị phần kích hoạt tài khoản nếu là khách vãng lai (lazy sign-up) -->
+         <div class="activation-section" th:if="${activateLink != null}">
+            <h3>Kích hoạt tài khoản thành viên</h3>
+            <p>Chúng tôi đã tạo một tài khoản OmniBooking tạm thời cho bạn. Hãy thiết lập mật khẩu của bạn để kích hoạt tài khoản, nhận ưu đãi thành viên Genius (giảm giá lên tới 20%) cho các lần đặt tiếp theo:</p>
+            <a th:href="${activateLink}" class="btn">Thiết lập mật khẩu & Kích hoạt</a>
+         </div>
+
+         <p style="margin-top: 25px; text-align: center; font-size: 14px; color: #475569;">Chúc bạn có một kỳ nghỉ tuyệt vời!</p>
+      </div>
+      <div class="footer">
+         <p>&copy; 2026 OmniBooking Team. Tất cả các quyền được bảo lưu.</p>
+         <p>Đây là email tự động, vui lòng không phản hồi email này.</p>
+      </div>
+   </div>
+</body>
+
+</html>

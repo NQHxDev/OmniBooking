@@ -2,6 +2,8 @@ package com.omnibooking.repository;
 
 import com.omnibooking.model.Media;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,5 +16,8 @@ public interface MediaRepository extends JpaRepository<Media, UUID> {
    List<Media> findByEntityIdAndEntityType(UUID entityId, String entityType);
 
    Optional<Media> findFirstByEntityIdAndEntityTypeAndIsMainTrue(UUID entityId, String entityType);
+
+   @Query("SELECT m FROM Media m WHERE m.entityType = 'PROPERTY' AND m.isMain = true AND m.entityId IN :entityIds")
+   List<Media> findMainImagesByEntityIds(@Param("entityIds") List<UUID> entityIds);
 
 }

@@ -25,6 +25,7 @@ public interface UserMapper {
    @Mapping(target = "deletedAt", ignore = true)
    @Mapping(target = "version", ignore = true)
    @Mapping(target = "profile", ignore = true)
+   @Mapping(target = "tokenVersion", ignore = true)
    User toUser(RegisterRequest request);
 
    @Mapping(target = "id", source = "user.id")

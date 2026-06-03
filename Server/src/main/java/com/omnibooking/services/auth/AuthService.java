@@ -42,4 +42,8 @@ public interface AuthService {
 
    AuthResponse finalizeRegistration(String accessToken, String ip, String userAgent, HttpServletResponse response);
 
+   boolean checkEmail(String email);
+
+   AuthResponse activateGuest(String token, String password, String ip, String userAgent, HttpServletResponse response);
+
 }

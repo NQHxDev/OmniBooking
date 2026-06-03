@@ -29,6 +29,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
    private final StringRedisTemplate redisTemplate;
 
+   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
    @Override
    protected void doFilterInternal(
          @org.springframework.lang.NonNull HttpServletRequest request,
@@ -71,15 +73,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // 3. Stateful Verification: Check Redis
             String redisKey = "refresh:" + sessionIdFromJwt;
-            if (Boolean.FALSE.equals(redisTemplate.hasKey(redisKey))) {
-               log.warn("Session not found in Redis for sessionId: {}", sessionIdFromJwt);
-               filterChain.doFilter(request, response);
+            try {
+               if (Boolean.FALSE.equals(redisTemplate.hasKey(redisKey))) {
+                  log.warn("Session not found in Redis for sessionId: {}", sessionIdFromJwt);
+                  filterChain.doFilter(request, response);
+                  return;
+               }
+            } catch (Exception ex) {
+               log.error("Redis is unavailable during session verification: {}", ex.getMessage());
+               handleRedisFailure(request, response, ex);
                return;
             }
 
             // 4. Set Authentication
             if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                UserDetails userDetails = userDetailsService.loadUserById(userId.toString());
+
+               if (userDetails instanceof UserPrincipal userPrincipal) {
+                  Integer tokenVersionFromJwt = jwtService.extractTokenVersion(accessToken);
+                  if (tokenVersionFromJwt == null || !tokenVersionFromJwt.equals(userPrincipal.getTokenVersion())) {
+                     log.warn("Token version mismatch for user: {}. Expected {}, got {}", userId, userPrincipal.getTokenVersion(), tokenVersionFromJwt);
+                     filterChain.doFilter(request, response);
+                     return;
+                  }
+               }
 
                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                      userDetails, null, userDetails.getAuthorities());
@@ -95,6 +112,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       }
 
       filterChain.doFilter(request, response);
+   }
+
+   private void handleRedisFailure(HttpServletRequest request, HttpServletResponse response, Exception ex) throws IOException {
+      String requestId = (String) request.getAttribute("requestId");
+      
+      // Classify Redis exception reason
+      String reason = "lookup_failure";
+      if (ex instanceof org.springframework.dao.QueryTimeoutException || ex.getMessage().toLowerCase().contains("timeout")) {
+         reason = "timeout";
+      } else if (ex instanceof org.springframework.data.redis.RedisConnectionFailureException ||
+                 ex instanceof org.springframework.dao.DataAccessResourceFailureException) {
+         reason = "connection_failure";
+      }
+      
+      meterRegistry.counter("omnibooking.auth.redis.failures", "reason", reason).increment();
+      meterRegistry.counter("omnibooking.auth.rejections", "reason", "redis_unavailable").increment();
+      
+      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE); // HTTP 503
+      response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
+      response.setCharacterEncoding("UTF-8");
+
+      com.omnibooking.dto.ApiResponse<Object> apiResponse = com.omnibooking.dto.ApiResponse.error(
+            "Authentication service is temporarily unavailable. Please try again later.",
+            "SERVICE_UNAVAILABLE",
+            ex.getMessage(),
+            requestId);
+      response.getWriter().write(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(apiResponse));
    }
 
 }
