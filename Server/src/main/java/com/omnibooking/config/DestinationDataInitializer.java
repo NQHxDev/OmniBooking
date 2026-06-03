@@ -24,8 +24,8 @@ public class DestinationDataInitializer implements CommandLineRunner {
             // Vietnam
             createDest("1", "Hà Nội", "CITY", "VN", "Việt Nam", 21.0285, 105.8542, 100.0,
                   "https://res.cloudinary.com/demo/image/upload/v1/geo/hanoi.jpg"),
-            createDest("2", "Hồ Chí Minh", "CITY", "VN", "Việt Nam", 10.8231, 106.6297, 95.0,
-                  "https://res.cloudinary.com/demo/image/upload/v1/geo/hcmc.jpg"),
+            createDest("2", "Thành Phố Hồ Chí Minh", "CITY", "VN", "Việt Nam", 10.8231, 106.6297, 95.0,
+                  "https://res.cloudinary.com/dbm3etf8n/image/upload/v1780019498/TP-HCM_z1rn9m.jpg"),
             createDest("3", "Đà Nẵng", "CITY", "VN", "Việt Nam", 16.0544, 108.2022, 90.0,
                   "https://res.cloudinary.com/demo/image/upload/v1/geo/danang.jpg"),
             createDest("4", "Hội An", "CITY", "VN", "Việt Nam", 15.8801, 108.3380, 85.0,

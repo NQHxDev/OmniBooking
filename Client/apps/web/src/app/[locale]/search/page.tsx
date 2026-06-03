@@ -126,6 +126,7 @@ export default function SearchResultsPage() {
       if (locale === "en") {
          switch (rawDestination) {
             case "Hồ Chí Minh":
+            case "Thành Phố Hồ Chí Minh":
                return "Ho Chi Minh City";
             case "Hà Nội":
                return "Hanoi";
@@ -160,7 +161,8 @@ export default function SearchResultsPage() {
          switch (rawDestination) {
             case "Ho Chi Minh City":
             case "Ho Chi Minh":
-               return "Hồ Chí Minh";
+            case "Thành Phố Hồ Chí Minh":
+               return "Thành Phố Hồ Chí Minh";
             case "Hanoi":
                return "Hà Nội";
             case "Da Nang":

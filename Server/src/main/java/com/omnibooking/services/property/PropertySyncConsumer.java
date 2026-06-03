@@ -25,6 +25,7 @@ public class PropertySyncConsumer {
    private final MediaRepository mediaRepository;
    private final IdempotencyService idempotencyService;
    private final MeterRegistry meterRegistry;
+   private final DestinationService destinationService;
 
    @KafkaListener(topics = "${app.kafka.topics.property-sync}", groupId = "omnibooking-property-sync-group")
    public void consumePropertySync(PropertySyncEvent event) {
@@ -61,6 +62,19 @@ public class PropertySyncConsumer {
 
             propertyElasticsearchRepository.save(document);
             log.info("Successfully synced property to Elasticsearch: {}", property.getId());
+
+            // Register destination if not exists
+            try {
+               destinationService.registerDestinationIfNeeded(
+                     property.getCity(),
+                     property.getCountry(),
+                     property.getLatitude() != null ? property.getLatitude().doubleValue() : null,
+                     property.getLongitude() != null ? property.getLongitude().doubleValue() : null
+               );
+            } catch (Exception e) {
+               log.error("Failed to register destination for property: {}", property.getId(), e);
+            }
+
             if (event.getEventId() != null) {
                idempotencyService.completeEvent(event.getEventId(), consumerGroup);
             }

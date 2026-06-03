@@ -26,7 +26,7 @@ export default function PopularDestinationsLinksClient({
 
    // 1. Domestic Cities
    const domesticCitiesVi: LinkItem[] = [
-      { name: "Khách sạn TP. Hồ Chí Minh", searchQuery: "Hồ Chí Minh" },
+      { name: "Khách sạn TP. Hồ Chí Minh", searchQuery: "Thành Phố Hồ Chí Minh" },
       { name: "Khách sạn Vũng Tàu", searchQuery: "Vũng Tàu" },
       { name: "Khách sạn Hà Nội", searchQuery: "Hà Nội" },
       { name: "Khách sạn Đà Nẵng", searchQuery: "Đà Nẵng" },
@@ -54,7 +54,7 @@ export default function PopularDestinationsLinksClient({
    ];
 
    const domesticCitiesEn: LinkItem[] = [
-      { name: "Hotels in Ho Chi Minh City", searchQuery: "Ho Chi Minh" },
+      { name: "Hotels in Ho Chi Minh City", searchQuery: "Thành Phố Hồ Chí Minh" },
       { name: "Hotels in Vung Tau", searchQuery: "Vung Tau" },
       { name: "Hotels in Hanoi", searchQuery: "Hanoi" },
       { name: "Hotels in Da Nang", searchQuery: "Da Nang" },
@@ -325,7 +325,7 @@ export default function PopularDestinationsLinksClient({
          </h3>
 
          {/* Tabs Selector */}
-         <div className="flex gap-2 mt-4 overflow-x-auto pb-2 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+         <div className="flex gap-2 mt-4 overflow-x-auto pb-2 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none]">
             {tabs.map((tab) => {
                const selected = activeTab === tab.id;
                return (
@@ -368,12 +368,12 @@ export default function PopularDestinationsLinksClient({
             >
                {isExpanded ? (
                   <>
-                     <Minus className="h-4 w-4 stroke-[3]" />
+                     <Minus className="h-4 w-4 stroke-3" />
                      <span>{t("showLess")}</span>
                   </>
                ) : (
                   <>
-                     <Plus className="h-4 w-4 stroke-[3]" />
+                     <Plus className="h-4 w-4 stroke-3" />
                      <span>{t("showMore")}</span>
                   </>
                )}

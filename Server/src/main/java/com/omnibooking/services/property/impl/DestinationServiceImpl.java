@@ -12,7 +12,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.data.elasticsearch.core.geo.GeoPoint;
 
 @Slf4j
 @Service
@@ -80,7 +82,7 @@ public class DestinationServiceImpl implements DestinationService {
          switch (name) {
             case "Hà Nội":
                return "Hanoi";
-            case "Hồ Chí Minh":
+            case "Thành Phố Hồ Chí Minh":
                return "Ho Chi Minh City";
             case "Đà Nẵng":
                return "Da Nang";
@@ -178,6 +180,84 @@ public class DestinationServiceImpl implements DestinationService {
             .imageUrl(doc.getImageUrl())
             .propertyCount(propertyCount)
             .build();
+   }
+
+   @Override
+   public void registerDestinationIfNeeded(String cityName, String countryName, Double latitude, Double longitude) {
+      if (cityName == null || cityName.isBlank()) {
+         return;
+      }
+      String normalizedCity = normalizeCityName(cityName);
+
+      try {
+         List<DestinationDocument> existing = destinationRepository.searchByName(normalizedCity);
+         boolean exists = existing.stream().anyMatch(d -> d.getName().equalsIgnoreCase(normalizedCity));
+
+         if (!exists) {
+            log.info("Destination '{}' (original: '{}') does not exist in Elasticsearch. Registering a new one...", 
+                  normalizedCity, cityName);
+
+            String resolvedCountryCode = "VN";
+            String resolvedCountryName = "Việt Nam";
+
+            if (countryName != null && !countryName.isBlank()) {
+               String trimmedCountry = countryName.trim();
+               if (trimmedCountry.equalsIgnoreCase("Vietnam") || trimmedCountry.equalsIgnoreCase("Việt Nam")) {
+                  resolvedCountryCode = "VN";
+                  resolvedCountryName = "Việt Nam";
+               } else if (trimmedCountry.equalsIgnoreCase("France") || trimmedCountry.equalsIgnoreCase("Pháp")) {
+                  resolvedCountryCode = "FR";
+                  resolvedCountryName = "Pháp";
+               } else if (trimmedCountry.equalsIgnoreCase("United Kingdom") || trimmedCountry.equalsIgnoreCase("Vương quốc Anh")) {
+                  resolvedCountryCode = "GB";
+                  resolvedCountryName = "Vương quốc Anh";
+               } else if (trimmedCountry.equalsIgnoreCase("Japan") || trimmedCountry.equalsIgnoreCase("Nhật Bản")) {
+                  resolvedCountryCode = "JP";
+                  resolvedCountryName = "Nhật Bản";
+               } else if (trimmedCountry.equalsIgnoreCase("United States") || trimmedCountry.equalsIgnoreCase("Hoa Kỳ")) {
+                  resolvedCountryCode = "US";
+                  resolvedCountryName = "Hoa Kỳ";
+               } else if (trimmedCountry.equalsIgnoreCase("Thailand") || trimmedCountry.equalsIgnoreCase("Thái Lan")) {
+                  resolvedCountryCode = "TH";
+                  resolvedCountryName = "Thái Lan";
+               } else {
+                  resolvedCountryName = trimmedCountry;
+                  resolvedCountryCode = trimmedCountry.length() >= 2 ? trimmedCountry.substring(0, 2).toUpperCase() : "VN";
+               }
+            }
+
+            double lat = latitude != null ? latitude : 0.0;
+            double lon = longitude != null ? longitude : 0.0;
+
+            DestinationDocument newDest = DestinationDocument.builder()
+                  .id(UUID.randomUUID().toString())
+                  .name(normalizedCity)
+                  .type("CITY")
+                  .countryCode(resolvedCountryCode)
+                  .countryName(resolvedCountryName)
+                  .location(new GeoPoint(lat, lon))
+                  .popularityScore(1.0)
+                  .build();
+
+            destinationRepository.save(newDest);
+            log.info("Successfully registered new destination: {}", normalizedCity);
+         }
+      } catch (Exception e) {
+         log.error("Failed to check or register destination for city: {}", normalizedCity, e);
+      }
+   }
+
+   private String normalizeCityName(String cityName) {
+      if (cityName == null) return null;
+      String trimmed = cityName.trim();
+      if (trimmed.equalsIgnoreCase("Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("Thành Phố Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("Thành phố Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("TP Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("TP. Hồ Chí Minh")) {
+         return "Thành Phố Hồ Chí Minh";
+      }
+      return trimmed.replaceAll("^(?i)(Thành\\s+phố|Tỉnh|TP\\.?)\\s+", "").trim();
    }
 
 }

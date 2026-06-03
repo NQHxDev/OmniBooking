@@ -12,6 +12,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
+import com.omnibooking.services.property.DestinationService;
 
 @Slf4j
 @Configuration
@@ -22,6 +23,7 @@ public class PropertyElasticsearchReindexInitializer implements CommandLineRunne
    private final PropertyElasticsearchRepository propertyElasticsearchRepository;
    private final PropertyDocumentMapper propertyDocumentMapper;
    private final MediaRepository mediaRepository;
+   private final DestinationService destinationService;
 
    @Override
    public void run(String... args) {
@@ -44,7 +46,20 @@ public class PropertyElasticsearchReindexInitializer implements CommandLineRunne
                mediaRepository.findFirstByEntityIdAndEntityTypeAndIsMainTrue(property.getId(), "PROPERTY")
                      .ifPresent(media -> document.setMainImageUrl(media.getUrl()));
                propertyElasticsearchRepository.save(document);
-               successCount++;
+
+                // Register destination if not exists
+                try {
+                   destinationService.registerDestinationIfNeeded(
+                         property.getCity(),
+                         property.getCountry(),
+                         property.getLatitude() != null ? property.getLatitude().doubleValue() : null,
+                         property.getLongitude() != null ? property.getLongitude().doubleValue() : null
+                   );
+                } catch (Exception e) {
+                   log.error("Failed to register destination on startup: {}", property.getCity(), e);
+                }
+
+                successCount++;
             } catch (Exception e) {
                log.error("Failed to sync property: id={}, name='{}', city='{}' - Error: {}",
                      property.getId(), property.getName(), property.getCity(), e.getMessage(), e);

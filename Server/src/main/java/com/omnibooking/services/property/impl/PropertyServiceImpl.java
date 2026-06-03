@@ -93,7 +93,7 @@ public class PropertyServiceImpl implements PropertyService {
             .description(request.getDescription())
             .propertyType(PropertyType.valueOf(request.getPropertyType()))
             .address(request.getAddress())
-            .city(request.getCity())
+            .city(normalizeCityName(request.getCity()))
             .country(request.getCountry())
             .starRating(
                   request.getStarRating() != null && request.getStarRating() == 0 ? null : request.getStarRating())
@@ -440,6 +440,19 @@ public class PropertyServiceImpl implements PropertyService {
             .amenities(amenities)
             .roomTypes(roomTypes)
             .build();
+   }
+
+   private String normalizeCityName(String cityName) {
+      if (cityName == null) return null;
+      String trimmed = cityName.trim();
+      if (trimmed.equalsIgnoreCase("Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("Thành Phố Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("Thành phố Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("TP Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("TP. Hồ Chí Minh")) {
+         return "Thành Phố Hồ Chí Minh";
+      }
+      return trimmed.replaceAll("^(?i)(Thành\\s+phố|Tỉnh|TP\\.?)\\s+", "").trim();
    }
 
 }

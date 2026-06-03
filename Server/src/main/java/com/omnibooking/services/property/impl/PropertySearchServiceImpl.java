@@ -154,7 +154,7 @@ public class PropertySearchServiceImpl implements PropertySearchService {
          case "hồ chí minh":
          case "ho chi minh":
          case "ho chi minh city":
-            return "Hồ Chí Minh";
+            return "Thành Phố Hồ Chí Minh";
 
          case "hà nội":
          case "hanoi":

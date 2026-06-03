@@ -65,6 +65,7 @@ const translateDestinationName = (name: string, id: string, locale: string): str
          case "Hà Nội":
             return "Hanoi";
          case "Hồ Chí Minh":
+         case "Thành Phố Hồ Chí Minh":
             return "Ho Chi Minh City";
          case "Đà Nẵng":
             return "Da Nang";
@@ -96,7 +97,7 @@ const translateDestinationName = (name: string, id: string, locale: string): str
          case "1":
             return "Hà Nội";
          case "2":
-            return "Hồ Chí Minh";
+            return "Thành Phố Hồ Chí Minh";
          case "3":
             return "Đà Nẵng";
          case "4":
@@ -127,7 +128,8 @@ const translateDestinationName = (name: string, id: string, locale: string): str
             return "Hà Nội";
          case "Ho Chi Minh City":
          case "Ho Chi Minh":
-            return "Hồ Chí Minh";
+         case "Thành Phố Hồ Chí Minh":
+            return "Thành Phố Hồ Chí Minh";
          case "Da Nang":
             return "Đà Nẵng";
          case "Hoi An":
