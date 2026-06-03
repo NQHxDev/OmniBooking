@@ -136,12 +136,12 @@ export default function PartnerBookingList({ initialBookings }: PartnerBookingLi
                   <table className="w-full border-collapse text-left text-sm text-zinc-700">
                      <thead>
                         <tr className="border-b border-zinc-100 bg-zinc-50/70 text-xs font-bold uppercase tracking-wider text-zinc-400">
-                           <th className="px-6 py-4.5">Mã / Khách hàng</th>
-                           <th className="px-6 py-4.5">Chỗ nghỉ & Loại phòng</th>
-                           <th className="px-6 py-4.5">Thời gian lưu trú</th>
-                           <th className="px-6 py-4.5">Số lượng</th>
-                           <th className="px-6 py-4.5">Doanh thu</th>
-                           <th className="px-6 py-4.5">Trạng thái</th>
+                           <th className="px-6 py-4.5 text-center">Mã / Khách hàng</th>
+                           <th className="px-6 py-4.5 text-center">Chỗ nghỉ & Loại phòng</th>
+                           <th className="px-6 py-4.5 text-center">Thời gian lưu trú</th>
+                           <th className="px-6 py-4.5 text-center">Số lượng</th>
+                           <th className="px-6 py-4.5 text-center">Doanh thu</th>
+                           <th className="px-6 py-4.5 text-center">Trạng thái</th>
                         </tr>
                      </thead>
                      <tbody className="divide-y divide-zinc-100">

@@ -23,6 +23,8 @@ import com.omnibooking.repository.RoomAvailabilityRepository;
 import com.omnibooking.repository.RoomTypeRepository;
 import com.omnibooking.repository.UserRepository;
 import com.omnibooking.repository.UserProfileRepository;
+import com.omnibooking.repository.TransactionRepository;
+import com.omnibooking.model.Transaction;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.services.booking.BookingService;
 import com.omnibooking.services.communication.MailService;
@@ -60,6 +62,7 @@ public class BookingServiceImpl implements BookingService {
    private final RoleRepository roleRepository;
    private final CouponRepository couponRepository;
    private final BookingStatusLogRepository bookingStatusLogRepository;
+   private final TransactionRepository transactionRepository;
 
    private final EncryptionService encryptionService;
    private final BloomFilterService bloomFilterService;
@@ -210,7 +213,34 @@ public class BookingServiceImpl implements BookingService {
          couponRepository.save(coupon);
       }
 
+      // 4. Calculate Deposit Requirements
+      boolean requiresDeposit = false;
+      if (principal == null) {
+         requiresDeposit = true;
+      } else {
+         long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), request.getCheckInDate());
+         if (daysBetween >= 5) {
+            requiresDeposit = true;
+         }
+      }
+
+      BigDecimal depositAmount = BigDecimal.ZERO;
+      if (requiresDeposit) {
+         BigDecimal fifteenPercent = finalPrice.multiply(new BigDecimal("0.15"));
+         BigDecimal firstNightRoomPrice = roomType.getBasePrice();
+         Optional<RoomAvailability> firstDayOpt = roomAvailabilityRepository
+               .findByRoomTypeIdAndAvailabilityDateWithLock(roomType.getId(), request.getCheckInDate());
+         if (firstDayOpt.isPresent() && firstDayOpt.get().getPriceOverride() != null) {
+            firstNightRoomPrice = firstDayOpt.get().getPriceOverride();
+         }
+         BigDecimal oneNightTotal = firstNightRoomPrice.multiply(BigDecimal.valueOf(request.getNumRooms()));
+         depositAmount = fifteenPercent.min(oneNightTotal).setScale(4, RoundingMode.HALF_UP);
+      }
+
       // 4. Save Booking
+      boolean isPendingMomo = requiresDeposit && "momo".equalsIgnoreCase(request.getPaymentMethod());
+      BookingStatus initialStatus = isPendingMomo ? BookingStatus.PENDING : BookingStatus.CONFIRMED;
+
       Booking booking = Booking.builder()
             .user(user)
             .roomType(roomType)
@@ -221,7 +251,7 @@ public class BookingServiceImpl implements BookingService {
             .finalPrice(finalPrice)
             .currency(request.getCurrency())
             .coupon(coupon)
-            .status(BookingStatus.CONFIRMED) // Default active booking as confirmed
+            .status(initialStatus)
             .guestName(request.getGuestName())
             .guestEmail(request.getGuestEmail())
             .guestPhoneEncrypted(
@@ -229,6 +259,9 @@ public class BookingServiceImpl implements BookingService {
             .guestPhoneSearchHash(
                   request.getGuestPhone() != null ? encryptionService.createBlindIndex(request.getGuestPhone()) : null)
             .specialRequests(request.getSpecialRequests())
+            .paymentMethod(request.getPaymentMethod())
+            .requiresDeposit(requiresDeposit)
+            .depositAmount(depositAmount)
             .build();
 
       booking = bookingRepository.save(booking);
@@ -237,14 +270,13 @@ public class BookingServiceImpl implements BookingService {
       BookingStatusLog logEntry = BookingStatusLog.builder()
             .booking(booking)
             .oldStatus(null)
-            .newStatus(BookingStatus.CONFIRMED)
-            .reason("Initial booking created and confirmed")
+            .newStatus(initialStatus)
+            .reason(isPendingMomo ? "Initial booking created, pending MoMo deposit payment" : "Initial booking created and confirmed")
             .changedBy(user)
             .build();
       bookingStatusLogRepository.save(logEntry);
 
-      // 5. Send outbox confirmation email & activation token if guest is new or
-      // inactive
+      // 5. Send outbox confirmation email & activation token if guest is new or inactive
       String token = null;
       if (isNewGuest || isInactiveGuest) {
          token = verificationService.createVerificationToken(user.getId());
@@ -252,50 +284,51 @@ public class BookingServiceImpl implements BookingService {
 
       String bookingCode = booking.getId().toString().substring(0, 8).toUpperCase();
 
-      String bookingCurrency = booking.getCurrency();
-      BigDecimal convertedTotal = currencyService.convertFromBase(totalPrice, bookingCurrency);
-      BigDecimal convertedFinal = currencyService.convertFromBase(finalPrice, bookingCurrency);
+      if (!isPendingMomo) {
+         String bookingCurrency = booking.getCurrency();
+         BigDecimal convertedTotal = currencyService.convertFromBase(totalPrice, bookingCurrency);
+         BigDecimal convertedFinal = currencyService.convertFromBase(finalPrice, bookingCurrency);
 
-      String formattedTotal = formatCurrency(convertedTotal, bookingCurrency);
-      String formattedFinal = formatCurrency(convertedFinal, bookingCurrency);
+         String formattedTotal = formatCurrency(convertedTotal, bookingCurrency);
+         String formattedFinal = formatCurrency(convertedFinal, bookingCurrency);
 
-      String secondaryTotal = null;
-      String secondaryFinal = null;
-      if ("VND".equalsIgnoreCase(bookingCurrency)) {
-         secondaryTotal = "(" + formatCurrency(totalPrice, "USD") + ")";
-         secondaryFinal = "(" + formatCurrency(finalPrice, "USD") + ")";
-      }
-
-      EmailEvent emailEvent = mailService.buildBookingConfirmationEmailEvent(
-            booking.getGuestEmail(),
-            booking.getGuestName(),
-            token,
-            bookingCode,
-            roomType.getProperty().getName(),
-            roomType.getName(),
-            booking.getCheckInDate().toString(),
-            booking.getCheckOutDate().toString(),
-            formattedTotal,
-            formattedFinal,
-            secondaryTotal,
-            secondaryFinal);
-
-      outboxService.saveEvent(
-            booking.getId(),
-            "BOOKING",
-            "BOOKING_CONFIRMED_MAIL",
-            emailEvent);
-
-      // Evict partner bookings list cache to show the new booking on their management
-      // page
-      try {
-         org.springframework.cache.Cache cache = cacheManager.getCache("partner_bookings");
-         if (cache != null) {
-            cache.evict(roomType.getProperty().getOwner().getId());
-            log.info("Evicted partner_bookings cache for partner: {}", roomType.getProperty().getOwner().getId());
+         String secondaryTotal = null;
+         String secondaryFinal = null;
+         if ("VND".equalsIgnoreCase(bookingCurrency)) {
+            secondaryTotal = "(" + formatCurrency(totalPrice, "USD") + ")";
+            secondaryFinal = "(" + formatCurrency(finalPrice, "USD") + ")";
          }
-      } catch (Exception e) {
-         log.error("Failed to evict partner_bookings cache", e);
+
+         EmailEvent emailEvent = mailService.buildBookingConfirmationEmailEvent(
+               booking.getGuestEmail(),
+               booking.getGuestName(),
+               token,
+               bookingCode,
+               roomType.getProperty().getName(),
+               roomType.getName(),
+               booking.getCheckInDate().toString(),
+               booking.getCheckOutDate().toString(),
+               formattedTotal,
+               formattedFinal,
+               secondaryTotal,
+               secondaryFinal);
+
+         outboxService.saveEvent(
+               booking.getId(),
+               "BOOKING",
+               "BOOKING_CONFIRMED_MAIL",
+               emailEvent);
+
+         // Evict partner bookings list cache to show the new booking on their management page
+         try {
+            org.springframework.cache.Cache cache = cacheManager.getCache("partner_bookings");
+            if (cache != null) {
+               cache.evict(roomType.getProperty().getOwner().getId());
+               log.info("Evicted partner_bookings cache for partner: {}", roomType.getProperty().getOwner().getId());
+            }
+         } catch (Exception e) {
+            log.error("Failed to evict partner_bookings cache", e);
+         }
       }
 
       return BookingResponse.builder()
@@ -313,6 +346,135 @@ public class BookingServiceImpl implements BookingService {
             .status(booking.getStatus())
             .activationToken(token)
             .currency(booking.getCurrency())
+            .depositAmount(booking.getDepositAmount())
+            .requiresDeposit(booking.getRequiresDeposit())
+            .paymentMethod(booking.getPaymentMethod())
+            .build();
+   }
+
+   @Override
+   @Transactional
+   public void confirmBooking(UUID bookingId, String paymentMethod, String providerTransactionId, String metadata) {
+      log.info("Confirming booking: {} via paymentMethod: {}, providerTransactionId: {}", bookingId, paymentMethod, providerTransactionId);
+      Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Booking not found"));
+
+      if (booking.getStatus() == BookingStatus.CONFIRMED) {
+         log.info("Booking {} is already CONFIRMED, skipping status update.", bookingId);
+         return;
+      }
+
+      BookingStatus oldStatus = booking.getStatus();
+      booking.setStatus(BookingStatus.CONFIRMED);
+      booking = bookingRepository.save(booking);
+
+      // Create Booking Status Log
+      BookingStatusLog logEntry = BookingStatusLog.builder()
+            .booking(booking)
+            .oldStatus(oldStatus)
+            .newStatus(BookingStatus.CONFIRMED)
+            .reason("Deposit paid via " + paymentMethod)
+            .changedBy(booking.getUser())
+            .build();
+      bookingStatusLogRepository.save(logEntry);
+
+      // Save Transaction record
+      Transaction transaction = Transaction.builder()
+            .booking(booking)
+            .amount(booking.getDepositAmount())
+            .transactionType(com.omnibooking.model.enums.TransactionType.PAYMENT)
+            .paymentMethod(paymentMethod)
+            .status(com.omnibooking.model.enums.TransactionStatus.SUCCESS)
+            .providerTransactionId(providerTransactionId)
+            .metadata(metadata)
+            .build();
+      transactionRepository.save(transaction);
+
+      // Send confirmation email
+      String token = null;
+      if (booking.getUser() != null && Boolean.FALSE.equals(booking.getUser().getIsActive())) {
+         token = verificationService.createVerificationToken(booking.getUser().getId());
+      }
+
+      String bookingCode = booking.getId().toString().substring(0, 8).toUpperCase();
+      String bookingCurrency = booking.getCurrency();
+      BigDecimal convertedTotal = currencyService.convertFromBase(booking.getTotalPrice(), bookingCurrency);
+      BigDecimal convertedFinal = currencyService.convertFromBase(booking.getFinalPrice(), bookingCurrency);
+
+      String formattedTotal = formatCurrency(convertedTotal, bookingCurrency);
+      String formattedFinal = formatCurrency(convertedFinal, bookingCurrency);
+
+      String secondaryTotal = null;
+      String secondaryFinal = null;
+      if ("VND".equalsIgnoreCase(bookingCurrency)) {
+         secondaryTotal = "(" + formatCurrency(booking.getTotalPrice(), "USD") + ")";
+         secondaryFinal = "(" + formatCurrency(booking.getFinalPrice(), "USD") + ")";
+      }
+
+      EmailEvent emailEvent = mailService.buildBookingConfirmationEmailEvent(
+            booking.getGuestEmail(),
+            booking.getGuestName(),
+            token,
+            bookingCode,
+            booking.getRoomType().getProperty().getName(),
+            booking.getRoomType().getName(),
+            booking.getCheckInDate().toString(),
+            booking.getCheckOutDate().toString(),
+            formattedTotal,
+            formattedFinal,
+            secondaryTotal,
+            secondaryFinal);
+
+      outboxService.saveEvent(
+            booking.getId(),
+            "BOOKING",
+            "BOOKING_CONFIRMED_MAIL",
+            emailEvent);
+
+      // Evict partner bookings list cache to show the new booking on their management page
+      try {
+         org.springframework.cache.Cache cache = cacheManager.getCache("partner_bookings");
+         if (cache != null) {
+            cache.evict(booking.getRoomType().getProperty().getOwner().getId());
+            log.info("Evicted partner_bookings cache for partner: {}", booking.getRoomType().getProperty().getOwner().getId());
+         }
+      } catch (Exception e) {
+         log.error("Failed to evict partner_bookings cache", e);
+      }
+   }
+
+   @Override
+   @org.springframework.transaction.annotation.Transactional(readOnly = true)
+   public BookingResponse getBookingById(UUID bookingId) {
+      log.info("Fetching booking details for ID: {}", bookingId);
+      Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Booking not found"));
+
+      String bookingCode = booking.getId().toString().substring(0, 8).toUpperCase();
+
+      String token = null;
+      if (booking.getUser() != null && Boolean.FALSE.equals(booking.getUser().getIsActive())) {
+         token = verificationService.createVerificationToken(booking.getUser().getId());
+      }
+
+      return BookingResponse.builder()
+            .id(booking.getId())
+            .bookingCode(bookingCode)
+            .guestName(booking.getGuestName())
+            .guestEmail(booking.getGuestEmail())
+            .propertyName(booking.getRoomType().getProperty().getName())
+            .roomTypeName(booking.getRoomType().getName())
+            .checkInDate(booking.getCheckInDate())
+            .checkOutDate(booking.getCheckOutDate())
+            .numRooms(booking.getNumRooms())
+            .totalPrice(booking.getTotalPrice())
+            .finalPrice(booking.getFinalPrice())
+            .status(booking.getStatus())
+            .activationToken(token)
+            .currency(booking.getCurrency())
+            .depositAmount(booking.getDepositAmount())
+            .requiresDeposit(booking.getRequiresDeposit())
+            .paymentMethod(booking.getPaymentMethod())
             .build();
    }
 

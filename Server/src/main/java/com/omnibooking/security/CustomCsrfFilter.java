@@ -33,25 +33,27 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
 
    private static final List<String> CSRF_BYPASS_PATTERNS = Arrays.asList(
          "/auth/login", "/auth/login/**",
-         "/*/auth/login", "/*/auth/login/**",
+         "/**/auth/login", "/**/auth/login/**",
          "/auth/register", "/auth/register/**",
-         "/*/auth/register", "/*/auth/register/**",
+         "/**/auth/register", "/**/auth/register/**",
          "/auth/refresh", "/auth/refresh/**",
-         "/*/auth/refresh", "/*/auth/refresh/**",
+         "/**/auth/refresh", "/**/auth/refresh/**",
          "/auth/logout", "/auth/logout/**",
-         "/*/auth/logout", "/*/auth/logout/**",
+         "/**/auth/logout", "/**/auth/logout/**",
          "/auth/2fa/login", "/auth/2fa/login/**",
-         "/*/auth/2fa/login", "/*/auth/2fa/login/**",
+         "/**/auth/2fa/login", "/**/auth/2fa/login/**",
          "/auth/forgot-password", "/auth/forgot-password/**",
-         "/*/auth/forgot-password", "/*/auth/forgot-password/**",
+         "/**/auth/forgot-password", "/**/auth/forgot-password/**",
          "/auth/reset-password", "/auth/reset-password/**",
-         "/*/auth/reset-password", "/*/auth/reset-password/**",
+         "/**/auth/reset-password", "/**/auth/reset-password/**",
          "/auth/activate-guest", "/auth/activate-guest/**",
-         "/*/auth/activate-guest", "/*/auth/activate-guest/**",
+         "/**/auth/activate-guest", "/**/auth/activate-guest/**",
          "/auth/finalize-registration", "/auth/finalize-registration/**",
-         "/*/auth/finalize-registration", "/*/auth/finalize-registration/**",
+         "/**/auth/finalize-registration", "/**/auth/finalize-registration/**",
          "/bookings", "/bookings/**",
-         "/*/bookings", "/*/bookings/**");
+         "/**/bookings", "/**/bookings/**",
+         "/payments/*/create", "/**/payments/*/create",
+         "/payments/*/callback", "/**/payments/*/callback");
 
    @Override
    protected void doFilterInternal(

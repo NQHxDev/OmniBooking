@@ -28,4 +28,7 @@ public class BookingResponse {
    private BookingStatus status;
    private String activationToken;
    private String currency;
+   private BigDecimal depositAmount;
+   private Boolean requiresDeposit;
+   private String paymentMethod;
 }

@@ -13,10 +13,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.UUID;
 
 @CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true", allowedHeaders = "*")
 @RestController
@@ -39,5 +42,18 @@ public class BookingController {
 
       BookingResponse response = bookingService.createBooking(request, principal);
       return ResponseEntity.ok(ApiResponse.success(response, "Booking created successfully", requestId));
+   }
+
+   @Anonymous
+   @GetMapping("/{id}")
+   public ResponseEntity<ApiResponse<BookingResponse>> getBookingById(
+         @PathVariable UUID id,
+         HttpServletRequest httpRequest) {
+
+      String requestId = (String) httpRequest.getAttribute("requestId");
+      log.info("Received get booking details request. requestId={}, bookingId={}", requestId, id);
+
+      BookingResponse response = bookingService.getBookingById(id);
+      return ResponseEntity.ok(ApiResponse.success(response, "Booking details retrieved successfully", requestId));
    }
 }

@@ -17,12 +17,15 @@ import {
    Sparkles,
    CheckCircle,
    X,
+   Wallet,
+   Landmark,
 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useSettingStore } from "@/store/useSettingStore";
 import { propertyService, PropertyDetailResponse } from "@/services/propertyService";
 import { authService } from "@/lib/api/services/authService";
 import { bookingService } from "@/lib/api/services/bookingService";
+import { paymentService } from "@/lib/api/services/paymentService";
 import PriceDisplay from "@/components/PriceDisplay";
 
 export default function BookingPage() {
@@ -46,6 +49,8 @@ export default function BookingPage() {
    const [guestPhone, setGuestPhone] = useState("");
    const [specialRequests, setSpecialRequests] = useState("");
    const [appliedCoupon] = useState<{ id: string } | null>(null);
+   const [paymentMethod, setPaymentMethod] = useState<"visa" | "momo" | "banking">("visa");
+   const [errors, setErrors] = useState<{ guestName?: string; guestEmail?: string }>({});
 
    // UI States
    const [property, setProperty] = useState<PropertyDetailResponse | null>(null);
@@ -53,6 +58,8 @@ export default function BookingPage() {
    const [submitting, setSubmitting] = useState(false);
    const [error, setError] = useState<string | null>(null);
    const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+   const [showPaymentModal, setShowPaymentModal] = useState(false);
+   const [paying, setPaying] = useState(false);
 
    // Track last seen auth state to detect updates
    const [prevAuth, setPrevAuth] = useState({
@@ -163,6 +170,17 @@ export default function BookingPage() {
    const basePrice = roomType.basePrice * nights * roomsCount;
    const finalPrice = basePrice; // In real flow, handle coupon discount on backend response
 
+   const checkinDate = parseISO(checkin);
+   const todayDate = new Date();
+   todayDate.setHours(0, 0, 0, 0);
+   const daysUntilCheckin = differenceInDays(checkinDate, todayDate);
+   const requiresDeposit = !isLoggedIn || daysUntilCheckin >= 5;
+
+   const firstNightPrice = roomType.basePrice * roomsCount;
+   const fifteenPercent = finalPrice * 0.15;
+   const depositAmount = requiresDeposit ? Math.min(fifteenPercent, firstNightPrice) : 0;
+   const payLaterAmount = finalPrice - depositAmount;
+
    const handleEmailBlur = async () => {
       if (isLoggedIn) return; // Skip if logged in
       if (!guestEmail || !guestEmail.includes("@")) return;
@@ -177,8 +195,7 @@ export default function BookingPage() {
       }
    };
 
-   const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
+   const performBooking = async () => {
       setSubmitting(true);
       setError(null);
 
@@ -194,7 +211,22 @@ export default function BookingPage() {
             specialRequests: specialRequests || undefined,
             couponId: appliedCoupon?.id || undefined,
             currency,
+            paymentMethod: paymentMethod.toUpperCase(),
          });
+
+         if (requiresDeposit && paymentMethod === "momo") {
+            const payData = await paymentService.createMomoPayment(response.id);
+            if (payData && payData.payUrl) {
+               window.location.href = payData.payUrl;
+               return;
+            } else {
+               throw new Error(
+                  locale === "vi"
+                     ? "Không thể tạo liên kết thanh toán MoMo."
+                     : "Failed to create MoMo payment link."
+               );
+            }
+         }
 
          // Navigate to success page with details in query params
          const successUrl =
@@ -210,6 +242,9 @@ export default function BookingPage() {
             `&rooms=${response.numRooms}` +
             `&total=${response.totalPrice}` +
             `&final=${response.finalPrice}` +
+            `&deposit=${response.depositAmount || 0}` +
+            `&requiresDeposit=${response.requiresDeposit || false}` +
+            `&paymentMethod=${paymentMethod}` +
             (response.activationToken ? `&token=${response.activationToken}` : "");
 
          router.push(successUrl);
@@ -223,6 +258,46 @@ export default function BookingPage() {
                   : "Booking failed. Please try again.")
          );
          setSubmitting(false);
+      }
+   };
+
+   const handleSimulatedPayment = async () => {
+      setPaying(true);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      setPaying(false);
+      setShowPaymentModal(false);
+      await performBooking();
+   };
+
+   const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+
+      const newErrors: { guestName?: string; guestEmail?: string } = {};
+      if (!guestName.trim()) {
+         newErrors.guestName =
+            locale === "vi" ? "Vui lòng nhập họ và tên của bạn" : "Please enter your full name";
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!guestEmail.trim()) {
+         newErrors.guestEmail =
+            locale === "vi" ? "Vui lòng nhập địa chỉ email" : "Please enter your email address";
+      } else if (!emailRegex.test(guestEmail.trim())) {
+         newErrors.guestEmail =
+            locale === "vi" ? "Địa chỉ email không hợp lệ" : "Invalid email address";
+      }
+
+      if (Object.keys(newErrors).length > 0) {
+         setErrors(newErrors);
+         return;
+      }
+
+      setErrors({});
+
+      if (requiresDeposit && paymentMethod !== "momo") {
+         setShowPaymentModal(true);
+      } else {
+         await performBooking();
       }
    };
 
@@ -306,7 +381,12 @@ export default function BookingPage() {
                         </h2>
                      </div>
 
-                     <form onSubmit={handleSubmit} id="booking-form" className="space-y-5">
+                     <form
+                        onSubmit={handleSubmit}
+                        id="booking-form"
+                        className="space-y-5"
+                        noValidate
+                     >
                         <div className="space-y-1.5">
                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
                               {locale === "vi" ? "Họ và tên" : "Full Name"} *
@@ -317,13 +397,27 @@ export default function BookingPage() {
                               </span>
                               <input
                                  type="text"
-                                 required
                                  placeholder={locale === "vi" ? "Nhập họ tên đầy đủ" : "John Doe"}
                                  value={guestName}
-                                 onChange={(e) => setGuestName(e.target.value)}
-                                 className="w-full pl-10 pr-4 py-3 border border-zinc-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-hidden transition-all text-sm font-medium"
+                                 onChange={(e) => {
+                                    setGuestName(e.target.value);
+                                    if (errors.guestName) {
+                                       setErrors((prev) => ({ ...prev, guestName: undefined }));
+                                    }
+                                 }}
+                                 className={`w-full pl-10 pr-4 py-3 border rounded-xl outline-hidden transition-all text-sm font-medium ${
+                                    errors.guestName
+                                       ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                       : "border-zinc-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                 }`}
                               />
                            </div>
+                           {errors.guestName && (
+                              <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1 animate-in fade-in duration-200">
+                                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                 <span>{errors.guestName}</span>
+                              </p>
+                           )}
                         </div>
 
                         <div className="space-y-1.5">
@@ -336,14 +430,28 @@ export default function BookingPage() {
                               </span>
                               <input
                                  type="email"
-                                 required
                                  placeholder="name@example.com"
                                  value={guestEmail}
-                                 onChange={(e) => setGuestEmail(e.target.value)}
+                                 onChange={(e) => {
+                                    setGuestEmail(e.target.value);
+                                    if (errors.guestEmail) {
+                                       setErrors((prev) => ({ ...prev, guestEmail: undefined }));
+                                    }
+                                 }}
                                  onBlur={handleEmailBlur}
-                                 className="w-full pl-10 pr-4 py-3 border border-zinc-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-hidden transition-all text-sm font-medium"
+                                 className={`w-full pl-10 pr-4 py-3 border rounded-xl outline-hidden transition-all text-sm font-medium ${
+                                    errors.guestEmail
+                                       ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                       : "border-zinc-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                 }`}
                               />
                            </div>
+                           {errors.guestEmail && (
+                              <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1 animate-in fade-in duration-200">
+                                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                 <span>{errors.guestEmail}</span>
+                              </p>
+                           )}
                            <p className="text-[10px] text-zinc-400 font-medium">
                               {locale === "vi"
                                  ? "OmniBooking sẽ gửi xác nhận đặt phòng và link kích hoạt tài khoản thành viên tới email này."
@@ -401,21 +509,115 @@ export default function BookingPage() {
                            {locale === "vi" ? "Hình thức thanh toán" : "Payment option"}
                         </h2>
                      </div>
-                     <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
-                        <div>
-                           <h4 className="text-sm font-bold text-emerald-800">
-                              {locale === "vi"
-                                 ? "Thanh toán trực tiếp tại chỗ nghỉ"
-                                 : "Pay at the property"}
-                           </h4>
-                           <p className="text-xs text-emerald-700/85 leading-relaxed mt-0.5">
-                              {locale === "vi"
-                                 ? "Nhận phòng thành công mới cần trả tiền! OmniBooking không yêu cầu bạn trả trước bất kỳ khoản phí nào."
-                                 : "No upfront fees required! Simply pay at the hotel desk during check-in."}
-                           </p>
+                     {requiresDeposit ? (
+                        <div className="space-y-4">
+                           <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3">
+                              <CreditCard className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                              <div>
+                                 <h4 className="text-sm font-bold text-blue-800">
+                                    {locale === "vi"
+                                       ? "Yêu cầu đặt cọc 15%"
+                                       : "15% Deposit Required"}
+                                 </h4>
+                                 <div className="text-xs text-blue-700/85 leading-relaxed mt-0.5">
+                                    {locale === "vi"
+                                       ? `Bạn cần thanh toán khoản đặt cọc thử nghiệm trị giá `
+                                       : `You need to pay a simulated deposit of `}
+                                    <span className="font-bold">
+                                       <PriceDisplay amount={depositAmount} size="sm" />
+                                    </span>
+                                    {locale === "vi"
+                                       ? ` để xác nhận đặt phòng. Khoản cọc này tối đa bằng 1 đêm nghỉ.`
+                                       : ` to secure your booking. The deposit is capped at 1 night.`}
+                                 </div>
+                              </div>
+                           </div>
+                           <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-start gap-3">
+                              <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                              <div>
+                                 <h4 className="text-sm font-bold text-emerald-800">
+                                    {locale === "vi"
+                                       ? "Thanh toán phần còn lại tại chỗ nghỉ"
+                                       : "Pay remainder at the property"}
+                                 </h4>
+                                 <div className="text-xs text-emerald-700/85 leading-relaxed mt-0.5">
+                                    {locale === "vi"
+                                       ? `Số tiền còn lại `
+                                       : `The remaining amount of `}
+                                    <span className="font-bold">
+                                       <PriceDisplay amount={payLaterAmount} size="sm" />
+                                    </span>
+                                    {locale === "vi"
+                                       ? ` sẽ được thanh toán trực tiếp tại quầy lễ tân khi bạn nhận phòng.`
+                                       : ` will be paid directly at the reception desk during check-in.`}
+                                 </div>
+                              </div>
+                           </div>
+                           <div className="pt-4 border-t border-zinc-100">
+                              <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">
+                                 {locale === "vi"
+                                    ? "Chọn phương thức thanh toán tiền cọc"
+                                    : "Select payment method for deposit"}
+                              </h3>
+                              <div className="grid grid-cols-3 gap-3">
+                                 <button
+                                    type="button"
+                                    onClick={() => setPaymentMethod("visa")}
+                                    className={`p-4 border rounded-2xl flex flex-col items-center gap-2 cursor-pointer transition-all ${
+                                       paymentMethod === "visa"
+                                          ? "border-blue-600 bg-blue-50/50 text-blue-600 ring-2 ring-blue-600/20"
+                                          : "border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:bg-zinc-50"
+                                    }`}
+                                 >
+                                    <CreditCard className="h-6 w-6" />
+                                    <span className="text-xs font-bold">Visa / Master</span>
+                                 </button>
+
+                                 <button
+                                    type="button"
+                                    onClick={() => setPaymentMethod("momo")}
+                                    className={`p-4 border rounded-2xl flex flex-col items-center gap-2 cursor-pointer transition-all ${
+                                       paymentMethod === "momo"
+                                          ? "border-pink-600 bg-pink-50/30 text-pink-600 ring-2 ring-pink-600/20"
+                                          : "border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:bg-zinc-50"
+                                    }`}
+                                 >
+                                    <Wallet className="h-6 w-6" />
+                                    <span className="text-xs font-bold">Ví MoMo</span>
+                                 </button>
+
+                                 <button
+                                    type="button"
+                                    onClick={() => setPaymentMethod("banking")}
+                                    className={`p-4 border rounded-2xl flex flex-col items-center gap-2 cursor-pointer transition-all ${
+                                       paymentMethod === "banking"
+                                          ? "border-emerald-600 bg-emerald-50/30 text-emerald-600 ring-2 ring-emerald-600/20"
+                                          : "border-zinc-200 hover:border-zinc-300 text-zinc-600 hover:bg-zinc-50"
+                                    }`}
+                                 >
+                                    <Landmark className="h-6 w-6" />
+                                    <span className="text-xs font-bold">Banking</span>
+                                 </button>
+                              </div>
+                           </div>
                         </div>
-                     </div>
+                     ) : (
+                        <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-2xl flex items-start gap-3">
+                           <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                           <div>
+                              <h4 className="text-sm font-bold text-emerald-800">
+                                 {locale === "vi"
+                                    ? "Thanh toán trực tiếp tại chỗ nghỉ"
+                                    : "Pay at the property"}
+                              </h4>
+                              <p className="text-xs text-emerald-700/85 leading-relaxed mt-0.5">
+                                 {locale === "vi"
+                                    ? "Nhận phòng thành công mới cần trả tiền! OmniBooking không yêu cầu bạn trả trước bất kỳ khoản phí nào."
+                                    : "No upfront fees required! Simply pay at the hotel desk during check-in."}
+                              </p>
+                           </div>
+                        </div>
+                     )}
                   </div>
                </div>
 
@@ -523,6 +725,31 @@ export default function BookingPage() {
                         </div>
                      </div>
 
+                     {requiresDeposit && (
+                        <div className="border-t border-zinc-100 pt-4 space-y-2 text-xs font-semibold text-zinc-700">
+                           <div className="flex justify-between text-blue-600 font-bold">
+                              <span>
+                                 {locale === "vi"
+                                    ? "Số tiền cọc (15%):"
+                                    : "Deposit required (15%):"}
+                              </span>
+                              <span>
+                                 <PriceDisplay amount={depositAmount} size="sm" />
+                              </span>
+                           </div>
+                           <div className="flex justify-between text-zinc-500 font-medium">
+                              <span>
+                                 {locale === "vi"
+                                    ? "Thanh toán tại chỗ nghỉ:"
+                                    : "Pay at the property:"}
+                              </span>
+                              <span>
+                                 <PriceDisplay amount={payLaterAmount} size="sm" />
+                              </span>
+                           </div>
+                        </div>
+                     )}
+
                      <div className="border-t border-zinc-100 pt-4 flex justify-between items-baseline">
                         <span className="text-sm font-bold text-zinc-900">
                            {locale === "vi" ? "Tổng cộng" : "Total Price"}
@@ -562,6 +789,255 @@ export default function BookingPage() {
                </div>
             </div>
          </div>
+
+         {/* Simulated Payment Modal */}
+         {showPaymentModal && (
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+               <div className="bg-white rounded-3xl border border-zinc-200/80 shadow-2xl p-6 sm:p-8 max-w-md w-full relative animate-in fade-in zoom-in-95 duration-200">
+                  {paying && (
+                     <div className="absolute inset-0 bg-white/90 backdrop-blur-xs rounded-3xl flex flex-col items-center justify-center space-y-4 z-20">
+                        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-sm font-bold text-zinc-900 animate-pulse">
+                           {locale === "vi"
+                              ? "Đang xử lý giao dịch giả lập..."
+                              : "Processing simulated payment..."}
+                        </p>
+                     </div>
+                  )}
+                  <button
+                     onClick={() => setShowPaymentModal(false)}
+                     disabled={paying}
+                     className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-600"
+                  >
+                     <X className="h-5 w-5" />
+                  </button>
+                  <div className="flex flex-col space-y-5">
+                     <div className="flex items-center gap-3 pb-3 border-b border-zinc-100">
+                        <div className="p-2 bg-blue-50 rounded-lg">
+                           <CreditCard className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                           <h3 className="text-lg font-bold text-zinc-950">
+                              {locale === "vi" ? "Thanh toán đặt cọc giả lập" : "Simulated Deposit"}
+                           </h3>
+                           <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+                              OmniBooking Payment Sandbox
+                           </p>
+                        </div>
+                     </div>
+
+                     <p className="text-xs text-zinc-500 leading-relaxed">
+                        {locale === "vi"
+                           ? "Hệ thống đang chạy chế độ thử nghiệm thanh toán giả lập. Bạn cần đóng trước tiền đặt cọc để xác nhận đơn đặt phòng."
+                           : "The system is running in payment sandbox mode. You need to prepay a deposit to confirm your reservation."}
+                     </p>
+
+                     {paymentMethod === "visa" && (
+                        <div className="space-y-3 border border-zinc-200/60 rounded-2xl p-4 bg-zinc-50/50">
+                           <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
+                                 {locale === "vi" ? "Số thẻ" : "Card Number"}
+                              </label>
+                              <input
+                                 type="text"
+                                 readOnly
+                                 value="4111 2222 3333 4444"
+                                 className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-700 outline-hidden"
+                              />
+                           </div>
+                           <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                 <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
+                                    {locale === "vi" ? "Hết hạn" : "Expiry Date"}
+                                 </label>
+                                 <input
+                                    type="text"
+                                    readOnly
+                                    value="12/28"
+                                    className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-700 outline-hidden"
+                                 />
+                              </div>
+                              <div className="space-y-1">
+                                 <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
+                                    CVV
+                                 </label>
+                                 <input
+                                    type="password"
+                                    readOnly
+                                    value="123"
+                                    className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-700 outline-hidden"
+                                 />
+                              </div>
+                           </div>
+                           <p className="text-[9px] text-zinc-400 font-medium">
+                              *{" "}
+                              {locale === "vi"
+                                 ? "Thông tin thẻ demo được điền tự động"
+                                 : "Demo card info is pre-filled"}
+                           </p>
+                        </div>
+                     )}
+
+                     {paymentMethod === "momo" && (
+                        <div className="flex flex-col items-center justify-center border border-pink-100 rounded-2xl p-5 bg-pink-50/10 space-y-3">
+                           <div className="w-36 h-36 bg-white border-2 border-pink-500 p-2 rounded-2xl flex items-center justify-center relative shadow-xs">
+                              <svg className="w-full h-full text-zinc-800" viewBox="0 0 100 100">
+                                 <rect width="100" height="100" fill="none" />
+                                 <rect x="5" y="5" width="25" height="25" fill="currentColor" />
+                                 <rect x="9" y="9" width="17" height="17" fill="white" />
+                                 <rect x="13" y="13" width="9" height="9" fill="currentColor" />
+                                 <rect x="70" y="5" width="25" height="25" fill="currentColor" />
+                                 <rect x="74" y="9" width="17" height="17" fill="white" />
+                                 <rect x="78" y="13" width="9" height="9" fill="currentColor" />
+                                 <rect x="5" y="70" width="25" height="25" fill="currentColor" />
+                                 <rect x="9" y="74" width="17" height="17" fill="white" />
+                                 <rect x="13" y="78" width="9" height="9" fill="currentColor" />
+                                 <rect x="40" y="5" width="10" height="10" fill="currentColor" />
+                                 <rect x="55" y="15" width="10" height="5" fill="currentColor" />
+                                 <rect x="45" y="30" width="15" height="10" fill="currentColor" />
+                                 <rect x="5" y="45" width="10" height="15" fill="currentColor" />
+                                 <rect x="20" y="50" width="15" height="10" fill="currentColor" />
+                                 <rect x="80" y="45" width="15" height="15" fill="currentColor" />
+                                 <rect x="45" y="55" width="10" height="20" fill="currentColor" />
+                                 <rect x="75" y="75" width="20" height="10" fill="currentColor" />
+                                 <rect x="60" y="80" width="10" height="15" fill="currentColor" />
+                                 <rect x="40" y="85" width="15" height="10" fill="currentColor" />
+                              </svg>
+                              <div className="absolute inset-0 m-auto w-10 h-10 bg-pink-600 rounded-xl flex items-center justify-center text-white text-[10px] font-black shadow-md border-2 border-white">
+                                 MoMo
+                              </div>
+                           </div>
+                           <div className="text-center">
+                              <p className="text-xs font-bold text-pink-700">
+                                 {locale === "vi"
+                                    ? "Quét mã QR giả lập để thanh toán"
+                                    : "Scan simulated QR to pay"}
+                              </p>
+                              <p className="text-[10px] text-zinc-400 mt-1">
+                                 {locale === "vi"
+                                    ? "Mở app MoMo và quét mã này để hoàn tất đặt cọc"
+                                    : "Open MoMo app and scan to pay"}
+                              </p>
+                           </div>
+                        </div>
+                     )}
+
+                     {paymentMethod === "banking" && (
+                        <div className="flex flex-col items-center border border-emerald-100 rounded-2xl p-4 bg-emerald-50/10 space-y-3">
+                           <div className="w-32 h-32 bg-white border-2 border-emerald-500 p-2 rounded-2xl flex items-center justify-center relative shadow-xs">
+                              <svg className="w-full h-full text-zinc-800" viewBox="0 0 100 100">
+                                 <rect width="100" height="100" fill="none" />
+                                 <rect x="5" y="5" width="25" height="25" fill="currentColor" />
+                                 <rect x="9" y="9" width="17" height="17" fill="white" />
+                                 <rect x="13" y="13" width="9" height="9" fill="currentColor" />
+                                 <rect x="70" y="5" width="25" height="25" fill="currentColor" />
+                                 <rect x="74" y="9" width="17" height="17" fill="white" />
+                                 <rect x="78" y="13" width="9" height="9" fill="currentColor" />
+                                 <rect x="5" y="70" width="25" height="25" fill="currentColor" />
+                                 <rect x="9" y="74" width="17" height="17" fill="white" />
+                                 <rect x="13" y="78" width="9" height="9" fill="currentColor" />
+                                 <rect x="40" y="5" width="10" height="10" fill="currentColor" />
+                                 <rect x="55" y="15" width="10" height="5" fill="currentColor" />
+                                 <rect x="45" y="30" width="15" height="10" fill="currentColor" />
+                                 <rect x="5" y="45" width="10" height="15" fill="currentColor" />
+                                 <rect x="20" y="50" width="15" height="10" fill="currentColor" />
+                                 <rect x="80" y="45" width="15" height="15" fill="currentColor" />
+                                 <rect x="45" y="55" width="10" height="20" fill="currentColor" />
+                                 <rect x="75" y="75" width="20" height="10" fill="currentColor" />
+                                 <rect x="60" y="80" width="10" height="15" fill="currentColor" />
+                                 <rect x="40" y="85" width="15" height="10" fill="currentColor" />
+                              </svg>
+                              <div className="absolute inset-0 m-auto w-8 h-8 bg-emerald-600 rounded-full flex items-center justify-center text-white text-[9px] font-black shadow-md border-2 border-white">
+                                 VietQR
+                              </div>
+                           </div>
+                           <div className="w-full space-y-1.5 text-xs font-semibold text-zinc-700">
+                              <div className="flex justify-between border-b border-zinc-100 pb-1">
+                                 <span className="text-zinc-400">
+                                    {locale === "vi" ? "Ngân hàng" : "Bank"}
+                                 </span>
+                                 <span className="text-zinc-800 font-bold">Techcombank</span>
+                              </div>
+                              <div className="flex justify-between border-b border-zinc-100 pb-1">
+                                 <span className="text-zinc-400">
+                                    {locale === "vi" ? "Số tài khoản" : "Account No."}
+                                 </span>
+                                 <span className="text-zinc-800 font-bold">1902 8888 8888</span>
+                              </div>
+                              <div className="flex justify-between border-b border-zinc-100 pb-1">
+                                 <span className="text-zinc-400">
+                                    {locale === "vi" ? "Chủ tài khoản" : "Account Name"}
+                                 </span>
+                                 <span className="text-zinc-800 font-bold">
+                                    OMNIBOOKING SANDBOX
+                                 </span>
+                              </div>
+                              <div className="flex justify-between">
+                                 <span className="text-zinc-400">
+                                    {locale === "vi" ? "Số tiền cọc" : "Deposit Amount"}
+                                 </span>
+                                 <span className="text-emerald-600 font-extrabold">
+                                    <PriceDisplay amount={depositAmount} size="sm" />
+                                 </span>
+                              </div>
+                           </div>
+                        </div>
+                     )}
+
+                     <div className="bg-zinc-50 rounded-2xl p-4 space-y-2.5 text-xs font-semibold text-zinc-700 border border-zinc-100">
+                        <div className="flex justify-between">
+                           <span className="text-zinc-500">
+                              {locale === "vi" ? "Tổng cộng đơn đặt" : "Booking Total"}
+                           </span>
+                           <span className="text-zinc-900">
+                              <PriceDisplay amount={finalPrice} />
+                           </span>
+                        </div>
+                        <div className="flex justify-between text-blue-600 font-bold">
+                           <span>
+                              {locale === "vi"
+                                 ? "Tiền cọc cần thanh toán (15%)"
+                                 : "Deposit now (15%)"}
+                           </span>
+                           <span>
+                              <PriceDisplay amount={depositAmount} />
+                           </span>
+                        </div>
+                        <div className="h-px bg-zinc-200/80 my-1"></div>
+                        <div className="flex justify-between text-emerald-600">
+                           <span>
+                              {locale === "vi"
+                                 ? "Trả tại chỗ nghỉ nhận phòng"
+                                 : "Pay at property on check-in"}
+                           </span>
+                           <span>
+                              <PriceDisplay amount={payLaterAmount} />
+                           </span>
+                        </div>
+                     </div>
+
+                     <div className="space-y-3 pt-2">
+                        <button
+                           onClick={handleSimulatedPayment}
+                           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all cursor-pointer shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                        >
+                           <span>
+                              {locale === "vi"
+                                 ? "Xác nhận Thanh toán giả lập"
+                                 : "Confirm Simulated Payment"}
+                           </span>
+                        </button>
+                        <button
+                           onClick={() => setShowPaymentModal(false)}
+                           className="w-full text-zinc-400 hover:text-zinc-600 font-bold py-2 text-xs transition-colors cursor-pointer"
+                        >
+                           {locale === "vi" ? "Hủy bỏ" : "Cancel"}
+                        </button>
+                     </div>
+                  </div>
+               </div>
+            </div>
+         )}
       </div>
    );
 }

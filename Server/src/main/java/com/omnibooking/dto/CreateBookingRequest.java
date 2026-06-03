@@ -39,6 +39,7 @@ public class CreateBookingRequest {
    private String guestPhone; // Optional, will be encrypted
    private String specialRequests;
    private UUID couponId;
+   private String paymentMethod;
 
    @Builder.Default
    private String currency = "USD";

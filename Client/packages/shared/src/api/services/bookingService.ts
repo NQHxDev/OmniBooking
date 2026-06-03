@@ -12,6 +12,7 @@ export interface CreateBookingRequest {
    specialRequests?: string;
    couponId?: string;
    currency?: string;
+   paymentMethod?: string;
 }
 
 export interface BookingResponse {
@@ -29,6 +30,9 @@ export interface BookingResponse {
    status: string;
    activationToken?: string;
    currency?: string;
+   depositAmount?: number;
+   requiresDeposit?: boolean;
+   paymentMethod?: string;
 }
 
 export const bookingService = {
@@ -36,6 +40,13 @@ export const bookingService = {
       const response = await apiClient.post<unknown, ApiResponse<BookingResponse>>(
          "/bookings",
          request,
+         { withCredentials: true }
+      );
+      return response.data;
+   },
+   getById: async (id: string): Promise<BookingResponse> => {
+      const response = await apiClient.get<unknown, ApiResponse<BookingResponse>>(
+         `/bookings/${id}`,
          { withCredentials: true }
       );
       return response.data;

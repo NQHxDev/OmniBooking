@@ -106,6 +106,8 @@ public class SecurityConfig {
                         "/auth/check-email", "/auth/activate-guest")
                   .permitAll()
                   .requestMatchers(HttpMethod.POST, "/bookings").permitAll()
+                  .requestMatchers(HttpMethod.GET, "/bookings/**").permitAll()
+                  .requestMatchers("/payments/**").permitAll()
                   .requestMatchers("/properties/search", "/properties/search/**").permitAll()
                   .requestMatchers("/destinations", "/destinations/**").permitAll()
                   .requestMatchers("/health/**").permitAll()

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { format, parseISO } from "date-fns";
@@ -9,6 +9,8 @@ import { CheckCircle, Home, Lock, ArrowRight, AlertCircle, Sparkles } from "luci
 import { useAuthStore } from "@/store/useAuthStore";
 import { useSettingStore } from "@/store/useSettingStore";
 import { authService } from "@/lib/api/services/authService";
+import { bookingService, BookingResponse } from "@/lib/api/services/bookingService";
+import { paymentService } from "@/lib/api/services/paymentService";
 import PriceDisplay from "@/components/PriceDisplay";
 import Barcode from "@/components/Barcode";
 
@@ -18,14 +20,100 @@ export default function BookingSuccessPage() {
    const searchParams = useSearchParams();
    const dateLocale = locale === "vi" ? vi : enUS;
 
-   const bookingCode = searchParams.get("code") || "N/A";
-   const guestName = searchParams.get("name") || "";
-   const propertyName = searchParams.get("property") || "";
-   const roomTypeName = searchParams.get("room") || "";
-   const checkin = searchParams.get("checkin");
-   const checkout = searchParams.get("checkout");
-   const finalPrice = Number(searchParams.get("final")) || 0;
-   const token = searchParams.get("token"); // Guest activation token
+   const rawBookingId = searchParams.get("bookingId") || searchParams.get("orderId");
+   const bookingId =
+      rawBookingId && rawBookingId.includes("_") ? rawBookingId.split("_")[0] : rawBookingId;
+   const [bookingDetails, setBookingDetails] = useState<BookingResponse | null>(null);
+   const [loading, setLoading] = useState(!!bookingId);
+   const [fetchError, setFetchError] = useState<string | null>(null);
+   const [retrying, setRetrying] = useState(false);
+
+   const resultCode = searchParams.get("resultCode");
+   const isPaymentSuccess = resultCode === null || resultCode === "0";
+
+   const [prevBookingId, setPrevBookingId] = useState(bookingId);
+   if (bookingId !== prevBookingId) {
+      setPrevBookingId(bookingId);
+      setLoading(true);
+      setBookingDetails(null);
+      setFetchError(null);
+   }
+
+   useEffect(() => {
+      if (bookingId) {
+         bookingService
+            .getById(bookingId)
+            .then((details) => {
+               setBookingDetails(details);
+            })
+            .catch((err) => {
+               console.error("Failed to fetch booking details:", err);
+               setFetchError(
+                  locale === "vi"
+                     ? "Không thể tải thông tin đặt phòng."
+                     : "Failed to load booking details."
+               );
+            })
+            .finally(() => {
+               setLoading(false);
+            });
+      }
+   }, [bookingId, locale]);
+
+   const handleRetryPayment = async () => {
+      if (!bookingId) return;
+      setRetrying(true);
+      try {
+         const payData = await paymentService.createMomoPayment(bookingId);
+         if (payData && payData.payUrl) {
+            window.location.href = payData.payUrl;
+         } else {
+            alert(
+               locale === "vi"
+                  ? "Không thể tạo liên kết thanh toán MoMo."
+                  : "Failed to create MoMo payment link."
+            );
+         }
+      } catch (err) {
+         console.error("Retry payment error:", err);
+         alert(
+            locale === "vi"
+               ? "Có lỗi xảy ra khi tạo liên kết thanh toán."
+               : "An error occurred while creating the payment link."
+         );
+      } finally {
+         setRetrying(false);
+      }
+   };
+
+   const bookingCode = bookingDetails
+      ? bookingDetails.bookingCode
+      : searchParams.get("code") || "N/A";
+   const guestName = bookingDetails ? bookingDetails.guestName : searchParams.get("name") || "";
+   const propertyName = bookingDetails
+      ? bookingDetails.propertyName
+      : searchParams.get("property") || "";
+   const roomTypeName = bookingDetails
+      ? bookingDetails.roomTypeName
+      : searchParams.get("room") || "";
+   const checkin = bookingDetails ? bookingDetails.checkInDate : searchParams.get("checkin");
+   const checkout = bookingDetails ? bookingDetails.checkOutDate : searchParams.get("checkout");
+   const finalPrice = bookingDetails
+      ? bookingDetails.finalPrice || 0
+      : Number(searchParams.get("final")) || 0;
+   const depositAmount = bookingDetails
+      ? bookingDetails.depositAmount || 0
+      : Number(searchParams.get("deposit")) || 0;
+   const requiresDeposit = bookingDetails
+      ? bookingDetails.requiresDeposit || false
+      : searchParams.get("requiresDeposit") === "true";
+   const payLaterAmount = finalPrice - depositAmount;
+   const paymentMethod = bookingDetails
+      ? bookingDetails.paymentMethod || "visa"
+      : searchParams.get("paymentMethod") || "visa";
+   const token = bookingDetails
+      ? bookingDetails.activationToken || null
+      : searchParams.get("token"); // Guest activation token
 
    const { setAuth } = useAuthStore();
    const { currency } = useSettingStore();
@@ -80,23 +168,77 @@ export default function BookingSuccessPage() {
       }
    };
 
+   if (loading) {
+      return (
+         <div className="min-h-screen bg-zinc-50/50 py-12 px-4 sm:px-6 lg:px-8 font-sans flex flex-col justify-center items-center">
+            <div className="max-w-xl w-full space-y-8 flex flex-col items-center">
+               <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+               <p className="text-sm font-semibold text-zinc-500">
+                  {locale === "vi"
+                     ? "Đang tải thông tin đặt phòng..."
+                     : "Loading booking details..."}
+               </p>
+            </div>
+         </div>
+      );
+   }
+
+   if (fetchError) {
+      return (
+         <div className="min-h-screen bg-zinc-50/50 py-12 px-4 sm:px-6 lg:px-8 font-sans flex flex-col justify-center items-center">
+            <div className="max-w-md w-full bg-white rounded-3xl border border-zinc-200 shadow-sm p-8 text-center space-y-6">
+               <div className="inline-flex p-3 bg-red-50 rounded-full border border-red-100 shadow-sm">
+                  <AlertCircle className="h-10 w-10 text-red-600" />
+               </div>
+               <h1 className="text-xl font-bold text-zinc-950">
+                  {locale === "vi" ? "Lỗi tải thông tin" : "Error Loading Details"}
+               </h1>
+               <p className="text-sm text-zinc-500 font-medium">{fetchError}</p>
+               <button
+                  onClick={() => router.push(`/${locale}`)}
+                  className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3 px-6 rounded-xl transition-all cursor-pointer shadow-md text-xs flex items-center justify-center gap-2"
+               >
+                  <Home className="h-4 w-4" />
+                  <span>{locale === "vi" ? "Về trang chủ" : "Return Home"}</span>
+               </button>
+            </div>
+         </div>
+      );
+   }
+
    return (
       <div className="min-h-screen bg-zinc-50/50 py-12 px-4 sm:px-6 lg:px-8 font-sans flex flex-col justify-center items-center">
          <div className="max-w-xl w-full space-y-8">
             {/* Header Success Status */}
-            <div className="text-center space-y-4 animate-in fade-in duration-300">
-               <div className="inline-flex p-3 bg-emerald-50 rounded-full border border-emerald-100 shadow-sm">
-                  <CheckCircle className="h-14 w-14 text-emerald-600" />
+            {isPaymentSuccess ? (
+               <div className="text-center space-y-4 animate-in fade-in duration-300">
+                  <div className="inline-flex p-3 bg-emerald-50 rounded-full border border-emerald-100 shadow-sm">
+                     <CheckCircle className="h-14 w-14 text-emerald-600" />
+                  </div>
+                  <h1 className="text-3xl font-bold text-zinc-950 tracking-tight">
+                     {locale === "vi" ? "Đặt phòng thành công!" : "Booking Confirmed!"}
+                  </h1>
+                  <p className="text-sm text-zinc-500 font-medium max-w-sm mx-auto">
+                     {locale === "vi"
+                        ? "Cảm ơn bạn đã lựa chọn OmniBooking. Chúng tôi đã gửi email xác nhận chi tiết tới địa chỉ email của bạn."
+                        : "Thank you for booking with OmniBooking. We've sent a confirmation email to your address."}
+                  </p>
                </div>
-               <h1 className="text-3xl font-extrabold text-zinc-950 tracking-tight">
-                  {locale === "vi" ? "Đặt phòng thành công!" : "Booking Confirmed!"}
-               </h1>
-               <p className="text-sm text-zinc-500 font-medium max-w-sm mx-auto">
-                  {locale === "vi"
-                     ? "Cảm ơn bạn đã lựa chọn OmniBooking. Chúng tôi đã gửi email xác nhận chi tiết tới địa chỉ email của bạn."
-                     : "Thank you for booking with OmniBooking. We've sent a confirmation email to your address."}
-               </p>
-            </div>
+            ) : (
+               <div className="text-center space-y-4 animate-in fade-in duration-300">
+                  <div className="inline-flex p-3 bg-rose-50 rounded-full border border-rose-100 shadow-sm">
+                     <AlertCircle className="h-14 w-14 text-rose-600" />
+                  </div>
+                  <h1 className="text-3xl font-bold text-zinc-950 tracking-tight">
+                     {locale === "vi" ? "Thanh toán thất bại!" : "Payment Unsuccessful!"}
+                  </h1>
+                  <p className="text-sm text-zinc-500 font-medium max-w-sm mx-auto">
+                     {locale === "vi"
+                        ? "Giao dịch thanh toán qua MoMo đã bị hủy hoặc không thành công. Yêu cầu đặt phòng của bạn tạm thời chưa được xác nhận."
+                        : "The MoMo payment transaction was cancelled or failed. Your booking has not been confirmed yet."}
+                  </p>
+               </div>
+            )}
 
             {/* Booking Ticket Card (Boarding Pass Style) */}
             <div className="relative bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-visible">
@@ -108,9 +250,15 @@ export default function BookingSuccessPage() {
                <div className="p-6 sm:p-8 space-y-6">
                   <div className="flex justify-between items-center pb-4 border-b border-zinc-100">
                      <div className="flex items-center gap-2">
-                        <div className="bg-emerald-50 text-emerald-700 font-extrabold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider border border-emerald-100">
-                           {locale === "vi" ? "Đã xác nhận" : "Confirmed"}
-                        </div>
+                        {isPaymentSuccess ? (
+                           <div className="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider border border-emerald-100">
+                              {locale === "vi" ? "Đã xác nhận" : "Confirmed"}
+                           </div>
+                        ) : (
+                           <div className="bg-rose-50 text-rose-700 font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider border border-rose-100">
+                              {locale === "vi" ? "Chưa thanh toán" : "Unpaid"}
+                           </div>
+                        )}
                      </div>
                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                         OmniBooking Boarding Pass
@@ -198,25 +346,87 @@ export default function BookingSuccessPage() {
                      </div>
                   </div>
 
-                  <div className="border-t border-zinc-100 pt-4 flex justify-between items-baseline">
-                     <span className="text-xs font-bold text-zinc-900">
-                        {locale === "vi"
-                           ? "Tổng thanh toán tại chỗ nghỉ"
-                           : "Total to pay at property"}
-                     </span>
-                     <div className="text-right">
-                        <PriceDisplay
-                           amount={finalPrice}
-                           size="lg"
-                           className="text-emerald-600 font-extrabold text-lg block"
-                        />
-                        {currency === "VND" && (
-                           <span className="text-[10px] text-zinc-400 font-bold block mt-0.5">
-                              (${finalPrice.toFixed(2)} USD)
+                  {requiresDeposit ? (
+                     <div className="border-t border-zinc-100 pt-4 space-y-3">
+                        <div className="flex justify-between items-baseline text-xs font-semibold text-zinc-500">
+                           <span>
+                              {locale === "vi" ? "Tổng cộng giá trị đơn:" : "Total booking value:"}
                            </span>
-                        )}
+                           <span>
+                              <PriceDisplay
+                                 amount={finalPrice}
+                                 size="sm"
+                                 className="text-zinc-700 font-bold"
+                              />
+                           </span>
+                        </div>
+                        <div className="flex justify-between items-baseline text-xs font-semibold text-blue-600">
+                           <span>
+                              {locale === "vi"
+                                 ? `Đã đặt cọc trực tuyến qua ${
+                                      paymentMethod === "momo"
+                                         ? "Ví MoMo"
+                                         : paymentMethod === "banking"
+                                           ? "Chuyển khoản"
+                                           : "Thẻ Visa/Master"
+                                   } (giả lập):`
+                                 : `Deposit paid via ${
+                                      paymentMethod === "momo"
+                                         ? "MoMo"
+                                         : paymentMethod === "banking"
+                                           ? "Bank Transfer"
+                                           : "Visa/Mastercard"
+                                   } (simulated):`}
+                           </span>
+                           <span>
+                              <PriceDisplay
+                                 amount={depositAmount}
+                                 size="sm"
+                                 className="font-black text-blue-600"
+                              />
+                           </span>
+                        </div>
+                        <div className="flex justify-between items-baseline border-t border-zinc-100/50 pt-3">
+                           <span className="text-xs font-bold text-zinc-900">
+                              {locale === "vi"
+                                 ? "Còn lại thanh toán tại chỗ nghỉ"
+                                 : "Remaining to pay at property"}
+                           </span>
+                           <div className="text-right">
+                              <PriceDisplay
+                                 amount={payLaterAmount}
+                                 size="lg"
+                                 className="text-emerald-600 font-extrabold text-lg block"
+                              />
+                              {currency === "VND" && (
+                                 <span className="text-[10px] text-zinc-400 font-bold block mt-0.5">
+                                    (${payLaterAmount.toFixed(2)} USD)
+                                 </span>
+                              )}
+                           </div>
+                        </div>
                      </div>
-                  </div>
+                  ) : (
+                     <div className="border-t border-zinc-100 pt-4 flex justify-between items-baseline">
+                        <span className="text-xs font-bold text-zinc-900">
+                           {locale === "vi"
+                              ? "Tổng thanh toán tại chỗ nghỉ"
+                              : "Total to pay at property"}
+                        </span>
+                        <div className="text-right">
+                           <PriceDisplay
+                              amount={finalPrice}
+                              size="lg"
+                              className="text-emerald-600 font-extrabold text-lg block"
+                           />
+                           {currency === "VND" && (
+                              <span className="text-[10px] text-zinc-400 font-bold block mt-0.5">
+                                 (${finalPrice.toFixed(2)} USD)
+                              </span>
+                           )}
+                        </div>
+                     </div>
+                  )}
 
                   {/* Scannable Barcode */}
                   <div className="border-t border-zinc-100 pt-6 flex flex-col items-center justify-center space-y-2">
@@ -240,7 +450,7 @@ export default function BookingSuccessPage() {
             </div>
 
             {/* Lazy Sign-up Box */}
-            {token && !activatedSuccessfully && (
+            {isPaymentSuccess && token && !activatedSuccessfully && (
                <div className="bg-blue-50/70 rounded-3xl border border-blue-100 p-6 sm:p-8 space-y-6 relative overflow-hidden shadow-xs">
                   <div className="absolute -top-6 -right-6 w-20 h-20 bg-blue-100 rounded-full opacity-50 blur-xl"></div>
 
@@ -349,13 +559,36 @@ export default function BookingSuccessPage() {
 
             {/* Actions */}
             <div className="text-center pt-4">
-               <button
-                  onClick={() => router.push(`/${locale}`)}
-                  className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-800 text-sm font-bold border border-zinc-200 bg-white rounded-xl px-6 py-3 cursor-pointer transition-colors shadow-2xs hover:shadow-xs"
-               >
-                  <Home className="h-4.5 w-4.5" />
-                  <span>{locale === "vi" ? "Về trang chủ" : "Return Home"}</span>
-               </button>
+               {isPaymentSuccess ? (
+                  <button
+                     onClick={() => router.push(`/${locale}`)}
+                     className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-800 text-sm font-bold border border-zinc-200 bg-white rounded-xl px-6 py-3 cursor-pointer transition-colors shadow-2xs hover:shadow-xs"
+                  >
+                     <Home className="h-4.5 w-4.5" />
+                     <span>{locale === "vi" ? "Về trang chủ" : "Return Home"}</span>
+                  </button>
+               ) : (
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                     <button
+                        onClick={handleRetryPayment}
+                        disabled={retrying}
+                        className="inline-flex items-center justify-center gap-2 text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-sm font-bold rounded-xl px-6 py-3 cursor-pointer transition-all shadow-md hover:shadow-lg w-full sm:w-auto min-w-[160px]"
+                     >
+                        {retrying ? (
+                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                           <span>{locale === "vi" ? "Thử thanh toán lại" : "Retry Payment"}</span>
+                        )}
+                     </button>
+                     <button
+                        onClick={() => router.push(`/${locale}`)}
+                        className="inline-flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-800 text-sm font-bold border border-zinc-200 bg-white rounded-xl px-6 py-3 cursor-pointer transition-colors shadow-2xs hover:shadow-xs w-full sm:w-auto"
+                     >
+                        <Home className="h-4.5 w-4.5" />
+                        <span>{locale === "vi" ? "Về trang chủ" : "Return Home"}</span>
+                     </button>
+                  </div>
+               )}
             </div>
          </div>
       </div>
