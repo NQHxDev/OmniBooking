@@ -16,6 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
@@ -78,12 +81,12 @@ public class CurrencyService {
       String url = String.format(appProperties.getCurrency().getProviderUrl(), apiKey, base);
 
       try {
-         @SuppressWarnings("unchecked")
-         Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+         ParameterizedTypeReference<Map<String, Object>> responseType = new ParameterizedTypeReference<>() {};
+         ResponseEntity<Map<String, Object>> responseEntity = restTemplate.exchange(url, HttpMethod.GET, null, responseType);
+         Map<String, Object> response = responseEntity.getBody();
 
-         if (response != null && "success".equals(response.get("result"))) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> rates = (Map<String, Object>) response.get("conversion_rates");
+         if (response != null && "success".equals(response.get("result"))
+               && response.get("conversion_rates") instanceof Map<?, ?> rates) {
 
             // Get list of supported currency codes from DB
             List<String> supportedCodes = currencyRepository.findAll().stream()
@@ -91,17 +94,18 @@ public class CurrencyService {
                   .collect(Collectors.toList());
 
             rates.forEach((code, value) -> {
+               String currencyCode = String.valueOf(code);
                // Only process if the currency is supported by our system
-               if (supportedCodes.contains(code)) {
+               if (supportedCodes.contains(currencyCode)) {
                   BigDecimal apiRate = new BigDecimal(String.valueOf(value));
 
                   // Apply profit margin (markup)
-                  BigDecimal bigRate = applyProfitMargin(code, apiRate);
+                  BigDecimal bigRate = applyProfitMargin(currencyCode, apiRate);
 
                   // Save to DB
                   ExchangeRate exchangeRate = ExchangeRate.builder()
                         .fromCurrency(base)
-                        .toCurrency(code)
+                        .toCurrency(currencyCode)
                         .rate(bigRate)
                         .provider("ExchangeRate-API")
                         .fetchedAt(Instant.now())
@@ -109,7 +113,7 @@ public class CurrencyService {
                   exchangeRateRepository.save(exchangeRate);
 
                   // Cache in Redis (TTL 4 hours)
-                  redisTemplate.opsForValue().set(RATE_CACHE_PREFIX + code, bigRate.toString(), 4, TimeUnit.HOURS);
+                  redisTemplate.opsForValue().set(RATE_CACHE_PREFIX + currencyCode, bigRate.toString(), 4, TimeUnit.HOURS);
                }
             });
             log.info("Successfully updated exchange rates from API for {} supported currencies.",

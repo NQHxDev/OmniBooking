@@ -15,28 +15,49 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
 import org.springframework.web.filter.OncePerRequestFilter;
-
-import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.servlet.HandlerExecutionChain;
-import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 @RequiredArgsConstructor
 public class CustomCsrfFilter extends OncePerRequestFilter {
 
    private final ObjectMapper objectMapper;
 
-   private final RequestMappingHandlerMapping requestMappingHandlerMapping;
-
    private final String allowedOrigins;
+
+   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
 
    private static final List<String> STATE_CHANGING_METHODS = Arrays.asList("POST", "PUT", "DELETE", "PATCH");
 
+   private static final org.springframework.util.AntPathMatcher PATH_MATCHER = new org.springframework.util.AntPathMatcher();
+
+   private static final List<String> CSRF_BYPASS_PATTERNS = Arrays.asList(
+         "/auth/login", "/auth/login/**",
+         "/*/auth/login", "/*/auth/login/**",
+         "/auth/register", "/auth/register/**",
+         "/*/auth/register", "/*/auth/register/**",
+         "/auth/refresh", "/auth/refresh/**",
+         "/*/auth/refresh", "/*/auth/refresh/**",
+         "/auth/logout", "/auth/logout/**",
+         "/*/auth/logout", "/*/auth/logout/**",
+         "/auth/2fa/login", "/auth/2fa/login/**",
+         "/*/auth/2fa/login", "/*/auth/2fa/login/**",
+         "/auth/forgot-password", "/auth/forgot-password/**",
+         "/*/auth/forgot-password", "/*/auth/forgot-password/**",
+         "/auth/reset-password", "/auth/reset-password/**",
+         "/*/auth/reset-password", "/*/auth/reset-password/**",
+         "/auth/activate-guest", "/auth/activate-guest/**",
+         "/*/auth/activate-guest", "/*/auth/activate-guest/**",
+         "/auth/finalize-registration", "/auth/finalize-registration/**",
+         "/*/auth/finalize-registration", "/*/auth/finalize-registration/**",
+         "/bookings", "/bookings/**",
+         "/*/bookings", "/*/bookings/**");
+
    @Override
    protected void doFilterInternal(
-         @org.springframework.lang.NonNull HttpServletRequest request,
-         @org.springframework.lang.NonNull HttpServletResponse response,
-         @org.springframework.lang.NonNull FilterChain filterChain)
+         @NonNull HttpServletRequest request,
+         @NonNull HttpServletResponse response,
+         @NonNull FilterChain filterChain)
          throws ServletException, IOException {
 
       if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
@@ -46,7 +67,7 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
 
       String method = request.getMethod();
       if (STATE_CHANGING_METHODS.contains(method)) {
-         if (isPublicEndpoint(request)) {
+         if (isCsrfBypassEndpoint(request)) {
             filterChain.doFilter(request, response);
             return;
          }
@@ -78,26 +99,18 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
    }
 
-   private boolean isPublicEndpoint(@org.springframework.lang.NonNull HttpServletRequest request) {
-      try {
-         HandlerExecutionChain handlerChain = requestMappingHandlerMapping.getHandler(request);
-         if (handlerChain == null) {
-            return false;
-         }
-
-         Object handler = handlerChain.getHandler();
-         if (handler instanceof HandlerMethod handlerMethod) {
-            return handlerMethod.hasMethodAnnotation(Anonymous.class) ||
-                  handlerMethod.getBeanType().isAnnotationPresent(Anonymous.class);
-         }
-      } catch (Exception e) {
-         return false;
-      }
-      return false;
+   private boolean isCsrfBypassEndpoint(@org.springframework.lang.NonNull HttpServletRequest request) {
+      String path = request.getRequestURI();
+      return CSRF_BYPASS_PATTERNS.stream().anyMatch(pattern -> PATH_MATCHER.match(pattern, path));
    }
 
-   private void handleError(HttpServletRequest request, HttpServletResponse response, ErrorCode error) throws IOException {
+   private void handleError(HttpServletRequest request, HttpServletResponse response, ErrorCode error)
+         throws IOException {
       String requestId = (String) request.getAttribute("requestId");
+
+      meterRegistry.counter("omnibooking.auth.csrf.rejections", "reason", error.name().toLowerCase()).increment();
+      meterRegistry.counter("omnibooking.auth.rejections", "reason", "csrf_invalid").increment();
+
       ApiResponse<Object> apiResponse = ApiResponse.error(
             error.getMessage(),
             error.getCode(),

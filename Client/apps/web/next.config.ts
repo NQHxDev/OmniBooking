@@ -38,8 +38,8 @@ loadRootEnv();
 const withNextIntl = createNextIntlPlugin("./src/i18n.ts");
 
 // Calculate allowedDevOrigins dynamically
-const webUrl = process.env.NEXT_PUBLIC_WEB_URL || "https://zeion.online";
-const partnerUrl = process.env.NEXT_PUBLIC_PARTNER_URL || "https://partner.zeion.online";
+const webUrl = process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3000";
+const partnerUrl = process.env.NEXT_PUBLIC_PARTNER_URL || "http://localhost:3002";
 const getHostname = (url: string) => {
    try {
       return new URL(url).hostname;

@@ -5,8 +5,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
 import org.springframework.http.ResponseCookie;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 public class CookieUtils {
 
@@ -24,27 +22,6 @@ public class CookieUtils {
       if (cookieDomain != null && !cookieDomain.isBlank()) {
          return cookieDomain;
       }
-      try {
-         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-         if (attributes != null) {
-            HttpServletRequest request = attributes.getRequest();
-            String host = request.getHeader("X-Forwarded-Host");
-            if (host == null || host.isBlank()) {
-               host = request.getHeader("Host");
-            }
-            if (host != null && !host.isBlank()) {
-               String hostname = host.split(":")[0].toLowerCase();
-               if (hostname.equals("localhost") || hostname.equals("127.0.0.1") || hostname.startsWith("192.168.")) {
-                  return null; // Omit domain for local loopback/IP testing so it defaults to request host
-               }
-               if (hostname.endsWith("zeion.online")) {
-                  return ".zeion.online";
-               }
-            }
-         }
-      } catch (Exception e) {
-         // Fallback if request context is not available
-      }
       return null;
    }
 
@@ -53,13 +30,14 @@ public class CookieUtils {
     */
    public static void setAuthCookies(HttpServletResponse response, String accessToken, String sessionId,
          String refreshToken, String fingerprint, boolean secure, int expiry) {
-      
+
       addCookie(response, ACCESS_TOKEN, accessToken, 15 * 60, secure); // Access token always 15 mins
       addCookie(response, SESSION_ID, sessionId, expiry, secure);
       addCookie(response, REFRESH_TOKEN, refreshToken, expiry, secure);
       addCookie(response, FINGERPRINT, fingerprint, expiry, secure);
-      
-      // Set csrf_token cookie for double submit cookie verification (not HttpOnly so client JS can read it)
+
+      // Set csrf_token cookie for double submit cookie verification (not HttpOnly so
+      // client JS can read it)
       String csrfToken = java.util.UUID.randomUUID().toString();
       addCookie(response, "csrf_token", csrfToken, expiry, secure);
    }

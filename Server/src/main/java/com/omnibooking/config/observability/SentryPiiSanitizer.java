@@ -75,22 +75,21 @@ public final class SentryPiiSanitizer {
          return sanitizeString((String) value);
       }
 
-      if (value instanceof Map) {
-         @SuppressWarnings("unchecked")
-         Map<String, Object> mapValue = (Map<String, Object>) value;
+      if (value instanceof Map<?, ?> mapValue) {
          return sanitizeMap(mapValue);
       }
 
       return value;
    }
 
-   public static Map<String, Object> sanitizeMap(Map<String, Object> map) {
+   public static Map<String, Object> sanitizeMap(Map<?, ?> map) {
       if (map == null) {
          return null;
       }
       Map<String, Object> sanitizedMap = new HashMap<>();
-      for (Map.Entry<String, Object> entry : map.entrySet()) {
-         sanitizedMap.put(entry.getKey(), sanitizeValue(entry.getKey(), entry.getValue()));
+      for (Map.Entry<?, ?> entry : map.entrySet()) {
+         String key = String.valueOf(entry.getKey());
+         sanitizedMap.put(key, sanitizeValue(key, entry.getValue()));
       }
       return sanitizedMap;
    }

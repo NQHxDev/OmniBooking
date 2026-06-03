@@ -27,7 +27,6 @@ import org.springframework.http.MediaType;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 @Configuration
 @EnableWebSecurity
@@ -38,7 +37,7 @@ public class SecurityConfig {
    private final CustomUserDetailsService userDetailsService;
    private final StringRedisTemplate redisTemplate;
    private final ObjectMapper objectMapper;
-   private final RequestMappingHandlerMapping requestMappingHandlerMapping;
+   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
 
    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:3000}")
    private String allowedOrigins;
@@ -88,8 +87,10 @@ public class SecurityConfig {
 
    @Bean
    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-      JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, userDetailsService, redisTemplate);
-      CustomCsrfFilter csrfFilter = new CustomCsrfFilter(objectMapper, requestMappingHandlerMapping, allowedOrigins);
+      JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, userDetailsService, redisTemplate,
+            meterRegistry);
+      CustomCsrfFilter csrfFilter = new CustomCsrfFilter(objectMapper, allowedOrigins,
+            meterRegistry);
 
       http
             .csrf(AbstractHttpConfigurer::disable)
@@ -98,8 +99,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                   .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                   .requestMatchers("/auth/passkey/**").authenticated()
-                  .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh", "/auth/logout", "/auth/2fa/login",
-                        "/auth/forgot-password", "/auth/reset-password", "/auth/google/**", "/auth/subscribe/**", "/auth/finalize-registration",
+                  .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh", "/auth/logout",
+                        "/auth/2fa/login",
+                        "/auth/forgot-password", "/auth/reset-password", "/auth/google/**", "/auth/subscribe/**",
+                        "/auth/finalize-registration",
                         "/auth/check-email", "/auth/activate-guest")
                   .permitAll()
                   .requestMatchers(HttpMethod.POST, "/bookings").permitAll()

@@ -1,6 +1,6 @@
 # --- General & OS ---
 .DS_Store
-.vscode/
+.vscode/*
 .idea/
 *.log
 *.gz
@@ -16,6 +16,11 @@ node_modules/
 
 Todo.md
 NOTE.md
+
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
 # --- Backend (Server - Spring Boot / Maven) ---
 Server/bin/

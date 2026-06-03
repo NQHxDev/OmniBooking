@@ -19,6 +19,8 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.mockito.Mockito.when;
+import java.util.UUID;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -91,5 +93,32 @@ public class CsrfIntegrationTest {
             .header("X-CSRF-Token", "my_token"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.errorCode").value("AUTH_006")); // CSRF check passed, blocked by JWT filter
+   }
+
+   @Autowired
+   private com.omnibooking.services.auth.JWTService jwtService;
+
+   @Test
+   public void shouldReturnServiceUnavailableWhenRedisIsDownDuringAuthentication() throws Exception {
+      UUID userId = UUID.randomUUID();
+      UUID sessionId = UUID.randomUUID();
+      String fingerprint = "fingerprint";
+      String fgpHash = com.omnibooking.util.SecurityUtils.hashFingerprint(fingerprint);
+      String token = jwtService.generateAccessToken(userId, java.util.Collections.singletonList("ROLE_USER"), sessionId, fgpHash);
+      
+      when(stringRedisTemplate.hasKey(org.mockito.ArgumentMatchers.anyString())).thenThrow(
+            new org.springframework.data.redis.RedisConnectionFailureException("Redis connection failed")
+      );
+
+      mockMvc.perform(post("/bookings")
+            .cookie(new Cookie("access_token", token))
+            .cookie(new Cookie("session_id", sessionId.toString()))
+            .cookie(new Cookie("x_fgp", fingerprint))
+            .header("x-fgp", fingerprint)
+            .cookie(new Cookie("csrf_token", "dummy_csrf"))
+            .header("X-CSRF-Token", "dummy_csrf"))
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(jsonPath("$.errorCode").value("SERVICE_UNAVAILABLE"))
+            .andExpect(jsonPath("$.message").value("Authentication service is temporarily unavailable. Please try again later."));
    }
 }

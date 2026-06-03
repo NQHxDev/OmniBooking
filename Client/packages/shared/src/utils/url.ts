@@ -10,7 +10,7 @@ export function getPartnerUrl(origin: string): string {
       }
       return `${url.protocol}//partner.${hostname}`;
    } catch {
-      return "https://partner.zeion.online";
+      return process.env.NEXT_PUBLIC_PARTNER_URL || "http://localhost:3002";
    }
 }
 
@@ -27,7 +27,7 @@ export function getOwnerUrl(origin: string): string {
       const cleanHostname = hostname.replace("partner.", "");
       return `${url.protocol}//owner.${cleanHostname}`;
    } catch {
-      return "https://owner.zeion.online";
+      return process.env.NEXT_PUBLIC_OWNER_URL || "http://localhost:3005";
    }
 }
 
@@ -44,6 +44,6 @@ export function getWebUrl(origin: string): string {
       const domain = hostname.replace("partner.", "").replace("owner.", "");
       return `${url.protocol}//${domain}`;
    } catch {
-      return "https://zeion.online";
+      return process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3000";
    }
 }

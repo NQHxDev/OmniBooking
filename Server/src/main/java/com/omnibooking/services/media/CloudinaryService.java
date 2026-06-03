@@ -27,6 +27,6 @@ public interface CloudinaryService {
     * @param publicId The public_id of the file to delete
     * @return Result of the deletion as a raw Map
     */
-   Map<String, Object> delete(String publicId) throws IOException;
+   Map<?, ?> delete(String publicId) throws IOException;
 
 }

@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EncryptionServiceImpl Unit Tests")
@@ -30,16 +31,14 @@ class EncryptionServiceImplTest {
    private static final String HASH_PEPPER = "99eb73cbfbaa0963213c38d2c9bc0bae74ad6e4d4fef9cd667485709c54d5e97";
 
    @BeforeEach
-   @SuppressWarnings("all")
    void setUp() {
-      org.mockito.Mockito.lenient().when(appProperties.getSecurity()).thenReturn(security);
-      org.mockito.Mockito.lenient().when(security.getEncryptionSecret()).thenReturn(ENCRYPTION_SECRET);
-      org.mockito.Mockito.lenient().when(security.getHashPepper()).thenReturn(HASH_PEPPER);
+      lenient().when(appProperties.getSecurity()).thenReturn(security);
+      lenient().when(security.getEncryptionSecret()).thenReturn(ENCRYPTION_SECRET);
+      lenient().when(security.getHashPepper()).thenReturn(HASH_PEPPER);
    }
 
    @Test
    @DisplayName("Should encrypt and decrypt successfully")
-   @SuppressWarnings("all")
    void shouldEncryptAndDecrypt_Success() {
       String plainText = "0901234567";
 
@@ -53,7 +52,6 @@ class EncryptionServiceImplTest {
 
    @Test
    @DisplayName("Should produce same blind index for same input")
-   @SuppressWarnings("all")
    void shouldCreateBlindIndex_Deterministic() {
       String input = "0901234567";
 
@@ -66,10 +64,10 @@ class EncryptionServiceImplTest {
 
    @Test
    @DisplayName("Should return null for null input")
-   @SuppressWarnings("all")
    void shouldReturnNull_WhenInputIsNull() {
       assertThat(encryptionService.encrypt(null)).isNull();
       assertThat(encryptionService.decrypt(null)).isNull();
       assertThat(encryptionService.createBlindIndex(null)).isNull();
    }
+
 }

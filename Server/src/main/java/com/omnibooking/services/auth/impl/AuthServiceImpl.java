@@ -77,6 +77,8 @@ public class AuthServiceImpl implements AuthService {
 
    private final com.omnibooking.services.auth.TwoFactorAuthService twoFactorAuthService;
 
+   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
    private static final long SESSION_SLIDING_NORMAL_MS = 1 * 24 * 60 * 60 * 1000L;
    private static final long SESSION_SLIDING_REMEMBER_ME_MS = 7 * 24 * 60 * 60 * 1000L;
    private static final long SESSION_HARD_CAP_NORMAL_MS = 3 * 24 * 60 * 60 * 1000L;
@@ -181,10 +183,12 @@ public class AuthServiceImpl implements AuthService {
       }
 
       String lockKey = "lock:refresh:" + sId;
-      Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "L", 2, TimeUnit.SECONDS);
+      String lockValue = UUID.randomUUID().toString();
+      Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, 5, TimeUnit.SECONDS);
 
       if (Boolean.FALSE.equals(acquired)) {
          log.warn("Refresh already in progress for session: {}", sId);
+         meterRegistry.counter("omnibooking.auth.lock.contention").increment();
          throw new AppException(ErrorCode.INVALID_SESSION);
       }
 
@@ -222,7 +226,12 @@ public class AuthServiceImpl implements AuthService {
          return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, info.isRememberMe(),
                info.getCreatedAt(), info.getLastAccessedAt(), sId);
       } finally {
-         redisTemplate.delete(lockKey);
+         String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+         redisTemplate.execute(
+               new org.springframework.data.redis.core.script.DefaultRedisScript<>(script, Long.class),
+               java.util.Collections.singletonList(lockKey),
+               lockValue
+         );
       }
    }
 
