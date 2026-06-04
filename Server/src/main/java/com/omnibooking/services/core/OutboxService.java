@@ -22,4 +22,5 @@ public interface OutboxService {
    void purgeOldOutboxEvents();
 
    void rescheduleRetry(UUID eventId);
+
 }

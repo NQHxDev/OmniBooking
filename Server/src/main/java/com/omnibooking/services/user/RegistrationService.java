@@ -2,6 +2,7 @@ package com.omnibooking.services.user;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.f4b6a3.uuid.UuidCreator;
 import com.omnibooking.config.RedisPubSubConfig;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.RegisterRequest;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.services.auth.CachedRoleService;
@@ -37,14 +39,23 @@ import com.omnibooking.services.core.BloomFilterService;
 public class RegistrationService {
 
    private final UserRepository userRepository;
+
    private final UserProfileRepository userProfileRepository;
+
    private final CachedRoleService cachedRoleService;
+
    private final PasswordEncoder passwordEncoder;
+
    private final UserMapper userMapper;
+
    private final KafkaTemplate<String, Object> kafkaTemplate;
+
    private final StringRedisTemplate redisTemplate;
+
    private final ObjectMapper objectMapper;
+
    private final BloomFilterService bloomFilterService;
+
    private final JWTService jwtService;
 
    private static final String USER_CDC_TOPIC = "omnibooking-user-cdc";
@@ -95,16 +106,16 @@ public class RegistrationService {
          // Update Bloom Filter
          bloomFilterService.add(user.getEmail());
 
-         // 1. Emit Kafka Event for other services (Async)
+         // Emit Kafka Event for other services (Async)
          UserCreatedEvent event = UserCreatedEvent.builder()
-               .eventId(com.github.f4b6a3.uuid.UuidCreator.getTimeOrderedEpoch())
+               .eventId(UuidCreator.getTimeOrderedEpoch())
                .userId(user.getId())
                .email(user.getEmail())
                .fullName(req.getFullName())
                .build();
          kafkaTemplate.send(USER_CDC_TOPIC, event.getUserId().toString(), event);
 
-         // 2. Notify SSE via Redis Pub/Sub (Real-time) - ONLY AFTER TRANSACTION COMMITS
+         // Notify SSE via Redis Pub/Sub (Real-time) - ONLY AFTER TRANSACTION COMMITS
          final String finalRequestId = req.getRequestId();
          final User finalUser = user;
          final UserProfile finalProfile = profile;
@@ -127,7 +138,7 @@ public class RegistrationService {
          AuthResponse authResponse = userMapper.toAuthResponse(user, profile, roleNames);
 
          // Generate a temporary access token to be used for session finalization
-         String accessToken = jwtService.generateAccessToken(user.getId(), roleNames, java.util.UUID.randomUUID(),
+         String accessToken = jwtService.generateAccessToken(user.getId(), roleNames, UUID.randomUUID(),
                "async-registration");
          authResponse.setAccessToken(accessToken);
 
@@ -141,4 +152,5 @@ public class RegistrationService {
          log.error("Failed to serialize AuthResponse for SSE notification", e);
       }
    }
+
 }

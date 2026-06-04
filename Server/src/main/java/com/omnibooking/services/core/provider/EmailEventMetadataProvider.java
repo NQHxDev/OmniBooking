@@ -32,6 +32,7 @@ public class EmailEventMetadataProvider implements EventMetadataProvider {
          metadata.put("to", event.getTo() != null ? event.getTo() : "");
          metadata.put("subject", event.getSubject() != null ? event.getSubject() : "");
       }
+
       return metadata;
    }
 

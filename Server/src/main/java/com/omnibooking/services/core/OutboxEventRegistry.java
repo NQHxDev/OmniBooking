@@ -31,4 +31,5 @@ public class OutboxEventRegistry {
    public static void register(String eventType, Class<?> clazz) {
       REGISTRY.put(eventType, clazz);
    }
+
 }

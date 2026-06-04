@@ -21,4 +21,5 @@ public class PropertySyncProducer {
       log.info("Sending property sync event: {} for property: {}", event.getOperation(), event.getPropertyId());
       kafkaTemplate.send(topic, event.getPropertyId().toString(), event);
    }
+
 }

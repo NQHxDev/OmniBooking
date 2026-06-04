@@ -64,11 +64,11 @@ public class MediaConsumer {
 
       CloudinaryResponse response = null;
       try (LeaseRenewer ignored = new LeaseRenewer(idempotencyService, event.getEventId(), consumerGroup)) {
-         // 1. Upload to Cloudinary
+         // Upload to Cloudinary
          response = cloudinaryService.upload(event.getFileBytes(), event.getFolder());
          log.info("[Kafka Consumer] Uploaded to Cloudinary. URL: {}", response.url());
 
-         // 2. Persist to Database
+         // Persist to Database
          Media media = Media.builder()
                .url(response.secureUrl())
                .publicId(response.publicId())
@@ -166,4 +166,5 @@ public class MediaConsumer {
          throw new RuntimeException("Media processing failed, rolled back changes", e);
       }
    }
+
 }

@@ -32,7 +32,7 @@ public class PropertySearchServiceImpl implements PropertySearchService {
 
       BoolQuery.Builder boolBuilder = new BoolQuery.Builder();
 
-      // 1. Text Search using multi_match with cross_fields for best Vietnamese text
+      // Text Search using multi_match with cross_fields for best Vietnamese text
       // matching
       if (query != null && !query.isBlank()) {
          String trimmedQuery = query.trim();
@@ -55,7 +55,7 @@ public class PropertySearchServiceImpl implements PropertySearchService {
                .build());
       }
 
-      // 2. Price Filter
+      // Price Filter
       if (minPrice != null) {
          final double min = minPrice;
          boolBuilder.filter(Query.of(q -> q
@@ -73,7 +73,7 @@ public class PropertySearchServiceImpl implements PropertySearchService {
                            .lte(max)))));
       }
 
-      // 3. Star Rating Filter
+      // Star Rating Filter
       if (stars != null) {
          boolBuilder.filter(new Query.Builder()
                .term(new TermQuery.Builder()
@@ -83,7 +83,7 @@ public class PropertySearchServiceImpl implements PropertySearchService {
                .build());
       }
 
-      // 4. Property Type Filter
+      // Property Type Filter
       if (propertyType != null && !propertyType.isBlank()) {
          boolBuilder.filter(new Query.Builder()
                .term(new TermQuery.Builder()
@@ -93,7 +93,7 @@ public class PropertySearchServiceImpl implements PropertySearchService {
                .build());
       }
 
-      // 5. Amenities Filter (Matches ALL specified amenities)
+      // Amenities Filter (Matches ALL specified amenities)
       if (amenities != null && !amenities.isEmpty()) {
          for (String amenity : amenities) {
             boolBuilder.filter(new Query.Builder()
@@ -105,7 +105,7 @@ public class PropertySearchServiceImpl implements PropertySearchService {
          }
       }
 
-      // 6. Rating Filter
+      // Rating Filter
       if (minRating != null) {
          final double rating = minRating;
          boolBuilder.filter(Query.of(q -> q
@@ -210,4 +210,5 @@ public class PropertySearchServiceImpl implements PropertySearchService {
             return null;
       }
    }
+
 }

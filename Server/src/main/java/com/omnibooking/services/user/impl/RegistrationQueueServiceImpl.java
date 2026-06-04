@@ -37,4 +37,5 @@ public class RegistrationQueueServiceImpl implements RegistrationQueueService {
          throw new RuntimeException("System is busy, please try again later");
       }
    }
+
 }

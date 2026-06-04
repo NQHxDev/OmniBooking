@@ -28,7 +28,9 @@ import org.springframework.cache.annotation.Cacheable;
 public class PartnerServiceImpl implements PartnerService {
 
    private final BookingRepository bookingRepository;
+
    private final PropertyRepository propertyRepository;
+
    private final EncryptionService encryptionService;
 
    @Override
@@ -47,9 +49,10 @@ public class PartnerServiceImpl implements PartnerService {
       List<Booking> previousMonthBookings = new ArrayList<>();
 
       for (Booking b : bookings) {
-         if (b.getCreatedAt() == null) continue;
+         if (b.getCreatedAt() == null)
+            continue;
          LocalDate bDate = LocalDate.ofInstant(b.getCreatedAt(), ZoneId.systemDefault());
-         
+
          boolean isActive = b.getStatus() != BookingStatus.CANCELLED && b.getStatus() != BookingStatus.REFUNDED;
 
          if (isActive) {
@@ -61,7 +64,7 @@ public class PartnerServiceImpl implements PartnerService {
          }
       }
 
-      // -- 1. Monthly Revenue --
+      // Monthly Revenue
       BigDecimal currentRevenue = currentMonthBookings.stream()
             .map(Booking::getFinalPrice)
             .filter(Objects::nonNull)
@@ -76,14 +79,14 @@ public class PartnerServiceImpl implements PartnerService {
       String revenueChange = calculatePercentageChange(currentRevenue, previousRevenue);
       boolean revenueUp = currentRevenue.compareTo(previousRevenue) >= 0;
 
-      // -- 2. Total Bookings --
+      // Total Bookings
       long currentBookingCount = currentMonthBookings.size();
       long previousBookingCount = previousMonthBookings.size();
       String bookingsStr = String.valueOf(currentBookingCount);
       String bookingsChange = calculateCountPercentageChange(currentBookingCount, previousBookingCount);
       boolean bookingsUp = currentBookingCount >= previousBookingCount;
 
-      // -- 3. New Customers --
+      // New Customers
       long currentCustomers = currentMonthBookings.stream()
             .map(Booking::getGuestEmail)
             .filter(Objects::nonNull)
@@ -100,7 +103,7 @@ public class PartnerServiceImpl implements PartnerService {
       String customersChange = calculateCountPercentageChange(currentCustomers, previousCustomers);
       boolean customersUp = currentCustomers >= previousCustomers;
 
-      // -- 4. Rating Score --
+      // Rating Score
       List<Property> properties = propertyRepository.findByOwnerId(partnerId);
       double avgRating = 4.9; // default fallback
       if (!properties.isEmpty()) {
@@ -116,7 +119,7 @@ public class PartnerServiceImpl implements PartnerService {
             avgRating = (double) sum / count;
          }
       }
-      
+
       String ratingStr = String.format(Locale.US, "%.1f", avgRating);
       String ratingChange = "+0.0";
       boolean ratingUp = true;
@@ -159,7 +162,7 @@ public class PartnerServiceImpl implements PartnerService {
       BigDecimal difference = current.subtract(previous);
       BigDecimal change = difference.multiply(new BigDecimal("100"))
             .divide(previous, 1, RoundingMode.HALF_UP);
-      
+
       String prefix = change.compareTo(BigDecimal.ZERO) >= 0 ? "+" : "";
       return prefix + change.toString() + "%";
    }
@@ -168,7 +171,7 @@ public class PartnerServiceImpl implements PartnerService {
       if (previous == 0) {
          return current == 0 ? "0.0%" : "+100.0%";
       }
-      double change = ((double)(current - previous) / previous) * 100;
+      double change = ((double) (current - previous) / previous) * 100;
       String prefix = change >= 0 ? "+" : "";
       return prefix + String.format(Locale.US, "%.1f", change) + "%";
    }
@@ -181,7 +184,8 @@ public class PartnerServiceImpl implements PartnerService {
 
       List<Booking> bookings = bookingRepository.findAllByPartnerId(partnerId);
 
-      // Sort bookings: newest bookings first (using createdAt, fallback to checkInDate)
+      // Sort bookings: newest bookings first (using createdAt, fallback to
+      // checkInDate)
       bookings.sort((b1, b2) -> {
          if (b1.getCreatedAt() != null && b2.getCreatedAt() != null) {
             return b2.getCreatedAt().compareTo(b1.getCreatedAt()); // Descending
@@ -191,8 +195,8 @@ public class PartnerServiceImpl implements PartnerService {
 
       List<PartnerBookingResponse> response = new ArrayList<>();
       for (Booking b : bookings) {
-         String decryptedPhone = b.getGuestPhoneEncrypted() != null 
-               ? encryptionService.decrypt(b.getGuestPhoneEncrypted()) 
+         String decryptedPhone = b.getGuestPhoneEncrypted() != null
+               ? encryptionService.decrypt(b.getGuestPhoneEncrypted())
                : null;
 
          response.add(PartnerBookingResponse.builder()
@@ -214,4 +218,5 @@ public class PartnerServiceImpl implements PartnerService {
       }
       return response;
    }
+
 }

@@ -5,6 +5,10 @@ import com.omnibooking.dto.auth.passkey.PasskeyRegistrationOptionsResponse;
 import com.omnibooking.dto.auth.passkey.PasskeyRegistrationVerifyRequest;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.services.auth.PasskeyService;
+import com.omnibooking.services.auth.SecurityVerificationService;
+
+import jakarta.servlet.http.HttpServletRequest;
+
 import com.omnibooking.dto.auth.passkey.PasskeyResponse;
 import com.omnibooking.exception.ErrorCode;
 
@@ -30,14 +34,15 @@ import java.util.List;
 public class PasskeyController {
 
    private final PasskeyService passkeyService;
-   private final com.omnibooking.services.auth.SecurityVerificationService securityVerificationService;
+   private final SecurityVerificationService securityVerificationService;
 
    @PostMapping("/register/options")
    public ResponseEntity<ApiResponse<PasskeyRegistrationOptionsResponse>> getRegistrationOptions(
          @AuthenticationPrincipal UserPrincipal principal,
-         jakarta.servlet.http.HttpServletRequest httpRequest) {
-      if (principal == null)
+         HttpServletRequest httpRequest) {
+      if (principal == null) {
          throw new InsufficientAuthenticationException("User must be authenticated");
+      }
 
       String requestId = (String) httpRequest.getAttribute("requestId");
 
@@ -49,6 +54,7 @@ public class PasskeyController {
       }
 
       PasskeyRegistrationOptionsResponse options = passkeyService.generateRegistrationOptions(principal.getId());
+
       return ResponseEntity.ok(ApiResponse.success(options, "Registration options generated", requestId));
    }
 
@@ -56,36 +62,41 @@ public class PasskeyController {
    public ResponseEntity<ApiResponse<Void>> verifyRegistration(
          @AuthenticationPrincipal UserPrincipal principal,
          @RequestBody PasskeyRegistrationVerifyRequest request,
-         jakarta.servlet.http.HttpServletRequest httpRequest) {
+         HttpServletRequest httpRequest) {
       if (principal == null)
          throw new InsufficientAuthenticationException("User must be authenticated");
 
       String requestId = (String) httpRequest.getAttribute("requestId");
       passkeyService.verifyRegistration(principal.getId(), request);
+
       return ResponseEntity.ok(ApiResponse.success(null, "Passkey registered successfully", requestId));
    }
 
    @GetMapping("/status")
    public ResponseEntity<ApiResponse<Boolean>> checkPasskeyStatus(
          @AuthenticationPrincipal UserPrincipal principal,
-         jakarta.servlet.http.HttpServletRequest httpRequest) {
-      if (principal == null)
+         HttpServletRequest httpRequest) {
+      if (principal == null) {
          throw new InsufficientAuthenticationException("User must be authenticated");
+      }
 
       String requestId = (String) httpRequest.getAttribute("requestId");
       boolean hasPasskeys = passkeyService.hasPasskeys(principal.getId());
+
       return ResponseEntity.ok(ApiResponse.success(hasPasskeys, "Passkey status fetched", requestId));
    }
 
    @GetMapping
    public ResponseEntity<ApiResponse<List<PasskeyResponse>>> listPasskeys(
          @AuthenticationPrincipal UserPrincipal principal,
-         jakarta.servlet.http.HttpServletRequest httpRequest) {
-      if (principal == null)
+         HttpServletRequest httpRequest) {
+      if (principal == null) {
          throw new InsufficientAuthenticationException("User must be authenticated");
+      }
 
       String requestId = (String) httpRequest.getAttribute("requestId");
       List<PasskeyResponse> passkeys = passkeyService.listPasskeys(principal.getId());
+
       return ResponseEntity.ok(ApiResponse.success(passkeys, "Passkeys fetched successfully", requestId));
    }
 
@@ -93,9 +104,10 @@ public class PasskeyController {
    public ResponseEntity<ApiResponse<Void>> deletePasskey(
          @AuthenticationPrincipal UserPrincipal principal,
          @PathVariable UUID passkeyId,
-         jakarta.servlet.http.HttpServletRequest httpRequest) {
-      if (principal == null)
+         HttpServletRequest httpRequest) {
+      if (principal == null) {
          throw new InsufficientAuthenticationException("User must be authenticated");
+      }
 
       String requestId = (String) httpRequest.getAttribute("requestId");
 
@@ -106,6 +118,7 @@ public class PasskeyController {
       }
 
       passkeyService.deletePasskey(principal.getId(), passkeyId);
+
       return ResponseEntity.ok(ApiResponse.success(null, "Passkey deleted successfully", requestId));
    }
 

@@ -15,6 +15,8 @@ import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
 import com.omnibooking.model.enums.BookingStatus;
 import com.omnibooking.model.enums.DiscountType;
+import com.omnibooking.model.enums.TransactionStatus;
+import com.omnibooking.model.enums.TransactionType;
 import com.omnibooking.repository.BookingRepository;
 import com.omnibooking.repository.BookingStatusLogRepository;
 import com.omnibooking.repository.CouponRepository;
@@ -37,6 +39,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Locale;
@@ -48,6 +51,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.Cache;
 
 @Service
 @RequiredArgsConstructor
@@ -233,7 +237,7 @@ public class BookingServiceImpl implements BookingService {
       if (principal == null) {
          requiresDeposit = true;
       } else {
-         long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), request.getCheckInDate());
+         long daysBetween = ChronoUnit.DAYS.between(LocalDate.now(), request.getCheckInDate());
          if (daysBetween >= 5) {
             requiresDeposit = true;
          }
@@ -252,7 +256,7 @@ public class BookingServiceImpl implements BookingService {
          depositAmount = fifteenPercent.min(oneNightTotal).setScale(4, RoundingMode.HALF_UP);
       }
 
-      // 4. Save Booking
+      // Save Booking
       boolean isPendingMomo = requiresDeposit && "momo".equalsIgnoreCase(request.getPaymentMethod());
       BookingStatus initialStatus = isPendingMomo ? BookingStatus.PENDING : BookingStatus.CONFIRMED;
 
@@ -292,8 +296,7 @@ public class BookingServiceImpl implements BookingService {
             .build();
       bookingStatusLogRepository.save(logEntry);
 
-      // 5. Send outbox confirmation email & activation token if guest is new or
-      // inactive
+      // Send outbox confirmation email & activation token if guest is new or inactive
       String token = null;
       if (isNewGuest || isInactiveGuest) {
          token = verificationService.createVerificationToken(user.getId());
@@ -339,7 +342,7 @@ public class BookingServiceImpl implements BookingService {
          // Evict partner bookings list cache to show the new booking on their management
          // page
          try {
-            org.springframework.cache.Cache cache = cacheManager.getCache("partner_bookings");
+            Cache cache = cacheManager.getCache("partner_bookings");
             if (cache != null) {
                cache.evict(roomType.getProperty().getOwner().getId());
                log.info("Evicted partner_bookings cache for partner: {}", roomType.getProperty().getOwner().getId());
@@ -401,9 +404,9 @@ public class BookingServiceImpl implements BookingService {
       Transaction transaction = Transaction.builder()
             .booking(booking)
             .amount(booking.getDepositAmount())
-            .transactionType(com.omnibooking.model.enums.TransactionType.PAYMENT)
+            .transactionType(TransactionType.PAYMENT)
             .paymentMethod(paymentMethod)
-            .status(com.omnibooking.model.enums.TransactionStatus.SUCCESS)
+            .status(TransactionStatus.SUCCESS)
             .providerTransactionId(providerTransactionId)
             .metadata(metadata)
             .build();
@@ -453,7 +456,7 @@ public class BookingServiceImpl implements BookingService {
       // Evict partner bookings list cache to show the new booking on their management
       // page
       try {
-         org.springframework.cache.Cache cache = cacheManager.getCache("partner_bookings");
+         Cache cache = cacheManager.getCache("partner_bookings");
          if (cache != null) {
             cache.evict(booking.getRoomType().getProperty().getOwner().getId());
             log.info("Evicted partner_bookings cache for partner: {}",

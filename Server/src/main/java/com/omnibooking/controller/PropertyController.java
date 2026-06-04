@@ -1,6 +1,7 @@
 package com.omnibooking.controller;
 
 import com.omnibooking.dto.ApiResponse;
+import com.omnibooking.dto.PartnerLegalProfileResponse;
 import com.omnibooking.dto.PropertyRequest;
 import com.omnibooking.dto.PropertyResponse;
 import com.omnibooking.services.property.PropertyService;
@@ -39,6 +40,7 @@ public class PropertyController {
       UUID userId = SecurityUtils.getCurrentUserId();
       log.info("Controller: Creating property for user: {}", userId);
       PropertyResponse response = propertyService.createProperty(request, userId);
+
       return ApiResponse.success(response);
    }
 
@@ -49,16 +51,18 @@ public class PropertyController {
       UUID userId = SecurityUtils.getCurrentUserId();
       log.info("Controller: Fetching properties for user: {}", userId);
       List<PropertyResponse> response = propertyService.getPropertiesByOwner(userId);
+
       return ApiResponse.success(response);
    }
 
    @GetMapping("/legal-profiles")
    @PreAuthorize("hasAuthority(T(com.omnibooking.constant.SecurityConstants.Roles).PARTNER)")
    @Operation(summary = "Get active legal profiles for current partner")
-   public ApiResponse<List<com.omnibooking.dto.PartnerLegalProfileResponse>> getLegalProfiles() {
+   public ApiResponse<List<PartnerLegalProfileResponse>> getLegalProfiles() {
       UUID userId = SecurityUtils.getCurrentUserId();
       log.info("Controller: Fetching legal profiles for partner: {}", userId);
-      List<com.omnibooking.dto.PartnerLegalProfileResponse> response = propertyService.getPartnerLegalProfiles(userId);
+      List<PartnerLegalProfileResponse> response = propertyService.getPartnerLegalProfiles(userId);
+
       return ApiResponse.success(response);
    }
 
@@ -69,6 +73,7 @@ public class PropertyController {
       UUID userId = SecurityUtils.getCurrentUserId();
       log.info("Controller: Fetching detailed property: {} for user: {}", id, userId);
       PropertyDetailResponse response = propertyService.getPropertyDetailForPartner(id, userId);
+
       return ApiResponse.success(response);
    }
 

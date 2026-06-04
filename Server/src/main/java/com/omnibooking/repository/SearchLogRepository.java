@@ -20,7 +20,8 @@ public interface SearchLogRepository extends JpaRepository<SearchLog, UUID> {
          "AND sl.deletedAt IS NULL " +
          "GROUP BY sl.queryText " +
          "ORDER BY MAX(CASE WHEN sl.isBoosted = true THEN 1 ELSE 0 END) DESC, COUNT(sl.id) DESC")
-   List<String> findTopQueries(@Param("since") Instant since, 
-                               @Param("countryCode") String countryCode, 
-                               Pageable pageable);
+   List<String> findTopQueries(@Param("since") Instant since,
+         @Param("countryCode") String countryCode,
+         Pageable pageable);
+
 }

@@ -1,6 +1,8 @@
 package com.omnibooking.security;
 
 import com.omnibooking.services.auth.JWTService;
+
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,10 +40,14 @@ import org.springframework.beans.factory.annotation.Value;
 public class SecurityConfig {
 
    private final JWTService jwtService;
+
    private final CustomUserDetailsService userDetailsService;
+
    private final StringRedisTemplate redisTemplate;
+
    private final ObjectMapper objectMapper;
-   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
+   private final MeterRegistry meterRegistry;
 
    @Value("${app.cors.allowed-origins:http://localhost:3000}")
    private String allowedOrigins;

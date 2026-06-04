@@ -48,4 +48,5 @@ public class SearchLogServiceImpl implements SearchLogService {
          log.error("Failed to log search query: {}", query, e);
       }
    }
+
 }

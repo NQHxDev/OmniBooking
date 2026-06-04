@@ -21,7 +21,9 @@ public final class ModuleTagResolver {
       if (lowerClass.contains(".user.") || lowerClass.contains("usercontroller")) {
          return Modules.AUTH;
       }
-      if (lowerClass.contains(".property.") || lowerClass.contains("propertycontroller") || lowerClass.contains("roomcontroller") || lowerClass.contains("bookingcontroller") || lowerClass.contains(".core.") || lowerClass.contains(".partner.")) {
+      if (lowerClass.contains(".property.") || lowerClass.contains("propertycontroller")
+            || lowerClass.contains("roomcontroller") || lowerClass.contains("bookingcontroller")
+            || lowerClass.contains(".core.") || lowerClass.contains(".partner.")) {
          return Modules.BOOKING;
       }
       if (lowerClass.contains(".payment.") || lowerClass.contains("paymentcontroller")) {
@@ -33,7 +35,8 @@ public final class ModuleTagResolver {
       if (lowerClass.contains(".search.") || lowerClass.contains("searchcontroller")) {
          return Modules.SEARCH;
       }
-      if (lowerClass.contains(".communication.") || lowerClass.contains("notification") || lowerClass.contains("mail") || lowerClass.contains("sms") || lowerClass.contains("worker")) {
+      if (lowerClass.contains(".communication.") || lowerClass.contains("notification") || lowerClass.contains("mail")
+            || lowerClass.contains("sms") || lowerClass.contains("worker")) {
          return Modules.NOTIFICATION;
       }
 
@@ -44,6 +47,8 @@ public final class ModuleTagResolver {
       if (clazz == null) {
          return Modules.INFRASTRUCTURE;
       }
+
       return resolveModule(clazz.getName());
    }
+
 }

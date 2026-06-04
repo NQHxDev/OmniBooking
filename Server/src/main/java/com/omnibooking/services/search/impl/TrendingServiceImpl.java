@@ -15,6 +15,7 @@ import java.util.List;
 public class TrendingServiceImpl implements TrendingService {
 
    private final SearchLogRepository searchLogRepository;
+
    private static final int TRENDING_DAYS = 21;
 
    @Override
@@ -22,4 +23,5 @@ public class TrendingServiceImpl implements TrendingService {
       Instant since = Instant.now().minus(TRENDING_DAYS, ChronoUnit.DAYS);
       return searchLogRepository.findTopQueries(since, countryCode, PageRequest.of(0, limit));
    }
+
 }

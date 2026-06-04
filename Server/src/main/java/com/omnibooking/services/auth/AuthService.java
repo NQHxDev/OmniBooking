@@ -7,8 +7,8 @@ import com.omnibooking.dto.TwoFactorLoginRequest;
 import com.omnibooking.dto.oauth.OAuth2UserInfo;
 import com.omnibooking.security.RedisSessionInfo;
 
-import jakarta.servlet.http.HttpServletResponse;
 import java.util.UUID;
+import jakarta.servlet.http.HttpServletResponse;
 
 public interface AuthService {
 

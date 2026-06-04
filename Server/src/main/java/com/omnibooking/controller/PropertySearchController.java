@@ -36,12 +36,15 @@ public class PropertySearchController {
          @RequestParam(required = false) Double minRating,
          Pageable pageable) {
 
-      System.out.println("API Search request: ss=" + ss + ", minPrice=" + minPrice + ", maxPrice=" + maxPrice + ", stars=" + stars + ", propertyType=" + propertyType + ", amenities=" + amenities + ", minRating=" + minRating);
+      System.out
+            .println("API Search request: ss=" + ss + ", minPrice=" + minPrice + ", maxPrice=" + maxPrice + ", stars="
+                  + stars + ", propertyType=" + propertyType + ", amenities=" + amenities + ", minRating=" + minRating);
 
       Page<PropertyDocument> results = propertySearchService.searchProperties(
             ss, minPrice, maxPrice, stars, propertyType, amenities, minRating, pageable);
 
       System.out.println("API Search results count: " + results.getTotalElements());
+
       return ApiResponse.success(results);
    }
 

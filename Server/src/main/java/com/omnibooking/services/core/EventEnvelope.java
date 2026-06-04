@@ -9,8 +9,11 @@ import java.util.UUID;
 public class EventEnvelope {
 
    private final UUID eventId;
+
    private final String eventType;
+
    private final Object payload;
+
    private final Map<String, Object> metadata;
 
    public EventEnvelope(UUID eventId, String eventType, Object payload, EventMetadataProvider provider) {

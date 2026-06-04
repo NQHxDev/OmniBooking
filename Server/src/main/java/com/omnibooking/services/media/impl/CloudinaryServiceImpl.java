@@ -20,6 +20,7 @@ import java.util.Map;
 public class CloudinaryServiceImpl implements CloudinaryService {
 
    private final Cloudinary cloudinary;
+
    private final ObjectMapper objectMapper;
 
    @Override

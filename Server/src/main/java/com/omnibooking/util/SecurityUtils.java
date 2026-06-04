@@ -7,13 +7,16 @@ import java.util.Base64;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import com.omnibooking.security.UserPrincipal;
+
 import java.util.UUID;
 
 public class SecurityUtils {
 
    /**
     * Get the ID of the currently authenticated user.
-    * 
+    *
     * @return UUID of the current user
     */
    public static UUID getCurrentUserId() {
@@ -21,12 +24,12 @@ public class SecurityUtils {
       if (authentication == null || !authentication.isAuthenticated()) {
          return null;
       }
-      
+
       Object principal = authentication.getPrincipal();
-      if (principal instanceof com.omnibooking.security.UserPrincipal) {
-         return ((com.omnibooking.security.UserPrincipal) principal).getId();
+      if (principal instanceof UserPrincipal) {
+         return ((UserPrincipal) principal).getId();
       }
-      
+
       // Fallback for cases where principal is a string or other type
       try {
          return UUID.fromString(authentication.getName());

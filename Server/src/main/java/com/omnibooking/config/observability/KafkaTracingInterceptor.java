@@ -18,19 +18,24 @@ public class KafkaTracingInterceptor implements ProducerInterceptor<String, Obje
       RequestContext context = RequestContextHolder.getContext();
       if (context != null) {
          if (context.getRequestId() != null) {
-            record.headers().add(new RecordHeader(Headers.REQUEST_ID, context.getRequestId().getBytes(StandardCharsets.UTF_8)));
+            record.headers()
+                  .add(new RecordHeader(Headers.REQUEST_ID, context.getRequestId().getBytes(StandardCharsets.UTF_8)));
          }
          if (context.getCorrelationId() != null) {
-            record.headers().add(new RecordHeader(Headers.CORRELATION_ID, context.getCorrelationId().getBytes(StandardCharsets.UTF_8)));
+            record.headers().add(new RecordHeader(Headers.CORRELATION_ID,
+                  context.getCorrelationId().getBytes(StandardCharsets.UTF_8)));
          }
          if (context.getTraceId() != null) {
-            record.headers().add(new RecordHeader(Headers.SENTRY_TRACE, context.getTraceId().getBytes(StandardCharsets.UTF_8)));
+            record.headers()
+                  .add(new RecordHeader(Headers.SENTRY_TRACE, context.getTraceId().getBytes(StandardCharsets.UTF_8)));
          }
          if (context.getUserId() != null) {
-            record.headers().add(new RecordHeader(Headers.USER_ID, context.getUserId().getBytes(StandardCharsets.UTF_8)));
+            record.headers()
+                  .add(new RecordHeader(Headers.USER_ID, context.getUserId().getBytes(StandardCharsets.UTF_8)));
          }
          if (context.getTenantId() != null) {
-            record.headers().add(new RecordHeader(Headers.TENANT_ID, context.getTenantId().getBytes(StandardCharsets.UTF_8)));
+            record.headers()
+                  .add(new RecordHeader(Headers.TENANT_ID, context.getTenantId().getBytes(StandardCharsets.UTF_8)));
          }
       }
       return record;
@@ -47,4 +52,5 @@ public class KafkaTracingInterceptor implements ProducerInterceptor<String, Obje
    @Override
    public void configure(Map<String, ?> configs) {
    }
+
 }

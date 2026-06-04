@@ -27,9 +27,9 @@ public class IdempotencyServiceImpl implements IdempotencyService {
       if (eventId == null) {
          return false;
       }
-      
+
       Optional<ProcessedEvent> existingOpt = processedEventRepository.findByIdForWrite(eventId, consumerGroup);
-      
+
       if (existingOpt.isEmpty()) {
          try {
             ProcessedEvent processedEvent = ProcessedEvent.builder()
@@ -42,9 +42,10 @@ public class IdempotencyServiceImpl implements IdempotencyService {
                   .build();
             processedEventRepository.saveAndFlush(processedEvent);
             log.info("Successfully claimed new event: eventId={}, consumerGroup={}", eventId, consumerGroup);
+
             return true;
          } catch (DataIntegrityViolationException e) {
-            log.warn("Race condition: Duplicate event claim detected: eventId={}, consumerGroup={}", 
+            log.warn("Race condition: Duplicate event claim detected: eventId={}, consumerGroup={}",
                   eventId, consumerGroup);
             return false;
          }
@@ -57,10 +58,12 @@ public class IdempotencyServiceImpl implements IdempotencyService {
          existing.setLeaseUntil(Instant.now().plus(java.time.Duration.ofMinutes(5)));
          processedEventRepository.saveAndFlush(existing);
          log.info("Retrying previously failed event: eventId={}, consumerGroup={}", eventId, consumerGroup);
+
          return true;
       }
 
-      log.warn("Duplicate claim rejected (already COMPLETED or PROCESSING): eventId={}, consumerGroup={}, currentStatus={}", 
+      log.warn(
+            "Duplicate claim rejected (already COMPLETED or PROCESSING): eventId={}, consumerGroup={}, currentStatus={}",
             eventId, consumerGroup, existing.getStatus());
       return false;
    }
@@ -94,7 +97,8 @@ public class IdempotencyServiceImpl implements IdempotencyService {
             processedEvent.setUpdatedAt(Instant.now());
             processedEvent.setLeaseUntil(Instant.now());
             processedEventRepository.saveAndFlush(processedEvent);
-            log.info("Successfully released claim (marked as FAILED): eventId={}, consumerGroup={}", eventId, consumerGroup);
+            log.info("Successfully released claim (marked as FAILED): eventId={}, consumerGroup={}", eventId,
+                  consumerGroup);
          });
       } catch (Exception e) {
          log.error("Failed to release claim: eventId={}, consumerGroup={}", eventId, consumerGroup, e);
@@ -113,7 +117,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
             processedEvent.setLeaseUntil(Instant.now().plus(extension));
             processedEvent.setUpdatedAt(Instant.now());
             processedEventRepository.saveAndFlush(processedEvent);
-            log.info("Successfully renewed lease for event: eventId={}, consumerGroup={}, leaseUntil={}", 
+            log.info("Successfully renewed lease for event: eventId={}, consumerGroup={}, leaseUntil={}",
                   eventId, consumerGroup, processedEvent.getLeaseUntil());
          }
       });

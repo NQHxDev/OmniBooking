@@ -7,6 +7,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.HexFormat;
+
 import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.GCMParameterSpec;
@@ -26,6 +28,7 @@ public class EncryptionServiceImpl implements EncryptionService {
    private static final String HMAC_ALGO = "HmacSHA256";
 
    private final AppProperties appProperties;
+
    private final SecureRandom secureRandom = new SecureRandom();
 
    @Override
@@ -94,12 +97,12 @@ public class EncryptionServiceImpl implements EncryptionService {
       try {
          Mac mac = Mac.getInstance(HMAC_ALGO);
          SecretKeySpec secretKeySpec = new SecretKeySpec(
-               appProperties.getSecurity().getHashPepper().getBytes(StandardCharsets.UTF_8), 
-               HMAC_ALGO
-         );
+               appProperties.getSecurity().getHashPepper().getBytes(StandardCharsets.UTF_8),
+               HMAC_ALGO);
          mac.init(secretKeySpec);
 
          byte[] hash = mac.doFinal(input.getBytes(StandardCharsets.UTF_8));
+
          return Base64.getEncoder().encodeToString(hash);
       } catch (GeneralSecurityException e) {
          log.error("HMAC generation failed", e);
@@ -111,10 +114,11 @@ public class EncryptionServiceImpl implements EncryptionService {
       String secret = appProperties.getSecurity().getEncryptionSecret();
       byte[] keyBytes;
 
-      // If the secret is 64 characters, assume it's a Hex string (64 hex chars = 32 bytes)
+      // If the secret is 64 characters, assume it's a Hex string (64 hex chars = 32
+      // bytes)
       if (secret.length() == 64) {
          try {
-            keyBytes = java.util.HexFormat.of().parseHex(secret);
+            keyBytes = HexFormat.of().parseHex(secret);
          } catch (IllegalArgumentException e) {
             keyBytes = secret.getBytes(StandardCharsets.UTF_8);
          }
@@ -123,9 +127,12 @@ public class EncryptionServiceImpl implements EncryptionService {
       }
 
       if (keyBytes.length != 32) {
-         log.error("Encryption secret must be exactly 32 bytes (256 bits) for AES-256. Current bytes: {}", keyBytes.length);
+         log.error("Encryption secret must be exactly 32 bytes (256 bits) for AES-256. Current bytes: {}",
+               keyBytes.length);
          throw new RuntimeException("Invalid encryption key length");
       }
+
       return new SecretKeySpec(keyBytes, "AES");
    }
+
 }

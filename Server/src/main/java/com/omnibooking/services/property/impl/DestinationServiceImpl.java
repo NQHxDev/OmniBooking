@@ -22,17 +22,20 @@ import org.springframework.data.elasticsearch.core.geo.GeoPoint;
 public class DestinationServiceImpl implements DestinationService {
 
    private final DestinationElasticsearchRepository destinationRepository;
+
    private final SearchLogService searchLogService;
+
    private final TrendingService trendingService;
+
    private final PropertyElasticsearchRepository propertyElasticsearchRepository;
 
    @Override
    public List<DestinationSuggestionResponse> searchSuggestions(String query, String locale) {
-      // 1. Log search (async)
+      // Log search (async)
       // Note: countryCode could be passed from controller if needed, or inferred.
       searchLogService.logSearch(query, null, null);
 
-      // 2. Search Elasticsearch
+      // Search Elasticsearch
       List<DestinationDocument> documents = destinationRepository.searchByName(query);
 
       return documents.stream()
@@ -194,7 +197,7 @@ public class DestinationServiceImpl implements DestinationService {
          boolean exists = existing.stream().anyMatch(d -> d.getName().equalsIgnoreCase(normalizedCity));
 
          if (!exists) {
-            log.info("Destination '{}' (original: '{}') does not exist in Elasticsearch. Registering a new one...", 
+            log.info("Destination '{}' (original: '{}') does not exist in Elasticsearch. Registering a new one...",
                   normalizedCity, cityName);
 
             String resolvedCountryCode = "VN";
@@ -208,13 +211,15 @@ public class DestinationServiceImpl implements DestinationService {
                } else if (trimmedCountry.equalsIgnoreCase("France") || trimmedCountry.equalsIgnoreCase("Pháp")) {
                   resolvedCountryCode = "FR";
                   resolvedCountryName = "Pháp";
-               } else if (trimmedCountry.equalsIgnoreCase("United Kingdom") || trimmedCountry.equalsIgnoreCase("Vương quốc Anh")) {
+               } else if (trimmedCountry.equalsIgnoreCase("United Kingdom")
+                     || trimmedCountry.equalsIgnoreCase("Vương quốc Anh")) {
                   resolvedCountryCode = "GB";
                   resolvedCountryName = "Vương quốc Anh";
                } else if (trimmedCountry.equalsIgnoreCase("Japan") || trimmedCountry.equalsIgnoreCase("Nhật Bản")) {
                   resolvedCountryCode = "JP";
                   resolvedCountryName = "Nhật Bản";
-               } else if (trimmedCountry.equalsIgnoreCase("United States") || trimmedCountry.equalsIgnoreCase("Hoa Kỳ")) {
+               } else if (trimmedCountry.equalsIgnoreCase("United States")
+                     || trimmedCountry.equalsIgnoreCase("Hoa Kỳ")) {
                   resolvedCountryCode = "US";
                   resolvedCountryName = "Hoa Kỳ";
                } else if (trimmedCountry.equalsIgnoreCase("Thailand") || trimmedCountry.equalsIgnoreCase("Thái Lan")) {
@@ -222,7 +227,8 @@ public class DestinationServiceImpl implements DestinationService {
                   resolvedCountryName = "Thái Lan";
                } else {
                   resolvedCountryName = trimmedCountry;
-                  resolvedCountryCode = trimmedCountry.length() >= 2 ? trimmedCountry.substring(0, 2).toUpperCase() : "VN";
+                  resolvedCountryCode = trimmedCountry.length() >= 2 ? trimmedCountry.substring(0, 2).toUpperCase()
+                        : "VN";
                }
             }
 
@@ -248,7 +254,8 @@ public class DestinationServiceImpl implements DestinationService {
    }
 
    private String normalizeCityName(String cityName) {
-      if (cityName == null) return null;
+      if (cityName == null)
+         return null;
       String trimmed = cityName.trim();
       if (trimmed.equalsIgnoreCase("Hồ Chí Minh") ||
             trimmed.equalsIgnoreCase("Thành Phố Hồ Chí Minh") ||

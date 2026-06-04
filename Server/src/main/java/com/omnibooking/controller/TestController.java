@@ -30,30 +30,37 @@ import org.springframework.data.elasticsearch.core.IndexOperations;
 public class TestController {
 
    private final UserProfileRepository userProfileRepository;
+
    private final EncryptionService encryptionService;
+
    private final PropertyRepository propertyRepository;
+
    private final PropertyElasticsearchRepository propertyElasticsearchRepository;
+
    private final PropertyDocumentMapper propertyDocumentMapper;
+
    private final MediaRepository mediaRepository;
+
    private final ElasticsearchOperations elasticsearchOperations;
- 
+
    @GetMapping("/reindex-properties")
    @Transactional(readOnly = true)
    public ApiResponse<String> reindexProperties() {
-      // 1. Explicitly recreate properties index to apply settings.json and vi_analyzer mapping
+      // Explicitly recreate properties index to apply settings.json and
+      // vi_analyzer mapping
       IndexOperations indexOps = elasticsearchOperations.indexOps(PropertyDocument.class);
       if (indexOps.exists()) {
          indexOps.delete();
       }
       indexOps.create();
       indexOps.putMapping(indexOps.createMapping(PropertyDocument.class));
- 
-      // 2. Sync properties from PostgreSQL to Elasticsearch
+
+      // Sync properties from PostgreSQL to Elasticsearch
       List<Property> properties = propertyRepository.findAllWithAmenitiesAndRoomTypes();
       for (Property property : properties) {
          PropertyDocument doc = propertyDocumentMapper.toDocument(property);
          mediaRepository.findFirstByEntityIdAndEntityTypeAndIsMainTrue(property.getId(), "PROPERTY")
-            .ifPresent(media -> doc.setMainImageUrl(media.getUrl()));
+               .ifPresent(media -> doc.setMainImageUrl(media.getUrl()));
          propertyElasticsearchRepository.save(doc);
       }
       return ApiResponse.success("Successfully reindexed " + properties.size() + " properties to Elasticsearch.");
@@ -61,10 +68,10 @@ public class TestController {
 
    @GetMapping("/search-phone")
    public ApiResponse<Map<String, Object>> searchPhone(@RequestParam String phone) {
-      // 1. Create Blind Index from input
+      // Create Blind Index from input
       String searchHash = encryptionService.createBlindIndex(phone);
 
-      // 2. Search in DB using Hash
+      // Search in DB using Hash
       Optional<UserProfile> profileOpt = userProfileRepository.findByPhoneSearchHash(searchHash);
 
       Map<String, Object> result = new HashMap<>();
@@ -85,4 +92,5 @@ public class TestController {
 
       return ApiResponse.success(result);
    }
+
 }

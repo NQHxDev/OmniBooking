@@ -32,6 +32,7 @@ public class GenericSpecification<T> implements Specification<T> {
             return builder.equal(root.get(criteria.getKey()), criteria.getValue());
          }
       }
+
       return null;
    }
 

@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import com.omnibooking.model.Media;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,10 +38,12 @@ import com.omnibooking.repository.PartnerLegalProfileRepository;
 import com.omnibooking.services.core.EncryptionService;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.time.LocalDate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -161,8 +164,10 @@ public class PropertyServiceImpl implements PropertyService {
          }
       }
 
-      // Immediate sync to Elasticsearch has been removed because property images are processed asynchronously.
-      // The property will be indexed in Elasticsearch once the main image upload finishes in MediaConsumer.
+      // Immediate sync to Elasticsearch has been removed because property images are
+      // processed asynchronously.
+      // The property will be indexed in Elasticsearch once the main image upload
+      // finishes in MediaConsumer.
 
       return PropertyResponse.builder()
             .id(saved.getId())
@@ -194,59 +199,58 @@ public class PropertyServiceImpl implements PropertyService {
       log.info("Evicting all public properties cache");
    }
 
-    @Override
-    @Cacheable(value = "properties", key = "'featured:' + #limit")
-    public List<PropertyResponse> getFeaturedProperties(int limit) {
-       log.info("Fetching {} featured properties", limit);
-       Instant startDate = Instant.now().minus(30, ChronoUnit.DAYS);
-       List<Property> properties = propertyRepository
-             .findFeaturedProperties(startDate, org.springframework.data.domain.PageRequest.of(0, limit));
-       return mapToPropertyResponses(properties);
-    }
+   @Override
+   @Cacheable(value = "properties", key = "'featured:' + #limit")
+   public List<PropertyResponse> getFeaturedProperties(int limit) {
+      log.info("Fetching {} featured properties", limit);
+      Instant startDate = Instant.now().minus(30, ChronoUnit.DAYS);
+      List<Property> properties = propertyRepository
+            .findFeaturedProperties(startDate, PageRequest.of(0, limit));
+      return mapToPropertyResponses(properties);
+   }
 
-    @Override
-    @Cacheable(value = "properties", key = "'new:' + #limit")
-    public List<PropertyResponse> getNewProperties(int limit) {
-       log.info("Fetching {} new properties", limit);
-       List<Property> properties = propertyRepository
-             .findNewProperties(org.springframework.data.domain.PageRequest.of(0, limit));
-       return mapToPropertyResponses(properties);
-    }
+   @Override
+   @Cacheable(value = "properties", key = "'new:' + #limit")
+   public List<PropertyResponse> getNewProperties(int limit) {
+      log.info("Fetching {} new properties", limit);
+      List<Property> properties = propertyRepository
+            .findNewProperties(PageRequest.of(0, limit));
+      return mapToPropertyResponses(properties);
+   }
 
-    private List<PropertyResponse> mapToPropertyResponses(List<Property> properties) {
-       if (properties.isEmpty()) {
-          return List.of();
-       }
+   private List<PropertyResponse> mapToPropertyResponses(List<Property> properties) {
+      if (properties.isEmpty()) {
+         return List.of();
+      }
 
-       List<UUID> propertyIds = properties.stream().map(Property::getId).toList();
-       List<Media> mainImages = mediaRepository.findMainImagesByEntityIds(propertyIds);
+      List<UUID> propertyIds = properties.stream().map(Property::getId).toList();
+      List<Media> mainImages = mediaRepository.findMainImagesByEntityIds(propertyIds);
 
-       // Defensive mapping: pick the first main image if duplicates exist
-       java.util.Map<UUID, Media> mainImageMap = mainImages.stream()
-             .collect(java.util.stream.Collectors.toMap(
-                   Media::getEntityId,
-                   m -> m,
-                   (existing, replacement) -> existing
-             ));
+      // Defensive mapping: pick the first main image if duplicates exist
+      Map<UUID, Media> mainImageMap = mainImages.stream()
+            .collect(Collectors.toMap(
+                  Media::getEntityId,
+                  m -> m,
+                  (existing, replacement) -> existing));
 
-       return properties.stream()
-             .map(p -> {
-                Media mainMedia = mainImageMap.get(p.getId());
-                return PropertyResponse.builder()
-                      .id(p.getId())
-                      .name(p.getName())
-                      .propertyType(p.getPropertyType().name())
-                      .city(p.getCity())
-                      .country(p.getCountry())
-                      .imageUrl(mainMedia != null ? mainMedia.getUrl() : null)
-                      .build();
-             })
-             .toList();
-    }
+      return properties.stream()
+            .map(p -> {
+               Media mainMedia = mainImageMap.get(p.getId());
+               return PropertyResponse.builder()
+                     .id(p.getId())
+                     .name(p.getName())
+                     .propertyType(p.getPropertyType().name())
+                     .city(p.getCity())
+                     .country(p.getCountry())
+                     .imageUrl(mainMedia != null ? mainMedia.getUrl() : null)
+                     .build();
+            })
+            .toList();
+   }
 
    private String getMainImageUrl(UUID propertyId) {
       return mediaRepository.findFirstByEntityIdAndEntityTypeAndIsMainTrue(propertyId, "PROPERTY")
-            .map(com.omnibooking.model.Media::getUrl)
+            .map(Media::getUrl)
             .orElse(null);
    }
 
@@ -277,7 +281,7 @@ public class PropertyServiceImpl implements PropertyService {
             .toList();
    }
 
-   private void savePartnerLegalProfile(com.omnibooking.model.User partner, String regNum, String taxCode,
+   private void savePartnerLegalProfile(User partner, String regNum, String taxCode,
          String ownerName) {
       if (regNum == null || regNum.isBlank() ||
             taxCode == null || taxCode.isBlank() ||
@@ -443,7 +447,8 @@ public class PropertyServiceImpl implements PropertyService {
    }
 
    private String normalizeCityName(String cityName) {
-      if (cityName == null) return null;
+      if (cityName == null)
+         return null;
       String trimmed = cityName.trim();
       if (trimmed.equalsIgnoreCase("Hồ Chí Minh") ||
             trimmed.equalsIgnoreCase("Thành Phố Hồ Chí Minh") ||
@@ -452,6 +457,7 @@ public class PropertyServiceImpl implements PropertyService {
             trimmed.equalsIgnoreCase("TP. Hồ Chí Minh")) {
          return "Thành Phố Hồ Chí Minh";
       }
+
       return trimmed.replaceAll("^(?i)(Thành\\s+phố|Tỉnh|TP\\.?)\\s+", "").trim();
    }
 

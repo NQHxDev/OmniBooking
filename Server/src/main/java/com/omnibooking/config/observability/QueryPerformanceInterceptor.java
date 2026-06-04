@@ -23,6 +23,8 @@ public class QueryPerformanceInterceptor implements StatementInspector {
             return "/* requestId: " + context.getRequestId() + " */ " + sql;
          }
       }
+
       return sql;
    }
+
 }

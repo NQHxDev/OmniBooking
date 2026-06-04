@@ -33,6 +33,7 @@ public class PublicPropertyController {
          @RequestParam(defaultValue = "6") int limit) {
       log.info("Public API: Fetching {} featured properties", limit);
       List<PropertyResponse> response = propertyService.getFeaturedProperties(limit);
+
       return ApiResponse.success(response);
    }
 
@@ -42,6 +43,7 @@ public class PublicPropertyController {
          @RequestParam(defaultValue = "15") int limit) {
       log.info("Public API: Fetching {} new properties", limit);
       List<PropertyResponse> response = propertyService.getNewProperties(limit);
+
       return ApiResponse.success(response);
    }
 
@@ -50,6 +52,7 @@ public class PublicPropertyController {
    public ApiResponse<PropertyDetailResponse> getPropertyDetail(@PathVariable UUID id) {
       log.info("Public API: Fetching detailed property: {}", id);
       PropertyDetailResponse response = propertyService.getPropertyDetail(id);
+
       return ApiResponse.success(response);
    }
 

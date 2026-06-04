@@ -3,41 +3,46 @@ ifneq (,$(wildcard .env))
 	export
 endif
 
-.PHONY: dev dev-server dev-client dev-web dev-partner docker-infra docker-up docker-down docker-stop logs install restart build clean clear-logs help
-
 .DEFAULT_GOAL := help
 
 # Run Server and all Clients in parallel (Local development)
+.PHONY: dev
 dev:
 	@echo "Starting Server, Web Client, Partner Client, and Owner Client services..."
 	@make -j 4 dev-server dev-web dev-partner dev-owner
 
 # Run Backend only
+.PHONY: dev-server
 dev-server:
 	@echo "Starting Spring Boot Server..."
 	@make clear-logs && cd Server && ./mvnw clean compile -DskipTests spring-boot:run
 
 # Run all Clients in parallel
+.PHONY: dev-client
 dev-client:
 	@echo "Starting Next.js Web, Partner, and Owner Clients..."
 	@make -j 3 dev-web dev-partner dev-owner
 
 # Run Web Client only (Port 3000)
+.PHONY: dev-web
 dev-web:
 	@echo "Starting Next.js Web Client on port 3000..."
 	@PORT=3000 npm run dev --workspace=apps/web --prefix Client
 
 # Run Partner Client only (Port 3002)
+.PHONY: dev-partner
 dev-partner:
 	@echo "Starting Next.js Partner Client on port 3002..."
 	@PORT=3002 npm run dev --workspace=apps/partner --prefix Client
 
 # Run Owner Client only (Port 3005)
+.PHONY: dev-owner
 dev-owner:
 	@echo "Starting Next.js Owner Client on port 3005..."
 	@PORT=3005 npm run dev --workspace=apps/owner --prefix Client
 
 # Docker Infrastructure Commands
+.PHONY: docker-infra
 docker-infra:
 	@echo "Starting infrastructure..."
 	@docker-compose up -d db redis kafka kafdrop elasticsearch kibana prometheus grafana
@@ -48,33 +53,40 @@ docker-infra:
 	done
 	@echo "\nInfrastructure (DB, Redis, Kafka, ES, Prometheus, Grafana) is Ready..."
 
+.PHONY: monitoring
 monitoring:
 	@echo "Starting Prometheus and Grafana..."
 	@docker-compose up -d prometheus grafana
 	@echo "Prometheus is running at http://localhost:9090"
 	@echo "Grafana is running at http://localhost:3001"
 
+.PHONY: test-server
 test-server:
 	@echo "Running Server unit tests..."
 	@cd Server && ./mvnw test
 
 # Docker Full Stack Commands
+.PHONY: docker-up
 docker-up:
 	@echo "Starting all services in Docker (detached)..."
 	@docker-compose up -d
 
+.PHONY: docker-down
 docker-down:
 	@echo "Stopping all Docker services..."
 	@docker-compose down -v
 
+.PHONY: docker-stop
 docker-stop:
 	@echo "Stopping all Docker services..."
 	@docker-compose stop
 
+.PHONY: logs
 logs:
 	@docker-compose logs -f
 
 # Install dependencies for both projects
+.PHONY: install
 install:
 	@echo "Installing Root dependencies..."
 	@npm install
@@ -83,11 +95,13 @@ install:
 	@echo "Installing Client dependencies..."
 	@npm install --prefix Client
 
+.PHONY: restart
 restart:
 	@echo "Rebuilding and restarting all Docker services..."
 	@docker-compose up -d --build
 
 # Build projects for production
+.PHONY: build
 build:
 	@echo "Building Server artifacts..."
 	@cd Server && ./mvnw clean package -DskipTests
@@ -97,6 +111,7 @@ build:
 	@npm run build:owner --prefix Client
 
 # Remove build artifacts and temporary files
+.PHONY: clean
 clean:
 	@echo "Cleaning Server build directory..."
 	@cd Server && ./mvnw clean
@@ -104,11 +119,23 @@ clean:
 	@rm -rf Client/apps/web/.next Client/apps/partner/.next Client/apps/owner/.next Client/out Client/node_modules
 
 # Clean logs
+.PHONY: clear-logs
 clear-logs:
 	@rm -rf Server/logs/*
 	@echo "Logs cleaned..."
 
+# Run CodeGraph to index and map code structure/flows
+.PHONY: codegraph
+codegraph:
+	@echo "Updating CodeGraph index..."
+	@if [ ! -d ".codegraph" ]; then \
+		npx codegraph init -i; \
+	else \
+		npx codegraph index; \
+	fi
+
 # Display help information
+.PHONY: help
 help:
 	@echo "OmniBooking Monorepo Management:"
 	@echo "  Development Flow:"
@@ -131,3 +158,4 @@ help:
 	@echo "    make logs          - Tail Docker logs"
 	@echo "    make monitoring    - Start Prometheus and Grafana"
 	@echo "    make test-server   - Run server unit tests"
+	@echo "    make codegraph     - Index/update CodeGraph codebase flows"

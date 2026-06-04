@@ -15,8 +15,7 @@ public class PaymentProviderFactory {
       this.providers = providerList.stream()
             .collect(Collectors.toMap(
                   p -> p.getProviderName().toUpperCase(),
-                  Function.identity()
-            ));
+                  Function.identity()));
    }
 
    public PaymentProvider getProvider(String providerName) {
@@ -29,4 +28,5 @@ public class PaymentProviderFactory {
       }
       return provider;
    }
+
 }

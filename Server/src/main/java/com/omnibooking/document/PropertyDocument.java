@@ -9,6 +9,7 @@ import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 import org.springframework.data.elasticsearch.annotations.GeoPointField;
+import org.springframework.data.elasticsearch.annotations.Setting;
 import org.springframework.data.elasticsearch.core.geo.GeoPoint;
 
 import java.util.List;
@@ -18,7 +19,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(indexName = "properties")
-@org.springframework.data.elasticsearch.annotations.Setting(settingPath = "elasticsearch/settings.json")
+@Setting(settingPath = "elasticsearch/settings.json")
 public class PropertyDocument {
 
    @Id

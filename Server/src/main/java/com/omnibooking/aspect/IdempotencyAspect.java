@@ -46,7 +46,7 @@ public class IdempotencyAspect {
 
       String redisKey = REDIS_PREFIX + key;
 
-      // 1. Kiểm tra xem key đã tồn tại chưa
+      // Kiểm tra xem key đã tồn tại chưa
       String cachedResponse = redisTemplate.opsForValue().get(redisKey);
 
       if (cachedResponse != null) {
@@ -64,17 +64,17 @@ public class IdempotencyAspect {
          return objectMapper.readValue(cachedResponse, type);
       }
 
-      // 2. Đánh dấu đang xử lý (Lock)
+      // Đánh dấu đang xử lý (Lock)
       Boolean isNewKey = redisTemplate.opsForValue().setIfAbsent(redisKey, PROCESSING_VALUE, 5, TimeUnit.MINUTES);
       if (Boolean.FALSE.equals(isNewKey)) {
          throw new AppException(ErrorCode.IDEMPOTENCY_KEY_PROCESSING);
       }
 
       try {
-         // 3. Thực thi nghiệp vụ
+         // Thực thi nghiệp vụ
          Object result = joinPoint.proceed();
 
-         // 4. Lưu kết quả vào Redis
+         // Lưu kết quả vào Redis
          String jsonResponse = objectMapper.writeValueAsString(result);
          redisTemplate.opsForValue().set(redisKey, Objects.requireNonNull(jsonResponse), idempotent.expiration(),
                Objects.requireNonNull(idempotent.timeUnit()));

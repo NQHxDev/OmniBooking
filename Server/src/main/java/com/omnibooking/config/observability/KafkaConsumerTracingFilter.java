@@ -18,7 +18,8 @@ import java.nio.charset.StandardCharsets;
 public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Object> {
 
    @Override
-   public ConsumerRecord<String, Object> intercept(ConsumerRecord<String, Object> record, Consumer<String, Object> consumer) {
+   public ConsumerRecord<String, Object> intercept(ConsumerRecord<String, Object> record,
+         Consumer<String, Object> consumer) {
       String requestId = getHeaderValue(record, Headers.REQUEST_ID);
       String correlationId = getHeaderValue(record, Headers.CORRELATION_ID);
       String traceId = getHeaderValue(record, Headers.SENTRY_TRACE);
@@ -108,4 +109,5 @@ public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Obj
       Header header = record.headers().lastHeader(headerName);
       return header != null ? new String(header.value(), StandardCharsets.UTF_8) : null;
    }
+
 }

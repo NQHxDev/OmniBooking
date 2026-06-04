@@ -19,7 +19,9 @@ import java.util.List;
 public class SearchReconciliationServiceImpl implements SearchReconciliationService {
 
    private final PropertyRepository propertyRepository;
+
    private final PropertyElasticsearchRepository propertyElasticsearchRepository;
+
    private final OutboxService outboxService;
 
    @Override
@@ -48,8 +50,7 @@ public class SearchReconciliationServiceImpl implements SearchReconciliationServ
                   PropertySyncEvent.builder()
                         .propertyId(property.getId())
                         .operation("CREATE")
-                        .build()
-            );
+                        .build());
             driftCount++;
          }
       }

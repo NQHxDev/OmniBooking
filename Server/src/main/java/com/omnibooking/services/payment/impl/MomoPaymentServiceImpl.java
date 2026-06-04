@@ -14,6 +14,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -33,15 +34,19 @@ import java.util.UUID;
 public class MomoPaymentServiceImpl implements MomoPaymentService {
 
    private final MomoConfig momoConfig;
+
    private final BookingRepository bookingRepository;
+
    private final BookingService bookingService;
+
    private final CurrencyService currencyService;
+
    private final RestTemplate restTemplate;
 
-    @Override
-    public String getProviderName() {
-       return "MOMO";
-    }
+   @Override
+   public String getProviderName() {
+      return "MOMO";
+   }
 
    @Override
    public String createPaymentLink(UUID bookingId) {
@@ -51,7 +56,7 @@ public class MomoPaymentServiceImpl implements MomoPaymentService {
 
       if (!booking.getRequiresDeposit()) {
          throw new AppException("PAYMENT_001", "Deposit is not required for this booking",
-               org.springframework.http.HttpStatus.BAD_REQUEST);
+               HttpStatus.BAD_REQUEST);
       }
 
       // Convert USD amount to VND
@@ -107,8 +112,8 @@ public class MomoPaymentServiceImpl implements MomoPaymentService {
                momoConfig.getApiUrl(),
                HttpMethod.POST,
                entity,
-               new ParameterizedTypeReference<Map<String, Object>>() {}
-         );
+               new ParameterizedTypeReference<Map<String, Object>>() {
+               });
          Map<String, Object> response = responseEntity.getBody();
 
          if (response != null && response.containsKey("resultCode")) {
@@ -227,4 +232,5 @@ public class MomoPaymentServiceImpl implements MomoPaymentService {
          throw new RuntimeException("Failed to calculate HMAC-SHA256 signature", e);
       }
    }
+
 }

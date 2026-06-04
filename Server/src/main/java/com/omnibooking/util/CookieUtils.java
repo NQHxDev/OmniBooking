@@ -3,14 +3,18 @@ package com.omnibooking.util;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.Arrays;
+
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 
 public class CookieUtils {
 
    public static final String ACCESS_TOKEN = "access_token";
+
    public static final String SESSION_ID = "session_id";
+
    public static final String REFRESH_TOKEN = "refresh_token";
+
    public static final String FINGERPRINT = "x_fgp";
 
    public static String cookieDomain;
@@ -65,7 +69,7 @@ public class CookieUtils {
       if (resolvedDomain != null && !resolvedDomain.isBlank()) {
          builder.domain(resolvedDomain);
       }
-      response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, builder.build().toString());
+      response.addHeader(HttpHeaders.SET_COOKIE, builder.build().toString());
    }
 
    public static void deleteCookie(HttpServletResponse response, String name, boolean secure) {
@@ -80,27 +84,61 @@ public class CookieUtils {
       if (resolvedDomain != null && !resolvedDomain.isBlank()) {
          builder.domain(resolvedDomain);
       }
-      response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, builder.build().toString());
+      response.addHeader(HttpHeaders.SET_COOKIE, builder.build().toString());
    }
 
    public static String getCookieValue(HttpServletRequest request, String name) {
       if (request.getCookies() != null) {
-         return Arrays.stream(request.getCookies())
-               .filter(cookie -> name.equals(cookie.getName()))
-               .map(Cookie::getValue)
-               .findFirst()
-               .orElse(null);
+         for (Cookie cookie : request.getCookies()) {
+            if (name.equals(cookie.getName())) {
+               return cookie.getValue();
+            }
+         }
       }
 
       // Manual parsing if getCookies() is null (common in server-to-server fetches)
       String cookieHeader = request.getHeader("Cookie");
       if (cookieHeader != null) {
-         return Arrays.stream(cookieHeader.split(";"))
-               .map(String::trim)
-               .filter(s -> s.startsWith(name + "="))
-               .map(s -> s.substring(name.length() + 1))
-               .findFirst()
-               .orElse(null);
+         int nameLen = name.length();
+         int headerLen = cookieHeader.length();
+         int pos = 0;
+         while (pos < headerLen) {
+            // Trim leading spaces and semicolons
+            while (pos < headerLen && (cookieHeader.charAt(pos) == ' ' || cookieHeader.charAt(pos) == ';')) {
+               pos++;
+            }
+            if (pos >= headerLen) {
+               break;
+            }
+            // Check if match found
+            if (pos + nameLen < headerLen && cookieHeader.charAt(pos + nameLen) == '=') {
+               boolean match = true;
+               for (int i = 0; i < nameLen; i++) {
+                  if (cookieHeader.charAt(pos + i) != name.charAt(i)) {
+                     match = false;
+                     break;
+                  }
+               }
+               if (match) {
+                  int valStart = pos + nameLen + 1;
+                  int valEnd = valStart;
+                  while (valEnd < headerLen && cookieHeader.charAt(valEnd) != ';') {
+                     valEnd++;
+                  }
+                  // Strip quotes if value is double-quoted (RFC 6265 compliant)
+                  if (valEnd - valStart > 1 && cookieHeader.charAt(valStart) == '"'
+                        && cookieHeader.charAt(valEnd - 1) == '"') {
+                     valStart++;
+                     valEnd--;
+                  }
+                  return cookieHeader.substring(valStart, valEnd);
+               }
+            }
+            // Skip current cookie pair to next semicolon
+            while (pos < headerLen && cookieHeader.charAt(pos) != ';') {
+               pos++;
+            }
+         }
       }
 
       return null;

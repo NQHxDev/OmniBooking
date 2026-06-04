@@ -19,6 +19,7 @@ import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.services.communication.MailService;
 import com.omnibooking.services.core.OutboxService;
 import com.omnibooking.services.auth.SessionService;
+import com.omnibooking.services.auth.TwoFactorAuthService;
 import com.omnibooking.services.user.VerificationService;
 import com.omnibooking.util.CookieUtils;
 import com.omnibooking.util.SecurityUtils;
@@ -78,7 +79,7 @@ public class AuthServiceImpl implements AuthService {
 
    private final SocialAccountRepository socialAccountRepository;
 
-   private final com.omnibooking.services.auth.TwoFactorAuthService twoFactorAuthService;
+   private final TwoFactorAuthService twoFactorAuthService;
 
    private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
 

@@ -16,6 +16,8 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @RequiredArgsConstructor
@@ -25,11 +27,11 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
 
    private final String allowedOrigins;
 
-   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+   private final MeterRegistry meterRegistry;
 
    private static final List<String> STATE_CHANGING_METHODS = Arrays.asList("POST", "PUT", "DELETE", "PATCH");
 
-   private static final org.springframework.util.AntPathMatcher PATH_MATCHER = new org.springframework.util.AntPathMatcher();
+   private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
    private static final List<String> CSRF_BYPASS_PATTERNS = Arrays.asList(
          "/auth/login", "/auth/login/**",
@@ -101,7 +103,7 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
    }
 
-   private boolean isCsrfBypassEndpoint(@org.springframework.lang.NonNull HttpServletRequest request) {
+   private boolean isCsrfBypassEndpoint(@NonNull HttpServletRequest request) {
       String path = request.getRequestURI();
       return CSRF_BYPASS_PATTERNS.stream().anyMatch(pattern -> PATH_MATCHER.match(pattern, path));
    }

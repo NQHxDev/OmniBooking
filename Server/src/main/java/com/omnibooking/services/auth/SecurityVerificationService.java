@@ -3,6 +3,7 @@ package com.omnibooking.services.auth;
 import java.util.UUID;
 
 public interface SecurityVerificationService {
+
    /**
     * Gửi mã OTP xác thực các hành động nhạy cảm qua Email.
     */
@@ -19,4 +20,5 @@ public interface SecurityVerificationService {
     * "Trusted" (30p) hay không.
     */
    boolean isSessionTrusted(UUID userId);
+
 }
