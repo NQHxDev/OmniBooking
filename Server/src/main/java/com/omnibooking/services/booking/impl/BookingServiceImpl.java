@@ -1,5 +1,6 @@
 package com.omnibooking.services.booking.impl;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.dto.CreateBookingRequest;
 import com.omnibooking.dto.BookingResponse;
 import com.omnibooking.dto.event.EmailEvent;
@@ -336,7 +337,7 @@ public class BookingServiceImpl implements BookingService {
          outboxService.saveEvent(
                booking.getId(),
                "BOOKING",
-               "BOOKING_CONFIRMED_MAIL",
+               EventConstants.BOOKING_CONFIRMED_MAIL,
                emailEvent);
 
          // Evict partner bookings list cache to show the new booking on their management
@@ -450,7 +451,7 @@ public class BookingServiceImpl implements BookingService {
       outboxService.saveEvent(
             booking.getId(),
             "BOOKING",
-            "BOOKING_CONFIRMED_MAIL",
+            EventConstants.BOOKING_CONFIRMED_MAIL,
             emailEvent);
 
       // Evict partner bookings list cache to show the new booking on their management

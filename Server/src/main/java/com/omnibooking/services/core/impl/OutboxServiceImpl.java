@@ -27,7 +27,11 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.scheduling.annotation.Async;
 
+import com.omnibooking.constant.EventConstants;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -221,7 +225,7 @@ public class OutboxServiceImpl implements OutboxService {
    }
 
    private int getTargetVersionForEvent(String eventType) {
-      if ("USER_REGISTERED_MAIL".equals(eventType)) {
+      if (EventConstants.USER_REGISTERED_MAIL.equals(eventType)) {
          return 2;
       }
 
@@ -278,33 +282,45 @@ public class OutboxServiceImpl implements OutboxService {
    }
 
    private String getStackTraceAsString(Exception e) {
-      java.io.StringWriter sw = new java.io.StringWriter();
-      java.io.PrintWriter pw = new java.io.PrintWriter(sw);
+      StringWriter sw = new StringWriter();
+      PrintWriter pw = new PrintWriter(sw);
       e.printStackTrace(pw);
 
       return sw.toString();
    }
 
    private String getTopicForEvent(String eventType) {
-      if (eventType.contains("MAIL") || eventType.contains("REGISTERED") ||
-            eventType.contains("PASSWORD") || eventType.contains("VERIFICATION") ||
-            eventType.contains("OTP")) {
-         return KafkaConfig.MAIL_TOPIC;
+      if (eventType == null) {
+         return KafkaConfig.DEFAULT_TOPIC;
       }
-      if (eventType.contains("MEDIA")) {
-         return KafkaConfig.MEDIA_TOPIC;
-      }
-      if (eventType.contains("PROPERTY_SYNC")) {
-         return "omnibooking-property-sync";
-      }
+      return switch (eventType) {
+         case EventConstants.USER_REGISTERED_MAIL,
+              EventConstants.USER_REGISTERED,
+              EventConstants.USER_RESEND_VERIFICATION_MAIL,
+              EventConstants.RESEND_VERIFICATION,
+              EventConstants.USER_FORGOT_PASSWORD_MAIL,
+              EventConstants.FORGOT_PASSWORD,
+              EventConstants.SECURITY_OTP_SEND,
+              EventConstants.TWO_FACTOR_OTP_SEND,
+              EventConstants.PARTNER_OTP_SEND,
+              EventConstants.TWO_FACTOR_ENABLED,
+              EventConstants.BOOKING_CONFIRMED_MAIL -> KafkaConfig.MAIL_TOPIC;
 
-      return "omnibooking-default-topic";
+         case EventConstants.PROPERTY_SYNC -> KafkaConfig.PROPERTY_SYNC_TOPIC;
+
+         default -> {
+            if (eventType.contains("MEDIA")) {
+               yield KafkaConfig.MEDIA_TOPIC;
+            }
+            yield KafkaConfig.DEFAULT_TOPIC;
+         }
+      };
    }
 
    @Override
    @Transactional
    public void purgeOldOutboxEvents() {
-      Instant threshold = Instant.now().minus(30, java.time.temporal.ChronoUnit.DAYS);
+      Instant threshold = Instant.now().minus(30, ChronoUnit.DAYS);
       int deleted = outboxEventRepository.deleteProcessedEventsBefore(threshold);
       if (deleted > 0) {
          log.info("Purged {} processed outbox events older than 30 days", deleted);

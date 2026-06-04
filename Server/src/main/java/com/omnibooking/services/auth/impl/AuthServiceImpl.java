@@ -1,5 +1,6 @@
 package com.omnibooking.services.auth.impl;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.dto.RegisterRequest;
@@ -137,7 +138,7 @@ public class AuthServiceImpl implements AuthService {
       outboxService.saveEvent(
             savedUser.getId(),
             "USER",
-            "USER_REGISTERED",
+            EventConstants.USER_REGISTERED,
             emailEvent);
 
       // Automatic Login
@@ -302,7 +303,7 @@ public class AuthServiceImpl implements AuthService {
       outboxService.saveEvent(
             user.getId(),
             "USER",
-            "RESEND_VERIFICATION",
+            EventConstants.RESEND_VERIFICATION,
             mailService.buildVerificationEmailEvent(user.getEmail(), profile.getDisplayName(), token));
 
       // Set rate limit in Redis for 30 seconds
@@ -493,7 +494,7 @@ public class AuthServiceImpl implements AuthService {
          outboxService.saveEvent(
                user.getId(),
                "USER",
-               "FORGOT_PASSWORD",
+               EventConstants.FORGOT_PASSWORD,
                mailService.buildForgotPasswordEmailEvent(email, fullName, token));
       });
    }

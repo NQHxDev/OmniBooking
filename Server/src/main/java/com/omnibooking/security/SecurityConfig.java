@@ -33,6 +33,7 @@ import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
+import com.omnibooking.config.AppProperties;
 
 @Configuration
 @EnableWebSecurity
@@ -48,6 +49,8 @@ public class SecurityConfig {
    private final ObjectMapper objectMapper;
 
    private final MeterRegistry meterRegistry;
+
+   private final AppProperties appProperties;
 
    @Value("${app.cors.allowed-origins:http://localhost:3000}")
    private String allowedOrigins;
@@ -99,8 +102,16 @@ public class SecurityConfig {
    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
       JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, userDetailsService, redisTemplate,
             meterRegistry);
-      CustomCsrfFilter csrfFilter = new CustomCsrfFilter(objectMapper, allowedOrigins,
-            meterRegistry);
+      CustomCsrfFilter csrfFilter = new CustomCsrfFilter(
+            objectMapper,
+            allowedOrigins,
+            meterRegistry,
+            appProperties.getSecurity().getCsrfBypassPatterns(),
+            appProperties.getSecurity().isCookieSecure(),
+            appProperties.getSecurity().getCsrfSecret() != null && !appProperties.getSecurity().getCsrfSecret().isBlank()
+                  ? appProperties.getSecurity().getCsrfSecret()
+                  : appProperties.getSecurity().getJwtSecret()
+      );
 
       http
             .csrf(AbstractHttpConfigurer::disable)
@@ -113,7 +124,7 @@ public class SecurityConfig {
                         "/auth/2fa/login",
                         "/auth/forgot-password", "/auth/reset-password", "/auth/google/**", "/auth/subscribe/**",
                         "/auth/finalize-registration",
-                        "/auth/check-email", "/auth/activate-guest")
+                        "/auth/check-email", "/auth/activate-guest", "/auth/csrf")
                   .permitAll()
                   .requestMatchers(HttpMethod.POST, "/bookings").permitAll()
                   .requestMatchers(HttpMethod.GET, "/bookings/**").permitAll()

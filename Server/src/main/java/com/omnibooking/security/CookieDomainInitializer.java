@@ -42,6 +42,13 @@ public class CookieDomainInitializer {
          log.info("No cookie domain specified, cookies will default to current host");
          CookieUtils.cookieDomain = null;
       }
+
+      String csrfSecret = appProperties.getSecurity().getCsrfSecret();
+      if (csrfSecret == null || csrfSecret.isBlank()) {
+         csrfSecret = appProperties.getSecurity().getJwtSecret();
+      }
+
+      CookieUtils.csrfSecret = csrfSecret;
    }
 
 }

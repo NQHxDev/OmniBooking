@@ -191,4 +191,16 @@ export const authService = {
       )) as unknown as ApiResponse<User>;
       return response.data;
    },
+
+   /**
+    * Fetches a CSRF token from the server to bootstrap the session if needed.
+    */
+   getCsrfToken: async (): Promise<string> => {
+      const response = (await apiClient.get("/auth/csrf", {
+         withCredentials: true,
+         // @ts-expect-error - Custom axios config flag for interceptor
+         _skipToast: true,
+      })) as unknown as ApiResponse<{ csrfToken: string }>;
+      return response.data.csrfToken;
+   },
 };

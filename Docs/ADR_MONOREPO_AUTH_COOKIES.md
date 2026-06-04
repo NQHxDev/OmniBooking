@@ -63,7 +63,7 @@ When running in production profile (`prod` or `production`), the startup safegua
 Since cookies are shared across subdomains, we enforce three lines of defense:
 
 1. **Fingerprinting (`x_fgp` Cookie)**: Binds the access token to a cryptographically random fingerprint. Even if an XSS vulnerability on one subdomain leaks a JWT token, it cannot be re-used from another browser unless the attacker also steals the HttpOnly `x_fgp` cookie.
-2. **Double-Submit CSRF**: `CustomCsrfFilter` enforces strict CSRF verification matching the `csrf_token` cookie against the `X-CSRF-Token` header.
+2. **Double-Submit CSRF**: `CustomCsrfFilter` enforces strict CSRF verification matching the `csrf_token` cookie against the `X-CSRF-Token` header. To prevent token-spoofing and bypasses, the token value is cryptographically bound to the backend session using HMAC-SHA256 of the `session_id` and is rotated dynamically on login, logout, and token refresh. Origin matching is normalized using URI parsing. Additionally, a bootstrap endpoint `/auth/csrf` is provided for client-side token retrieval.
 3. **Fail-Closed Session Checks**: The backend verifies token revocations via Redis on every request. Redis outages immediately return HTTP 503 instead of falling back to insecure defaults.
 
 ---

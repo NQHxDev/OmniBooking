@@ -1,5 +1,6 @@
 package com.omnibooking.services.auth.impl;
 
+import com.omnibooking.constant.EventConstants;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.config.AppProperties;
@@ -146,7 +147,7 @@ public class TwoFactorAuthServiceImpl implements TwoFactorAuthService {
          outboxService.saveEvent(
                user.getId(),
                "USER",
-               "TWO_FACTOR_ENABLED",
+               EventConstants.TWO_FACTOR_ENABLED,
                emailEvent);
 
       } catch (AppException e) {

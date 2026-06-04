@@ -1,5 +1,6 @@
 package com.omnibooking.consumer;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.dto.event.EmailEvent;
 import com.omnibooking.dto.event.UserCreatedEvent;
 import com.omnibooking.services.communication.MailService;
@@ -11,9 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import com.omnibooking.services.core.LeaseRenewer;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 @RequiredArgsConstructor
@@ -30,17 +29,17 @@ public class UserCDCConsumer {
 
    private final MeterRegistry meterRegistry;
 
-   @Transactional
+   private final TransactionTemplate transactionTemplate;
+
    @KafkaListener(topics = "omnibooking-user-cdc", groupId = "omnibooking-cdc-group")
    public void handleUserCreated(UserCreatedEvent event) {
       String consumerGroup = "omnibooking-cdc-group";
       if (event.getEventId() != null) {
          boolean claimed = idempotencyService.claimEvent(event.getEventId(), consumerGroup);
          if (!claimed) {
-            log.warn("[Kafka Consumer] Duplicate UserCreated CDC event detected and skipped: eventId={}, userId={}",
+            log.info("Duplicate completed event skipped: eventId={}, userId={}",
                   event.getEventId(), event.getUserId());
             meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
-            meterRegistry.counter("omnibooking.kafka.consumer.skipped").increment();
             return;
          }
       }
@@ -48,28 +47,31 @@ public class UserCDCConsumer {
       log.info("CDC Event received: New user created with ID: {} (eventId: {})",
             event.getUserId(), event.getEventId());
 
-      try (LeaseRenewer ignored = new LeaseRenewer(idempotencyService, event.getEventId(), consumerGroup)) {
-         // Create Verification Token
+      try {
+         // Create Verification Token (Redis network call - OUTSIDE database transaction)
          String token = verificationService.createVerificationToken(event.getUserId());
 
-         // Build Email Event
+         // Build Email Event (CPU operation - OUTSIDE database transaction)
          EmailEvent emailEvent = mailService.buildVerificationEmailEvent(
                event.getEmail(),
                event.getFullName(),
                token);
 
-         // Send to Outbox
-         outboxService.saveEvent(
-               event.getUserId(),
-               "USER",
-               "USER_REGISTERED_MAIL",
-               emailEvent);
+         // Execute DB writes in a transaction block
+         transactionTemplate.executeWithoutResult(status -> {
+            // Send to Outbox (requires active transaction)
+            outboxService.saveEvent(
+                  event.getUserId(),
+                  "USER",
+                  EventConstants.USER_REGISTERED_MAIL,
+                  emailEvent);
+
+            if (event.getEventId() != null) {
+               idempotencyService.completeEvent(event.getEventId(), consumerGroup);
+            }
+         });
 
          log.info("CDC Side-effects completed for user: {}", event.getEmail());
-
-         if (event.getEventId() != null) {
-            idempotencyService.completeEvent(event.getEventId(), consumerGroup);
-         }
       } catch (Exception e) {
          log.error("Failed to process CDC side-effects for user: {}", event.getUserId(), e);
          if (event.getEventId() != null) {

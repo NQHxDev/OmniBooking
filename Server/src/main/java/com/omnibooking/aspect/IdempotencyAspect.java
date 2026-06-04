@@ -54,8 +54,7 @@ public class IdempotencyAspect {
 
       String redisKey = getRedisKey(request, key);
 
-      // Đánh dấu đang xử lý (Lock) - sử dụng setIfAbsent trước để tối ưu hóa số lần
-      // gọi Redis (1 RTT cho request mới)
+      // Đánh dấu đang xử lý (Lock)
       Boolean isNewKey = redisTemplate.opsForValue().setIfAbsent(redisKey, PROCESSING_VALUE, 5, TimeUnit.MINUTES);
 
       if (Boolean.FALSE.equals(isNewKey)) {

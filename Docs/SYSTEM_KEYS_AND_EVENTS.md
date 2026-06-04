@@ -60,15 +60,19 @@ OmniBooking uses Kafka as its core event broker, backed by the Transactional Out
 
 ### 2.2 Outbox Event Types & Registrations
 
-These event types are registered in `OutboxEventRegistry` and map to specific Java payload DTOs.
+These event types are defined in [EventConstants.java](file:///Users/anhjkr/Documents/My%20Projects/OmniBooking/Server/src/main/java/com/omnibooking/constant/EventConstants.java), registered in [OutboxEventRegistry.java](file:///Users/anhjkr/Documents/My%20Projects/OmniBooking/Server/src/main/java/com/omnibooking/services/core/OutboxEventRegistry.java), and map to specific Java payload DTOs.
 
-| Event Type Constant             | Payload DTO Class         | Target Kafka Topic          | Trigger Description                                              |
-| :------------------------------ | :------------------------ | :-------------------------- | :--------------------------------------------------------------- |
-| `USER_REGISTERED_MAIL`          | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent to verify a newly registered email address (Upcasted V2).   |
-| `USER_RESEND_VERIFICATION_MAIL` | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent when requesting a new verification email.                   |
-| `USER_FORGOT_PASSWORD_MAIL`     | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent when forgot password reset link is requested.               |
-| `SECURITY_OTP_SEND`             | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent when sensitive account configurations require security OTP. |
-| `2FA_OTP_SEND`                  | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent for Two-Factor Authentication codes during login.           |
-| `PARTNER_OTP_SEND`              | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent for partner activation verification OTP.                    |
-| `PROPERTY_SYNC`                 | `PropertySyncEvent.class` | `omnibooking-property-sync` | Sent to update property search indexes in Elasticsearch.         |
-| `BOOKING_CONFIRMED_MAIL`        | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent to guests upon successful booking confirmation.             |
+| Event Constant (EventConstants.java) | Database String Key             | Payload DTO Class         | Target Kafka Topic          | Trigger Description                                                             |
+| :----------------------------------- | :------------------------------ | :------------------------ | :-------------------------- | :------------------------------------------------------------------------------ |
+| `USER_REGISTERED_MAIL`               | `USER_REGISTERED_MAIL`          | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent via CDC listener to verify a newly registered email address (Upcasted V2). |
+| `USER_REGISTERED`                    | `USER_REGISTERED`               | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent via auth registration flow to verify email address.                        |
+| `USER_RESEND_VERIFICATION_MAIL`      | `USER_RESEND_VERIFICATION_MAIL` | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent when requesting a new verification email (alternative).                    |
+| `RESEND_VERIFICATION`                | `RESEND_VERIFICATION`           | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent when requesting a new verification email.                                  |
+| `USER_FORGOT_PASSWORD_MAIL`          | `USER_FORGOT_PASSWORD_MAIL`     | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent when forgot password reset link is requested (alternative).                |
+| `FORGOT_PASSWORD`                    | `FORGOT_PASSWORD`               | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent when forgot password reset link is requested.                              |
+| `SECURITY_OTP_SEND`                  | `SECURITY_OTP_SEND`             | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent when sensitive account configurations require security OTP.                |
+| `TWO_FACTOR_OTP_SEND`                | `2FA_OTP_SEND`                  | `EmailEvent.class`        | `omnibooking-mail-topic`    | Reserved for Two-Factor Authentication codes during login.                      |
+| `PARTNER_OTP_SEND`                   | `PARTNER_OTP_SEND`              | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent for partner activation verification OTP.                                   |
+| `TWO_FACTOR_ENABLED`                 | `TWO_FACTOR_ENABLED`            | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent to users when 2FA is successfully enabled.                                 |
+| `PROPERTY_SYNC`                      | `PROPERTY_SYNC`                 | `PropertySyncEvent.class` | `omnibooking-property-sync` | Sent to update property search indexes in Elasticsearch.                        |
+| `BOOKING_CONFIRMED_MAIL`             | `BOOKING_CONFIRMED_MAIL`        | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent to guests upon successful booking confirmation.                            |

@@ -1,5 +1,6 @@
 package com.omnibooking.services.booking.impl;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.dto.BookingResponse;
 import com.omnibooking.dto.CreateBookingRequest;
 import com.omnibooking.dto.event.EmailEvent;
@@ -364,7 +365,7 @@ class BookingServiceImplTest {
       verify(bookingRepository, times(1)).save(mockBooking);
       verify(bookingStatusLogRepository, times(1)).save(any());
       verify(transactionRepository, times(1)).save(any(Transaction.class));
-      verify(outboxService, times(1)).saveEvent(eq(bookingId), eq("BOOKING"), eq("BOOKING_CONFIRMED_MAIL"), any());
+      verify(outboxService, times(1)).saveEvent(eq(bookingId), eq("BOOKING"), eq(EventConstants.BOOKING_CONFIRMED_MAIL), any());
    }
 
    @Test

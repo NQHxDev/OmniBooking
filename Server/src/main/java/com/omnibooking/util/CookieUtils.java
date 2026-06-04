@@ -19,6 +19,27 @@ public class CookieUtils {
 
    public static String cookieDomain;
 
+   public static String csrfSecret;
+
+   /**
+    * Calculates CSRF Token bound to session using HMAC-SHA256.
+    */
+   public static String calculateCsrfToken(String sessionId, String secret) {
+      if (sessionId == null || sessionId.isBlank() || secret == null || secret.isBlank()) {
+         return java.util.UUID.randomUUID().toString();
+      }
+      try {
+         javax.crypto.Mac sha256_HMAC = javax.crypto.Mac.getInstance("HmacSHA256");
+         javax.crypto.spec.SecretKeySpec secretKeySpec = new javax.crypto.spec.SecretKeySpec(
+               secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256");
+         sha256_HMAC.init(secretKeySpec);
+         byte[] hash = sha256_HMAC.doFinal(sessionId.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+         return java.util.HexFormat.of().formatHex(hash);
+      } catch (Exception e) {
+         return java.util.UUID.randomUUID().toString();
+      }
+   }
+
    /**
     * Resolves the cookie domain dynamically based on request host.
     */
@@ -42,7 +63,7 @@ public class CookieUtils {
 
       // Set csrf_token cookie for double submit cookie verification (not HttpOnly so
       // client JS can read it)
-      String csrfToken = java.util.UUID.randomUUID().toString();
+      String csrfToken = calculateCsrfToken(sessionId, csrfSecret);
       addCookie(response, "csrf_token", csrfToken, expiry, secure);
    }
 

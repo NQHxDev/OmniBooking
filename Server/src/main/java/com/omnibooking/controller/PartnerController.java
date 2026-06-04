@@ -1,5 +1,6 @@
 package com.omnibooking.controller;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.services.communication.MailService;
@@ -111,7 +112,7 @@ public class PartnerController {
       outboxService.saveEvent(
             userId,
             "PARTNER",
-            "PARTNER_OTP_SEND",
+            EventConstants.PARTNER_OTP_SEND,
             emailEvent);
 
       log.info("Partner OTP recorded in outbox for email: {} (RequestId: {})", email, requestId);

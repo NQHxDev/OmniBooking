@@ -1,5 +1,6 @@
 package com.omnibooking.services.media;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.config.KafkaConfig;
 import com.omnibooking.dto.CloudinaryResponse;
 import com.omnibooking.dto.event.MediaUploadEvent;
@@ -122,7 +123,7 @@ public class MediaConsumer {
             outboxService.saveEvent(
                   propertyId,
                   "PROPERTY",
-                  "PROPERTY_SYNC",
+                  EventConstants.PROPERTY_SYNC,
                   PropertySyncEvent.builder()
                         .propertyId(propertyId)
                         .operation("CREATE")

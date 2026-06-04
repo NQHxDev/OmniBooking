@@ -1,6 +1,7 @@
 package com.omnibooking.config;
 
 import lombok.Data;
+import java.util.List;
 
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -115,6 +116,28 @@ public class AppProperties {
       private boolean twoFactorEnabled = true;
       private boolean cookieSecure;
       private String cookieDomain;
+      private String csrfSecret;
+      private List<String> csrfBypassPatterns = java.util.Arrays.asList(
+            "/auth/login", "/auth/login/**",
+            "/**/auth/login", "/**/auth/login/**",
+            "/auth/register", "/auth/register/**",
+            "/**/auth/register", "/**/auth/register/**",
+            "/auth/refresh", "/auth/refresh/**",
+            "/**/auth/refresh", "/**/auth/refresh/**",
+            "/auth/logout", "/auth/logout/**",
+            "/**/auth/logout", "/**/auth/logout/**",
+            "/auth/2fa/login", "/auth/2fa/login/**",
+            "/**/auth/2fa/login", "/**/auth/2fa/login/**",
+            "/auth/forgot-password", "/auth/forgot-password/**",
+            "/**/auth/forgot-password", "/**/auth/forgot-password/**",
+            "/auth/reset-password", "/auth/reset-password/**",
+            "/**/auth/reset-password", "/**/auth/reset-password/**",
+            "/auth/activate-guest", "/auth/activate-guest/**",
+            "/**/auth/activate-guest", "/**/auth/activate-guest/**",
+            "/auth/finalize-registration", "/auth/finalize-registration/**",
+            "/**/auth/finalize-registration", "/**/auth/finalize-registration/**",
+            "/payments/*/callback", "/**/payments/*/callback"
+      );
    }
 
    @Data

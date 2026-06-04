@@ -9,8 +9,10 @@ import org.springframework.kafka.config.TopicBuilder;
 @Configuration
 public class KafkaConfig {
 
-   public static final String MAIL_TOPIC = "omnibooking-mail-topic";
+    public static final String MAIL_TOPIC = "omnibooking-mail-topic";
    public static final String MEDIA_TOPIC = "omnibooking-media-topic";
+   public static final String PROPERTY_SYNC_TOPIC = "omnibooking-property-sync";
+   public static final String DEFAULT_TOPIC = "omnibooking-default-topic";
 
    @Value("${app.kafka.partitions:3}")
    private int partitions;
@@ -29,6 +31,22 @@ public class KafkaConfig {
    @Bean
    public NewTopic mediaTopic() {
       return TopicBuilder.name(MEDIA_TOPIC)
+            .partitions(partitions)
+            .replicas(replicas)
+            .build();
+   }
+
+   @Bean
+   public NewTopic propertySyncTopic() {
+      return TopicBuilder.name(PROPERTY_SYNC_TOPIC)
+            .partitions(partitions)
+            .replicas(replicas)
+            .build();
+   }
+
+   @Bean
+   public NewTopic defaultTopic() {
+      return TopicBuilder.name(DEFAULT_TOPIC)
             .partitions(partitions)
             .replicas(replicas)
             .build();

@@ -1,5 +1,6 @@
 package com.omnibooking.services.property.impl;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.model.Property;
 import com.omnibooking.repository.PropertyRepository;
 import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
@@ -46,7 +47,7 @@ public class SearchReconciliationServiceImpl implements SearchReconciliationServ
             outboxService.saveEvent(
                   property.getId(),
                   "PROPERTY",
-                  "PROPERTY_SYNC",
+                  EventConstants.PROPERTY_SYNC,
                   PropertySyncEvent.builder()
                         .propertyId(property.getId())
                         .operation("CREATE")

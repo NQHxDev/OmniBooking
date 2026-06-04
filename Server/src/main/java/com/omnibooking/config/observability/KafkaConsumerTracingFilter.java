@@ -5,6 +5,10 @@ import com.omnibooking.constant.ObservabilityConstants.Headers;
 import com.omnibooking.constant.ObservabilityConstants.MdcKeys;
 import com.omnibooking.context.RequestContext;
 import com.omnibooking.context.RequestContextHolder;
+
+import io.sentry.Sentry;
+import io.sentry.protocol.User;
+
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
@@ -67,7 +71,7 @@ public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Obj
       final String finalCorrelationId = correlationId;
       final String finalTenantId = tenantId;
       final String finalModule = module;
-      io.sentry.Sentry.configureScope(scope -> {
+      Sentry.configureScope(scope -> {
          scope.setTag(MdcKeys.REQUEST_ID, finalRequestId);
          scope.setTag(MdcKeys.CORRELATION_ID, finalCorrelationId);
          scope.setTag(MdcKeys.MODULE, finalModule);
@@ -75,7 +79,7 @@ public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Obj
             scope.setTag(MdcKeys.TENANT_ID, finalTenantId);
          }
          if (finalUserId != null) {
-            io.sentry.protocol.User sentryUser = new io.sentry.protocol.User();
+            User sentryUser = new User();
             sentryUser.setId(finalUserId);
             scope.setUser(sentryUser);
          }

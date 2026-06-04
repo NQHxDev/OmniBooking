@@ -1,5 +1,6 @@
 package com.omnibooking.services.impl;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.dto.RegisterRequest;
@@ -169,7 +170,7 @@ class AuthServiceImplTest {
          verify(userRepository, times(1)).save(any(User.class));
          verify(bloomFilterService, times(1)).add(request.getEmail());
          verify(sessionService, times(1)).saveSession(any(), any(), anyLong());
-         verify(outboxService, times(1)).saveEvent(any(), eq("USER"), eq("USER_REGISTERED"), any());
+         verify(outboxService, times(1)).saveEvent(any(), eq("USER"), eq(EventConstants.USER_REGISTERED), any());
       }
 
       @Test
@@ -322,7 +323,7 @@ class AuthServiceImplTest {
          // Verify reset token set
          verify(valueOps, times(1)).set(startsWith("reset_token:"), eq(email), eq(15L), any(TimeUnit.class));
          // Verify outbox event recorded
-         verify(outboxService, times(1)).saveEvent(any(), eq("USER"), eq("FORGOT_PASSWORD"), any());
+         verify(outboxService, times(1)).saveEvent(any(), eq("USER"), eq(EventConstants.FORGOT_PASSWORD), any());
       }
 
       @Test
@@ -401,4 +402,5 @@ class AuthServiceImplTest {
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.INVALID_RESET_TOKEN);
       }
    }
+
 }

@@ -15,6 +15,7 @@ import com.omnibooking.services.auth.TurnstileService;
 import com.omnibooking.services.user.RegistrationQueueService;
 import com.omnibooking.services.communication.SseNotificationService;
 import com.omnibooking.config.AppProperties;
+import com.omnibooking.util.CookieUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -208,11 +209,13 @@ public class AuthController {
       String requestId = (String) httpRequest.getAttribute("requestId");
 
       if (token == null || password == null) {
-         throw new com.omnibooking.exception.AppException(com.omnibooking.exception.ErrorCode.INVALID_TOKEN, "Token and password are required");
+         throw new com.omnibooking.exception.AppException(com.omnibooking.exception.ErrorCode.INVALID_TOKEN,
+               "Token and password are required");
       }
 
       AuthResponse authResponse = authService.activateGuest(token, password, ip, userAgent, httpResponse);
-      return ResponseEntity.ok(ApiResponse.success(authResponse, "Account activated and logged in successfully", requestId));
+      return ResponseEntity
+            .ok(ApiResponse.success(authResponse, "Account activated and logged in successfully", requestId));
    }
 
    @Anonymous
@@ -272,6 +275,28 @@ public class AuthController {
          httpResponse
                .sendRedirect(appProperties.getOauth2().getGoogle().getFrontendCallbackUrl() + "?error=auth_failed");
       }
+   }
+
+   @Anonymous
+   @GetMapping("/csrf")
+   public ResponseEntity<ApiResponse<Map<String, String>>> getCsrfToken(
+         HttpServletRequest request,
+         HttpServletResponse response) {
+
+      String csrfCookie = CookieUtils.getCookieValue(request, "csrf_token");
+      if (csrfCookie == null || csrfCookie.isBlank()) {
+         String sessionId = CookieUtils.getCookieValue(request, "session_id");
+         String secret = appProperties.getSecurity().getCsrfSecret();
+         if (secret == null || secret.isBlank()) {
+            secret = appProperties.getSecurity().getJwtSecret();
+         }
+         csrfCookie = CookieUtils.calculateCsrfToken(sessionId, secret);
+         CookieUtils.addCookie(response, "csrf_token", csrfCookie, 86400, appProperties.getSecurity().isCookieSecure());
+      }
+      String requestId = (String) request.getAttribute("requestId");
+
+      return ResponseEntity
+            .ok(ApiResponse.success(Map.of("csrfToken", csrfCookie), "CSRF token retrieved successfully", requestId));
    }
 
    private String getClientIp(HttpServletRequest request) {

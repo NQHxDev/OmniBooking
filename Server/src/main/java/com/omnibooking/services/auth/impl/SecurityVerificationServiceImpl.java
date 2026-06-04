@@ -1,5 +1,6 @@
 package com.omnibooking.services.auth.impl;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.services.communication.MailService;
 import com.omnibooking.services.core.OutboxService;
 import com.omnibooking.services.auth.SecurityVerificationService;
@@ -47,7 +48,7 @@ public class SecurityVerificationServiceImpl implements SecurityVerificationServ
       outboxService.saveEvent(
             userId,
             "SECURITY",
-            "SECURITY_OTP_SEND",
+            EventConstants.SECURITY_OTP_SEND,
             emailEvent);
 
       log.info("Security OTP recorded in outbox for userId: {}. OTP: {}", userId, otp);
