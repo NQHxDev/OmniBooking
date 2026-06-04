@@ -4,6 +4,8 @@ import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.RegisterRequest;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
+
+import org.mapstruct.Builder;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
@@ -12,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", builder = @Builder(disableBuilder = true))
 public interface UserMapper {
 
    @Mapping(target = "id", ignore = true)

@@ -14,29 +14,29 @@ import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 @SpringBootTest
 class ServerApplicationTests {
 
-	@MockitoBean
-	private ElasticsearchOperations elasticsearchOperations;
+   @MockitoBean
+   private ElasticsearchOperations elasticsearchOperations;
 
-	@MockitoBean
-	private PropertyElasticsearchRepository propertyElasticsearchRepository;
+   @MockitoBean
+   private PropertyElasticsearchRepository propertyElasticsearchRepository;
 
-	@MockitoBean
-	private DestinationElasticsearchRepository destinationElasticsearchRepository;
+   @MockitoBean
+   private DestinationElasticsearchRepository destinationElasticsearchRepository;
 
-	@MockitoBean
-	private KafkaTemplate<String, Object> kafkaTemplate;
+   @MockitoBean
+   private KafkaTemplate<String, Object> kafkaTemplate;
 
-	@MockitoBean
-	private KafkaAdmin kafkaAdmin;
+   @MockitoBean
+   private KafkaAdmin kafkaAdmin;
 
-	@MockitoBean
-	private StringRedisTemplate stringRedisTemplate;
+   @MockitoBean
+   private StringRedisTemplate stringRedisTemplate;
 
-	@MockitoBean
-	private RedisMessageListenerContainer redisMessageListenerContainer;
+   @MockitoBean
+   private RedisMessageListenerContainer redisMessageListenerContainer;
 
-	@Test
-	void contextLoads() {
-	}
+   @Test
+   void contextLoads() {
+   }
 
 }

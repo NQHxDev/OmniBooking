@@ -19,8 +19,14 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 public class PropertyImagesCacheServiceTest {
@@ -58,7 +64,8 @@ public class PropertyImagesCacheServiceTest {
 
       when(redisTemplate.opsForValue()).thenReturn(valueOperations);
       when(valueOperations.get(cacheKey)).thenReturn(jsonUrls);
-      when(objectMapper.readValue(eq(jsonUrls), org.mockito.ArgumentMatchers.<TypeReference<List<String>>>any())).thenReturn(expectedUrls);
+      when(objectMapper.readValue(eq(jsonUrls), org.mockito.ArgumentMatchers.<TypeReference<List<String>>>any()))
+            .thenReturn(expectedUrls);
 
       List<String> actualUrls = propertyImagesCacheService.getPropertyImageUrls(propertyId);
 
@@ -73,7 +80,8 @@ public class PropertyImagesCacheServiceTest {
 
       when(redisTemplate.opsForValue()).thenReturn(valueOperations);
       when(valueOperations.get(cacheKey)).thenReturn(null); // cache miss
-      when(valueOperations.setIfAbsent(eq(lockKey), anyString(), anyLong(), any(TimeUnit.class))).thenReturn(true); // lock acquired
+      when(valueOperations.setIfAbsent(eq(lockKey), anyString(), anyLong(), any(TimeUnit.class))).thenReturn(true); // lock
+                                                                                                                    // acquired
 
       when(mediaRepository.findByEntityIdAndEntityType(propertyId, "PROPERTY")).thenReturn(mediaList);
       when(objectMapper.writeValueAsString(expectedUrls)).thenReturn("[\"http://url1.com\"]");

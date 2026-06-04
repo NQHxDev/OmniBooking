@@ -63,7 +63,7 @@ monitoring:
 .PHONY: test-server
 test-server:
 	@echo "Running Server unit tests..."
-	@cd Server && ./mvnw test
+	@cd Server && ./mvnw clean test
 
 # Docker Full Stack Commands
 .PHONY: docker-up
