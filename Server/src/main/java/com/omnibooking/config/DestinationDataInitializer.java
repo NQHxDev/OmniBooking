@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.data.elasticsearch.core.geo.GeoPoint;
 
 import java.util.Arrays;
@@ -13,6 +14,7 @@ import java.util.List;
 
 @Slf4j
 @Configuration
+@Order(4)
 @RequiredArgsConstructor
 public class DestinationDataInitializer implements CommandLineRunner {
 

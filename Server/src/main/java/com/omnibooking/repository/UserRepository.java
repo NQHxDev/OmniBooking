@@ -20,6 +20,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    boolean existsByUsername(String username);
 
    boolean existsByEmail(String email);
+   
+   List<User> findByEmailEndingWith(String emailSuffix);
 
    @Query("SELECT u.id, u.email FROM User u WHERE (:lastId IS NULL OR u.id > :lastId) AND u.deletedAt IS NULL ORDER BY u.id ASC")
    List<Object[]> findEmailsForWarmup(@Param("lastId") UUID lastId, Pageable pageable);

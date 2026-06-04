@@ -10,12 +10,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 
 import java.util.List;
 import com.omnibooking.services.property.DestinationService;
 
 @Slf4j
 @Configuration
+@Order(3)
 @RequiredArgsConstructor
 public class PropertyElasticsearchReindexInitializer implements CommandLineRunner {
 

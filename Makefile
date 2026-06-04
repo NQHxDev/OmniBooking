@@ -65,6 +65,12 @@ test-server:
 	@echo "Running Server unit tests..."
 	@cd Server && ./mvnw clean test
 
+# Seeding Commands
+.PHONY: generate-mock-users
+generate-mock-users:
+	@echo "Generating 10,000 mock users..."
+	@node scripts/generate-users.js
+
 # Docker Full Stack Commands
 .PHONY: docker-up
 docker-up:
@@ -145,6 +151,7 @@ help:
 	@echo "    make dev-client    - Run both Web and Partner clients in parallel"
 	@echo "    make dev-web       - Run Web client only (Port 3000)"
 	@echo "    make dev-partner   - Run Partner client only (Port 3002)"
+	@echo "    make seed-db       - Generate mock-users.json and run Server with --seed argument"
 	@echo ""
 	@echo "  Docker Full Stack:"
 	@echo "    make docker-up     - Start everything in Docker"

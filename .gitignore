@@ -32,6 +32,7 @@ Server/.classpath
 Server/.factorypath
 Server/.mvn/wrapper/*.jar
 !Server/.mvn/wrapper/maven-wrapper.jar
+Server/src/main/resources/mock-users.json
 
 # --- Frontend (Client - Next.js / Node) ---
 *.tsbuildinfo
