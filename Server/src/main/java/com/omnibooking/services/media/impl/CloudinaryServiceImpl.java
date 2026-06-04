@@ -35,7 +35,23 @@ public class CloudinaryServiceImpl implements CloudinaryService {
       log.info("Uploading bytes to Cloudinary folder: {}", folder);
       Map<?, ?> rawResult = cloudinary.uploader().upload(fileBytes, ObjectUtils.asMap(
             "folder", folder,
-            "resource_type", "auto"));
+            "resource_type", "image",
+            "format", "webp"));
+
+      return objectMapper.convertValue(rawResult, CloudinaryResponse.class);
+   }
+
+   @Override
+   @CircuitBreaker(name = "externalService")
+   @Retry(name = "externalService")
+   public CloudinaryResponse upload(byte[] fileBytes, String folder, String publicId) throws IOException {
+      log.info("Uploading bytes to Cloudinary folder: {}, publicId: {}", folder, publicId);
+      Map<?, ?> rawResult = cloudinary.uploader().upload(fileBytes, ObjectUtils.asMap(
+            "folder", folder,
+            "public_id", publicId,
+            "resource_type", "image",
+            "format", "webp",
+            "overwrite", true));
 
       return objectMapper.convertValue(rawResult, CloudinaryResponse.class);
    }

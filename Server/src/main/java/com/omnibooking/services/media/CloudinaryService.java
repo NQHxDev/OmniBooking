@@ -8,7 +8,7 @@ import java.util.Map;
 public interface CloudinaryService {
 
    /**
-    * Uploads a file to Cloudinary.
+    * Uploads a file to Cloudinary
     *
     * @param file   The multipart file from request
     * @param folder The target folder in Cloudinary
@@ -17,12 +17,17 @@ public interface CloudinaryService {
    CloudinaryResponse upload(MultipartFile file, String folder) throws IOException;
 
    /**
-    * Uploads raw bytes to Cloudinary.
+    * Uploads raw bytes to Cloudinary
     */
    CloudinaryResponse upload(byte[] fileBytes, String folder) throws IOException;
 
    /**
-    * Deletes a file from Cloudinary.
+    * Uploads raw bytes to Cloudinary with a specific public ID
+    */
+   CloudinaryResponse upload(byte[] fileBytes, String folder, String publicId) throws IOException;
+
+   /**
+    * Deletes a file from Cloudinary
     *
     * @param publicId The public_id of the file to delete
     * @return Result of the deletion as a raw Map

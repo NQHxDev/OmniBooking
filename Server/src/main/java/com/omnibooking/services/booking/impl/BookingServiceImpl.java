@@ -1,6 +1,7 @@
 package com.omnibooking.services.booking.impl;
 
 import com.omnibooking.constant.EventConstants;
+import com.omnibooking.constant.SecurityConstants;
 import com.omnibooking.dto.CreateBookingRequest;
 import com.omnibooking.dto.BookingResponse;
 import com.omnibooking.dto.event.EmailEvent;
@@ -125,7 +126,7 @@ public class BookingServiceImpl implements BookingService {
             }
          } else {
             isNewGuest = true;
-            Role userRole = cachedRoleService.getRoleByName("ROLE_USER");
+            Role userRole = cachedRoleService.getRoleByName(SecurityConstants.Roles.USER);
 
             String username = "guest_" + UUID.randomUUID().toString().substring(0, 8);
             String rawPassword = UUID.randomUUID().toString();

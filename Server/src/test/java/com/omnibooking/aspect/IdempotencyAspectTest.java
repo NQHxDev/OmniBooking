@@ -10,6 +10,7 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -32,41 +33,49 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.contains;
 
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 
 public class IdempotencyAspectTest {
 
+   @Mock
    private StringRedisTemplate redisTemplate;
+
+   @Mock
    private ValueOperations<String, String> valueOperations;
+
    private ObjectMapper objectMapper;
+
    private IdempotencyAspect idempotencyAspect;
 
+   @Mock
    private ProceedingJoinPoint joinPoint;
+
+   @Mock
    private MethodSignature methodSignature;
+
+   @Mock
    private HttpServletRequest request;
+
+   @Mock
    private ServletRequestAttributes requestAttributes;
+
    private com.omnibooking.annotation.Idempotent idempotentAnnotation;
 
    private MockedStatic<RequestContextHolder> mockedRequestContextHolder;
+
    private MockedStatic<SecurityUtils> mockedSecurityUtils;
 
-   @SuppressWarnings("unchecked")
+   private AutoCloseable closeable;
+
    @BeforeEach
    void setUp() {
-      redisTemplate = mock(StringRedisTemplate.class);
-      valueOperations = mock(ValueOperations.class);
+      closeable = org.mockito.MockitoAnnotations.openMocks(this);
       when(redisTemplate.opsForValue()).thenReturn(valueOperations);
       objectMapper = new ObjectMapper();
 
       idempotencyAspect = new IdempotencyAspect(redisTemplate, objectMapper);
-
-      joinPoint = mock(ProceedingJoinPoint.class);
-      methodSignature = mock(MethodSignature.class);
-      request = mock(HttpServletRequest.class);
-      requestAttributes = mock(ServletRequestAttributes.class);
 
       // Instantiate annotation as an anonymous class to avoid Mockito proxying issues
       // with annotations
@@ -97,9 +106,12 @@ public class IdempotencyAspectTest {
    }
 
    @AfterEach
-   void tearDown() {
+   void tearDown() throws Exception {
       mockedRequestContextHolder.close();
       mockedSecurityUtils.close();
+      if (closeable != null) {
+         closeable.close();
+      }
    }
 
    @Test

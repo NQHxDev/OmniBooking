@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS users (
    version BIGINT DEFAULT 0,
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-   deleted_at TIMESTAMP WITH TIME ZONE
+   deleted_at TIMESTAMP WITH TIME ZONE,
+   token_version INT NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS amenities (
@@ -49,8 +50,10 @@ CREATE TABLE IF NOT EXISTS amenities (
    name VARCHAR(100) NOT NULL UNIQUE,
    category VARCHAR(50), -- GENERAL, ROOM, BATHROOM, KITCHEN
    icon_url VARCHAR(255),
+   version BIGINT DEFAULT 0,
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS cancellation_policies (
@@ -150,7 +153,10 @@ CREATE TABLE IF NOT EXISTS properties (
    version BIGINT DEFAULT 0,
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-   deleted_at TIMESTAMP WITH TIME ZONE
+   deleted_at TIMESTAMP WITH TIME ZONE,
+   business_registration_number VARCHAR(255),
+   tax_code VARCHAR(255),
+   legal_owner_name VARCHAR(255)
 );
 
 CREATE TABLE IF NOT EXISTS room_types (
@@ -192,6 +198,7 @@ CREATE TABLE IF NOT EXISTS room_availability (
    version BIGINT DEFAULT 0,
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   deleted_at TIMESTAMP WITH TIME ZONE,
    UNIQUE (room_type_id, availability_date)
 );
 
@@ -219,6 +226,11 @@ CREATE TABLE IF NOT EXISTS bookings (
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    deleted_at TIMESTAMP WITH TIME ZONE,
 
+   currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+   deposit_amount DECIMAL(19, 4) NOT NULL DEFAULT 0.0000,
+   requires_deposit BOOLEAN NOT NULL DEFAULT FALSE,
+   payment_method VARCHAR(50),
+
    CONSTRAINT check_booking_dates CHECK (check_out_date > check_in_date)
 );
 
@@ -229,7 +241,10 @@ CREATE TABLE IF NOT EXISTS booking_status_logs (
    new_status VARCHAR(20) NOT NULL,
    reason TEXT,
    changed_by UUID REFERENCES users(id),
-   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   deleted_at TIMESTAMP WITH TIME ZONE,
+   version BIGINT DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
@@ -243,7 +258,8 @@ CREATE TABLE IF NOT EXISTS transactions (
    metadata JSONB,
    version BIGINT DEFAULT 0,
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS media (
@@ -272,13 +288,15 @@ CREATE TABLE IF NOT EXISTS outbox_events (
    aggregate_type VARCHAR(50) NOT NULL,
    event_type VARCHAR(100) NOT NULL,
    payload TEXT NOT NULL,
-   payload_class VARCHAR(255) NOT NULL,
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    deleted_at TIMESTAMP WITH TIME ZONE,
    version BIGINT DEFAULT 0,
-   processed BOOLEAN DEFAULT FALSE,
-   processed_at TIMESTAMP WITH TIME ZONE
+   status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+   retry_count INTEGER NOT NULL DEFAULT 0,
+   next_retry_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   last_error TEXT,
+   event_version INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS social_accounts (
@@ -337,6 +355,41 @@ CREATE TABLE IF NOT EXISTS user_passkeys (
    aaguid VARCHAR(255)
 );
 
+CREATE TABLE IF NOT EXISTS user_two_factor (
+   id UUID PRIMARY KEY,
+   user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+   secret_key VARCHAR(255) NOT NULL,
+   is_enabled BOOLEAN DEFAULT FALSE,
+   backup_codes TEXT, -- Hashed JSON list of backup codes
+   version BIGINT DEFAULT 0,
+   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE IF NOT EXISTS partner_legal_profiles (
+   id UUID PRIMARY KEY,
+   partner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+   business_registration_number VARCHAR(255) NOT NULL,
+   tax_code VARCHAR(255) NOT NULL,
+   legal_owner_name VARCHAR(255) NOT NULL,
+   is_active BOOLEAN NOT NULL DEFAULT TRUE,
+   version BIGINT NOT NULL DEFAULT 0,
+   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE IF NOT EXISTS processed_events (
+   event_id UUID NOT NULL,
+   consumer_group VARCHAR(100) NOT NULL,
+   processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   status VARCHAR(20) NOT NULL DEFAULT 'PROCESSING',
+   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   lease_until TIMESTAMP WITH TIME ZONE,
+   PRIMARY KEY (event_id, consumer_group)
+);
+
 -- 3. Indexes
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email);
@@ -357,7 +410,7 @@ CREATE INDEX idx_transactions_booking_id ON transactions(booking_id);
 CREATE INDEX idx_coupons_code ON coupons(code);
 CREATE INDEX idx_media_entity ON media(entity_id, entity_type);
 
-CREATE INDEX idx_outbox_unprocessed ON outbox_events(processed) WHERE processed = FALSE;
+CREATE INDEX idx_outbox_processing ON outbox_events(status, next_retry_at) WHERE status IN ('PENDING', 'PROCESSING');
 CREATE INDEX idx_social_accounts_user_id ON social_accounts(user_id);
 CREATE INDEX idx_social_accounts_provider_id ON social_accounts(provider, provider_id);
 CREATE INDEX idx_search_logs_query ON search_logs(query_text);
@@ -365,6 +418,10 @@ CREATE INDEX idx_search_logs_created ON search_logs(created_at);
 
 CREATE INDEX idx_user_passkeys_user_id ON user_passkeys(user_id);
 CREATE UNIQUE INDEX idx_user_passkeys_credential_id_active ON user_passkeys(credential_id) WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_user_two_factor_user_id ON user_two_factor(user_id);
+CREATE INDEX idx_partner_legal_profiles_partner_active ON partner_legal_profiles(partner_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_processed_events_time ON processed_events(processed_at);
 
 COMMENT ON COLUMN user_passkeys.deleted_at IS 'Timestamp of soft deletion';
 
@@ -447,3 +504,48 @@ VALUES
    (gen_random_uuid(), 'USD', 'US Dollar', '$', TRUE),
    (gen_random_uuid(), 'VND', 'Vietnamese Dong', '₫', FALSE)
 ON CONFLICT (code) DO NOTHING;
+
+-- Standard Amenities
+-- General Amenities
+INSERT INTO amenities (id, name, category, icon_url) VALUES 
+(gen_random_uuid(), 'Free Wi-Fi', 'GENERAL', 'wifi'),
+(gen_random_uuid(), 'Swimming Pool', 'GENERAL', 'pool'),
+(gen_random_uuid(), 'Parking', 'GENERAL', 'parking'),
+(gen_random_uuid(), 'Airport Shuttle', 'GENERAL', 'shuttle'),
+(gen_random_uuid(), 'Gym / Fitness Center', 'GENERAL', 'gym'),
+(gen_random_uuid(), 'Spa & Wellness Center', 'GENERAL', 'spa'),
+(gen_random_uuid(), '24-Hour Front Desk', 'GENERAL', 'reception'),
+(gen_random_uuid(), 'Elevator', 'GENERAL', 'elevator'),
+(gen_random_uuid(), 'Family Rooms', 'GENERAL', 'family'),
+(gen_random_uuid(), 'Pet Friendly', 'GENERAL', 'pet')
+ON CONFLICT (name) DO NOTHING;
+
+-- Room Amenities
+INSERT INTO amenities (id, name, category, icon_url) VALUES 
+(gen_random_uuid(), 'Air Conditioning', 'ROOM', 'ac'),
+(gen_random_uuid(), 'Flat-screen TV', 'ROOM', 'tv'),
+(gen_random_uuid(), 'Balcony', 'ROOM', 'balcony'),
+(gen_random_uuid(), 'Minibar', 'ROOM', 'minibar'),
+(gen_random_uuid(), 'Safe', 'ROOM', 'safe'),
+(gen_random_uuid(), 'Work Desk', 'ROOM', 'desk'),
+(gen_random_uuid(), 'Ironing Facilities', 'ROOM', 'iron')
+ON CONFLICT (name) DO NOTHING;
+
+-- Bathroom Amenities
+INSERT INTO amenities (id, name, category, icon_url) VALUES 
+(gen_random_uuid(), 'Private Bathroom', 'BATHROOM', 'bathroom'),
+(gen_random_uuid(), 'Hairdryer', 'BATHROOM', 'hairdryer'),
+(gen_random_uuid(), 'Free Toiletries', 'BATHROOM', 'toiletries'),
+(gen_random_uuid(), 'Bathrobe', 'BATHROOM', 'bathrobe'),
+(gen_random_uuid(), 'Shower', 'BATHROOM', 'shower'),
+(gen_random_uuid(), 'Bathtub', 'BATHROOM', 'bathtub')
+ON CONFLICT (name) DO NOTHING;
+
+-- Kitchen Amenities
+INSERT INTO amenities (id, name, category, icon_url) VALUES 
+(gen_random_uuid(), 'Refrigerator', 'KITCHEN', 'refrigerator'),
+(gen_random_uuid(), 'Microwave', 'KITCHEN', 'microwave'),
+(gen_random_uuid(), 'Electric Kettle', 'KITCHEN', 'kettle'),
+(gen_random_uuid(), 'Kitchenware', 'KITCHEN', 'kitchenware'),
+(gen_random_uuid(), 'Dining Table', 'KITCHEN', 'table')
+ON CONFLICT (name) DO NOTHING;

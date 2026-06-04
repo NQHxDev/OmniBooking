@@ -2,11 +2,14 @@ package com.omnibooking.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import com.omnibooking.model.enums.BedType;
 import java.math.BigDecimal;
 import java.util.Set;
 import lombok.AllArgsConstructor;
@@ -53,8 +56,9 @@ public class RoomType extends BaseEntity {
    @Column(name = "room_size_sqm")
    private BigDecimal roomSizeSqm;
 
+   @Enumerated(EnumType.STRING)
    @Column(name = "bed_type", length = 50)
-   private String bedType;
+   private BedType bedType;
 
    @ManyToMany
    @JoinTable(

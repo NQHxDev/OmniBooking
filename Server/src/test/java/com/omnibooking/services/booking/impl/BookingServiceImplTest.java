@@ -1,6 +1,7 @@
 package com.omnibooking.services.booking.impl;
 
 import com.omnibooking.constant.EventConstants;
+import com.omnibooking.constant.SecurityConstants;
 import com.omnibooking.dto.BookingResponse;
 import com.omnibooking.dto.CreateBookingRequest;
 import com.omnibooking.dto.event.EmailEvent;
@@ -137,7 +138,7 @@ class BookingServiceImplTest {
 
       mockRole = Role.builder()
             .id(UUID.randomUUID())
-            .name("ROLE_USER")
+            .name(SecurityConstants.Roles.USER)
             .build();
 
       lenient().when(roomTypeRepository.findById(mockRoomType.getId())).thenReturn(Optional.of(mockRoomType));
@@ -199,7 +200,7 @@ class BookingServiceImplTest {
 
       mockRoomAvailability(checkIn, checkOut, null);
       when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
-      when(cachedRoleService.getRoleByName("ROLE_USER")).thenReturn(mockRole);
+      when(cachedRoleService.getRoleByName(SecurityConstants.Roles.USER)).thenReturn(mockRole);
       when(passwordEncoder.encode(anyString())).thenReturn("hashed_pass");
       when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
          User u = invocation.getArgument(0);
@@ -240,7 +241,7 @@ class BookingServiceImplTest {
 
       mockRoomAvailability(checkIn, checkOut, null);
       when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
-      when(cachedRoleService.getRoleByName("ROLE_USER")).thenReturn(mockRole);
+      when(cachedRoleService.getRoleByName(SecurityConstants.Roles.USER)).thenReturn(mockRole);
       when(passwordEncoder.encode(anyString())).thenReturn("hashed_pass");
       when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
          User u = invocation.getArgument(0);

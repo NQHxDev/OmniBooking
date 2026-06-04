@@ -1,6 +1,7 @@
 package com.omnibooking.services.impl;
 
 import com.omnibooking.constant.EventConstants;
+import com.omnibooking.constant.SecurityConstants;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.dto.RegisterRequest;
@@ -141,7 +142,7 @@ class AuthServiceImplTest {
                .password("password123")
                .fullName("Test User")
                .build();
-         Role userRole = Role.builder().name("ROLE_USER").build();
+         Role userRole = Role.builder().name(SecurityConstants.Roles.USER).build();
          User user = User.builder()
                .id(UUID.randomUUID())
                .email(request.getEmail())
@@ -150,7 +151,7 @@ class AuthServiceImplTest {
                .build();
 
          when(bloomFilterService.mightContain(request.getEmail())).thenReturn(false);
-         when(cachedRoleService.getRoleByName("ROLE_USER")).thenReturn(userRole);
+         when(cachedRoleService.getRoleByName(SecurityConstants.Roles.USER)).thenReturn(userRole);
          when(passwordEncoder.encode(anyString())).thenReturn("hashed_password");
          when(userMapper.toUser(any())).thenReturn(user);
          when(userRepository.save(any(User.class))).thenReturn(user);
@@ -205,7 +206,7 @@ class AuthServiceImplTest {
                .password("password123")
                .rememberMe(false)
                .build();
-         Role role = Role.builder().name("ROLE_USER").build();
+         Role role = Role.builder().name(SecurityConstants.Roles.USER).build();
          User user = User.builder()
                .id(UUID.randomUUID())
                .email(request.getEmail())
@@ -279,7 +280,7 @@ class AuthServiceImplTest {
                .password("password123")
                .rememberMe(false)
                .build();
-         Role role = Role.builder().name("ROLE_USER").build();
+         Role role = Role.builder().name(SecurityConstants.Roles.USER).build();
          User user = User.builder()
                .id(UUID.randomUUID())
                .email(request.getEmail())

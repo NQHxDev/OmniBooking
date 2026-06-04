@@ -1,5 +1,6 @@
 package com.omnibooking.security;
 
+import com.omnibooking.constant.SecurityConstants;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.exception.AppException;
 import com.omnibooking.exception.ErrorCode;
@@ -134,7 +135,7 @@ public class SessionRotationIntegrationTest {
             .userId(userId)
             .username("test@example.com")
             .email("test@example.com")
-            .roles(Set.of("ROLE_USER"))
+            .roles(Set.of(SecurityConstants.Roles.USER))
             .rememberMe(false)
             .createdAt(System.currentTimeMillis())
             .lastAccessedAt(System.currentTimeMillis())
@@ -142,7 +143,7 @@ public class SessionRotationIntegrationTest {
       doReturn(sessionInfo).when(sessionService).getSession(oldSessionId);
 
       // Mock user and profile retrieval
-      Role role = Role.builder().name("ROLE_USER").build();
+      Role role = Role.builder().name(SecurityConstants.Roles.USER).build();
       User user = User.builder()
             .id(userId)
             .email("test@example.com")
@@ -164,7 +165,7 @@ public class SessionRotationIntegrationTest {
                .userId(userId)
                .username("test@example.com")
                .email("test@example.com")
-               .roles(Set.of("ROLE_USER"))
+               .roles(Set.of(SecurityConstants.Roles.USER))
                .build();
       }).when(sessionService).getSession(any(UUID.class));
 
@@ -202,7 +203,7 @@ public class SessionRotationIntegrationTest {
             .userId(userId)
             .username("test@example.com")
             .email("test@example.com")
-            .roles(Set.of("ROLE_USER"))
+            .roles(Set.of(SecurityConstants.Roles.USER))
             .rememberMe(false)
             .createdAt(System.currentTimeMillis())
             .lastAccessedAt(System.currentTimeMillis())
@@ -210,7 +211,7 @@ public class SessionRotationIntegrationTest {
       doReturn(sessionInfo).when(sessionService).getSession(oldSessionId);
 
       // Mock user and profile retrieval
-      Role role = Role.builder().name("ROLE_USER").build();
+      Role role = Role.builder().name(SecurityConstants.Roles.USER).build();
       User user = User.builder()
             .id(userId)
             .email("test@example.com")
@@ -328,14 +329,14 @@ public class SessionRotationIntegrationTest {
             .userId(userId)
             .username("test@example.com")
             .email("test@example.com")
-            .roles(Set.of("ROLE_USER"))
+            .roles(Set.of(SecurityConstants.Roles.USER))
             .rememberMe(false)
             .createdAt(System.currentTimeMillis())
             .lastAccessedAt(System.currentTimeMillis())
             .build();
       doReturn(sessionInfo).when(sessionService).getSession(oldSessionId);
 
-      Role role = Role.builder().name("ROLE_USER").build();
+      Role role = Role.builder().name(SecurityConstants.Roles.USER).build();
       User user = User.builder()
             .id(userId)
             .email("test@example.com")
@@ -354,7 +355,7 @@ public class SessionRotationIntegrationTest {
                .userId(userId)
                .username("test@example.com")
                .email("test@example.com")
-               .roles(Set.of("ROLE_USER"))
+               .roles(Set.of(SecurityConstants.Roles.USER))
                .build();
       }).when(sessionService).getSession(any(UUID.class));
 

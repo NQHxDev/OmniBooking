@@ -25,6 +25,8 @@ import com.omnibooking.services.property.PropertyImagesCacheService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
@@ -43,6 +45,7 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.time.LocalDate;
 import java.time.Instant;
@@ -70,6 +73,10 @@ public class PropertyServiceImpl implements PropertyService {
    private final EncryptionService encryptionService;
 
    private final PropertyImagesCacheService propertyImagesCacheService;
+
+   private final CacheManager cacheManager;
+
+   private final ConcurrentHashMap<String, Object> locks = new ConcurrentHashMap<>();
 
    @Override
    @Transactional
@@ -199,23 +206,79 @@ public class PropertyServiceImpl implements PropertyService {
       log.info("Evicting all public properties cache");
    }
 
-   @Override
-   @Cacheable(value = "properties", key = "'featured:' + #limit")
-   public List<PropertyResponse> getFeaturedProperties(int limit) {
-      log.info("Fetching {} featured properties", limit);
-      Instant startDate = Instant.now().minus(30, ChronoUnit.DAYS);
-      List<Property> properties = propertyRepository
-            .findFeaturedProperties(startDate, PageRequest.of(0, limit));
-      return mapToPropertyResponses(properties);
+   private List<PropertyResponse> getCachedList(Cache cache, String key) {
+      if (cache == null) return null;
+      List<?> rawList = cache.get(key, List.class);
+      if (rawList == null || rawList.isEmpty()) return null;
+
+      List<PropertyResponse> cachedList = new java.util.ArrayList<>();
+      for (Object obj : rawList) {
+         if (obj instanceof PropertyResponse) {
+            cachedList.add((PropertyResponse) obj);
+         }
+      }
+      return cachedList.isEmpty() ? null : cachedList;
    }
 
    @Override
-   @Cacheable(value = "properties", key = "'new:' + #limit")
+   public List<PropertyResponse> getFeaturedProperties(int limit) {
+      String key = "featured:" + limit;
+      Cache cache = cacheManager != null ? cacheManager.getCache("properties") : null;
+
+      List<PropertyResponse> cached = getCachedList(cache, key);
+      if (cached != null) {
+         return cached;
+      }
+
+      Object lock = locks.computeIfAbsent(key, k -> new Object());
+      synchronized (lock) {
+         cached = getCachedList(cache, key);
+         if (cached != null) {
+            return cached;
+         }
+
+         log.info("Fetching {} featured properties from DB (Cache stampede mitigation)...", limit);
+         Instant startDate = Instant.now().minus(30, ChronoUnit.DAYS);
+         List<Property> properties = propertyRepository
+               .findFeaturedProperties(startDate, PageRequest.of(0, limit));
+         List<PropertyResponse> response = mapToPropertyResponses(properties);
+
+         if (cache != null && !response.isEmpty()) {
+            cache.put(key, response);
+         }
+
+         return response;
+      }
+   }
+
+   @Override
    public List<PropertyResponse> getNewProperties(int limit) {
-      log.info("Fetching {} new properties", limit);
-      List<Property> properties = propertyRepository
-            .findNewProperties(PageRequest.of(0, limit));
-      return mapToPropertyResponses(properties);
+      String key = "new:" + limit;
+      Cache cache = cacheManager != null ? cacheManager.getCache("properties") : null;
+
+      List<PropertyResponse> cached = getCachedList(cache, key);
+      if (cached != null) {
+         return cached;
+      }
+
+      Object lock = locks.computeIfAbsent(key, k -> new Object());
+      synchronized (lock) {
+         cached = getCachedList(cache, key);
+         if (cached != null) {
+            return cached;
+         }
+
+         log.info("Fetching {} new properties from DB (Cache stampede mitigation)...", limit);
+         List<Property> properties = propertyRepository
+               .findNewProperties(PageRequest.of(0, limit));
+         List<PropertyResponse> response = mapToPropertyResponses(properties);
+
+         if (cache != null && !response.isEmpty()) {
+            cache.put(key, response);
+         }
+
+         return response;
+      }
    }
 
    private List<PropertyResponse> mapToPropertyResponses(List<Property> properties) {

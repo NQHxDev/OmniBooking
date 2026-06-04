@@ -1,5 +1,6 @@
 package com.omnibooking.dto;
 
+import com.omnibooking.model.enums.BedType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,6 +30,6 @@ public class RoomTypeResponse {
 
    private BigDecimal roomSizeSqm;
 
-   private String bedType;
+   private BedType bedType;
 
 }

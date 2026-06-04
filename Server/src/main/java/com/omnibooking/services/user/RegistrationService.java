@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.omnibooking.constant.SecurityConstants;
 import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.services.auth.CachedRoleService;
 import com.omnibooking.services.core.BloomFilterService;
@@ -64,7 +65,7 @@ public class RegistrationService {
    public void saveBatch(List<RegisterRequest> requests) {
       Role userRole;
       try {
-         userRole = cachedRoleService.getRoleByName("ROLE_USER");
+         userRole = cachedRoleService.getRoleByName(SecurityConstants.Roles.USER);
       } catch (Exception e) {
          log.error("ROLE_USER not found, cannot process batch", e);
          return;

@@ -1,6 +1,7 @@
 package com.omnibooking.services.auth.impl;
 
 import com.omnibooking.constant.EventConstants;
+import com.omnibooking.constant.SecurityConstants;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.dto.RegisterRequest;
@@ -108,7 +109,7 @@ public class AuthServiceImpl implements AuthService {
          }
       }
 
-      Role userRole = cachedRoleService.getRoleByName("ROLE_USER");
+      Role userRole = cachedRoleService.getRoleByName(SecurityConstants.Roles.USER);
 
       User user = userMapper.toUser(request);
       user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -440,7 +441,7 @@ public class AuthServiceImpl implements AuthService {
       User user = userRepository.findById(Objects.requireNonNull(userId))
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-      Role partnerRole = cachedRoleService.getRoleByName("ROLE_PARTNER");
+      Role partnerRole = cachedRoleService.getRoleByName(SecurityConstants.Roles.PARTNER);
 
       // Add ROLE_PARTNER to the user's roles
       user.getRoles().add(partnerRole);
@@ -574,7 +575,7 @@ public class AuthServiceImpl implements AuthService {
 
          if (user == null) {
             // New User
-            Role userRole = cachedRoleService.getRoleByName("ROLE_USER");
+            Role userRole = cachedRoleService.getRoleByName(SecurityConstants.Roles.USER);
 
             user = User.builder()
                   .username(userInfo.getEmail()) // Use email as default username

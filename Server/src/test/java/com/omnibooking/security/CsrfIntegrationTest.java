@@ -14,6 +14,7 @@ import jakarta.servlet.http.Cookie;
 
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
+import com.omnibooking.constant.SecurityConstants;
 import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.util.SecurityUtils;
 import com.omnibooking.repository.elasticsearch.DestinationElasticsearchRepository;
@@ -113,7 +114,7 @@ public class CsrfIntegrationTest {
       UUID sessionId = UUID.randomUUID();
       String fingerprint = "fingerprint";
       String fgpHash = SecurityUtils.hashFingerprint(fingerprint);
-      String token = jwtService.generateAccessToken(userId, Collections.singletonList("ROLE_USER"), sessionId,
+      String token = jwtService.generateAccessToken(userId, Collections.singletonList(SecurityConstants.Roles.USER), sessionId,
             fgpHash);
 
       when(stringRedisTemplate.hasKey(ArgumentMatchers.anyString())).thenThrow(
