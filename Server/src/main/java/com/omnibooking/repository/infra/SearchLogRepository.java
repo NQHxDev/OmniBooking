@@ -1,4 +1,4 @@
-package com.omnibooking.repository;
+package com.omnibooking.repository.infra;
 
 import com.omnibooking.model.SearchLog;
 import org.springframework.data.domain.Pageable;

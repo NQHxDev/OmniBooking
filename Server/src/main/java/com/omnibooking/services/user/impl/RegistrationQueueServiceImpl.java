@@ -5,7 +5,7 @@ import com.omnibooking.dto.RegisterRequest;
 import com.omnibooking.dto.RegistrationMessage;
 import com.omnibooking.model.RegistrationInbox;
 import com.omnibooking.model.enums.RegistrationInboxStatus;
-import com.omnibooking.repository.RegistrationInboxRepository;
+import com.omnibooking.repository.registration.RegistrationInboxRepository;
 import com.omnibooking.services.core.EncryptionService;
 import com.omnibooking.services.user.RegistrationQueueService;
 
@@ -34,6 +34,7 @@ public class RegistrationQueueServiceImpl implements RegistrationQueueService {
    private final RegistrationInboxRepository registrationInboxRepository;
    private final EncryptionService encryptionService;
    private final KafkaTemplate<String, Object> kafkaTemplate;
+   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
 
    @Value("${omnibooking.kafka.registration.topic-name:registration-request-topic}")
    private String topicName;
@@ -100,8 +101,7 @@ public class RegistrationQueueServiceImpl implements RegistrationQueueService {
                .whenComplete((result, ex) -> {
                   if (ex != null) {
                      log.error("Failed to publish registration request to Kafka for email: {}", request.getEmail(), ex);
-                     // Note: Inbox table status remains PENDING. The Recovery Scheduler will pick it
-                     // up.
+                     handleIngressFailure(reqId, ex);
                   } else {
                      log.info("Successfully published registration request to Kafka for email: {}", request.getEmail());
                      updateInboxStatusToSent(reqId);
@@ -109,6 +109,7 @@ public class RegistrationQueueServiceImpl implements RegistrationQueueService {
                });
       } catch (Exception e) {
          log.error("Error preparing/publishing registration request to Kafka for email: {}", request.getEmail(), e);
+         handleIngressFailure(reqId, e);
       }
    }
 
@@ -119,6 +120,39 @@ public class RegistrationQueueServiceImpl implements RegistrationQueueService {
          inbox.setPublishedAt(Instant.now());
          registrationInboxRepository.save(inbox);
       });
+   }
+
+   @Transactional(propagation = Propagation.REQUIRES_NEW)
+   public void handleIngressFailure(UUID reqId, Throwable ex) {
+      registrationInboxRepository.findById(reqId).ifPresent(inbox -> {
+         int nextRetryCount = inbox.getRetryCount() + 1;
+         inbox.setRetryCount(nextRetryCount);
+         inbox.setLastError(ex != null ? ex.getMessage() : "Unknown Kafka publish failure");
+         
+         if (nextRetryCount > 10) {
+            inbox.setStatus(RegistrationInboxStatus.FAILED_PERMANENT);
+            inbox.setProcessedAt(Instant.now());
+            redisTemplate.opsForValue().set("registration_result:" + reqId, "FAILED_PERMANENT", 24, TimeUnit.HOURS);
+            meterRegistry.counter("omnibooking.registration.failed_permanent.count").increment();
+            log.warn("Ingress request {} exceeded max retries. Marked as FAILED_PERMANENT.", reqId);
+         } else {
+            int backoffSec = getBackoffSeconds(nextRetryCount);
+            inbox.setNextRetryAt(Instant.now().plusSeconds(backoffSec));
+            meterRegistry.counter("omnibooking.registration.retry.count").increment();
+            log.info("Ingress request {} failed, retryCount={}, nextRetryIn={}s", reqId, nextRetryCount, backoffSec);
+         }
+         registrationInboxRepository.save(inbox);
+      });
+   }
+
+   private int getBackoffSeconds(int retryCount) {
+      return switch (retryCount) {
+         case 1 -> 30;
+         case 2 -> 60;
+         case 3 -> 120;
+         case 4 -> 300;
+         default -> 600;
+      };
    }
 
 }

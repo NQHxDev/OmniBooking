@@ -1,4 +1,4 @@
-package com.omnibooking.repository;
+package com.omnibooking.repository.payment;
 
 import com.omnibooking.model.Transaction;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -1,4 +1,4 @@
-package com.omnibooking.repository;
+package com.omnibooking.repository.user;
 
 import com.omnibooking.model.UserProfile;
 import java.util.UUID;

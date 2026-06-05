@@ -1,7 +1,7 @@
 package com.omnibooking.security;
 
 import com.omnibooking.model.User;
-import com.omnibooking.repository.UserRepository;
+import com.omnibooking.repository.user.UserRepository;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;

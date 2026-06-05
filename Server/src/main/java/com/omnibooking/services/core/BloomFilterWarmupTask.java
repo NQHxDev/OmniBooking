@@ -1,16 +1,12 @@
 package com.omnibooking.services.core;
 
-import com.omnibooking.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 
 @Component
 @Order(2)
@@ -18,46 +14,41 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BloomFilterWarmupTask implements CommandLineRunner {
 
-   private final UserRepository userRepository;
-
    private final BloomFilterService bloomFilterService;
+   private final BloomFilterRebuildService rebuildService;
+   private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
 
    @Override
    public void run(String... args) {
-      log.info("Starting Bloom Filter warmup for user emails...");
+      log.info("Performing startup validation for Bloom Filter...");
 
-      // Tạo filter nếu chưa có (1% sai số, sức chứa ban đầu 10,000 users)
-      bloomFilterService.createFilter(bloomFilterService.getEmailFilterName(), 0.01, 10000);
-
-      int batchSize = 5000;
-      UUID lastId = null;
-      long totalWarmedUp = 0;
-      boolean hasMore = true;
-
-      // Truy vấn theo trang nhỏ sử dụng Keyset Pagination (u.id > lastId) để tránh
-      // tràn bộ nhớ
-      // và tối ưu hoá câu truy vấn (sử dụng chỉ mục của khoá chính id)
-      Pageable limit = PageRequest.of(0, batchSize);
-
-      while (hasMore) {
-         List<Object[]> batch = userRepository.findEmailsForWarmup(lastId, limit);
-         if (batch.isEmpty()) {
-            hasMore = false;
-         } else {
-            for (Object[] row : batch) {
-               UUID id = (UUID) row[0];
-               String email = (String) row[1];
-               if (email != null) {
-                  bloomFilterService.add(email);
-                  totalWarmedUp++;
-               }
-               lastId = id;
-            }
-            log.info("Warmed up batch of {} emails, lastId: {}", batch.size(), lastId);
-         }
+      String filterName = bloomFilterService.getEmailFilterName();
+      Boolean exists = false;
+      try {
+         exists = redisTemplate.hasKey(filterName);
+      } catch (Exception e) {
+         log.error("Failed to check Bloom Filter key existence in Redis (failing open): {}", e.getMessage());
+         // If Redis is down, we cannot rebuild anyway, skip and fail open
+         return;
       }
 
-      log.info("Bloom Filter warmup completed. Total warmed up user emails: {}", totalWarmedUp);
+      Boolean checkpointExists = false;
+      try {
+         checkpointExists = redisTemplate.hasKey("bloom_rebuild_checkpoint");
+      } catch (Exception e) {
+         log.error("Failed to check Bloom Filter checkpoint in Redis: {}", e.getMessage());
+      }
+
+      if (Boolean.FALSE.equals(exists) || Boolean.TRUE.equals(checkpointExists)) {
+         log.warn("Bloom Filter key '{}' does not exist or was interrupted. Triggering rebuild...", filterName);
+         try {
+            rebuildService.rebuildBloomFilter();
+         } catch (Exception e) {
+            log.error("Startup Bloom Filter rebuild failed", e);
+         }
+      } else {
+         log.info("Bloom Filter key '{}' already exists in Redis. Skipping startup rebuild.", filterName);
+      }
    }
 
 }

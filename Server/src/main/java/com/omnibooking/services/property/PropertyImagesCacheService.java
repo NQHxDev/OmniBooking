@@ -2,7 +2,7 @@ package com.omnibooking.services.property;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.omnibooking.repository.MediaRepository;
+import com.omnibooking.repository.infra.MediaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;

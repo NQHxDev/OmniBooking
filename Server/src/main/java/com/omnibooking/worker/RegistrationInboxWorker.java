@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.dto.RegisterRequest;
 import com.omnibooking.model.RegistrationInbox;
 import com.omnibooking.model.enums.RegistrationInboxStatus;
-import com.omnibooking.repository.RegistrationInboxRepository;
+import com.omnibooking.repository.registration.RegistrationInboxRepository;
 import com.omnibooking.services.user.impl.RegistrationQueueServiceImpl;
 import io.sentry.CheckIn;
 import io.sentry.CheckInStatus;
@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import com.omnibooking.services.user.RegistrationService;
 
 @Component
 @RequiredArgsConstructor
@@ -29,6 +30,7 @@ public class RegistrationInboxWorker {
    private final RegistrationInboxRepository registrationInboxRepository;
    private final RegistrationQueueServiceImpl registrationQueueService;
    private final ObjectMapper objectMapper;
+   private final RegistrationService registrationService;
 
    @Scheduled(fixedDelay = 30000) // Every 30 seconds
    public void recoverStaleRequests() {
@@ -38,8 +40,9 @@ public class RegistrationInboxWorker {
       try {
          // Process PENDING records that are older than 15 seconds
          Instant pendingThreshold = Instant.now().minusSeconds(15);
+         Instant now = Instant.now();
          List<RegistrationInbox> pendingRecords = registrationInboxRepository.findPendingToProcess(
-               pendingThreshold, PageRequest.of(0, 50));
+               pendingThreshold, now, PageRequest.of(0, 50));
 
          if (!pendingRecords.isEmpty()) {
             log.info("Found {} pending registration requests to republish", pendingRecords.size());
@@ -50,6 +53,7 @@ public class RegistrationInboxWorker {
                   registrationQueueService.publishToKafkaAsync(request, record.getRequestId());
                } catch (Exception e) {
                   log.error("Failed to parse and republish registration request: {}", record.getRequestId(), e);
+                  registrationQueueService.handleIngressFailure(record.getRequestId(), e);
                }
             }
          }
@@ -63,7 +67,8 @@ public class RegistrationInboxWorker {
             log.info("Found {} stale processing registration requests to reset and retry",
                   staleProcessingRecords.size());
             for (RegistrationInbox record : staleProcessingRecords) {
-               resetToPending(record);
+               registrationService.handleProcessingFailure(record.getRequestId(),
+                     new RuntimeException("Stale processing request (worker timeout)"));
             }
          }
 
@@ -73,17 +78,6 @@ public class RegistrationInboxWorker {
          log.error("Error in RegistrationInboxWorker recovery job", e);
          Sentry.captureCheckIn(
                new CheckIn(checkInId, "registration-inbox-recovery-worker", CheckInStatus.ERROR));
-      }
-   }
-
-   @Transactional
-   public void resetToPending(RegistrationInbox record) {
-      try {
-         record.setStatus(RegistrationInboxStatus.PENDING);
-         registrationInboxRepository.save(record);
-         log.info("Reset stale processing request {} back to PENDING for retry", record.getRequestId());
-      } catch (Exception e) {
-         log.error("Failed to reset stale request status: {}", record.getRequestId(), e);
       }
    }
 

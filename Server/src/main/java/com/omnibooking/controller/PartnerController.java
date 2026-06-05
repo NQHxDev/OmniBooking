@@ -5,7 +5,7 @@ import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.services.communication.MailService;
 import com.omnibooking.services.core.OutboxService;
-import com.omnibooking.repository.UserProfileRepository;
+import com.omnibooking.repository.user.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;

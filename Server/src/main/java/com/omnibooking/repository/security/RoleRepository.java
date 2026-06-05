@@ -1,4 +1,4 @@
-package com.omnibooking.repository;
+package com.omnibooking.repository.security;
 
 import com.omnibooking.model.Role;
 import java.util.Optional;

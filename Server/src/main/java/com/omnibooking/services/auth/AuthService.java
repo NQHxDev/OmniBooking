@@ -48,4 +48,6 @@ public interface AuthService {
 
    AuthResponse activateGuest(String token, String password, String ip, String userAgent, HttpServletResponse response);
 
+   com.omnibooking.dto.RegistrationStatusResponse getRegistrationStatus(String requestId);
+
 }

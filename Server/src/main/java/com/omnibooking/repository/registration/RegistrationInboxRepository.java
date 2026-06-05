@@ -1,4 +1,4 @@
-package com.omnibooking.repository;
+package com.omnibooking.repository.registration;
 
 import com.omnibooking.model.RegistrationInbox;
 import com.omnibooking.model.enums.RegistrationInboxStatus;
@@ -16,8 +16,8 @@ import java.util.UUID;
 @Repository
 public interface RegistrationInboxRepository extends JpaRepository<RegistrationInbox, UUID> {
 
-   @Query(value = "SELECT * FROM registration_inbox WHERE status = 'PENDING' AND created_at <= :threshold ORDER BY created_at ASC FOR UPDATE SKIP LOCKED", nativeQuery = true)
-   List<RegistrationInbox> findPendingToProcess(@Param("threshold") Instant threshold, Pageable pageable);
+   @Query(value = "SELECT * FROM registration_inbox WHERE status = 'PENDING' AND ((next_retry_at IS NULL AND created_at <= :pendingThreshold) OR (next_retry_at IS NOT NULL AND next_retry_at <= :now)) ORDER BY created_at ASC FOR UPDATE SKIP LOCKED", nativeQuery = true)
+   List<RegistrationInbox> findPendingToProcess(@Param("pendingThreshold") Instant pendingThreshold, @Param("now") Instant now, Pageable pageable);
 
    @Query(value = "SELECT * FROM registration_inbox WHERE status = 'PROCESSING' AND created_at <= :threshold ORDER BY created_at ASC FOR UPDATE SKIP LOCKED", nativeQuery = true)
    List<RegistrationInbox> findStaleProcessingToRecover(@Param("threshold") Instant threshold, Pageable pageable);

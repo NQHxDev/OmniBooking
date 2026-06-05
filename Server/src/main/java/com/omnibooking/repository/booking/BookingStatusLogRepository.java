@@ -1,4 +1,4 @@
-package com.omnibooking.repository;
+package com.omnibooking.repository.booking;
 
 import com.omnibooking.model.BookingStatusLog;
 import org.springframework.data.jpa.repository.JpaRepository;

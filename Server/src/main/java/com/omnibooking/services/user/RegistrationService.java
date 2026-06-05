@@ -13,9 +13,9 @@ import com.omnibooking.model.Role;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
 import com.omnibooking.model.enums.RegistrationInboxStatus;
-import com.omnibooking.repository.UserProfileRepository;
-import com.omnibooking.repository.UserRepository;
-import com.omnibooking.repository.RegistrationInboxRepository;
+import com.omnibooking.repository.user.UserProfileRepository;
+import com.omnibooking.repository.user.UserRepository;
+import com.omnibooking.repository.registration.RegistrationInboxRepository;
 import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.services.auth.CachedRoleService;
 import com.omnibooking.services.core.BloomFilterService;
@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -53,6 +54,7 @@ public class RegistrationService {
    private final ObjectMapper objectMapper;
    private final BloomFilterService bloomFilterService;
    private final JWTService jwtService;
+   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
 
    private static final String USER_CDC_TOPIC = "omnibooking-user-cdc";
 
@@ -65,6 +67,9 @@ public class RegistrationService {
    public void updateInboxStatus(UUID requestId, RegistrationInboxStatus status) {
       registrationInboxRepository.findById(requestId).ifPresent(inbox -> {
          inbox.setStatus(status);
+         if (status == RegistrationInboxStatus.SUCCESS || status == RegistrationInboxStatus.FAILED || status == RegistrationInboxStatus.FAILED_PERMANENT) {
+            inbox.setProcessedAt(Instant.now());
+         }
          registrationInboxRepository.save(inbox);
          log.debug("Updated pg registration_inbox status for requestId {} to {}", requestId, status);
       });
@@ -113,7 +118,7 @@ public class RegistrationService {
 
                         // Send real-time notify
                         notifyClient(finalRequestId, finalUser, finalProfile);
-                     }
+                      }
                   });
          }
       } catch (Exception e) {
@@ -163,9 +168,42 @@ public class RegistrationService {
                });
       } catch (Exception e) {
          log.error("Failed to save individual user record during fallback for requestId: {}", msg.getRequestId(), e);
-         updateInboxStatus(reqId, RegistrationInboxStatus.FAILED);
-         redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "FAILED", 24, TimeUnit.HOURS);
+         handleProcessingFailure(reqId, e);
       }
+   }
+
+   @Transactional(propagation = Propagation.REQUIRES_NEW)
+   public void handleProcessingFailure(UUID reqId, Throwable ex) {
+      registrationInboxRepository.findById(reqId).ifPresent(inbox -> {
+         int nextRetryCount = inbox.getRetryCount() + 1;
+         inbox.setRetryCount(nextRetryCount);
+         inbox.setLastError(ex != null ? ex.getMessage() : "Unknown consumer processing failure");
+
+         if (nextRetryCount > 10) {
+            inbox.setStatus(RegistrationInboxStatus.FAILED_PERMANENT);
+            inbox.setProcessedAt(Instant.now());
+            redisTemplate.opsForValue().set("registration_result:" + reqId, "FAILED_PERMANENT", 24, TimeUnit.HOURS);
+            meterRegistry.counter("omnibooking.registration.failed_permanent.count").increment();
+            log.warn("Processing request {} exceeded max retries. Marked as FAILED_PERMANENT.", reqId);
+         } else {
+            inbox.setStatus(RegistrationInboxStatus.PENDING);
+            int backoffSec = getBackoffSeconds(nextRetryCount);
+            inbox.setNextRetryAt(Instant.now().plusSeconds(backoffSec));
+            meterRegistry.counter("omnibooking.registration.retry.count").increment();
+            log.info("Processing request {} failed, retryCount={}, nextRetryIn={}s", reqId, nextRetryCount, backoffSec);
+         }
+         registrationInboxRepository.save(inbox);
+      });
+   }
+
+   private int getBackoffSeconds(int retryCount) {
+      return switch (retryCount) {
+         case 1 -> 30;
+         case 2 -> 60;
+         case 3 -> 120;
+         case 4 -> 300;
+         default -> 600;
+      };
    }
 
    /**

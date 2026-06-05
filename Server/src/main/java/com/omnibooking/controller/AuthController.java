@@ -7,6 +7,7 @@ import com.omnibooking.security.Anonymous;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.dto.RegisterRequest;
 import com.omnibooking.dto.ForgotPasswordRequest;
+import com.omnibooking.dto.RegistrationStatusResponse;
 import com.omnibooking.dto.ResetPasswordRequest;
 import com.omnibooking.dto.oauth.OAuth2UserInfo;
 import com.omnibooking.services.auth.AuthService;
@@ -98,11 +99,22 @@ public class AuthController {
       return ResponseEntity.ok(ApiResponse.success(authResponse, "Session synchronized successfully", requestId));
    }
 
-   @Anonymous
-   @GetMapping(value = "/subscribe/{requestId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-   public SseEmitter subscribe(@PathVariable String requestId) {
-      return sseNotificationService.subscribe(requestId);
-   }
+    @Anonymous
+    @GetMapping(value = "/subscribe/{requestId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter subscribe(@PathVariable String requestId) {
+       return sseNotificationService.subscribe(requestId);
+    }
+
+    @Anonymous
+    @GetMapping("/registration-status/{requestId}")
+    public ResponseEntity<ApiResponse<RegistrationStatusResponse>> getRegistrationStatus(
+          @PathVariable String requestId,
+          HttpServletRequest httpRequest) {
+
+       String reqId = (String) httpRequest.getAttribute("requestId");
+       RegistrationStatusResponse statusResponse = authService.getRegistrationStatus(requestId);
+       return ResponseEntity.ok(ApiResponse.success(statusResponse, "Registration status retrieved", reqId));
+    }
 
    @Anonymous
    @PostMapping("/login")
@@ -112,10 +124,6 @@ public class AuthController {
          HttpServletResponse httpResponse) {
 
       String ip = getClientIp(httpRequest);
-
-      // Verify CAPTCHA
-      turnstileService.verifyToken(request.getTurnstileToken(), ip);
-
       String userAgent = httpRequest.getHeader("User-Agent");
       String requestId = (String) httpRequest.getAttribute("requestId");
 

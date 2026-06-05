@@ -1,4 +1,4 @@
-package com.omnibooking.repository;
+package com.omnibooking.repository.property;
 
 import com.omnibooking.model.RoomAvailability;
 import jakarta.persistence.LockModeType;

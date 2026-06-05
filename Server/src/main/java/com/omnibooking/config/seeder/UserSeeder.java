@@ -7,7 +7,7 @@ import com.omnibooking.model.Role;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
 import com.omnibooking.services.auth.CachedRoleService;
-import com.omnibooking.repository.UserRepository;
+import com.omnibooking.repository.user.UserRepository;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

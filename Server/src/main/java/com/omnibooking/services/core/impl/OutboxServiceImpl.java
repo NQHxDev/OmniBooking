@@ -6,7 +6,7 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import com.omnibooking.config.KafkaConfig;
 import com.omnibooking.model.OutboxEvent;
 import com.omnibooking.model.enums.OutboxStatus;
-import com.omnibooking.repository.OutboxEventRepository;
+import com.omnibooking.repository.infra.OutboxEventRepository;
 import com.omnibooking.services.core.OutboxEventRegistry;
 import com.omnibooking.services.core.OutboxService;
 import com.omnibooking.services.core.EventMetadataProvider;

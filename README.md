@@ -192,10 +192,10 @@ OmniBooking triển khai mô hình bảo mật **Defense in Depth** — nhiều 
 │  Client Request                                                         │
 │       │                                                                 │
 │       ▼                                                                 │
-│  ┌─────────────────────┐     ┌──────────────────────────────┐           │
-│  │ Extract JWT Cookie  │────▶│ Validate JWT Signature       │           │
-│  │ (HttpOnly, Lax)     │     │ (JJWT + HMAC-SHA256)         │           │
-│  └─────────────────────┘     └──────────────┬───────────────┘           │
+│  ┌─────────────────────┐      ┌──────────────────────────────┐          │
+│  │ Extract JWT Cookie  │────> │ Validate JWT Signature       │          │
+│  │ (HttpOnly, Lax)     │      │ (JJWT + HMAC-SHA256)         │          │
+│  └─────────────────────┘      └─────────────┬────────────────┘          │
 │                                             │                           │
 │                                             ▼                           │
 │                              ┌──────────────────────────────┐           │
@@ -342,8 +342,8 @@ OmniBooking triển khai **Transactional Outbox** ở mức production-grade v�
 │                                                                      │
 │  Business Transaction                                                │
 │       │                                                              │
-│       ├──▶ Save Entity (DB)         ── Same Transaction ──┐          │
-│       └──▶ Save OutboxEvent (DB)    ◀─────────────────────┘          │
+│       ├──> Save Entity (DB)         ── Same Transaction ──┐          │
+│       └──> Save OutboxEvent (DB)    <─────────────────────┘          │
 │                    │                                                 │
 │                    ▼                                                 │
 │            afterCommit() → Wake-Up Signal (AtomicBoolean)            │
@@ -356,10 +356,10 @@ OmniBooking triển khai **Transactional Outbox** ở mức production-grade v�
 │         └─────────┬──────────────┘                                   │
 │                   │                                                  │
 │                   ▼                                                  │
-│         ┌─────────────────────┐     ┌──────────────────────┐         │
-│         │   Publish to Kafka  │────▶│  Idempotent Consumer │         │
-│         └─────────────────────┘     │  (Claim-then-Process)│         │
-│                                     └──────────────────────┘         │
+│         ┌─────────────────────┐      ┌──────────────────────┐        │
+│         │   Publish to Kafka  │────> │  Idempotent Consumer │        │
+│         └─────────────────────┘      │  (Claim-then-Process)│        │
+│                                      └──────────────────────┘        │
 │                                                                      │
 │  On Failure: Exponential Backoff (1m → 5m → 15m → 1h → Dead Letter)  │
 └──────────────────────────────────────────────────────────────────────┘
@@ -406,12 +406,12 @@ OmniBooking triển khai **Transactional Outbox** ở mức production-grade v�
 Mỗi request được gắn `X-Request-ID` duy nhất, truyền xuyên suốt từ Client → Next.js → Spring Boot → Kafka → Database:
 
 ```
-Client                 Next.js               Spring Boot            Kafka Consumer
-  │                      │                      │                      │
-  │ X-Request-ID: abc123 │                      │                      │
-  ├─────────────────────▶├─────────────────────▶├─────────────────────▶│
-  │                      │                      │ MDC.put("requestId") │
-  │                      │                      │ SQL Comment: abc123  │
+Client                   Next.js               Spring Boot               Kafka Consumer
+  │                        │                        │                        │
+  │ X-Request-ID: abc123   │                        │                        │
+  ├──────────────────────> ├──────────────────────> ├──────────────────────> │
+  │                        │                        │ MDC.put("requestId")   │
+  │                        │                        │ SQL Comment: abc123    │
 ```
 
 ### Structured Logging (4 Streams)

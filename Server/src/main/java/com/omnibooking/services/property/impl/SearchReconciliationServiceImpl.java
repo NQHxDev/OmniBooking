@@ -2,7 +2,7 @@ package com.omnibooking.services.property.impl;
 
 import com.omnibooking.constant.EventConstants;
 import com.omnibooking.model.Property;
-import com.omnibooking.repository.PropertyRepository;
+import com.omnibooking.repository.property.PropertyRepository;
 import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
 import com.omnibooking.dto.event.PropertySyncEvent;
 import com.omnibooking.services.core.OutboxService;

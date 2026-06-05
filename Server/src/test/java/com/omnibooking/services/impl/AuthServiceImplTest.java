@@ -10,9 +10,9 @@ import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.Role;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
-import com.omnibooking.repository.RoleRepository;
-import com.omnibooking.repository.UserProfileRepository;
-import com.omnibooking.repository.UserRepository;
+import com.omnibooking.repository.security.RoleRepository;
+import com.omnibooking.repository.user.UserProfileRepository;
+import com.omnibooking.repository.user.UserRepository;
 import com.omnibooking.config.AppProperties;
 import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.services.auth.SessionService;
@@ -156,7 +156,7 @@ class AuthServiceImplTest {
          when(userMapper.toUser(any())).thenReturn(user);
          when(userRepository.save(any(User.class))).thenReturn(user);
          when(userProfileRepository.save(any(UserProfile.class))).thenReturn(new UserProfile());
-         when(jwtService.generateAccessToken(any(), any(), any(), any(), any())).thenReturn("access_token");
+         when(jwtService.generateAccessToken(any(), any(), any(), any(), any(), any(), any())).thenReturn("access_token");
          when(sessionService.getSession(any())).thenReturn(RedisSessionInfo.builder().userId(user.getId()).build());
          when(userMapper.toAuthResponse(any(), any(), any())).thenReturn(AuthResponse.builder()
                .email(request.getEmail())
@@ -218,7 +218,7 @@ class AuthServiceImplTest {
          when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
          when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
          when(twoFactorAuthService.is2FAEnabledForUser(user.getId())).thenReturn(false);
-         when(jwtService.generateAccessToken(any(), any(), any(), any(), any())).thenReturn("access_token");
+         when(jwtService.generateAccessToken(any(), any(), any(), any(), any(), any(), any())).thenReturn("access_token");
          when(sessionService.getSession(any())).thenReturn(RedisSessionInfo.builder().userId(user.getId()).build());
          when(userMapper.toAuthResponse(any(), any(), any())).thenReturn(AuthResponse.builder()
                .email(request.getEmail())

@@ -1,6 +1,6 @@
 package com.omnibooking.services.search.impl;
 
-import com.omnibooking.repository.SearchLogRepository;
+import com.omnibooking.repository.infra.SearchLogRepository;
 import com.omnibooking.services.search.TrendingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;

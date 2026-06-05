@@ -2,8 +2,8 @@ package com.omnibooking.services.core;
 
 import com.omnibooking.config.AppProperties;
 import com.omnibooking.model.ExchangeRate;
-import com.omnibooking.repository.CurrencyRepository;
-import com.omnibooking.repository.ExchangeRateRepository;
+import com.omnibooking.repository.payment.CurrencyRepository;
+import com.omnibooking.repository.payment.ExchangeRateRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;

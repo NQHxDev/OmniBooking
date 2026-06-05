@@ -161,8 +161,7 @@ public class RegistrationKafkaConsumer {
 
          } catch (Exception e) {
             log.error("Failed to prepare registration message for requestId: {}", msg.getRequestId(), e);
-            registrationService.updateInboxStatus(reqId, RegistrationInboxStatus.FAILED);
-            redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "FAILED", 24, TimeUnit.HOURS);
+            registrationService.handleProcessingFailure(reqId, e);
          }
       }
 

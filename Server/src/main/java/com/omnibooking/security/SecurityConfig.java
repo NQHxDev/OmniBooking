@@ -138,6 +138,7 @@ public class SecurityConfig {
                   .requestMatchers("/actuator/**").permitAll()
                   // Allow public property details view if needed
                   .requestMatchers(HttpMethod.GET, "/properties/**").permitAll()
+                  .requestMatchers("/admin/**").hasRole("ADMIN")
                   .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(csrfFilter, JwtAuthenticationFilter.class)

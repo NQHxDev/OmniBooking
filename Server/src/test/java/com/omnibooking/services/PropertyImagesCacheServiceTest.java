@@ -3,7 +3,7 @@ package com.omnibooking.services;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.model.Media;
-import com.omnibooking.repository.MediaRepository;
+import com.omnibooking.repository.infra.MediaRepository;
 import com.omnibooking.services.property.PropertyImagesCacheService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

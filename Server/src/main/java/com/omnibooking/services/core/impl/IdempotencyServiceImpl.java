@@ -1,7 +1,7 @@
 package com.omnibooking.services.core.impl;
 
 import com.omnibooking.model.ProcessedEvent;
-import com.omnibooking.repository.ProcessedEventRepository;
+import com.omnibooking.repository.infra.ProcessedEventRepository;
 import com.omnibooking.services.core.IdempotencyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

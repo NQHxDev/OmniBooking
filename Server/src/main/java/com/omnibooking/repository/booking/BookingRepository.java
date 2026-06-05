@@ -1,4 +1,4 @@
-package com.omnibooking.repository;
+package com.omnibooking.repository.booking;
 
 import com.omnibooking.model.Booking;
 import java.util.List;

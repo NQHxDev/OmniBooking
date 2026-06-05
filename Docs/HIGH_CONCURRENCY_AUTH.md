@@ -859,15 +859,28 @@ To prevent Memory exhaustion (OOM) under bot storms or registration floods:
 
 ---
 
-### 5.11 Token Version & Force Logout
+### 5.11 Token Version Caching & Force Logout
 
-Each `User` entity has a `tokenVersion` field (integer). This is embedded in the JWT `tokenVersion` claim.
+Each `User` entity has a `tokenVersion` field (integer) which is embedded in the JWT `tokenVersion` claim.
 
-**Force-logout mechanism:**
+To prevent hitting the database for a user lookup on every incoming HTTP request, the token version is cached in Redis:
 
-1. Increment `user.tokenVersion` in the database.
-2. All existing JWTs become invalid because `JwtAuthenticationFilter` checks: `jwt.tokenVersion == user.tokenVersion`.
-3. Users must re-authenticate to get new tokens with the updated version.
+- **Redis Key**: `user_token_version:{userId}` (30-day TTL).
+- **Cache Hit Verification**:
+   - `JwtAuthenticationFilter` fetches the user's active token version from Redis.
+   - If the cached version matches the `tokenVersion` claim in the JWT, the filter bypasses database retrieval and reconstructs the `UserPrincipal` directly from the JWT claims (subject, username, email, roles, tokenVersion).
+   - This reduces the authentication database query overhead to zero for active sessions.
+   - Exposes Micrometer metrics: `omnibooking.auth.token_version.cache.hit` and `omnibooking.auth.token_version.cache.miss`.
+- **Cache Miss Fallback**:
+   - If the version is not found in Redis, the filter queries the database to load the user, verifies the version, and updates/warms the Redis cache key with a 30-day TTL.
+- **Fail-Closed Security**:
+   - If the Redis connection times out or fails during cache lookup, the filter immediately triggers **Fail-Closed** behavior, logging the error and returning an HTTP 503 Service Unavailable response to prevent request processing without token validation.
+
+**Force-Logout / Password Reset Revocation Flow**:
+
+1. Increment the `tokenVersion` of the user in the PostgreSQL database.
+2. Update the Redis cache key `user_token_version:{userId}` immediately with the new version.
+3. Any future requests with existing JWTs will fail version validation (since their `tokenVersion` claim is older than the cached/database version), forcing the user to log in again.
 
 ### 5.12 Rate Limiting
 
@@ -1018,24 +1031,35 @@ Session deletion in Redis instantly invalidates sessions across **all subdomains
 
 ### Authentication Endpoints (`/auth`)
 
-| Method | Path                          | Auth | Description                                       |
-| :----- | :---------------------------- | :--- | :------------------------------------------------ |
-| `POST` | `/auth/register`              |      | Register new user (async, returns `202 Accepted`) |
-| `POST` | `/auth/finalize-registration` |      | Finalize registration and create session          |
-| `GET`  | `/auth/subscribe/{requestId}` |      | SSE stream for registration status                |
-| `POST` | `/auth/login`                 |      | Standard email/password login                     |
-| `POST` | `/auth/2fa/login`             |      | Login with 2FA verification                       |
-| `GET`  | `/auth/{provider}/url`        |      | Get OAuth2 authorization URL                      |
-| `GET`  | `/auth/{provider}/callback`   |      | OAuth2 callback handler                           |
-| `POST` | `/auth/refresh`               |      | Refresh session tokens                            |
-| `POST` | `/auth/logout`                |      | Logout and clear session                          |
-| `GET`  | `/auth/verify`                |      | Verify email via token                            |
-| `POST` | `/auth/resend-verification`   |      | Resend verification email                         |
-| `GET`  | `/auth/check-email`           |      | Check if email is registered                      |
-| `POST` | `/auth/activate-guest`        |      | Activate guest account with password              |
-| `POST` | `/auth/forgot-password`       |      | Request password reset link                       |
-| `POST` | `/auth/reset-password`        |      | Reset password with token                         |
-| `GET`  | `/auth/csrf`                  |      | Bootstrap CSRF token                              |
+| Method | Path                                    | Auth | Description                                       |
+| :----- | :-------------------------------------- | :--- | :------------------------------------------------ |
+| `POST` | `/auth/register`                        |      | Register new user (async, returns `202 Accepted`) |
+| `POST` | `/auth/finalize-registration`           |      | Finalize registration and create session          |
+| `GET`  | `/auth/subscribe/{requestId}`           |      | SSE stream for registration status                |
+| `GET`  | `/auth/registration-status/{requestId}` |      | Retrieve registration status (Redis/DB fallback)  |
+| `POST` | `/auth/login`                           |      | Standard email/password login (adaptive CAPTCHA)  |
+| `POST` | `/auth/2fa/login`                       |      | Login with 2FA verification                       |
+| `GET`  | `/auth/{provider}/url`                  |      | Get OAuth2 authorization URL                      |
+| `GET`  | `/auth/{provider}/callback`             |      | OAuth2 callback handler                           |
+| `POST` | `/auth/refresh`                         |      | Refresh session tokens (lock heartbeat renewal)   |
+| `POST` | `/auth/logout`                          |      | Logout and clear session                          |
+| `GET`  | `/auth/verify`                          |      | Verify email via token                            |
+| `POST` | `/auth/resend-verification`             |      | Resend verification email                         |
+| `GET`  | `/auth/check-email`                     |      | Check if email is registered                      |
+| `POST` | `/auth/activate-guest`                  |      | Activate guest account with password              |
+| `POST` | `/auth/forgot-password`                 |      | Request password reset link                       |
+| `POST` | `/auth/reset-password`                  |      | Reset password with token                         |
+| `GET`  | `/auth/csrf`                            |      | Bootstrap CSRF token                              |
+
+### DLT Administration Endpoints (`/admin/dlt`)
+
+All administrative endpoints require `ROLE_ADMIN` authentication.
+
+| Method | Path                            | Auth  | Description                                        |
+| :----- | :------------------------------ | :---- | :------------------------------------------------- |
+| `POST` | `/admin/dlt/replay/{requestId}` | Admin | Replay a specific failed registration request.     |
+| `POST` | `/admin/dlt/replay/batch`       | Admin | Replay a batch of failed registration request IDs. |
+| `POST` | `/admin/dlt/replay/all`         | Admin | Replay all pending/failed registration requests.   |
 
 ### `AuthResponse` DTO
 
@@ -1095,6 +1119,10 @@ Session deletion in Redis instantly invalidates sessions across **all subdomains
 | `role:{name}`                               | Role (JSON)                            | 24 hours         | Cached Role entity                  |
 | `reset_token:{token}`                       | Email string                           | 15 minutes       | Password reset token                |
 | `rate_limit:forgot_password:{email}`        | Integer counter                        | 1 minute         | Forgot password rate limit          |
+| `login_failures:{email}`                    | Integer counter                        | 15 minutes       | Adaptive CAPTCHA login failures     |
+| `login_failures_ip:{ip}`                    | Integer counter                        | 15 minutes       | Adaptive CAPTCHA IP login failures  |
+| `user_token_version:{userId}`               | Integer version                        | 30 days          | Token version cache                 |
+| `bloom_rebuild_checkpoint`                  | String checkpoint (`lastId`)           | Persistent       | Bloom Filter rebuild checkpoint     |
 | `auth:resend-limit:{userId}`                | `"true"`                               | 30 seconds       | Resend verification rate limit      |
 | `totp:used:{userId}:{code}`                 | `"1"`                                  | 60 seconds       | TOTP replay prevention              |
 | `totp:failed:{userId}`                      | Integer counter                        | —                | 2FA brute force counter             |
@@ -1109,7 +1137,7 @@ Session deletion in Redis instantly invalidates sessions across **all subdomains
 | Topic                            | Producer                       | Consumer                    | Partition Key | Description                                            |
 | :------------------------------- | :----------------------------- | :-------------------------- | :------------ | :----------------------------------------------------- |
 | `registration-request-topic`     | `RegistrationQueueServiceImpl` | `RegistrationKafkaConsumer` | `email`       | Encrypted registration ingestion topic (32 partitions) |
-| `registration-request-topic-dlt` | Broker / Error Handler         | Administrator / DLQ Worker  | `email`       | Dead Letter Topic for failed registrations             |
+| `registration-request-topic-dlt` | Broker / Error Handler         | `RegistrationDltConsumer`   | `email`       | Dead Letter Topic for failed registrations             |
 | `omnibooking-user-cdc`           | `RegistrationService`          | `UserCDCConsumer`           | `userId`      | User registration CDC events                           |
 | `omnibooking-mail-topic`         | `OutboxWorker`                 | `EmailConsumer`             | `aggregateId` | Email delivery events                                  |
 
@@ -1140,21 +1168,24 @@ Session deletion in Redis instantly invalidates sessions across **all subdomains
 
 ### Operational Constants
 
-| Constant                   | Value                            | Location                    |
-| :------------------------- | :------------------------------- | :-------------------------- |
-| Inbox Table                | `registration_inbox`             | `RegistrationInbox`         |
-| Bloom Filter Key           | `bf:user_emails`                 | `BloomFilterService`        |
-| Kafka CDC Topic            | `omnibooking-user-cdc`           | `RegistrationService`       |
-| Batch Size                 | 100                              | `RegistrationKafkaConsumer` |
-| Inbox Recovery Interval    | 30 seconds                       | `RegistrationInboxWorker`   |
-| Inbox Purge Schedule       | Cron: `0 0 2 * * *` (Daily 2 AM) | `RegistrationInboxWorker`   |
-| SSE Timeout                | 120 seconds                      | `SseNotificationService`    |
-| Normal Session Sliding     | 1 day                            | `AuthServiceImpl`           |
-| Remember Me Sliding        | 7 days (max)                     | `AuthServiceImpl`           |
-| Normal Hard Cap            | 3 days                           | `AuthServiceImpl`           |
-| Remember Me Hard Cap       | 30 days                          | `AuthServiceImpl`           |
-| Refresh Lock TTL           | 5 seconds                        | `AuthServiceImpl`           |
-| User Sessions Index Expiry | 30 days                          | `SessionServiceImpl`        |
+| Constant                        | Value                            | Location                    |
+| :------------------------------ | :------------------------------- | :-------------------------- |
+| Inbox Table                     | `registration_inbox`             | `RegistrationInbox`         |
+| Bloom Filter Key                | `bf:user_emails`                 | `BloomFilterService`        |
+| Bloom Rebuild Checkpoint Key    | `bloom_rebuild_checkpoint`       | `BloomFilterRebuildService` |
+| Kafka CDC Topic                 | `omnibooking-user-cdc`           | `RegistrationService`       |
+| Batch Size                      | 100                              | `RegistrationKafkaConsumer` |
+| Inbox Recovery Interval         | 30 seconds                       | `RegistrationInboxWorker`   |
+| Inbox Purge Schedule            | Cron: `0 0 2 * * *` (Daily 2 AM) | `RegistrationInboxWorker`   |
+| SSE Timeout                     | 120 seconds                      | `SseNotificationService`    |
+| Normal Session Sliding          | 1 day                            | `AuthServiceImpl`           |
+| Remember Me Sliding             | 7 days (max)                     | `AuthServiceImpl`           |
+| Normal Hard Cap                 | 3 days                           | `AuthServiceImpl`           |
+| Remember Me Hard Cap            | 30 days                          | `AuthServiceImpl`           |
+| Refresh Lock TTL                | 5 seconds                        | `AuthServiceImpl`           |
+| Refresh Lock Heartbeat Interval | 2 seconds                        | `AuthServiceImpl`           |
+| Refresh Lock Heartbeat TTL      | 10 seconds                       | `AuthServiceImpl`           |
+| User Sessions Index Expiry      | 30 days                          | `SessionServiceImpl`        |
 
 ### System Roles
 
@@ -1168,8 +1199,18 @@ Session deletion in Redis instantly invalidates sessions across **all subdomains
 
 ### Monitoring Metrics (Micrometer)
 
-| Metric                             | Type                       | Description                          |
-| :--------------------------------- | :------------------------- | :----------------------------------- |
-| `omnibooking.auth.lock.contention` | Counter                    | Refresh lock contention events       |
-| `omnibooking.auth.redis.failures`  | Counter (tagged: `reason`) | Redis failures during authentication |
-| `omnibooking.auth.rejections`      | Counter (tagged: `reason`) | Authentication rejections            |
+| Metric                                            | Type                       | Description                                      |
+| :------------------------------------------------ | :------------------------- | :----------------------------------------------- |
+| `omnibooking.auth.lock.contention`                | Counter                    | Refresh lock contention events                   |
+| `omnibooking.auth.redis.failures`                 | Counter (tagged: `reason`) | Redis failures during authentication             |
+| `omnibooking.auth.rejections`                     | Counter (tagged: `reason`) | Authentication rejections                        |
+| `omnibooking.registration.retry.count`            | Counter                    | Ingress/processing registration retry attempts   |
+| `omnibooking.registration.failed_permanent.count` | Counter                    | Registration permanent failures (limit reached)  |
+| `omnibooking.dlt.pending`                         | Gauge                      | Count of pending DLT records in database         |
+| `omnibooking.dlt.replayed`                        | Counter                    | Successful DLT replay actions                    |
+| `omnibooking.auth.token_version.cache.hit`        | Counter                    | Token version Redis cache hits                   |
+| `omnibooking.auth.token_version.cache.miss`       | Counter                    | Token version Redis cache misses                 |
+| `omnibooking.bloom.rebuild.duration`              | Timer                      | Bloom Filter rebuild duration                    |
+| `omnibooking.bloom.rebuild.users_processed`       | Counter                    | Count of users processed in Bloom Filter rebuild |
+| `omnibooking.auth.refresh.lock.renewal`           | Counter                    | Successful refresh lock heartbeat renewals       |
+| `omnibooking.auth.refresh.lock.timeout`           | Counter                    | Refresh lock lost/timeout events                 |

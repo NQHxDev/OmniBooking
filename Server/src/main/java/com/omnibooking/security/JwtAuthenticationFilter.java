@@ -10,6 +10,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.concurrent.TimeUnit;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -95,20 +100,73 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // Set Authentication
             if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-               UserDetails userDetails = userDetailsService.loadUserById(userId.toString());
+               String versionKey = "user_token_version:" + userId;
+               Integer tokenVersionFromJwt = jwtService.extractTokenVersion(accessToken);
+               String cachedVersionStr = null;
+               try {
+                  cachedVersionStr = redisTemplate.opsForValue().get(versionKey);
+               } catch (Exception ex) {
+                  log.error("Redis is unavailable during token version cache lookup: {}", ex.getMessage());
+                  handleRedisFailure(request, response, ex);
+                  return;
+               }
 
-               if (userDetails instanceof UserPrincipal userPrincipal) {
-                  Integer tokenVersionFromJwt = jwtService.extractTokenVersion(accessToken);
-                  if (tokenVersionFromJwt == null || !tokenVersionFromJwt.equals(userPrincipal.getTokenVersion())) {
-                     log.warn("Token version mismatch for user: {}. Expected {}, got {}", userId,
-                           userPrincipal.getTokenVersion(), tokenVersionFromJwt);
+               Integer tokenVersion;
+               if (cachedVersionStr != null) {
+                  meterRegistry.counter("omnibooking.auth.token_version.cache.hit").increment();
+                  tokenVersion = Integer.parseInt(cachedVersionStr);
+               } else {
+                  meterRegistry.counter("omnibooking.auth.token_version.cache.miss").increment();
+                  // Cache miss: Load from DB and populate cache
+                  UserDetails userDetails;
+                  try {
+                     userDetails = userDetailsService.loadUserById(userId.toString());
+                  } catch (Exception ex) {
+                     log.error("Failed to load user from DB on token version cache miss: {}", ex.getMessage());
+                     filterChain.doFilter(request, response);
+                     return;
+                  }
+
+                  if (userDetails instanceof UserPrincipal userPrincipal) {
+                     tokenVersion = userPrincipal.getTokenVersion();
+                     try {
+                        redisTemplate.opsForValue().set(versionKey, String.valueOf(tokenVersion), 30, TimeUnit.DAYS);
+                     } catch (Exception ex) {
+                        log.error("Failed to populate token version cache in Redis: {}", ex.getMessage());
+                     }
+                  } else {
                      filterChain.doFilter(request, response);
                      return;
                   }
                }
 
+               if (tokenVersionFromJwt == null || !tokenVersionFromJwt.equals(tokenVersion)) {
+                  log.warn("Token version mismatch for user: {}. Expected {}, got {}", userId, tokenVersion, tokenVersionFromJwt);
+                  filterChain.doFilter(request, response);
+                  return;
+               }
+
+               // Reconstruct UserPrincipal from JWT claims without DB hit! (Task 3)
+               Set<String> roles = jwtService.extractRoles(accessToken);
+               List<SimpleGrantedAuthority> authorities = roles.stream()
+                     .map(SimpleGrantedAuthority::new)
+                     .collect(Collectors.toList());
+
+               String email = jwtService.extractEmail(accessToken);
+               String username = jwtService.extractUsername(accessToken);
+
+               UserPrincipal principal = UserPrincipal.builder()
+                     .id(userId)
+                     .username(username != null && !username.isBlank() ? username : userId.toString())
+                     .email(email != null ? email : "")
+                     .password("") // Password not needed for session auth
+                     .authorities(authorities)
+                     .active(true)
+                     .tokenVersion(tokenVersion)
+                     .build();
+
                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                     userDetails, null, userDetails.getAuthorities());
+                     principal, null, principal.getAuthorities());
                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                SecurityContextHolder.getContext().setAuthentication(authentication);
             }

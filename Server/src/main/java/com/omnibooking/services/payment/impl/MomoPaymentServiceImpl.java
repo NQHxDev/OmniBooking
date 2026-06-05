@@ -4,7 +4,7 @@ import com.omnibooking.config.MomoConfig;
 import com.omnibooking.exception.AppException;
 import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.Booking;
-import com.omnibooking.repository.BookingRepository;
+import com.omnibooking.repository.booking.BookingRepository;
 import com.omnibooking.services.booking.BookingService;
 import com.omnibooking.services.core.CurrencyService;
 import com.omnibooking.services.payment.MomoPaymentService;

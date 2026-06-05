@@ -14,12 +14,12 @@ import com.omnibooking.model.RoomAvailability;
 import com.omnibooking.model.Amenity;
 import com.omnibooking.model.enums.AmenityCategory;
 import com.omnibooking.model.enums.PropertyType;
-import com.omnibooking.repository.MediaRepository;
-import com.omnibooking.repository.PropertyRepository;
-import com.omnibooking.repository.RoomTypeRepository;
-import com.omnibooking.repository.UserRepository;
-import com.omnibooking.repository.RoomAvailabilityRepository;
-import com.omnibooking.repository.AmenityRepository;
+import com.omnibooking.repository.infra.MediaRepository;
+import com.omnibooking.repository.property.PropertyRepository;
+import com.omnibooking.repository.property.RoomTypeRepository;
+import com.omnibooking.repository.user.UserRepository;
+import com.omnibooking.repository.property.RoomAvailabilityRepository;
+import com.omnibooking.repository.property.AmenityRepository;
 import com.omnibooking.services.property.PropertyService;
 import com.omnibooking.services.property.PropertyImagesCacheService;
 
@@ -36,7 +36,7 @@ import com.omnibooking.model.Media;
 import org.springframework.transaction.annotation.Transactional;
 import com.omnibooking.dto.PartnerLegalProfileResponse;
 import com.omnibooking.model.PartnerLegalProfile;
-import com.omnibooking.repository.PartnerLegalProfileRepository;
+import com.omnibooking.repository.user.PartnerLegalProfileRepository;
 import com.omnibooking.services.core.EncryptionService;
 
 import java.util.List;

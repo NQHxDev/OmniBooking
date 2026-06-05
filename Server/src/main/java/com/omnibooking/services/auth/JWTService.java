@@ -34,7 +34,7 @@ public class JWTService {
     */
    public String generateAccessToken(UUID userId, Collection<String> roles, UUID sessionId,
          String fingerprintHash) {
-      return generateAccessToken(userId, roles, sessionId, fingerprintHash, 0);
+      return generateAccessToken(userId, userId.toString(), "", roles, sessionId, fingerprintHash, 0);
    }
 
    /**
@@ -42,8 +42,18 @@ public class JWTService {
     */
    public String generateAccessToken(UUID userId, Collection<String> roles, UUID sessionId,
          String fingerprintHash, Integer tokenVersion) {
+      return generateAccessToken(userId, userId.toString(), "", roles, sessionId, fingerprintHash, tokenVersion);
+   }
+
+   /**
+    * Generate an Access Token with userId, username, email, roles, sessionId, and tokenVersion.
+    */
+   public String generateAccessToken(UUID userId, String username, String email, Collection<String> roles,
+         UUID sessionId, String fingerprintHash, Integer tokenVersion) {
       return Jwts.builder()
             .subject(userId.toString())
+            .claim("username", username)
+            .claim("email", email)
             .claim("roles", roles)
             .claim("sessionId", sessionId.toString())
             .claim("fgh", fingerprintHash)
@@ -85,6 +95,14 @@ public class JWTService {
     */
    public String extractFingerprintHash(String token) {
       return extractAllClaims(token).get("fgh", String.class);
+   }
+
+   public String extractEmail(String token) {
+      return extractAllClaims(token).get("email", String.class);
+   }
+
+   public String extractUsername(String token) {
+      return extractAllClaims(token).get("username", String.class);
    }
 
    public Integer extractTokenVersion(String token) {

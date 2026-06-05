@@ -5,5 +5,6 @@ public enum RegistrationInboxStatus {
    SENT,
    PROCESSING,
    SUCCESS,
-   FAILED
+   FAILED,
+   FAILED_PERMANENT
 }

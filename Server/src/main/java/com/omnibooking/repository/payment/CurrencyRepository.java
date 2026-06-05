@@ -1,4 +1,4 @@
-package com.omnibooking.repository;
+package com.omnibooking.repository.payment;
 
 import com.omnibooking.model.Currency;
 import java.util.Optional;

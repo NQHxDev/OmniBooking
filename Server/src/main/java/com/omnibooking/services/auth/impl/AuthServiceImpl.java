@@ -11,13 +11,14 @@ import com.omnibooking.exception.AppException;
 import com.omnibooking.model.Role;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
-import com.omnibooking.repository.UserProfileRepository;
-import com.omnibooking.repository.UserRepository;
+import com.omnibooking.repository.user.UserProfileRepository;
+import com.omnibooking.repository.user.UserRepository;
 import com.omnibooking.security.RedisSessionInfo;
 import com.omnibooking.config.AppProperties;
 import com.omnibooking.services.auth.AuthService;
 import com.omnibooking.services.auth.CachedRoleService;
 import com.omnibooking.services.auth.JWTService;
+import com.omnibooking.services.auth.TurnstileService;
 import com.omnibooking.services.communication.MailService;
 import com.omnibooking.services.core.OutboxService;
 import com.omnibooking.services.auth.SessionService;
@@ -27,10 +28,14 @@ import com.omnibooking.util.CookieUtils;
 import com.omnibooking.util.SecurityUtils;
 import com.omnibooking.mapper.UserMapper;
 import com.omnibooking.model.SocialAccount;
-import com.omnibooking.repository.SocialAccountRepository;
+import com.omnibooking.repository.user.SocialAccountRepository;
 import com.omnibooking.dto.oauth.OAuth2UserInfo;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.servlet.http.HttpServletResponse;
+import com.omnibooking.repository.registration.RegistrationInboxRepository;
+import com.omnibooking.model.RegistrationInbox;
+import com.omnibooking.model.enums.RegistrationInboxStatus;
+import com.omnibooking.dto.RegistrationStatusResponse;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -45,6 +50,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Executors;
+import jakarta.annotation.PreDestroy;
 import com.omnibooking.services.core.BloomFilterService;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
@@ -52,6 +61,13 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 @RequiredArgsConstructor
 @Slf4j
 public class AuthServiceImpl implements AuthService {
+
+   private final ScheduledExecutorService lockRenewalScheduler = Executors.newScheduledThreadPool(4,
+         runnable -> {
+            Thread thread = Thread.ofVirtual().unstarted(runnable);
+            thread.setName("lock-renewal-heartbeat-" + thread.threadId());
+            return thread;
+         });
 
    private final UserRepository userRepository;
 
@@ -84,6 +100,10 @@ public class AuthServiceImpl implements AuthService {
    private final TwoFactorAuthService twoFactorAuthService;
 
    private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
+   private final RegistrationInboxRepository registrationInboxRepository;
+
+   private final TurnstileService turnstileService;
 
    private static final long SESSION_SLIDING_NORMAL_MS = 1 * 24 * 60 * 60 * 1000L;
 
@@ -152,31 +172,73 @@ public class AuthServiceImpl implements AuthService {
 
    @Override
    public AuthResponse login(LoginRequest request, String ip, String userAgent, HttpServletResponse response) {
-      // Check Bloom Filter
-      if (!bloomFilterService.mightContain(request.getEmail())) {
-         throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+      String emailClean = request.getEmail().trim().toLowerCase();
+      String emailKey = "login_failures:" + emailClean;
+      String ipKey = "login_failures_ip:" + ip;
+
+      String emailFailuresStr = redisTemplate.opsForValue().get(emailKey);
+      String ipFailuresStr = redisTemplate.opsForValue().get(ipKey);
+      int emailFailures = emailFailuresStr != null ? Integer.parseInt(emailFailuresStr) : 0;
+      int ipFailures = ipFailuresStr != null ? Integer.parseInt(ipFailuresStr) : 0;
+      int maxFailures = Math.max(emailFailures, ipFailures);
+
+      if (maxFailures >= 6) {
+         throw new AppException(ErrorCode.RATE_LIMIT_EXCEEDED);
       }
 
-      User user = userRepository.findByEmail(request.getEmail())
-            .orElseThrow(() -> new AppException(ErrorCode.INVALID_CREDENTIALS));
-
-      if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-         throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+      if (maxFailures == 4 || maxFailures == 5) {
+         turnstileService.verifyToken(request.getTurnstileToken(), ip);
       }
 
-      Set<String> roles = user.getRoles().stream()
-            .map(Role::getName)
-            .collect(Collectors.toSet());
+      try {
+         // Check Bloom Filter
+         if (!bloomFilterService.mightContain(emailClean)) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+         }
 
-      if (twoFactorAuthService.is2FAEnabledForUser(user.getId())) {
-         throw new AppException(ErrorCode.TWO_FACTOR_REQUIRED);
+         User user = userRepository.findByEmail(emailClean)
+               .orElseThrow(() -> new AppException(ErrorCode.INVALID_CREDENTIALS));
+
+         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+         }
+
+         // Credentials matched! Clear failure counts from Redis
+         try {
+            redisTemplate.delete(emailKey);
+            redisTemplate.delete(ipKey);
+         } catch (Exception ex) {
+            log.error("Failed to delete login failure keys in Redis", ex);
+         }
+
+         Set<String> roles = user.getRoles().stream()
+               .map(Role::getName)
+               .collect(Collectors.toSet());
+
+         if (twoFactorAuthService.is2FAEnabledForUser(user.getId())) {
+            throw new AppException(ErrorCode.TWO_FACTOR_REQUIRED);
+         }
+
+         UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
+         long now = System.currentTimeMillis();
+
+         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
+               now, null);
+      } catch (AppException e) {
+         if (e.getErrorEnum() == ErrorCode.INVALID_CREDENTIALS) {
+            // Increment failed login counts in Redis (15-minute TTL)
+            try {
+               redisTemplate.opsForValue().increment(emailKey);
+               redisTemplate.expire(emailKey, 15, TimeUnit.MINUTES);
+               
+               redisTemplate.opsForValue().increment(ipKey);
+               redisTemplate.expire(ipKey, 15, TimeUnit.MINUTES);
+            } catch (Exception ex) {
+               log.error("Failed to increment login failure count in Redis", ex);
+            }
+         }
+         throw e;
       }
-
-      UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
-      long now = System.currentTimeMillis();
-
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
-            now, null);
    }
 
    @Override
@@ -203,7 +265,27 @@ public class AuthServiceImpl implements AuthService {
          throw new AppException(ErrorCode.INVALID_SESSION);
       }
 
+      ScheduledFuture<?> heartbeatTask = null;
       try {
+         heartbeatTask = lockRenewalScheduler.scheduleAtFixedRate(() -> {
+            try {
+               String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('expire', KEYS[1], 10) else return 0 end";
+               Long result = redisTemplate.execute(
+                     new DefaultRedisScript<>(script, Long.class),
+                     Collections.singletonList(lockKey),
+                     lockValue
+               );
+               if (result != null && result > 0) {
+                  meterRegistry.counter("omnibooking.auth.refresh.lock.renewal").increment();
+               } else {
+                  meterRegistry.counter("omnibooking.auth.refresh.lock.timeout").increment();
+                  log.warn("Failed to renew refresh lock for session: {}", sId);
+               }
+            } catch (Exception ex) {
+               log.error("Error renewing refresh lock for session: {}", sId, ex);
+            }
+         }, 2, 2, TimeUnit.SECONDS);
+
          if (!sessionService.isValidSession(sId, rToken)) {
             CookieUtils.clearAuthCookies(response, isCookieSecure());
             throw new AppException(ErrorCode.INVALID_SESSION);
@@ -237,6 +319,9 @@ public class AuthServiceImpl implements AuthService {
          return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, info.isRememberMe(),
                info.getCreatedAt(), info.getLastAccessedAt(), sId);
       } finally {
+         if (heartbeatTask != null) {
+            heartbeatTask.cancel(true);
+         }
          String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
          redisTemplate.execute(new DefaultRedisScript<>(script, Long.class), Collections.singletonList(lockKey),
                lockValue);
@@ -323,8 +408,16 @@ public class AuthServiceImpl implements AuthService {
       String fingerprint = UuidCreator.getTimeOrderedEpoch().toString();
       String fgpHash = SecurityUtils.hashFingerprint(fingerprint);
 
-      String accessToken = jwtService.generateAccessToken(user.getId(), roles, sessionId, fgpHash,
-            user.getTokenVersion());
+      String accessToken = jwtService.generateAccessToken(user.getId(), user.getUsername(), user.getEmail(), roles,
+            sessionId, fgpHash, user.getTokenVersion());
+
+      // Cache token version in Redis (Task 3)
+      try {
+         String versionKey = "user_token_version:" + user.getId();
+         redisTemplate.opsForValue().set(versionKey, String.valueOf(user.getTokenVersion()), 30, TimeUnit.DAYS);
+      } catch (Exception ex) {
+         log.error("Failed to populate token version cache in Redis: {}", ex.getMessage());
+      }
 
       String fullName;
       if (profile != null && profile.getDisplayName() != null) {
@@ -515,7 +608,16 @@ public class AuthServiceImpl implements AuthService {
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
       user.setPassword(passwordEncoder.encode(newPassword));
+      user.setTokenVersion(user.getTokenVersion() + 1);
       userRepository.save(user);
+
+      // Update Redis cache (Task 3)
+      try {
+         String versionKey = "user_token_version:" + user.getId();
+         redisTemplate.opsForValue().set(versionKey, String.valueOf(user.getTokenVersion()), 30, TimeUnit.DAYS);
+      } catch (Exception ex) {
+         log.error("Failed to update token version cache in Redis: {}", ex.getMessage());
+      }
 
       // If requested, logout from all devices
       if (logoutAll) {
@@ -670,6 +772,15 @@ public class AuthServiceImpl implements AuthService {
          throw new AppException(ErrorCode.INVALID_OTP);
       }
 
+      // OTP code verified successfully! Clear Redis failure keys
+      try {
+         String emailClean = request.getEmail().trim().toLowerCase();
+         redisTemplate.delete("login_failures:" + emailClean);
+         redisTemplate.delete("login_failures_ip:" + ip);
+      } catch (Exception ex) {
+         log.error("Failed to delete login failure keys in Redis during 2FA", ex);
+      }
+
       Set<String> roles = user.getRoles().stream()
             .map(Role::getName)
             .collect(Collectors.toSet());
@@ -722,5 +833,64 @@ public class AuthServiceImpl implements AuthService {
 
       long now = System.currentTimeMillis();
       return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now, null);
+   }
+
+   @Override
+   public RegistrationStatusResponse getRegistrationStatus(String requestId) {
+      UUID reqId;
+      try {
+         reqId = UUID.fromString(requestId);
+      } catch (Exception e) {
+         throw new AppException(ErrorCode.INVALID_TOKEN, "Invalid requestId format");
+      }
+
+      // 1. Try Redis first
+      String redisKey = "registration_result:" + requestId;
+      String redisVal = redisTemplate.opsForValue().get(redisKey);
+
+      if (redisVal != null) {
+         String status = redisVal;
+         String message = "Status retrieved from cache";
+         if (redisVal.startsWith("FAILED")) {
+            status = "FAILED";
+            message = redisVal;
+         }
+         return RegistrationStatusResponse.builder()
+               .requestId(requestId)
+               .status(status)
+               .message(message)
+               .completedAt(null)
+               .build();
+      }
+
+      // 2. Fallback to DB
+      RegistrationInbox inbox = registrationInboxRepository.findById(reqId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Registration request not found"));
+
+      String message = "Status retrieved from database";
+      if (inbox.getStatus() == RegistrationInboxStatus.FAILED || inbox.getStatus() == RegistrationInboxStatus.FAILED_PERMANENT) {
+         message = inbox.getLastError() != null ? inbox.getLastError() : "Processing failed";
+      }
+
+      return RegistrationStatusResponse.builder()
+            .requestId(requestId)
+            .status(inbox.getStatus().name())
+            .message(message)
+            .completedAt(inbox.getProcessedAt())
+            .build();
+   }
+
+   @PreDestroy
+   public void shutdownScheduler() {
+      log.info("Shutting down lockRenewalScheduler...");
+      lockRenewalScheduler.shutdown();
+      try {
+         if (!lockRenewalScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+            lockRenewalScheduler.shutdownNow();
+         }
+      } catch (InterruptedException e) {
+         lockRenewalScheduler.shutdownNow();
+         Thread.currentThread().interrupt();
+      }
    }
 }

@@ -58,10 +58,17 @@ public class CsrfIntegrationTest {
    private StringRedisTemplate stringRedisTemplate;
 
    @MockitoBean
+   private org.springframework.data.redis.core.ValueOperations<String, String> valueOps;
+
+   @MockitoBean
    private RedisMessageListenerContainer redisMessageListenerContainer;
 
    @Test
    public void shouldAllowAnonymousStateChangingRequestWithoutCsrf() throws Exception {
+      // Mock Redis opsForValue to return 4 failed attempts to trigger Turnstile Captcha
+      when(stringRedisTemplate.opsForValue()).thenReturn(valueOps);
+      when(valueOps.get(ArgumentMatchers.anyString())).thenReturn("4");
+
       // /auth/login is public (@Anonymous) state-changing endpoint, should bypass
       // CSRF
       mockMvc.perform(post("/auth/login")
