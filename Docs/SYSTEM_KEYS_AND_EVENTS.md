@@ -60,7 +60,7 @@ OmniBooking uses Kafka as its core event broker, backed by the Transactional Out
 
 ### 2.2 Outbox Event Types & Registrations
 
-These event types are defined in [EventConstants.java](file:///Users/anhjkr/Documents/My%20Projects/OmniBooking/Server/src/main/java/com/omnibooking/constant/EventConstants.java), registered in [OutboxEventRegistry.java](file:///Users/anhjkr/Documents/My%20Projects/OmniBooking/Server/src/main/java/com/omnibooking/services/core/OutboxEventRegistry.java), and map to specific Java payload DTOs.
+These event types are defined in [EventConstants.java](../Server/src/main/java/com/omnibooking/constant/EventConstants.java), registered in [OutboxEventRegistry.java](../Server/src/main/java/com/omnibooking/services/core/OutboxEventRegistry.java), and map to specific Java payload DTOs.
 
 | Event Constant (EventConstants.java) | Database String Key             | Payload DTO Class         | Target Kafka Topic          | Trigger Description                                                             |
 | :----------------------------------- | :------------------------------ | :------------------------ | :-------------------------- | :------------------------------------------------------------------------------ |

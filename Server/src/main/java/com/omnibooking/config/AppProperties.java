@@ -1,7 +1,11 @@
 package com.omnibooking.config;
 
 import lombok.Data;
+
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -113,11 +117,13 @@ public class AppProperties {
       private String encryptionSecret;
       @NotBlank
       private String hashPepper;
+      private String activeKeyId;
+      private Map<String, String> keys = new HashMap<>();
       private boolean twoFactorEnabled = true;
       private boolean cookieSecure;
       private String cookieDomain;
       private String csrfSecret;
-      private List<String> csrfBypassPatterns = java.util.Arrays.asList(
+      private List<String> csrfBypassPatterns = Arrays.asList(
             "/auth/login", "/auth/login/**",
             "/**/auth/login", "/**/auth/login/**",
             "/auth/register", "/auth/register/**",
@@ -136,8 +142,7 @@ public class AppProperties {
             "/**/auth/activate-guest", "/**/auth/activate-guest/**",
             "/auth/finalize-registration", "/auth/finalize-registration/**",
             "/**/auth/finalize-registration", "/**/auth/finalize-registration/**",
-            "/payments/*/callback", "/**/payments/*/callback"
-      );
+            "/payments/*/callback", "/**/payments/*/callback");
    }
 
    @Data
