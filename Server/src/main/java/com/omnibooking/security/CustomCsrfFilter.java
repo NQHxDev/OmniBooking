@@ -11,11 +11,15 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import com.omnibooking.services.auth.SessionService;
 
 import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
@@ -38,15 +42,19 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
 
    private final String csrfSecret;
 
+   private final SessionService sessionService;
+
    private static final List<String> STATE_CHANGING_METHODS = Arrays.asList("POST", "PUT", "DELETE", "PATCH");
 
    public CustomCsrfFilter(ObjectMapper objectMapper, String allowedOrigins,
-         MeterRegistry meterRegistry, List<String> bypassPatterns, boolean cookieSecure, String csrfSecret) {
+         MeterRegistry meterRegistry, List<String> bypassPatterns, boolean cookieSecure, String csrfSecret,
+         SessionService sessionService) {
       this.objectMapper = objectMapper;
       this.allowedOrigins = allowedOrigins;
       this.meterRegistry = meterRegistry;
       this.cookieSecure = cookieSecure;
       this.csrfSecret = csrfSecret;
+      this.sessionService = sessionService;
 
       if (bypassPatterns != null) {
          log.info("Initialized CustomCsrfFilter with bypass patterns: {}", bypassPatterns);
@@ -102,8 +110,7 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
                return;
             }
          } else {
-            // Standard browser state-changing request should have Origin or Referer.
-            // Demoted from WARN to DEBUG to prevent log flooding (Task 5)
+            // Standard browser state-changing request should have Origin or Referer
             log.debug("CSRF validation: Request missing both Origin and Referer headers for path {}",
                   request.getRequestURI());
          }
@@ -121,10 +128,23 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
             return;
          }
 
-         // Session Binding Check (Task 1)
+         // Session Binding Check
          String sessionId = getCookieValue(request, CookieUtils.SESSION_ID);
          if (sessionId != null && !sessionId.isBlank()) {
-            String expectedCsrf = CookieUtils.calculateCsrfToken(sessionId, csrfSecret);
+            String csrfNonce = null;
+            try {
+               RedisSessionInfo sessionInfo = (RedisSessionInfo) request.getAttribute("sessionInfo");
+               if (sessionInfo == null) {
+                  UUID sId = UUID.fromString(sessionId);
+                  sessionInfo = sessionService.getSession(sId);
+               }
+               if (sessionInfo != null) {
+                  csrfNonce = sessionInfo.getCsrfNonce();
+               }
+            } catch (Exception e) {
+               log.error("Failed to load session for CSRF validation", e);
+            }
+            String expectedCsrf = CookieUtils.calculateCsrfToken(sessionId, csrfNonce, csrfSecret);
             if (!safeEquals(csrfCookie, expectedCsrf)) {
                log.warn("CSRF validation failed: Token is not bound to the active session. Path: {}",
                      request.getRequestURI());
@@ -138,7 +158,19 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
          String csrfCookie = getCookieValue(request, CookieUtils.CSRF_TOKEN);
          if (csrfCookie == null || csrfCookie.isBlank()) {
             String sessionId = getCookieValue(request, CookieUtils.SESSION_ID);
-            String newCsrfToken = CookieUtils.calculateCsrfToken(sessionId, csrfSecret);
+            String csrfNonce = null;
+            if (sessionId != null && !sessionId.isBlank()) {
+               try {
+                  UUID sId = UUID.fromString(sessionId);
+                  RedisSessionInfo sessionInfo = sessionService.getSession(sId);
+                  if (sessionInfo != null) {
+                     csrfNonce = sessionInfo.getCsrfNonce();
+                  }
+               } catch (Exception e) {
+                  log.error("Failed to load session for CSRF cookie generation", e);
+               }
+            }
+            String newCsrfToken = CookieUtils.calculateCsrfToken(sessionId, csrfNonce, csrfSecret);
             CookieUtils.addCookie(response, CookieUtils.CSRF_TOKEN, newCsrfToken, 86400, cookieSecure);
          }
       }
@@ -157,7 +189,7 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
          return false;
       }
       try {
-         java.net.URI originUri = new java.net.URI(origin);
+         URI originUri = new URI(origin);
          String originScheme = originUri.getScheme();
          String originHost = originUri.getHost();
          int originPort = originUri.getPort();
@@ -170,7 +202,7 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
                .filter(allowed -> !allowed.isBlank())
                .anyMatch(allowed -> {
                   try {
-                     java.net.URI allowedUri = new java.net.URI(allowed);
+                     URI allowedUri = new URI(allowed);
                      String allowedScheme = allowedUri.getScheme();
                      String allowedHost = allowedUri.getHost();
                      int allowedPort = allowedUri.getPort();
@@ -206,7 +238,7 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
          return false;
       }
       try {
-         java.net.URI uri = new java.net.URI(referer);
+         URI uri = new URI(referer);
          String scheme = uri.getScheme();
          String host = uri.getHost();
          int port = uri.getPort();
@@ -225,8 +257,8 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
       if (a == null || b == null) {
          return false;
       }
-      return MessageDigest.isEqual(a.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-            b.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8),
+            b.getBytes(StandardCharsets.UTF_8));
    }
 
    private void handleError(HttpServletRequest request, HttpServletResponse response, ErrorCode error)

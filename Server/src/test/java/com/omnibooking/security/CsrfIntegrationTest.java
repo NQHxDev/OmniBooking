@@ -22,6 +22,7 @@ import com.omnibooking.repository.elasticsearch.DestinationElasticsearchReposito
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
@@ -29,6 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 import java.util.Collections;
 import java.util.UUID;
@@ -66,7 +68,8 @@ public class CsrfIntegrationTest {
 
    @Test
    public void shouldAllowAnonymousStateChangingRequestWithoutCsrf() throws Exception {
-      // Mock Redis opsForValue to return 4 failed attempts to trigger Turnstile Captcha
+      // Mock Redis opsForValue to return 4 failed attempts to trigger Turnstile
+      // Captcha
       when(stringRedisTemplate.opsForValue()).thenReturn(valueOps);
       when(valueOps.get(ArgumentMatchers.anyString())).thenReturn("4");
 
@@ -122,10 +125,13 @@ public class CsrfIntegrationTest {
       UUID sessionId = UUID.randomUUID();
       String fingerprint = "fingerprint";
       String fgpHash = SecurityUtils.hashFingerprint(fingerprint);
-      String token = jwtService.generateAccessToken(userId, Collections.singletonList(SecurityConstants.Roles.USER), sessionId,
+      String token = jwtService.generateAccessToken(userId, Collections.singletonList(SecurityConstants.Roles.USER),
+            sessionId,
             fgpHash);
 
-      when(stringRedisTemplate.hasKey(ArgumentMatchers.anyString())).thenThrow(
+      HashOperations<String, Object, Object> hashOps = mock(ObjectHashOperations.class);
+      when(stringRedisTemplate.opsForHash()).thenReturn(hashOps);
+      when(hashOps.entries(ArgumentMatchers.anyString())).thenThrow(
             new RedisConnectionFailureException("Redis connection failed"));
 
       // Calculate the valid HMAC-based CSRF token for the session
@@ -211,5 +217,7 @@ public class CsrfIntegrationTest {
             .andExpect(MockMvcResultMatchers.cookie().exists(CookieUtils.CSRF_TOKEN))
             .andExpect(jsonPath("$.data.csrfToken").exists());
    }
+
+   private interface ObjectHashOperations extends HashOperations<String, Object, Object> {}
 
 }

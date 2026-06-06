@@ -25,12 +25,17 @@ import org.springframework.stereotype.Service;
 public class EncryptionServiceImpl implements EncryptionService {
 
    private static final String ENCRYPTION_ALGO = "AES/GCM/NoPadding";
+
    private static final int TAG_LENGTH_BIT = 128;
+
    private static final int IV_LENGTH_BYTE = 12;
+
    private static final String HMAC_ALGO = "HmacSHA256";
+
    private static final long CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes Cache TTL
 
    private final AppProperties appProperties;
+
    private final SecureRandom secureRandom = new SecureRandom();
 
    // Local cache for SecretKeys to avoid parsing/fetching overhead
@@ -153,16 +158,17 @@ public class EncryptionServiceImpl implements EncryptionService {
 
       // Load key from AppProperties keys map
       String secret = appProperties.getSecurity().getKeys().get(keyId);
-      
+
       // On-Demand Cache Bypass Refresh
       if (secret == null) {
          log.warn("KeyId '{}' not found in config cache. Attempting on-demand bypass refresh...", keyId);
-         
+
          // Try loading from environment variables directly for updated keys
          secret = System.getenv("ENCRYPTION_KEY_" + keyId.toUpperCase().replace("-", "_"));
-         
+
          if (secret == null) {
-            // Fallback to default encryptionSecret if keyId matches activeKeyId or is fallback "aes-v1"
+            // Fallback to default encryptionSecret if keyId matches activeKeyId or is
+            // fallback "aes-v1"
             if (keyId.equals(appProperties.getSecurity().getActiveKeyId()) || "aes-v1".equals(keyId)) {
                log.info("Using default encryptionSecret for keyId '{}'", keyId);
                secret = appProperties.getSecurity().getEncryptionSecret();

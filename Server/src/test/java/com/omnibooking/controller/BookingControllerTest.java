@@ -3,6 +3,8 @@ package com.omnibooking.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.dto.BookingResponse;
 import com.omnibooking.dto.CreateBookingRequest;
+import com.omnibooking.mapper.PropertyDocumentMapper;
+import com.omnibooking.mapper.UserMapper;
 import com.omnibooking.model.enums.BookingStatus;
 import com.omnibooking.services.booking.BookingService;
 import org.junit.jupiter.api.Test;
@@ -47,10 +49,10 @@ public class BookingControllerTest {
    private BookingService bookingService;
 
    @MockitoBean
-   private com.omnibooking.mapper.PropertyDocumentMapper propertyDocumentMapper;
+   private PropertyDocumentMapper propertyDocumentMapper;
 
    @MockitoBean
-   private com.omnibooking.mapper.UserMapper userMapper;
+   private UserMapper userMapper;
 
    // Mock external systems to avoid connection issues in tests
    @MockitoBean

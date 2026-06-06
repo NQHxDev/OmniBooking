@@ -51,11 +51,20 @@ public class SecurityUtils {
     * Uses ThreadLocal MessageDigest for thread-safety and performance.
     */
    public static String hashFingerprint(String input) {
+      return hashFingerprint(input, null);
+   }
+
+   /**
+    * Computes SHA-256 hash of a string + pepper and returns it as Base64.
+    * Uses ThreadLocal MessageDigest for thread-safety and performance.
+    */
+   public static String hashFingerprint(String input, String pepper) {
       if (input == null)
          return null;
+      String toHash = pepper != null ? input + pepper : input;
       MessageDigest digest = SHA_256_DIGEST.get();
       digest.reset();
-      byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+      byte[] hash = digest.digest(toHash.getBytes(StandardCharsets.UTF_8));
       return Base64.getEncoder().encodeToString(hash);
    }
 

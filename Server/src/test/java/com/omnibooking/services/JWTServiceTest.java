@@ -62,7 +62,8 @@ class JWTServiceTest {
             }
          }
       }
-      assertThat(extractedRoles).containsExactlyInAnyOrder(SecurityConstants.Roles.USER, SecurityConstants.Roles.PARTNER);
+      assertThat(extractedRoles).containsExactlyInAnyOrder(SecurityConstants.Roles.USER,
+            SecurityConstants.Roles.PARTNER);
    }
 
    @Test
@@ -105,4 +106,5 @@ class JWTServiceTest {
       assertThat(token).isNotBlank();
       assertThat(jwtService.extractTokenVersion(token)).isEqualTo(tokenVersion);
    }
+
 }

@@ -45,15 +45,25 @@ import java.util.stream.Collectors;
 public class RegistrationService {
 
    private final UserRepository userRepository;
+
    private final UserProfileRepository userProfileRepository;
+
    private final RegistrationInboxRepository registrationInboxRepository;
+
    private final CachedRoleService cachedRoleService;
+
    private final UserMapper userMapper;
+
    private final KafkaTemplate<String, Object> kafkaTemplate;
+
    private final StringRedisTemplate redisTemplate;
+
    private final ObjectMapper objectMapper;
+
    private final BloomFilterService bloomFilterService;
+
    private final JWTService jwtService;
+
    private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
 
    private static final String USER_CDC_TOPIC = "omnibooking-user-cdc";
@@ -67,7 +77,8 @@ public class RegistrationService {
    public void updateInboxStatus(UUID requestId, RegistrationInboxStatus status) {
       registrationInboxRepository.findById(requestId).ifPresent(inbox -> {
          inbox.setStatus(status);
-         if (status == RegistrationInboxStatus.SUCCESS || status == RegistrationInboxStatus.FAILED || status == RegistrationInboxStatus.FAILED_PERMANENT) {
+         if (status == RegistrationInboxStatus.SUCCESS || status == RegistrationInboxStatus.FAILED
+               || status == RegistrationInboxStatus.FAILED_PERMANENT) {
             inbox.setProcessedAt(Instant.now());
          }
          registrationInboxRepository.save(inbox);
@@ -118,7 +129,7 @@ public class RegistrationService {
 
                         // Send real-time notify
                         notifyClient(finalRequestId, finalUser, finalProfile);
-                      }
+                     }
                   });
          }
       } catch (Exception e) {

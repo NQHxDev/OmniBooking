@@ -1,6 +1,7 @@
 package com.omnibooking.aspect;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.omnibooking.annotation.Idempotent;
 import com.omnibooking.exception.AppException;
 import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.util.SecurityUtils;
@@ -13,12 +14,14 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -61,7 +64,7 @@ public class IdempotencyAspectTest {
    @Mock
    private ServletRequestAttributes requestAttributes;
 
-   private com.omnibooking.annotation.Idempotent idempotentAnnotation;
+   private Idempotent idempotentAnnotation;
 
    private MockedStatic<RequestContextHolder> mockedRequestContextHolder;
 
@@ -71,7 +74,7 @@ public class IdempotencyAspectTest {
 
    @BeforeEach
    void setUp() {
-      closeable = org.mockito.MockitoAnnotations.openMocks(this);
+      closeable = MockitoAnnotations.openMocks(this);
       when(redisTemplate.opsForValue()).thenReturn(valueOperations);
       objectMapper = new ObjectMapper();
 
@@ -79,10 +82,10 @@ public class IdempotencyAspectTest {
 
       // Instantiate annotation as an anonymous class to avoid Mockito proxying issues
       // with annotations
-      idempotentAnnotation = new com.omnibooking.annotation.Idempotent() {
+      idempotentAnnotation = new Idempotent() {
          @Override
-         public Class<? extends java.lang.annotation.Annotation> annotationType() {
-            return com.omnibooking.annotation.Idempotent.class;
+         public Class<? extends Annotation> annotationType() {
+            return Idempotent.class;
          }
 
          @Override
@@ -242,4 +245,5 @@ public class IdempotencyAspectTest {
    public ResponseEntity<String> dummyResponseEntityMethod() {
       return null;
    }
+
 }

@@ -39,6 +39,7 @@
       "consectetur",
       "CONTEXTPATH",
       "Cooldown",
+      "creds",
       "crios",
       "dalat",
       "dists",
@@ -58,9 +59,12 @@
       "Geolocation",
       "googleusercontent",
       "healthcheck",
+      "hget",
       "hikari",
       "HMAC",
+      "hmget",
       "Homestay",
+      "hset",
       "incididunt",
       "ipairs",
       "ipapi",
@@ -91,6 +95,7 @@
       "Palmtree",
       "passwordless",
       "paymentcontroller",
+      "pexpire",
       "Pointcut",
       "propertycontroller",
       "quangninh",
@@ -128,6 +133,8 @@
       "yourdomain",
       "Zalo",
       "zaxxer",
-      "zrange"
+      "zrange",
+      "zrem",
+      "ZSET"
    ]
 }

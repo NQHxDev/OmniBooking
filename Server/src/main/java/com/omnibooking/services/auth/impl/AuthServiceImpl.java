@@ -21,6 +21,10 @@ import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.services.auth.TurnstileService;
 import com.omnibooking.services.communication.MailService;
 import com.omnibooking.services.core.OutboxService;
+import com.omnibooking.services.core.EncryptionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import com.omnibooking.services.auth.SessionService;
 import com.omnibooking.services.auth.TwoFactorAuthService;
 import com.omnibooking.services.user.VerificationService;
@@ -31,26 +35,44 @@ import com.omnibooking.model.SocialAccount;
 import com.omnibooking.repository.user.SocialAccountRepository;
 import com.omnibooking.dto.oauth.OAuth2UserInfo;
 import com.github.f4b6a3.uuid.UuidCreator;
+
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import com.omnibooking.repository.registration.RegistrationInboxRepository;
 import com.omnibooking.model.RegistrationInbox;
 import com.omnibooking.model.enums.RegistrationInboxStatus;
 import com.omnibooking.dto.RegistrationStatusResponse;
+import com.omnibooking.dto.TwoFactorLoginRequest;
+
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Arrays;
 
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.stream.Collectors;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -66,37 +88,50 @@ public class AuthServiceImpl implements AuthService {
 
    private static final SecureRandom secureRandom = new SecureRandom();
 
-   private static final String INCR_EXPIRE_SCRIPT =
-         "local val = redis.call('incr', KEYS[1]); " +
+   private static final String INCR_EXPIRE_SCRIPT = "local val = redis.call('incr', KEYS[1]); " +
          "if val == 1 then " +
          "  redis.call('expire', KEYS[1], tonumber(ARGV[1])); " +
          "end; " +
          "return val;";
 
    private String getOsFamily(String ua) {
-      if (ua == null) return "OTHER";
+      if (ua == null)
+         return "OTHER";
       String uaLower = ua.toLowerCase();
-      if (uaLower.contains("windows")) return "WINDOWS";
-      if (uaLower.contains("macintosh") || uaLower.contains("mac os")) return "MAC";
-      if (uaLower.contains("iphone") || uaLower.contains("ipad") || uaLower.contains("ipod")) return "IOS";
-      if (uaLower.contains("android")) return "ANDROID";
-      if (uaLower.contains("linux")) return "LINUX";
+      if (uaLower.contains("windows"))
+         return "WINDOWS";
+      if (uaLower.contains("macintosh") || uaLower.contains("mac os"))
+         return "MAC";
+      if (uaLower.contains("iphone") || uaLower.contains("ipad") || uaLower.contains("ipod"))
+         return "IOS";
+      if (uaLower.contains("android"))
+         return "ANDROID";
+      if (uaLower.contains("linux"))
+         return "LINUX";
       return "OTHER";
    }
 
    private String getBrowserFamily(String ua) {
-      if (ua == null) return "OTHER";
+      if (ua == null)
+         return "OTHER";
       String uaLower = ua.toLowerCase();
-      if (uaLower.contains("edg/")) return "EDGE";
-      if (uaLower.contains("chrome/") || uaLower.contains("crios/")) return "CHROME";
-      if (uaLower.contains("firefox/") || uaLower.contains("fxios/")) return "FIREFOX";
-      if (uaLower.contains("safari/") && !uaLower.contains("chrome") && !uaLower.contains("chromium")) return "SAFARI";
-      if (uaLower.contains("postman")) return "POSTMAN";
-      if (uaLower.contains("curl")) return "CURL";
+      if (uaLower.contains("edg/"))
+         return "EDGE";
+      if (uaLower.contains("chrome/") || uaLower.contains("crios/"))
+         return "CHROME";
+      if (uaLower.contains("firefox/") || uaLower.contains("fxios/"))
+         return "FIREFOX";
+      if (uaLower.contains("safari/") && !uaLower.contains("chrome") && !uaLower.contains("chromium"))
+         return "SAFARI";
+      if (uaLower.contains("postman"))
+         return "POSTMAN";
+      if (uaLower.contains("curl"))
+         return "CURL";
       return "OTHER";
    }
 
-   private boolean isSignificantUserAgentChange(String oldPlatform, String newPlatform, String oldBrowser, String newBrowser) {
+   private boolean isSignificantUserAgentChange(String oldPlatform, String newPlatform, String oldBrowser,
+         String newBrowser) {
       if (oldPlatform == null || newPlatform == null || oldBrowser == null || newBrowser == null) {
          return true;
       }
@@ -108,8 +143,7 @@ public class AuthServiceImpl implements AuthService {
          redisTemplate.execute(
                new DefaultRedisScript<>(INCR_EXPIRE_SCRIPT, Long.class),
                Collections.singletonList(key),
-               String.valueOf(timeoutSeconds)
-         );
+               String.valueOf(timeoutSeconds));
       } catch (Exception e) {
          log.error("Failed to execute atomic increment for key: {}", key, e);
          try {
@@ -163,6 +197,10 @@ public class AuthServiceImpl implements AuthService {
    private final RegistrationInboxRepository registrationInboxRepository;
 
    private final TurnstileService turnstileService;
+
+   private final EncryptionService encryptionService;
+
+   private final ObjectMapper objectMapper;
 
    private static final long SESSION_SLIDING_NORMAL_MS = 1 * 24 * 60 * 60 * 1000L;
 
@@ -230,7 +268,8 @@ public class AuthServiceImpl implements AuthService {
    }
 
    @Override
-   public AuthResponse login(LoginRequest request, String ip, String userAgent, HttpServletResponse response, String oldSessionId) {
+   public AuthResponse login(LoginRequest request, String ip, String userAgent, HttpServletResponse response,
+         String oldSessionId) {
       String emailClean = request.getEmail().trim().toLowerCase();
       String emailKey = "login_failures:" + emailClean;
       String ipKey = "login_failures_ip:" + ip;
@@ -294,7 +333,8 @@ public class AuthServiceImpl implements AuthService {
                now, oldSessionUuid);
       } catch (AppException e) {
          if (e.getErrorEnum() == ErrorCode.INVALID_CREDENTIALS) {
-            // Increment failed login counts in Redis atomically (15-minute TTL = 900 seconds)
+            // Increment failed login counts in Redis atomically (15-minute TTL = 900
+            // seconds)
             incrementFailureCounter(emailKey, 900);
             incrementFailureCounter(ipKey, 900);
          }
@@ -305,104 +345,341 @@ public class AuthServiceImpl implements AuthService {
    @Override
    public AuthResponse refresh(String sessionId, String refreshToken, String ip, String userAgent,
          HttpServletResponse response) {
-      UUID sId;
-      UUID rToken;
+      long startTime = System.currentTimeMillis();
       try {
-         sId = UUID.fromString(sessionId);
-         rToken = UUID.fromString(refreshToken);
-      } catch (IllegalArgumentException e) {
-         log.error("Invalid UUID format for session or refresh token: session={}, refresh={}", sessionId, refreshToken);
-         CookieUtils.clearAuthCookies(response, isCookieSecure());
-         throw new AppException(ErrorCode.INVALID_SESSION);
-      }
-
-      String lockKey = "lock:refresh:" + sId;
-      String lockValue = UUID.randomUUID().toString();
-      Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, 5, TimeUnit.SECONDS);
-
-      if (Boolean.FALSE.equals(acquired)) {
-         log.warn("Refresh already in progress for session: {}", sId);
-         meterRegistry.counter("omnibooking.auth.lock.contention").increment();
-         throw new AppException(ErrorCode.INVALID_SESSION);
-      }
-
-      ScheduledFuture<?> heartbeatTask = null;
-      try {
-         heartbeatTask = lockRenewalScheduler.scheduleAtFixedRate(() -> {
-            try {
-               String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('expire', KEYS[1], 10) else return 0 end";
-               Long result = redisTemplate.execute(
-                     new DefaultRedisScript<>(script, Long.class),
-                     Collections.singletonList(lockKey),
-                     lockValue
-               );
-               if (result != null && result > 0) {
-                  meterRegistry.counter("omnibooking.auth.refresh.lock.renewal").increment();
-               } else {
-                  meterRegistry.counter("omnibooking.auth.refresh.lock.timeout").increment();
-                  log.warn("Failed to renew refresh lock for session: {}", sId);
-               }
-            } catch (Exception ex) {
-               log.error("Error renewing refresh lock for session: {}", sId, ex);
-            }
-         }, 2, 2, TimeUnit.SECONDS);
-
-         if (!sessionService.isValidSession(sId, rToken)) {
+         UUID sId;
+         UUID rToken;
+         try {
+            sId = UUID.fromString(sessionId);
+            rToken = UUID.fromString(refreshToken);
+         } catch (IllegalArgumentException e) {
+            log.error("Invalid UUID format for session or refresh token: session={}, refresh={}", sessionId,
+                  refreshToken);
             CookieUtils.clearAuthCookies(response, isCookieSecure());
             throw new AppException(ErrorCode.INVALID_SESSION);
          }
 
-         RedisSessionInfo info = sessionService.getSession(sId);
+         // Double-Layer Token Bucket Rate Limiting
+         String sessionLimitKey = "rate_limit:refresh:session:" + sId;
+         String ipLimitKey = "rate_limit:refresh:ip:" + ip;
+         if (!checkRateLimit(sessionLimitKey, 10, 0.1667)) {
+            throw new AppException(ErrorCode.RATE_LIMIT_EXCEEDED);
+         }
+         if (!checkRateLimit(ipLimitKey, 60, 1.0)) {
+            throw new AppException(ErrorCode.RATE_LIMIT_EXCEEDED);
+         }
 
-         User user = userRepository.findById(Objects.requireNonNull(info.getUserId()))
-               .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+         String lockKey = "lock:refresh:" + sId;
+         String lockValue = UUID.randomUUID().toString();
+         Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, 5, TimeUnit.SECONDS);
 
-         // Device Signature Verification with Backward Compatibility
-         if (info.getPlatform() == null || info.getBrowserFamily() == null) {
-            log.info("Legacy session detected during refresh for user: {}. Bypassing DeviceSignature validation.", user.getEmail());
-         } else {
-            String currentPlatform = getOsFamily(userAgent);
-            String currentBrowserFamily = getBrowserFamily(userAgent);
-            boolean suspicious = isSignificantUserAgentChange(info.getPlatform(), currentPlatform, info.getBrowserFamily(), currentBrowserFamily);
-            if (suspicious) {
-               log.warn("Significant device binding change detected during refresh (Suspicious device takeover). " +
-                     "User: {}, Stored: [{}, {}], Current: [{}, {}]",
-                     user.getEmail(), info.getPlatform(), info.getBrowserFamily(), currentPlatform, currentBrowserFamily);
+         if (Boolean.FALSE.equals(acquired)) {
+            log.warn("Refresh already in progress for session: {}", sId);
+            meterRegistry.counter("omnibooking.auth.lock.contention").increment();
+            throw new AppException(ErrorCode.INVALID_SESSION);
+         }
+
+         ScheduledFuture<?> heartbeatTask = null;
+         try {
+            heartbeatTask = lockRenewalScheduler.scheduleAtFixedRate(() -> {
+               try {
+                  String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('expire', KEYS[1], 10) else return 0 end";
+                  Long result = redisTemplate.execute(
+                        new DefaultRedisScript<>(script, Long.class),
+                        Collections.singletonList(lockKey),
+                        lockValue);
+                  if (result != null && result > 0) {
+                     meterRegistry.counter("omnibooking.auth.refresh.lock.renewal").increment();
+                  } else {
+                     meterRegistry.counter("omnibooking.auth.refresh.lock.timeout").increment();
+                     log.warn("Failed to renew refresh lock for session: {}", sId);
+                  }
+               } catch (Exception ex) {
+                  log.error("Error renewing refresh lock for session: {}", sId, ex);
+               }
+            }, 2, 2, TimeUnit.SECONDS);
+
+            // Load session S1 from Redis
+            RedisSessionInfo info = sessionService.getSession(sId);
+            if (info == null) {
+               CookieUtils.clearAuthCookies(response, isCookieSecure());
+               throw new AppException(ErrorCode.INVALID_SESSION);
+            }
+
+            // Load request for Access Token parsing
+            HttpServletRequest request = null;
+            try {
+               request = ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getRequest();
+            } catch (Exception ex) {
+               log.warn("Request attributes not available for JWT extraction", ex);
+            }
+
+            // Validate Session Version during Refresh
+            if (request != null) {
+               String accessToken = CookieUtils.getCookieValue(request, CookieUtils.ACCESS_TOKEN);
+               if (accessToken != null) {
+                  Claims claims = null;
+                  try {
+                     claims = jwtService.extractAllClaims(accessToken);
+                  } catch (ExpiredJwtException ex) {
+                     claims = ex.getClaims();
+                  } catch (Exception ex) {
+                     log.warn("Failed to parse claims from access token", ex);
+                  }
+
+                  if (claims != null) {
+                     // Validate session ownership (P1)
+                     String subject = claims.getSubject();
+                     if (subject == null || !subject.equals(info.getUserId().toString())) {
+                        log.warn("Session ownership mismatch during refresh. JWT subject = {}, Redis owner = {}",
+                              subject, info.getUserId());
+                        writeSecurityAuditEvent(info.getUserId(), sId, info.getRefreshFamilyId(),
+                              info.getRefreshTokenId(), "SESSION_OWNERSHIP_MISMATCH", ip, userAgent);
+                        CookieUtils.clearAuthCookies(response, isCookieSecure());
+                        throw new AppException(ErrorCode.INVALID_SESSION);
+                     }
+
+                     Integer jwtSessionVersion = claims.get("sv", Integer.class);
+                     if (jwtSessionVersion == null) {
+                        jwtSessionVersion = 1;
+                     }
+                     if (!jwtSessionVersion.equals(info.getSessionVersion())) {
+                        log.warn("Session version mismatch during refresh for user: {}. Expected {}, got {}",
+                              info.getUserId(), info.getSessionVersion(), jwtSessionVersion);
+                        writeSecurityAuditEvent(info.getUserId(), sId, info.getRefreshFamilyId(),
+                              info.getRefreshTokenId(), "SESSION_VERSION_MISMATCH", ip, userAgent);
+                        sessionService.deleteSession(sId);
+                        CookieUtils.clearAuthCookies(response, isCookieSecure());
+                        throw new AppException(ErrorCode.INVALID_SESSION);
+                     }
+                  }
+               }
+            }
+
+            User user = userRepository.findById(Objects.requireNonNull(info.getUserId()))
+                  .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+            // If parent session was already rotated (used == true) (Benign Concurrency &
+            // Recovery)
+            if (info.isUsed()) {
+               long elapsed = System.currentTimeMillis() - info.getRotationTimestamp();
+               long gracePeriodMs = appProperties.getSecurity().getRefreshGracePeriodMs();
+
+               // Extract fingerprint from cookie/header
+               String fingerprintFromCookie = null;
+               if (request != null) {
+                  fingerprintFromCookie = CookieUtils.getCookieValue(request, CookieUtils.FINGERPRINT);
+                  if (fingerprintFromCookie == null) {
+                     fingerprintFromCookie = request.getHeader("x-fgp");
+                  }
+               }
+
+               // Verify fingerprint with versioned pepper
+               String fgh_v = null;
+               if (request != null) {
+                  String accessToken = CookieUtils.getCookieValue(request, CookieUtils.ACCESS_TOKEN);
+                  if (accessToken != null) {
+                     try {
+                        fgh_v = jwtService.extractFingerprintPepperVersion(accessToken);
+                     } catch (ExpiredJwtException ex) {
+                        fgh_v = ex.getClaims().get("fgh_v", String.class);
+                     } catch (Exception ex) {
+                        log.warn("Failed to extract fingerprint pepper version from token", ex);
+                     }
+                  }
+               }
+               String pepper = null;
+               if (fgh_v != null && appProperties.getSecurity().getFingerprintPeppers() != null) {
+                  pepper = appProperties.getSecurity().getFingerprintPeppers().get(fgh_v);
+               }
+               String expectedHash = SecurityUtils.hashFingerprint(fingerprintFromCookie, pepper);
+
+               boolean fingerprintMatches = fingerprintFromCookie != null && expectedHash.equals(
+                     jwtService.extractFingerprintHash(CookieUtils.getCookieValue(request, CookieUtils.ACCESS_TOKEN)));
+
+               if (elapsed < gracePeriodMs && fingerprintMatches) {
+                  // Benign Concurrency!
+                  long abuseCount = redisTemplate.opsForHash().increment("refresh:" + sId, "concurrencyCount", 1);
+                  if (abuseCount > 3) {
+                     meterRegistry.counter("auth_concurrent_refresh_abuse_total").increment();
+                     writeSecurityAuditEvent(info.getUserId(), sId, info.getRefreshFamilyId(), info.getRefreshTokenId(),
+                           "GRACE_PERIOD_ABUSE", ip, userAgent);
+                  }
+
+                  UUID childId = info.getChildSessionId();
+                  if (childId == null) {
+                     // No child session stored, corrupted
+                     writeSecurityAuditEvent(info.getUserId(), sId, info.getRefreshFamilyId(), info.getRefreshTokenId(),
+                           "UNKNOWN_CHILD_SESSION", ip, userAgent);
+                     sessionService.revokeAllUserSessions(info.getUserId());
+                     CookieUtils.clearAuthCookies(response, isCookieSecure());
+                     throw new AppException(ErrorCode.INVALID_SESSION);
+                  }
+
+                  // Recover and activate child session atomically (Lua CAS - P21 & P25)
+                  long activateResult = activateChildSession(sId, childId);
+                  if (activateResult != 1 && activateResult != 0) {
+                     log.error("CAS Activation failed in recovery, result: {}", activateResult);
+                     if (activateResult == -3) {
+                        handleSecurityIntegrityViolation(info, info, "SECURITY_CHAIN_INTEGRITY_VIOLATION", ip,
+                              userAgent);
+                     } else {
+                        writeSecurityAuditEvent(info.getUserId(), sId, info.getRefreshFamilyId(),
+                              info.getRefreshTokenId(), "UNKNOWN_CHILD_SESSION", ip, userAgent);
+                        sessionService.revokeAllUserSessions(info.getUserId());
+                     }
+                     CookieUtils.clearAuthCookies(response, isCookieSecure());
+                     throw new AppException(ErrorCode.INVALID_SESSION);
+                  }
+
+                  // Decrypt child credentials
+                  String storedBlob = info.getEncryptedChildCredentials();
+                  if (storedBlob == null || !storedBlob.contains(":")) {
+                     log.error("Stored encrypted child credentials blob is invalid or missing");
+                     CookieUtils.clearAuthCookies(response, isCookieSecure());
+                     throw new AppException(ErrorCode.INVALID_SESSION);
+                  }
+
+                  int colonIndex = storedBlob.indexOf(':');
+                  String credVersion = storedBlob.substring(0, colonIndex);
+                  String cipherText = storedBlob.substring(colonIndex + 1);
+
+                  String decryptedJson;
+                  try {
+                     decryptedJson = encryptionService.decrypt(cipherText, credVersion);
+                  } catch (Exception e) {
+                     log.error("Failed to decrypt child credentials with key version {}", credVersion, e);
+                     CookieUtils.clearAuthCookies(response, isCookieSecure());
+                     throw new AppException(ErrorCode.INVALID_SESSION);
+                  }
+
+                  String childAccess;
+                  String childRefresh;
+                  try {
+                     Map<?, ?> creds = objectMapper.readValue(decryptedJson, Map.class);
+                     childAccess = (String) creds.get("accessToken");
+                     childRefresh = (String) creds.get("refreshToken");
+                  } catch (Exception e) {
+                     log.error("Failed to parse child credentials JSON", e);
+                     CookieUtils.clearAuthCookies(response, isCookieSecure());
+                     throw new AppException(ErrorCode.INVALID_SESSION);
+                  }
+
+                  // Load child session to get cookie expiry
+                  RedisSessionInfo childSession = sessionService.getSession(childId);
+                  if (childSession == null) {
+                     CookieUtils.clearAuthCookies(response, isCookieSecure());
+                     throw new AppException(ErrorCode.INVALID_SESSION);
+                  }
+
+                  // Refresh Family Lineage Verification
+                  boolean chainValid = childSession.getParentTokenId() != null
+                        && childSession.getParentTokenId().equals(info.getRefreshTokenId())
+                        && childSession.getRefreshFamilyId() != null
+                        && childSession.getRefreshFamilyId().equals(info.getRefreshFamilyId());
+                  if (!chainValid) {
+                     handleSecurityIntegrityViolation(info, childSession, "SECURITY_CHAIN_INTEGRITY_VIOLATION", ip,
+                           userAgent);
+                     CookieUtils.clearAuthCookies(response, isCookieSecure());
+                     throw new AppException(ErrorCode.INVALID_SESSION);
+                  }
+
+                  // Return already-issued child session credentials
+                  CookieUtils.setAuthCookies(response, childAccess, childId.toString(),
+                        childRefresh, fingerprintFromCookie, childSession.getCsrfNonce(), isCookieSecure(),
+                        (int) ((childSession.getCreatedAt()
+                              + (info.isRememberMe() ? SESSION_HARD_CAP_REMEMBER_ME_MS : SESSION_HARD_CAP_NORMAL_MS)
+                              - System.currentTimeMillis()) / 1000));
+
+                  return AuthResponse.builder()
+                        .accessToken(childAccess)
+                        .id(user.getId())
+                        .email(user.getEmail())
+                        .fullName(childSession.getFullName())
+                        .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toList()))
+                        .build();
+               } else {
+                  // Replay attack!
+                  String classification = "TOKEN_REUSE_AFTER_ROTATION";
+                  if (elapsed >= gracePeriodMs) {
+                     classification = "EXPIRED_GRACE_PERIOD";
+                  } else if (!fingerprintMatches) {
+                     classification = "FINGERPRINT_MISMATCH";
+                  }
+                  writeSecurityAuditEvent(info.getUserId(), sId, info.getRefreshFamilyId(), info.getRefreshTokenId(),
+                        classification, ip, userAgent);
+                  meterRegistry.counter("auth_refresh_replay_detected_total").increment();
+                  sessionService.revokeAllUserSessions(info.getUserId());
+                  CookieUtils.clearAuthCookies(response, isCookieSecure());
+                  throw new AppException(ErrorCode.INVALID_SESSION);
+               }
+            }
+
+            // Verify parent session refresh token match
+            if (!passwordEncoder.matches(rToken.toString(), info.getHashedRefreshToken())) {
+               CookieUtils.clearAuthCookies(response, isCookieSecure());
+               throw new AppException(ErrorCode.INVALID_SESSION);
+            }
+
+            // Device Signature Verification with Backward Compatibility
+            if (info.getPlatform() == null || info.getBrowserFamily() == null) {
+               log.info("Legacy session detected during refresh for user: {}. Bypassing DeviceSignature validation.",
+                     user.getEmail());
+            } else {
+               String currentPlatform = getOsFamily(userAgent);
+               String currentBrowserFamily = getBrowserFamily(userAgent);
+               boolean suspicious = isSignificantUserAgentChange(info.getPlatform(), currentPlatform,
+                     info.getBrowserFamily(), currentBrowserFamily);
+               if (suspicious) {
+                  log.warn("Significant device binding change detected during refresh (Suspicious device takeover). " +
+                        "User: {}, Stored: [{}, {}], Current: [{}, {}]",
+                        user.getEmail(), info.getPlatform(), info.getBrowserFamily(), currentPlatform,
+                        currentBrowserFamily);
+                  CookieUtils.clearAuthCookies(response, isCookieSecure());
+                  sessionService.deleteSession(sId);
+                  throw new AppException(ErrorCode.INVALID_SESSION);
+               }
+            }
+
+            Set<String> roles = user.getRoles().stream()
+                  .map(Role::getName)
+                  .collect(Collectors.toSet());
+
+            UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
+
+            // Check hard cap
+            long now = System.currentTimeMillis();
+            long elapsed = now - info.getCreatedAt();
+            long hardCap = info.isRememberMe() ? SESSION_HARD_CAP_REMEMBER_ME_MS : SESSION_HARD_CAP_NORMAL_MS;
+
+            if (elapsed >= hardCap) {
+               log.warn("Session hard cap reached for user: {} ({} ms elapsed)", user.getEmail(), elapsed);
                CookieUtils.clearAuthCookies(response, isCookieSecure());
                sessionService.deleteSession(sId);
                throw new AppException(ErrorCode.INVALID_SESSION);
             }
+
+            log.info("Rotating session for user: {}", user.getEmail());
+
+            return rotateSessionAndBuildResponse(user, roles, profile, ip, userAgent, response, info, sId);
+         } finally {
+            if (heartbeatTask != null) {
+               heartbeatTask.cancel(true);
+            }
+            String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+            redisTemplate.execute(new DefaultRedisScript<>(script, Long.class), Collections.singletonList(lockKey),
+                  lockValue);
          }
-
-         Set<String> roles = user.getRoles().stream()
-               .map(Role::getName)
-               .collect(Collectors.toSet());
-
-         UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
-
-         // Check hard cap
-         long now = System.currentTimeMillis();
-         long elapsed = now - info.getCreatedAt();
-         long hardCap = info.isRememberMe() ? SESSION_HARD_CAP_REMEMBER_ME_MS : SESSION_HARD_CAP_NORMAL_MS;
-
-         if (elapsed >= hardCap) {
-            log.warn("Session hard cap reached for user: {} ({} ms elapsed)", user.getEmail(), elapsed);
-            CookieUtils.clearAuthCookies(response, isCookieSecure());
-            sessionService.deleteSession(sId);
-            throw new AppException(ErrorCode.INVALID_SESSION);
-         }
-
-         log.info("Rotating session for user: {}", user.getEmail());
-
-         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, info.isRememberMe(),
-               info.getCreatedAt(), info.getLastAccessedAt(), sId);
-      } finally {
-         if (heartbeatTask != null) {
-            heartbeatTask.cancel(true);
-         }
-         String script = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
-         redisTemplate.execute(new DefaultRedisScript<>(script, Long.class), Collections.singletonList(lockKey),
-               lockValue);
+      } catch (AppException e) {
+         throw e;
+      } catch (Exception e) {
+         log.error("Redis or Database error during token refresh operation", e);
+         meterRegistry.counter("auth_redis_fail_closed_total").increment();
+         long durationMs = System.currentTimeMillis() - startTime;
+         meterRegistry.timer("auth_redis_unavailable_duration_seconds")
+               .record(durationMs, TimeUnit.MILLISECONDS);
+         CookieUtils.clearAuthCookies(response, isCookieSecure());
+         throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
       }
    }
 
@@ -488,8 +765,9 @@ public class AuthServiceImpl implements AuthService {
       String fingerprint = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
       String fgpHash = SecurityUtils.hashFingerprint(fingerprint);
 
+      String pepperVer = appProperties.getSecurity().getActiveFingerprintPepperVersion();
       String accessToken = jwtService.generateAccessToken(user.getId(), user.getUsername(), user.getEmail(), roles,
-            sessionId, fgpHash, user.getTokenVersion());
+            sessionId, fgpHash, user.getTokenVersion(), 1, pepperVer);
 
       // Cache token version in Redis (Task 3)
       try {
@@ -535,6 +813,7 @@ public class AuthServiceImpl implements AuthService {
 
       String platform = getOsFamily(userAgent);
       String browserFamily = getBrowserFamily(userAgent);
+      String csrfNonce = UUID.randomUUID().toString();
 
       // Build Session Info Object
       RedisSessionInfo sessionInfo = RedisSessionInfo.builder()
@@ -552,6 +831,13 @@ public class AuthServiceImpl implements AuthService {
             .deviceVersion(1)
             .platform(platform)
             .browserFamily(browserFamily)
+            .csrfNonce(csrfNonce)
+            .refreshFamilyId(sessionId) // First session in family uses its own ID
+            .refreshTokenId(refreshToken)
+            .parentTokenId(null)
+            .used(false)
+            .sessionVersion(1)
+            .active(true)
             .build();
 
       // Create and Save New Session
@@ -603,7 +889,7 @@ public class AuthServiceImpl implements AuthService {
       }
 
       CookieUtils.setAuthCookies(response, accessToken, sessionId.toString(), refreshToken.toString(), fingerprint,
-            isCookieSecure(), (int) (finalTtlMs / 1000));
+            csrfNonce, isCookieSecure(), (int) (finalTtlMs / 1000));
 
       return userMapper.toAuthResponse(user, profile, roles);
    }
@@ -645,7 +931,8 @@ public class AuthServiceImpl implements AuthService {
          }
       }
 
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now, oldSessionUuid);
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now,
+            oldSessionUuid);
    }
 
    @Override
@@ -723,7 +1010,7 @@ public class AuthServiceImpl implements AuthService {
 
       // Invalidate token after use
       redisTemplate.delete(redisKey);
-         log.info("Password reset successfully for user: {}", email);
+      log.info("Password reset successfully for user: {}", email);
    }
 
    @Override
@@ -822,7 +1109,8 @@ public class AuthServiceImpl implements AuthService {
          }
       }
 
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now, oldSessionUuid);
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now,
+            oldSessionUuid);
    }
 
    @Override
@@ -858,7 +1146,8 @@ public class AuthServiceImpl implements AuthService {
                log.warn("Invalid oldSessionId format in finalizeRegistration: {}", oldSessionId);
             }
          }
-         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now, oldSessionUuid);
+         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now,
+               oldSessionUuid);
       } catch (AppException e) {
          throw e;
       } catch (Exception e) {
@@ -869,7 +1158,7 @@ public class AuthServiceImpl implements AuthService {
 
    @Override
    @Transactional
-   public AuthResponse loginWith2FA(com.omnibooking.dto.TwoFactorLoginRequest request, String ip, String userAgent,
+   public AuthResponse loginWith2FA(TwoFactorLoginRequest request, String ip, String userAgent,
          HttpServletResponse response, String oldSessionId) {
       if (!bloomFilterService.mightContain(request.getEmail())) {
          throw new AppException(ErrorCode.INVALID_CREDENTIALS);
@@ -966,7 +1255,8 @@ public class AuthServiceImpl implements AuthService {
          }
       }
 
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now, oldSessionUuid);
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now,
+            oldSessionUuid);
    }
 
    @Override
@@ -1002,7 +1292,8 @@ public class AuthServiceImpl implements AuthService {
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Registration request not found"));
 
       String message = "Status retrieved from database";
-      if (inbox.getStatus() == RegistrationInboxStatus.FAILED || inbox.getStatus() == RegistrationInboxStatus.FAILED_PERMANENT) {
+      if (inbox.getStatus() == RegistrationInboxStatus.FAILED
+            || inbox.getStatus() == RegistrationInboxStatus.FAILED_PERMANENT) {
          message = inbox.getLastError() != null ? inbox.getLastError() : "Processing failed";
       }
 
@@ -1011,6 +1302,334 @@ public class AuthServiceImpl implements AuthService {
             .status(inbox.getStatus().name())
             .message(message)
             .completedAt(inbox.getProcessedAt())
+            .build();
+   }
+
+   private static final Logger auditLogger = LoggerFactory.getLogger("AUDIT_LOGGER");
+
+   private boolean checkRateLimit(String limitKey, int capacity, double refillRate) {
+      String script = "local key = KEYS[1]\n" +
+            "local capacity = tonumber(ARGV[1])\n" +
+            "local refill_rate = tonumber(ARGV[2])\n" +
+            "local now = tonumber(ARGV[3])\n" +
+            "local requested = 1\n" +
+            "local bucket = redis.call('hmget', key, 'tokens', 'last_updated')\n" +
+            "local tokens = tonumber(bucket[1])\n" +
+            "local last_updated = tonumber(bucket[2])\n" +
+            "if not tokens then\n" +
+            "    tokens = capacity\n" +
+            "    last_updated = now\n" +
+            "else\n" +
+            "    local delta = math.max(0, now - last_updated)\n" +
+            "    tokens = math.min(capacity, tokens + (delta * refill_rate / 1000.0))\n" +
+            "end\n" +
+            "if tokens >= requested then\n" +
+            "    tokens = tokens - requested\n" +
+            "    redis.call('hset', key, 'tokens', tokens, 'last_updated', now)\n" +
+            "    redis.call('pexpire', key, math.ceil(capacity * 1000.0 / refill_rate))\n" +
+            "    return 1\n" +
+            "else\n" +
+            "    redis.call('hset', key, 'tokens', tokens, 'last_updated', now)\n" +
+            "    return 0\n" +
+            "end";
+      try {
+         Long result = redisTemplate.execute(
+               new DefaultRedisScript<>(script, Long.class),
+               Collections.singletonList(limitKey),
+               String.valueOf(capacity),
+               String.valueOf(refillRate),
+               String.valueOf(System.currentTimeMillis()));
+         return result != null && result == 1;
+      } catch (Exception e) {
+         log.error("Failed to execute rate limit Lua script for key: {}", limitKey, e);
+         meterRegistry.counter("auth_redis_fail_closed_total").increment();
+         throw new AppException(ErrorCode.SERVICE_UNAVAILABLE);
+      }
+   }
+
+   private long activateChildSession(UUID parentId, UUID childId) {
+      String parentKey = "refresh:" + parentId;
+      String childKey = "refresh:" + childId;
+      String pendingKey = "pending_sessions";
+      String script = "local parentExists = redis.call('exists', KEYS[1])\n" +
+            "local childExists = redis.call('exists', KEYS[2])\n" +
+            "if parentExists == 0 or childExists == 0 then\n" +
+            "    return -1\n" +
+            "end\n" +
+            "local linkedChildId = redis.call('hget', KEYS[1], 'childSessionId')\n" +
+            "if linkedChildId ~= ARGV[1] then\n" +
+            "    return -3\n" +
+            "end\n" +
+            "local active = redis.call('hget', KEYS[2], 'active')\n" +
+            "if active == 'false' then\n" +
+            "    redis.call('hset', KEYS[2], 'active', 'true')\n" +
+            "    redis.call('zrem', KEYS[3], ARGV[1])\n" +
+            "    return 1\n" +
+            "elseif active == 'true' then\n" +
+            "    redis.call('zrem', KEYS[3], ARGV[1])\n" +
+            "    return 0\n" +
+            "end\n" +
+            "return -2";
+      try {
+         Long result = redisTemplate.execute(
+               new DefaultRedisScript<>(script, Long.class),
+               Arrays.asList(parentKey, childKey, pendingKey),
+               childId.toString());
+         return result != null ? result : -2;
+      } catch (Exception e) {
+         log.error("Failed to execute activateChildSession Lua script", e);
+         return -2;
+      }
+   }
+
+   private void handleSecurityIntegrityViolation(RedisSessionInfo parent, RedisSessionInfo child, String classification,
+         String ip, String userAgent) {
+      log.error("SECURITY INTEGRITY VIOLATION DETECTED: Classification = {}. Parent = {}, Child = {}",
+            classification, parent != null ? parent.getRefreshTokenId() : "null",
+            child != null ? child.getRefreshTokenId() : "null");
+      UUID userId = parent != null ? parent.getUserId() : (child != null ? child.getUserId() : null);
+      if (userId != null) {
+         sessionService.revokeAllUserSessions(userId);
+      }
+      writeSecurityAuditEvent(userId, parent != null ? parent.getRefreshTokenId() : null,
+            parent != null ? parent.getRefreshFamilyId() : null,
+            parent != null ? parent.getRefreshTokenId() : null,
+            classification, ip, userAgent);
+      meterRegistry.counter("auth_refresh_replay_detected_total").increment();
+   }
+
+   private void writeSecurityAuditEvent(UUID userId, UUID sessionId, UUID refreshFamilyId, UUID refreshTokenId,
+         String classification, String ip, String userAgent) {
+      long timestamp = System.currentTimeMillis();
+      String auditSecret = appProperties.getSecurity().getAuditSecret();
+
+      String input = (userId != null ? userId.toString() : "null") + ":"
+            + (sessionId != null ? sessionId.toString() : "null") + ":"
+            + timestamp + ":"
+            + classification;
+
+      String auditHash = "";
+      try {
+         Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
+         SecretKeySpec secretKeySpec = new SecretKeySpec(
+               auditSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+         sha256_HMAC.init(secretKeySpec);
+         byte[] hash = sha256_HMAC.doFinal(input.getBytes(StandardCharsets.UTF_8));
+         auditHash = HexFormat.of().formatHex(hash);
+      } catch (Exception e) {
+         log.error("Failed to generate audit hash", e);
+      }
+
+      Map<String, Object> logPayload = new HashMap<>();
+      logPayload.put("userId", userId);
+      logPayload.put("sessionId", sessionId);
+      logPayload.put("refreshFamilyId", refreshFamilyId);
+      logPayload.put("refreshTokenId", refreshTokenId);
+      logPayload.put("classification", classification);
+      logPayload.put("ip", ip);
+      logPayload.put("userAgent", userAgent);
+      logPayload.put("timestamp", timestamp);
+      logPayload.put("auditHash", auditHash);
+
+      try {
+         auditLogger.info(objectMapper.writeValueAsString(logPayload));
+      } catch (Exception e) {
+         log.error("Failed to write structured security audit log", e);
+      }
+   }
+
+   private AuthResponse rotateSessionAndBuildResponse(User user, Set<String> roles, UserProfile profile,
+         String ip, String userAgent, HttpServletResponse response, RedisSessionInfo info, UUID oldSessionId) {
+      UUID childSessionId = UuidCreator.getTimeOrderedEpoch();
+      UUID childRefreshToken = UuidCreator.getTimeOrderedEpoch();
+
+      byte[] randomBytes = new byte[32];
+      secureRandom.nextBytes(randomBytes);
+      String childFingerprint = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+      String fgpHash = SecurityUtils.hashFingerprint(childFingerprint);
+
+      String childAccessToken = jwtService.generateAccessToken(
+            user.getId(), user.getUsername(), user.getEmail(), roles,
+            childSessionId, fgpHash, user.getTokenVersion(),
+            info.getSessionVersion() + 1,
+            appProperties.getSecurity().getActiveFingerprintPepperVersion());
+
+      String encryptedChildCredentials;
+      try {
+         Map<String, String> credsMap = new HashMap<>();
+         credsMap.put("accessToken", childAccessToken);
+         credsMap.put("refreshToken", childRefreshToken.toString());
+         String plainText = objectMapper.writeValueAsString(credsMap);
+         String keyVer = appProperties.getSecurity().getCredentialEncryptionKeyVersion();
+         String cipherText = encryptionService.encrypt(plainText, keyVer);
+         encryptedChildCredentials = keyVer + ":" + cipherText;
+      } catch (Exception e) {
+         log.error("Failed to prepare and encrypt child credentials", e);
+         throw new AppException(ErrorCode.INVALID_SESSION);
+      }
+
+      String childCsrfNonce = UUID.randomUUID().toString();
+
+      long now = System.currentTimeMillis();
+      long slidingMs = info.isRememberMe() ? SESSION_SLIDING_REMEMBER_ME_MS : SESSION_SLIDING_NORMAL_MS;
+      long hardCapMs = info.isRememberMe() ? SESSION_HARD_CAP_REMEMBER_ME_MS : SESSION_HARD_CAP_NORMAL_MS;
+      long remainingHardCapMs = hardCapMs - (now - info.getCreatedAt());
+      long finalTtlMs = Math.min(slidingMs, remainingHardCapMs);
+      if (finalTtlMs < 0) {
+         finalTtlMs = 0;
+      }
+
+      RedisSessionInfo childSession = RedisSessionInfo.builder()
+            .userId(user.getId())
+            .username(user.getUsername())
+            .email(user.getEmail())
+            .fullName(info.getFullName())
+            .roles(roles)
+            .hashedRefreshToken(passwordEncoder.encode(childRefreshToken.toString()))
+            .ip(ip)
+            .userAgent(userAgent)
+            .createdAt(info.getCreatedAt())
+            .lastAccessedAt(now)
+            .rememberMe(info.isRememberMe())
+            .deviceVersion(1)
+            .platform(getOsFamily(userAgent))
+            .browserFamily(getBrowserFamily(userAgent))
+            .csrfNonce(childCsrfNonce)
+            .refreshFamilyId(info.getRefreshFamilyId() != null ? info.getRefreshFamilyId() : oldSessionId)
+            .refreshTokenId(childRefreshToken)
+            .parentTokenId(info.getRefreshTokenId())
+            .used(false)
+            .sessionVersion(info.getSessionVersion() + 1)
+            .active(false) // Pending state
+            .build();
+
+      try {
+         sessionService.saveSession(childSessionId, childSession, finalTtlMs);
+      } catch (Exception e) {
+         log.error("Failed to save pending child session", e);
+         throw new AppException(ErrorCode.INVALID_SESSION);
+      }
+
+      String rotateScript = "local oldExists = redis.call('exists', KEYS[1])\n" +
+            "if oldExists == 0 then return -1 end\n" +
+            "local used = redis.call('hget', KEYS[1], 'used')\n" +
+            "if used == 'true' then return -2 end\n" +
+            "redis.call('hset', KEYS[1], 'used', 'true')\n" +
+            "redis.call('hset', KEYS[1], 'childSessionId', ARGV[1])\n" +
+            "redis.call('hset', KEYS[1], 'rotationTimestamp', ARGV[3])\n" +
+            "redis.call('hset', KEYS[1], 'encryptedChildCredentials', ARGV[4])\n" +
+            "redis.call('pexpire', KEYS[1], tonumber(ARGV[2]))\n" +
+            "return 1";
+
+      long gracePeriodMs = appProperties.getSecurity().getRefreshGracePeriodMs();
+      Long rotateResult;
+      try {
+         rotateResult = redisTemplate.execute(
+               new DefaultRedisScript<>(rotateScript, Long.class),
+               Collections.singletonList("refresh:" + oldSessionId),
+               childSessionId.toString(),
+               String.valueOf(gracePeriodMs),
+               String.valueOf(now),
+               encryptedChildCredentials);
+      } catch (Exception e) {
+         log.error("Failed to execute rotate_session Lua script", e);
+         sessionService.deleteSession(childSessionId);
+         throw new AppException(ErrorCode.INVALID_SESSION);
+      }
+
+      if (rotateResult == null || rotateResult == -1) {
+         sessionService.deleteSession(childSessionId);
+         CookieUtils.clearAuthCookies(response, isCookieSecure());
+         throw new AppException(ErrorCode.INVALID_SESSION);
+      }
+
+      if (rotateResult == -2) {
+         // Concurrency collision! Another thread rotated this session. Clean up
+         // childSession.
+         sessionService.deleteSession(childSessionId);
+
+         // Reload parent session to decrypt credentials issued by the winning thread
+         RedisSessionInfo updatedParent = sessionService.getSession(oldSessionId);
+         if (updatedParent == null || updatedParent.getEncryptedChildCredentials() == null) {
+            CookieUtils.clearAuthCookies(response, isCookieSecure());
+            throw new AppException(ErrorCode.INVALID_SESSION);
+         }
+
+         String storedBlob = updatedParent.getEncryptedChildCredentials();
+         int colonIndex = storedBlob.indexOf(':');
+         String credVersion = storedBlob.substring(0, colonIndex);
+         String cipherText = storedBlob.substring(colonIndex + 1);
+
+         String decryptedJson;
+         try {
+            decryptedJson = encryptionService.decrypt(cipherText, credVersion);
+         } catch (Exception e) {
+            CookieUtils.clearAuthCookies(response, isCookieSecure());
+            throw new AppException(ErrorCode.INVALID_SESSION);
+         }
+
+         String childAccess;
+         String childRefresh;
+         try {
+            Map<?, ?> creds = objectMapper.readValue(decryptedJson, Map.class);
+            childAccess = (String) creds.get("accessToken");
+            childRefresh = (String) creds.get("refreshToken");
+         } catch (Exception e) {
+            CookieUtils.clearAuthCookies(response, isCookieSecure());
+            throw new AppException(ErrorCode.INVALID_SESSION);
+         }
+
+         UUID actualChildId = updatedParent.getChildSessionId();
+         RedisSessionInfo actualChildSession = sessionService.getSession(actualChildId);
+         if (actualChildSession == null) {
+            CookieUtils.clearAuthCookies(response, isCookieSecure());
+            throw new AppException(ErrorCode.INVALID_SESSION);
+         }
+
+         // Try to activate it in case it hasn't been activated by the other thread yet
+         activateChildSession(oldSessionId, actualChildId);
+
+         CookieUtils.setAuthCookies(response, childAccess, actualChildId.toString(),
+               childRefresh, childFingerprint, actualChildSession.getCsrfNonce(), isCookieSecure(),
+               (int) ((actualChildSession.getCreatedAt()
+                     + (info.isRememberMe() ? SESSION_HARD_CAP_REMEMBER_ME_MS : SESSION_HARD_CAP_NORMAL_MS)
+                     - System.currentTimeMillis()) / 1000));
+
+         return AuthResponse.builder()
+               .accessToken(childAccess)
+               .id(user.getId())
+               .email(user.getEmail())
+               .fullName(actualChildSession.getFullName())
+               .roles(new java.util.ArrayList<>(roles))
+               .build();
+      }
+
+      // Activate Child Session (Lua CAS)
+      long activateResult = activateChildSession(oldSessionId, childSessionId);
+      if (activateResult != 1 && activateResult != 0) {
+         log.error("Failed to activate child session via CAS, result: {}", activateResult);
+         sessionService.deleteSession(childSessionId);
+         if (activateResult == -3) {
+            handleSecurityIntegrityViolation(info, childSession, "SECURITY_CHAIN_INTEGRITY_VIOLATION", ip, userAgent);
+         } else {
+            writeSecurityAuditEvent(info.getUserId(), oldSessionId, info.getRefreshFamilyId(), info.getRefreshTokenId(),
+                  "UNKNOWN_CHILD_SESSION", ip, userAgent);
+            sessionService.revokeAllUserSessions(info.getUserId());
+         }
+         CookieUtils.clearAuthCookies(response, isCookieSecure());
+         throw new AppException(ErrorCode.INVALID_SESSION);
+      }
+
+      CookieUtils.setAuthCookies(response, childAccessToken, childSessionId.toString(),
+            childRefreshToken.toString(), childFingerprint, childCsrfNonce, isCookieSecure(),
+            (int) (finalTtlMs / 1000));
+
+      return AuthResponse.builder()
+            .accessToken(childAccessToken)
+            .id(user.getId())
+            .email(user.getEmail())
+            .fullName(childSession.getFullName())
+            .roles(new java.util.ArrayList<>(roles))
             .build();
    }
 
@@ -1027,4 +1646,5 @@ public class AuthServiceImpl implements AuthService {
          Thread.currentThread().interrupt();
       }
    }
+
 }

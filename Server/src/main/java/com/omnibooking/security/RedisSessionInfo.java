@@ -41,4 +41,25 @@ public class RedisSessionInfo {
 
    private String browserFamily;
 
+   private String csrfNonce;
+
+   private UUID refreshFamilyId;
+
+   private UUID refreshTokenId;
+
+   private UUID parentTokenId;
+
+   private boolean used;
+
+   private UUID childSessionId;
+
+   private Long rotationTimestamp;
+
+   private String encryptedChildCredentials;
+
+   @Builder.Default
+   private Integer sessionVersion = 1;
+
+   private boolean active;
+
 }

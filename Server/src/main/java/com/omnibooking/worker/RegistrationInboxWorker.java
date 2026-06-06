@@ -28,8 +28,11 @@ import com.omnibooking.services.user.RegistrationService;
 public class RegistrationInboxWorker {
 
    private final RegistrationInboxRepository registrationInboxRepository;
+
    private final RegistrationQueueServiceImpl registrationQueueService;
+
    private final ObjectMapper objectMapper;
+
    private final RegistrationService registrationService;
 
    @Scheduled(fixedDelay = 30000) // Every 30 seconds

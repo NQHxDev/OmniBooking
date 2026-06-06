@@ -19,6 +19,8 @@ import com.omnibooking.services.user.RegistrationQueueService;
 import com.omnibooking.services.communication.SseNotificationService;
 import com.omnibooking.config.AppProperties;
 import com.omnibooking.util.CookieUtils;
+import com.omnibooking.services.auth.SessionService;
+import com.omnibooking.security.RedisSessionInfo;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -65,6 +67,8 @@ public class AuthController {
    private final SseNotificationService sseNotificationService;
 
    private final TurnstileService turnstileService;
+
+   private final SessionService sessionService;
 
    @Anonymous
    @Idempotent
@@ -309,11 +313,22 @@ public class AuthController {
       String csrfCookie = CookieUtils.getCookieValue(request, CookieUtils.CSRF_TOKEN);
       if (csrfCookie == null || csrfCookie.isBlank()) {
          String sessionId = CookieUtils.getCookieValue(request, CookieUtils.SESSION_ID);
+         String csrfNonce = null;
+         if (sessionId != null && !sessionId.isBlank()) {
+            try {
+               RedisSessionInfo sessionInfo = sessionService.getSession(UUID.fromString(sessionId));
+               if (sessionInfo != null) {
+                  csrfNonce = sessionInfo.getCsrfNonce();
+               }
+            } catch (Exception e) {
+               log.error("Failed to load session for CSRF token endpoint", e);
+            }
+         }
          String secret = appProperties.getSecurity().getCsrfSecret();
          if (secret == null || secret.isBlank()) {
             secret = appProperties.getSecurity().getJwtSecret();
          }
-         csrfCookie = CookieUtils.calculateCsrfToken(sessionId, secret);
+         csrfCookie = CookieUtils.calculateCsrfToken(sessionId, csrfNonce, secret);
          CookieUtils.addCookie(response, CookieUtils.CSRF_TOKEN, csrfCookie, 86400,
                appProperties.getSecurity().isCookieSecure());
       }

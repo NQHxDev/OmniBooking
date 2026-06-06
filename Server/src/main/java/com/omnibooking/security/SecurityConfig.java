@@ -1,6 +1,7 @@
 package com.omnibooking.security;
 
 import com.omnibooking.services.auth.JWTService;
+import com.omnibooking.services.auth.SessionService;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
@@ -15,8 +16,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -52,13 +51,10 @@ public class SecurityConfig {
 
    private final AppProperties appProperties;
 
+   private final SessionService sessionService;
+
    @Value("${app.cors.allowed-origins:http://localhost:3000}")
    private String allowedOrigins;
-
-   @Bean
-   public PasswordEncoder passwordEncoder() {
-      return Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
-   }
 
    @Bean
    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
@@ -95,23 +91,25 @@ public class SecurityConfig {
       config.setExposedHeaders(List.of("Set-Cookie", "X-Request-ID", "X-Correlation-ID"));
       config.setMaxAge(3600L);
       source.registerCorsConfiguration("/**", config);
+
       return source;
    }
 
    @Bean
    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
       JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, userDetailsService, redisTemplate,
-            meterRegistry);
+            meterRegistry, sessionService, appProperties);
       CustomCsrfFilter csrfFilter = new CustomCsrfFilter(
             objectMapper,
             allowedOrigins,
             meterRegistry,
             appProperties.getSecurity().getCsrfBypassPatterns(),
             appProperties.getSecurity().isCookieSecure(),
-            appProperties.getSecurity().getCsrfSecret() != null && !appProperties.getSecurity().getCsrfSecret().isBlank()
-                  ? appProperties.getSecurity().getCsrfSecret()
-                  : appProperties.getSecurity().getJwtSecret()
-      );
+            appProperties.getSecurity().getCsrfSecret() != null
+                  && !appProperties.getSecurity().getCsrfSecret().isBlank()
+                        ? appProperties.getSecurity().getCsrfSecret()
+                        : appProperties.getSecurity().getJwtSecret(),
+            sessionService);
 
       http
             .csrf(AbstractHttpConfigurer::disable)

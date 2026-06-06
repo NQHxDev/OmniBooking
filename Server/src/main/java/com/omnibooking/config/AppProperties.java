@@ -120,6 +120,15 @@ public class AppProperties {
       private String activeKeyId;
       private Map<String, String> keys = new HashMap<>();
       private boolean twoFactorEnabled = true;
+      private String credentialEncryptionKeyVersion = "v1";
+      private String auditSecret = "defaultAuditSecretKeyForSignatureVerification";
+      private String activeFingerprintPepperVersion = "v1";
+      private Map<String, String> fingerprintPeppers = new HashMap<>();
+      private long refreshGracePeriodMs = 15000;
+      private boolean allowLegacyFingerprint = true;
+      private boolean enableFingerprintVersioning = true;
+      private boolean enableCsrfRotation = true;
+      private boolean enableRefreshReplayDetection = true;
       private boolean cookieSecure;
       private String cookieDomain;
       private String csrfSecret;

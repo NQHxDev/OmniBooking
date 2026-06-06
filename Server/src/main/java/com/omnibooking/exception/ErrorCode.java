@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 
 @Getter
 public enum ErrorCode {
+
    // Auth Errors
    USER_ALREADY_EXISTS("AUTH_001", "User already exists", HttpStatus.BAD_REQUEST),
    EMAIL_ALREADY_EXISTS("AUTH_002", "Email already exists", HttpStatus.BAD_REQUEST),
@@ -35,7 +36,9 @@ public enum ErrorCode {
 
    // Idempotency Errors
    IDEMPOTENCY_KEY_REQUIRED("IDEM_001", "X-Idempotency-Key header is required", HttpStatus.BAD_REQUEST),
-   IDEMPOTENCY_KEY_PROCESSING("IDEM_002", "Request is already being processed", HttpStatus.CONFLICT);
+   IDEMPOTENCY_KEY_PROCESSING("IDEM_002", "Request is already being processed", HttpStatus.CONFLICT),
+   SERVICE_UNAVAILABLE("GEN_503", "Service temporarily unavailable, please try again later",
+         HttpStatus.SERVICE_UNAVAILABLE);
 
    private final String code;
    private final String message;

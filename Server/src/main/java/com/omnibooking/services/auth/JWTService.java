@@ -50,6 +50,14 @@ public class JWTService {
     */
    public String generateAccessToken(UUID userId, String username, String email, Collection<String> roles,
          UUID sessionId, String fingerprintHash, Integer tokenVersion) {
+      return generateAccessToken(userId, username, email, roles, sessionId, fingerprintHash, tokenVersion, 1, null);
+   }
+
+   /**
+    * Generate an Access Token with userId, username, email, roles, sessionId, tokenVersion, sessionVersion, and fingerprintPepperVersion.
+    */
+   public String generateAccessToken(UUID userId, String username, String email, Collection<String> roles,
+         UUID sessionId, String fingerprintHash, Integer tokenVersion, Integer sessionVersion, String fingerprintPepperVersion) {
       return Jwts.builder()
             .subject(userId.toString())
             .claim("username", username)
@@ -57,6 +65,8 @@ public class JWTService {
             .claim("roles", roles)
             .claim("sessionId", sessionId.toString())
             .claim("fgh", fingerprintHash)
+            .claim("fgh_v", fingerprintPepperVersion)
+            .claim("sv", sessionVersion != null ? sessionVersion : 1)
             .claim("tokenVersion", tokenVersion != null ? tokenVersion : 0)
             .issuedAt(new Date())
             .expiration(new Date(System.currentTimeMillis() + expiration))
@@ -119,6 +129,14 @@ public class JWTService {
       }
 
       return Collections.emptySet();
+   }
+
+   public String extractFingerprintPepperVersion(String token) {
+      return extractAllClaims(token).get("fgh_v", String.class);
+   }
+
+   public Integer extractSessionVersion(String token) {
+      return extractAllClaims(token).get("sv", Integer.class);
    }
 
 }

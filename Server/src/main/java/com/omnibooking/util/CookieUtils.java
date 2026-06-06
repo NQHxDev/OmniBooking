@@ -4,6 +4,13 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
+import java.util.UUID;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 
@@ -27,18 +34,26 @@ public class CookieUtils {
     * Calculates CSRF Token bound to session using HMAC-SHA256.
     */
    public static String calculateCsrfToken(String sessionId, String secret) {
+      return calculateCsrfToken(sessionId, null, secret);
+   }
+
+   /**
+    * Calculates CSRF Token bound to session and nonce using HMAC-SHA256.
+    */
+   public static String calculateCsrfToken(String sessionId, String csrfNonce, String secret) {
       if (sessionId == null || sessionId.isBlank() || secret == null || secret.isBlank()) {
-         return java.util.UUID.randomUUID().toString();
+         return UUID.randomUUID().toString();
       }
+      String input = sessionId + (csrfNonce != null ? csrfNonce : "");
       try {
-         javax.crypto.Mac sha256_HMAC = javax.crypto.Mac.getInstance("HmacSHA256");
-         javax.crypto.spec.SecretKeySpec secretKeySpec = new javax.crypto.spec.SecretKeySpec(
-               secret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA256");
+         Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
+         SecretKeySpec secretKeySpec = new SecretKeySpec(
+               secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
          sha256_HMAC.init(secretKeySpec);
-         byte[] hash = sha256_HMAC.doFinal(sessionId.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-         return java.util.HexFormat.of().formatHex(hash);
+         byte[] hash = sha256_HMAC.doFinal(input.getBytes(StandardCharsets.UTF_8));
+         return HexFormat.of().formatHex(hash);
       } catch (Exception e) {
-         return java.util.UUID.randomUUID().toString();
+         return UUID.randomUUID().toString();
       }
    }
 
@@ -56,7 +71,7 @@ public class CookieUtils {
     * Sets auth cookies in the response.
     */
    public static void setAuthCookies(HttpServletResponse response, String accessToken, String sessionId,
-         String refreshToken, String fingerprint, boolean secure, int expiry) {
+         String refreshToken, String fingerprint, String csrfNonce, boolean secure, int expiry) {
 
       addCookie(response, ACCESS_TOKEN, accessToken, 15 * 60, secure); // Access token always 15 mins
       addCookie(response, SESSION_ID, sessionId, expiry, secure);
@@ -65,7 +80,7 @@ public class CookieUtils {
 
       // Set csrf_token cookie for double submit cookie verification (not HttpOnly so
       // client JS can read it)
-      String csrfToken = calculateCsrfToken(sessionId, csrfSecret);
+      String csrfToken = calculateCsrfToken(sessionId, csrfNonce, csrfSecret);
       addCookie(response, CSRF_TOKEN, csrfToken, expiry, secure);
    }
 
@@ -82,12 +97,16 @@ public class CookieUtils {
 
    public static void addCookie(HttpServletResponse response, String name, String value, int maxAge, boolean secure) {
       boolean httpOnly = !name.equals(CSRF_TOKEN);
+      String sameSite = "Lax";
+      if (name.equals(REFRESH_TOKEN) || name.equals(FINGERPRINT)) {
+         sameSite = "Strict";
+      }
       ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, value)
             .httpOnly(httpOnly)
             .secure(secure)
             .path("/")
             .maxAge(maxAge)
-            .sameSite("Lax");
+            .sameSite(sameSite);
       String resolvedDomain = resolveCookieDomain();
       if (resolvedDomain != null && !resolvedDomain.isBlank()) {
          builder.domain(resolvedDomain);
@@ -97,12 +116,16 @@ public class CookieUtils {
 
    public static void deleteCookie(HttpServletResponse response, String name, boolean secure) {
       boolean httpOnly = !name.equals(CSRF_TOKEN);
+      String sameSite = "Lax";
+      if (name.equals(REFRESH_TOKEN) || name.equals(FINGERPRINT)) {
+         sameSite = "Strict";
+      }
       ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, "")
             .httpOnly(httpOnly)
             .secure(secure)
             .path("/")
             .maxAge(0)
-            .sameSite("Lax");
+            .sameSite(sameSite);
       String resolvedDomain = resolveCookieDomain();
       if (resolvedDomain != null && !resolvedDomain.isBlank()) {
          builder.domain(resolvedDomain);
