@@ -17,6 +17,8 @@ public class CookieUtils {
 
    public static final String FINGERPRINT = "x_fgp";
 
+   public static final String CSRF_TOKEN = "csrf_token";
+
    public static String cookieDomain;
 
    public static String csrfSecret;
@@ -64,7 +66,7 @@ public class CookieUtils {
       // Set csrf_token cookie for double submit cookie verification (not HttpOnly so
       // client JS can read it)
       String csrfToken = calculateCsrfToken(sessionId, csrfSecret);
-      addCookie(response, "csrf_token", csrfToken, expiry, secure);
+      addCookie(response, CSRF_TOKEN, csrfToken, expiry, secure);
    }
 
    /**
@@ -75,11 +77,11 @@ public class CookieUtils {
       deleteCookie(response, SESSION_ID, secure);
       deleteCookie(response, REFRESH_TOKEN, secure);
       deleteCookie(response, FINGERPRINT, secure);
-      deleteCookie(response, "csrf_token", secure);
+      deleteCookie(response, CSRF_TOKEN, secure);
    }
 
    public static void addCookie(HttpServletResponse response, String name, String value, int maxAge, boolean secure) {
-      boolean httpOnly = !name.equals("csrf_token");
+      boolean httpOnly = !name.equals(CSRF_TOKEN);
       ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, value)
             .httpOnly(httpOnly)
             .secure(secure)
@@ -94,7 +96,7 @@ public class CookieUtils {
    }
 
    public static void deleteCookie(HttpServletResponse response, String name, boolean secure) {
-      boolean httpOnly = !name.equals("csrf_token");
+      boolean httpOnly = !name.equals(CSRF_TOKEN);
       ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(name, "")
             .httpOnly(httpOnly)
             .secure(secure)

@@ -10,6 +10,8 @@ import com.omnibooking.dto.ForgotPasswordRequest;
 import com.omnibooking.dto.RegistrationStatusResponse;
 import com.omnibooking.dto.ResetPasswordRequest;
 import com.omnibooking.dto.oauth.OAuth2UserInfo;
+import com.omnibooking.exception.AppException;
+import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.services.auth.AuthService;
 import com.omnibooking.services.auth.OAuth2ServiceFactory;
 import com.omnibooking.services.auth.TurnstileService;
@@ -23,6 +25,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
 
@@ -87,6 +90,7 @@ public class AuthController {
    @PostMapping("/finalize-registration")
    public ResponseEntity<ApiResponse<AuthResponse>> finalizeRegistration(
          @RequestBody Map<String, String> body,
+         @CookieValue(name = CookieUtils.SESSION_ID, required = false) String oldSessionId,
          HttpServletRequest httpRequest,
          HttpServletResponse httpResponse) {
 
@@ -95,31 +99,33 @@ public class AuthController {
       String userAgent = httpRequest.getHeader("User-Agent");
       String requestId = (String) httpRequest.getAttribute("requestId");
 
-      AuthResponse authResponse = authService.finalizeRegistration(accessToken, ip, userAgent, httpResponse);
+      AuthResponse authResponse = authService.finalizeRegistration(accessToken, ip, userAgent, httpResponse,
+            oldSessionId);
       return ResponseEntity.ok(ApiResponse.success(authResponse, "Session synchronized successfully", requestId));
    }
 
-    @Anonymous
-    @GetMapping(value = "/subscribe/{requestId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter subscribe(@PathVariable String requestId) {
-       return sseNotificationService.subscribe(requestId);
-    }
+   @Anonymous
+   @GetMapping(value = "/subscribe/{requestId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+   public SseEmitter subscribe(@PathVariable String requestId) {
+      return sseNotificationService.subscribe(requestId);
+   }
 
-    @Anonymous
-    @GetMapping("/registration-status/{requestId}")
-    public ResponseEntity<ApiResponse<RegistrationStatusResponse>> getRegistrationStatus(
-          @PathVariable String requestId,
-          HttpServletRequest httpRequest) {
+   @Anonymous
+   @GetMapping("/registration-status/{requestId}")
+   public ResponseEntity<ApiResponse<RegistrationStatusResponse>> getRegistrationStatus(
+         @PathVariable String requestId,
+         HttpServletRequest httpRequest) {
 
-       String reqId = (String) httpRequest.getAttribute("requestId");
-       RegistrationStatusResponse statusResponse = authService.getRegistrationStatus(requestId);
-       return ResponseEntity.ok(ApiResponse.success(statusResponse, "Registration status retrieved", reqId));
-    }
+      String reqId = (String) httpRequest.getAttribute("requestId");
+      RegistrationStatusResponse statusResponse = authService.getRegistrationStatus(requestId);
+      return ResponseEntity.ok(ApiResponse.success(statusResponse, "Registration status retrieved", reqId));
+   }
 
    @Anonymous
    @PostMapping("/login")
    public ResponseEntity<ApiResponse<AuthResponse>> login(
          @Valid @RequestBody LoginRequest request,
+         @CookieValue(name = CookieUtils.SESSION_ID, required = false) String oldSessionId,
          HttpServletRequest httpRequest,
          HttpServletResponse httpResponse) {
 
@@ -127,15 +133,15 @@ public class AuthController {
       String userAgent = httpRequest.getHeader("User-Agent");
       String requestId = (String) httpRequest.getAttribute("requestId");
 
-      AuthResponse authResponse = authService.login(request, ip, userAgent, httpResponse);
+      AuthResponse authResponse = authService.login(request, ip, userAgent, httpResponse, oldSessionId);
       return ResponseEntity.ok(ApiResponse.success(authResponse, "Login successful", requestId));
    }
 
    @Anonymous
    @PostMapping("/refresh")
    public ResponseEntity<ApiResponse<AuthResponse>> refresh(
-         @CookieValue(name = "session_id", required = false) String sessionId,
-         @CookieValue(name = "refresh_token", required = false) String refreshToken,
+         @CookieValue(name = CookieUtils.SESSION_ID, required = false) String sessionId,
+         @CookieValue(name = CookieUtils.REFRESH_TOKEN, required = false) String refreshToken,
          HttpServletRequest httpRequest,
          HttpServletResponse httpResponse) {
 
@@ -146,7 +152,7 @@ public class AuthController {
       if (sessionId == null || refreshToken == null) {
          log.warn("Missing session_id or refresh_token in cookies for refresh request");
          authService.clearAllCookies(httpResponse);
-         throw new com.omnibooking.exception.AppException(com.omnibooking.exception.ErrorCode.INVALID_SESSION);
+         throw new AppException(ErrorCode.INVALID_SESSION);
       }
 
       AuthResponse authResponse = authService.refresh(sessionId, refreshToken, ip, userAgent, httpResponse);
@@ -156,7 +162,7 @@ public class AuthController {
    @Anonymous
    @PostMapping("/logout")
    public ResponseEntity<ApiResponse<Void>> logout(
-         @CookieValue(name = "session_id", required = false) String sessionId,
+         @CookieValue(name = CookieUtils.SESSION_ID, required = false) String sessionId,
          @AuthenticationPrincipal UserPrincipal principal,
          HttpServletRequest httpRequest,
          HttpServletResponse httpResponse) {
@@ -181,6 +187,7 @@ public class AuthController {
 
       String requestId = (String) httpRequest.getAttribute("requestId");
       authService.verifyEmail(token);
+
       return ResponseEntity.ok(ApiResponse.success(null, "Email verified successfully", requestId));
    }
 
@@ -191,6 +198,7 @@ public class AuthController {
 
       String requestId = (String) httpRequest.getAttribute("requestId");
       authService.resendVerification(principal.getId());
+
       return ResponseEntity.ok(ApiResponse.success(null, "Verification email resent successfully", requestId));
    }
 
@@ -201,13 +209,15 @@ public class AuthController {
          HttpServletRequest httpRequest) {
       String requestId = (String) httpRequest.getAttribute("requestId");
       boolean exists = authService.checkEmail(email);
+
       return ResponseEntity.ok(ApiResponse.success(exists, "Email check completed", requestId));
    }
 
    @Anonymous
    @PostMapping("/activate-guest")
    public ResponseEntity<ApiResponse<AuthResponse>> activateGuest(
-         @RequestBody java.util.Map<String, String> body,
+         @RequestBody Map<String, String> body,
+         @CookieValue(name = CookieUtils.SESSION_ID, required = false) String oldSessionId,
          HttpServletRequest httpRequest,
          HttpServletResponse httpResponse) {
       String token = body.get("token");
@@ -217,11 +227,12 @@ public class AuthController {
       String requestId = (String) httpRequest.getAttribute("requestId");
 
       if (token == null || password == null) {
-         throw new com.omnibooking.exception.AppException(com.omnibooking.exception.ErrorCode.INVALID_TOKEN,
+         throw new AppException(ErrorCode.INVALID_TOKEN,
                "Token and password are required");
       }
 
-      AuthResponse authResponse = authService.activateGuest(token, password, ip, userAgent, httpResponse);
+      AuthResponse authResponse = authService.activateGuest(token, password, ip, userAgent, httpResponse, oldSessionId);
+
       return ResponseEntity
             .ok(ApiResponse.success(authResponse, "Account activated and logged in successfully", requestId));
    }
@@ -234,6 +245,7 @@ public class AuthController {
 
       String requestId = (String) httpRequest.getAttribute("requestId");
       authService.forgotPassword(request.getEmail());
+
       return ResponseEntity
             .ok(ApiResponse.success(null, "If an account exists, a reset link has been sent", requestId));
    }
@@ -246,6 +258,7 @@ public class AuthController {
 
       String requestId = (String) httpRequest.getAttribute("requestId");
       authService.resetPassword(request.getToken(), request.getNewPassword(), request.isLogoutAll());
+
       return ResponseEntity.ok(ApiResponse.success(null, "Password reset successfully", requestId));
    }
 
@@ -256,6 +269,7 @@ public class AuthController {
          HttpServletRequest httpRequest) {
       String requestId = (String) httpRequest.getAttribute("requestId");
       String url = oAuth2ServiceFactory.getService(provider).generateAuthUrl();
+
       return ResponseEntity.ok(ApiResponse.success(url, provider + " auth URL generated", requestId));
    }
 
@@ -266,14 +280,15 @@ public class AuthController {
          @RequestParam String code,
          @RequestParam String state,
          HttpServletRequest httpRequest,
-         HttpServletResponse httpResponse) throws java.io.IOException {
+         HttpServletResponse httpResponse) throws IOException {
 
       try {
          OAuth2UserInfo userInfo = oAuth2ServiceFactory.getService(provider).exchangeCodeForUserInfo(code, state);
          String ip = getClientIp(httpRequest);
          String userAgent = httpRequest.getHeader("User-Agent");
+         String oldSessionId = CookieUtils.getCookieValue(httpRequest, CookieUtils.SESSION_ID);
 
-         authService.loginWithOAuth2(provider, userInfo, ip, userAgent, httpResponse, false);
+         authService.loginWithOAuth2(provider, userInfo, ip, userAgent, httpResponse, false, oldSessionId);
 
          // Redirect to frontend
          httpResponse.sendRedirect(appProperties.getOauth2().getGoogle().getFrontendCallbackUrl());
@@ -291,15 +306,16 @@ public class AuthController {
          HttpServletRequest request,
          HttpServletResponse response) {
 
-      String csrfCookie = CookieUtils.getCookieValue(request, "csrf_token");
+      String csrfCookie = CookieUtils.getCookieValue(request, CookieUtils.CSRF_TOKEN);
       if (csrfCookie == null || csrfCookie.isBlank()) {
-         String sessionId = CookieUtils.getCookieValue(request, "session_id");
+         String sessionId = CookieUtils.getCookieValue(request, CookieUtils.SESSION_ID);
          String secret = appProperties.getSecurity().getCsrfSecret();
          if (secret == null || secret.isBlank()) {
             secret = appProperties.getSecurity().getJwtSecret();
          }
          csrfCookie = CookieUtils.calculateCsrfToken(sessionId, secret);
-         CookieUtils.addCookie(response, "csrf_token", csrfCookie, 86400, appProperties.getSecurity().isCookieSecure());
+         CookieUtils.addCookie(response, CookieUtils.CSRF_TOKEN, csrfCookie, 86400,
+               appProperties.getSecurity().isCookieSecure());
       }
       String requestId = (String) request.getAttribute("requestId");
 

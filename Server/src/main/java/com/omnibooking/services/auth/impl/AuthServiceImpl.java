@@ -42,6 +42,8 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +63,63 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 @RequiredArgsConstructor
 @Slf4j
 public class AuthServiceImpl implements AuthService {
+
+   private static final SecureRandom secureRandom = new SecureRandom();
+
+   private static final String INCR_EXPIRE_SCRIPT =
+         "local val = redis.call('incr', KEYS[1]); " +
+         "if val == 1 then " +
+         "  redis.call('expire', KEYS[1], tonumber(ARGV[1])); " +
+         "end; " +
+         "return val;";
+
+   private String getOsFamily(String ua) {
+      if (ua == null) return "OTHER";
+      String uaLower = ua.toLowerCase();
+      if (uaLower.contains("windows")) return "WINDOWS";
+      if (uaLower.contains("macintosh") || uaLower.contains("mac os")) return "MAC";
+      if (uaLower.contains("iphone") || uaLower.contains("ipad") || uaLower.contains("ipod")) return "IOS";
+      if (uaLower.contains("android")) return "ANDROID";
+      if (uaLower.contains("linux")) return "LINUX";
+      return "OTHER";
+   }
+
+   private String getBrowserFamily(String ua) {
+      if (ua == null) return "OTHER";
+      String uaLower = ua.toLowerCase();
+      if (uaLower.contains("edg/")) return "EDGE";
+      if (uaLower.contains("chrome/") || uaLower.contains("crios/")) return "CHROME";
+      if (uaLower.contains("firefox/") || uaLower.contains("fxios/")) return "FIREFOX";
+      if (uaLower.contains("safari/") && !uaLower.contains("chrome") && !uaLower.contains("chromium")) return "SAFARI";
+      if (uaLower.contains("postman")) return "POSTMAN";
+      if (uaLower.contains("curl")) return "CURL";
+      return "OTHER";
+   }
+
+   private boolean isSignificantUserAgentChange(String oldPlatform, String newPlatform, String oldBrowser, String newBrowser) {
+      if (oldPlatform == null || newPlatform == null || oldBrowser == null || newBrowser == null) {
+         return true;
+      }
+      return !oldPlatform.equalsIgnoreCase(newPlatform) || !oldBrowser.equalsIgnoreCase(newBrowser);
+   }
+
+   private void incrementFailureCounter(String key, long timeoutSeconds) {
+      try {
+         redisTemplate.execute(
+               new DefaultRedisScript<>(INCR_EXPIRE_SCRIPT, Long.class),
+               Collections.singletonList(key),
+               String.valueOf(timeoutSeconds)
+         );
+      } catch (Exception e) {
+         log.error("Failed to execute atomic increment for key: {}", key, e);
+         try {
+            redisTemplate.opsForValue().increment(key);
+            redisTemplate.expire(key, timeoutSeconds, TimeUnit.SECONDS);
+         } catch (Exception ex) {
+            log.error("Fallback increment also failed for key: {}", key, ex);
+         }
+      }
+   }
 
    private final ScheduledExecutorService lockRenewalScheduler = Executors.newScheduledThreadPool(4,
          runnable -> {
@@ -171,7 +230,7 @@ public class AuthServiceImpl implements AuthService {
    }
 
    @Override
-   public AuthResponse login(LoginRequest request, String ip, String userAgent, HttpServletResponse response) {
+   public AuthResponse login(LoginRequest request, String ip, String userAgent, HttpServletResponse response, String oldSessionId) {
       String emailClean = request.getEmail().trim().toLowerCase();
       String emailKey = "login_failures:" + emailClean;
       String ipKey = "login_failures_ip:" + ip;
@@ -222,20 +281,22 @@ public class AuthServiceImpl implements AuthService {
          UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
          long now = System.currentTimeMillis();
 
+         UUID oldSessionUuid = null;
+         if (oldSessionId != null && !oldSessionId.isBlank()) {
+            try {
+               oldSessionUuid = UUID.fromString(oldSessionId);
+            } catch (Exception ex) {
+               log.warn("Invalid oldSessionId format in login: {}", oldSessionId);
+            }
+         }
+
          return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
-               now, null);
+               now, oldSessionUuid);
       } catch (AppException e) {
          if (e.getErrorEnum() == ErrorCode.INVALID_CREDENTIALS) {
-            // Increment failed login counts in Redis (15-minute TTL)
-            try {
-               redisTemplate.opsForValue().increment(emailKey);
-               redisTemplate.expire(emailKey, 15, TimeUnit.MINUTES);
-               
-               redisTemplate.opsForValue().increment(ipKey);
-               redisTemplate.expire(ipKey, 15, TimeUnit.MINUTES);
-            } catch (Exception ex) {
-               log.error("Failed to increment login failure count in Redis", ex);
-            }
+            // Increment failed login counts in Redis atomically (15-minute TTL = 900 seconds)
+            incrementFailureCounter(emailKey, 900);
+            incrementFailureCounter(ipKey, 900);
          }
          throw e;
       }
@@ -295,6 +356,23 @@ public class AuthServiceImpl implements AuthService {
 
          User user = userRepository.findById(Objects.requireNonNull(info.getUserId()))
                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+         // Device Signature Verification with Backward Compatibility
+         if (info.getPlatform() == null || info.getBrowserFamily() == null) {
+            log.info("Legacy session detected during refresh for user: {}. Bypassing DeviceSignature validation.", user.getEmail());
+         } else {
+            String currentPlatform = getOsFamily(userAgent);
+            String currentBrowserFamily = getBrowserFamily(userAgent);
+            boolean suspicious = isSignificantUserAgentChange(info.getPlatform(), currentPlatform, info.getBrowserFamily(), currentBrowserFamily);
+            if (suspicious) {
+               log.warn("Significant device binding change detected during refresh (Suspicious device takeover). " +
+                     "User: {}, Stored: [{}, {}], Current: [{}, {}]",
+                     user.getEmail(), info.getPlatform(), info.getBrowserFamily(), currentPlatform, currentBrowserFamily);
+               CookieUtils.clearAuthCookies(response, isCookieSecure());
+               sessionService.deleteSession(sId);
+               throw new AppException(ErrorCode.INVALID_SESSION);
+            }
+         }
 
          Set<String> roles = user.getRoles().stream()
                .map(Role::getName)
@@ -405,7 +483,9 @@ public class AuthServiceImpl implements AuthService {
       UUID sessionId = UuidCreator.getTimeOrderedEpoch();
       UUID refreshToken = UuidCreator.getTimeOrderedEpoch();
 
-      String fingerprint = UuidCreator.getTimeOrderedEpoch().toString();
+      byte[] randomBytes = new byte[32];
+      secureRandom.nextBytes(randomBytes);
+      String fingerprint = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
       String fgpHash = SecurityUtils.hashFingerprint(fingerprint);
 
       String accessToken = jwtService.generateAccessToken(user.getId(), user.getUsername(), user.getEmail(), roles,
@@ -453,6 +533,9 @@ public class AuthServiceImpl implements AuthService {
       if (finalTtlMs < 0)
          finalTtlMs = 0;
 
+      String platform = getOsFamily(userAgent);
+      String browserFamily = getBrowserFamily(userAgent);
+
       // Build Session Info Object
       RedisSessionInfo sessionInfo = RedisSessionInfo.builder()
             .userId(user.getId())
@@ -466,6 +549,9 @@ public class AuthServiceImpl implements AuthService {
             .createdAt(createdAt)
             .lastAccessedAt(now) // Current time is the new lastAccessedAt
             .rememberMe(rememberMe)
+            .deviceVersion(1)
+            .platform(platform)
+            .browserFamily(browserFamily)
             .build();
 
       // Create and Save New Session
@@ -530,7 +616,7 @@ public class AuthServiceImpl implements AuthService {
    @Override
    @Transactional
    public AuthResponse upgradeToPartner(UUID userId, String ip, String userAgent, HttpServletResponse response,
-         boolean rememberMe) {
+         boolean rememberMe, String oldSessionId) {
       User user = userRepository.findById(Objects.requireNonNull(userId))
             .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
@@ -549,7 +635,17 @@ public class AuthServiceImpl implements AuthService {
             .collect(Collectors.toSet());
 
       long now = System.currentTimeMillis();
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now, null);
+
+      UUID oldSessionUuid = null;
+      if (oldSessionId != null && !oldSessionId.isBlank()) {
+         try {
+            oldSessionUuid = UUID.fromString(oldSessionId);
+         } catch (Exception ex) {
+            log.warn("Invalid oldSessionId format in upgradeToPartner: {}", oldSessionId);
+         }
+      }
+
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now, oldSessionUuid);
    }
 
    @Override
@@ -627,13 +723,13 @@ public class AuthServiceImpl implements AuthService {
 
       // Invalidate token after use
       redisTemplate.delete(redisKey);
-      log.info("Password reset successfully for user: {}", email);
+         log.info("Password reset successfully for user: {}", email);
    }
 
    @Override
    @Transactional
    public AuthResponse loginWithOAuth2(String provider, OAuth2UserInfo userInfo, String ip, String userAgent,
-         HttpServletResponse response, boolean rememberMe) {
+         HttpServletResponse response, boolean rememberMe, String oldSessionId) {
       // Check if social account already exists
       String providerUpper = provider.toUpperCase();
       SocialAccount socialAccount = socialAccountRepository.findByProviderAndProviderId(providerUpper, userInfo.getId())
@@ -716,7 +812,17 @@ public class AuthServiceImpl implements AuthService {
       }
 
       long now = System.currentTimeMillis();
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now, null);
+
+      UUID oldSessionUuid = null;
+      if (oldSessionId != null && !oldSessionId.isBlank()) {
+         try {
+            oldSessionUuid = UUID.fromString(oldSessionId);
+         } catch (Exception ex) {
+            log.warn("Invalid oldSessionId format in loginWithOAuth2: {}", oldSessionId);
+         }
+      }
+
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, rememberMe, now, now, oldSessionUuid);
    }
 
    @Override
@@ -731,7 +837,7 @@ public class AuthServiceImpl implements AuthService {
    @Override
    @Transactional
    public AuthResponse finalizeRegistration(String accessToken, String ip, String userAgent,
-         HttpServletResponse response) {
+         HttpServletResponse response, String oldSessionId) {
       try {
          UUID userId = jwtService.extractUserId(accessToken);
          Set<String> roles = jwtService.extractRoles(accessToken);
@@ -744,7 +850,15 @@ public class AuthServiceImpl implements AuthService {
          // For finalize registration, we don't have 'rememberMe' info from the original
          // request yet,
          // defaulting to false or we could pass it. Let's default to false for safety.
-         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now, null);
+         UUID oldSessionUuid = null;
+         if (oldSessionId != null && !oldSessionId.isBlank()) {
+            try {
+               oldSessionUuid = UUID.fromString(oldSessionId);
+            } catch (Exception ex) {
+               log.warn("Invalid oldSessionId format in finalizeRegistration: {}", oldSessionId);
+            }
+         }
+         return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now, oldSessionUuid);
       } catch (AppException e) {
          throw e;
       } catch (Exception e) {
@@ -756,7 +870,7 @@ public class AuthServiceImpl implements AuthService {
    @Override
    @Transactional
    public AuthResponse loginWith2FA(com.omnibooking.dto.TwoFactorLoginRequest request, String ip, String userAgent,
-         HttpServletResponse response) {
+         HttpServletResponse response, String oldSessionId) {
       if (!bloomFilterService.mightContain(request.getEmail())) {
          throw new AppException(ErrorCode.INVALID_CREDENTIALS);
       }
@@ -787,8 +901,18 @@ public class AuthServiceImpl implements AuthService {
 
       UserProfile profile = userProfileRepository.findById(user.getId()).orElse(null);
       long now = System.currentTimeMillis();
+
+      UUID oldSessionUuid = null;
+      if (oldSessionId != null && !oldSessionId.isBlank()) {
+         try {
+            oldSessionUuid = UUID.fromString(oldSessionId);
+         } catch (Exception ex) {
+            log.warn("Invalid oldSessionId format in loginWith2FA: {}", oldSessionId);
+         }
+      }
+
       return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, request.isRememberMe(), now,
-            now, null);
+            now, oldSessionUuid);
    }
 
    @Override
@@ -808,7 +932,7 @@ public class AuthServiceImpl implements AuthService {
    @Override
    @Transactional
    public AuthResponse activateGuest(String token, String password, String ip, String userAgent,
-         HttpServletResponse response) {
+         HttpServletResponse response, String oldSessionId) {
       UUID userId = verificationService.verifyToken(token);
       if (userId == null) {
          throw new AppException(ErrorCode.INVALID_TOKEN);
@@ -832,7 +956,17 @@ public class AuthServiceImpl implements AuthService {
             .collect(Collectors.toSet());
 
       long now = System.currentTimeMillis();
-      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now, null);
+
+      UUID oldSessionUuid = null;
+      if (oldSessionId != null && !oldSessionId.isBlank()) {
+         try {
+            oldSessionUuid = UUID.fromString(oldSessionId);
+         } catch (Exception ex) {
+            log.warn("Invalid oldSessionId format in activateGuest: {}", oldSessionId);
+         }
+      }
+
+      return issueTokensAndBuildResponse(user, roles, profile, ip, userAgent, response, false, now, now, oldSessionUuid);
    }
 
    @Override

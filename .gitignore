@@ -10,6 +10,8 @@ node_modules/
 .antigravity/
 .codegraph/
 
+*.zip
+
 .env
 .env.local
 .env.*.local

@@ -130,6 +130,23 @@ clear-logs:
 	@rm -rf Server/logs/*
 	@echo "Logs cleaned..."
 
+# Packaging Commands
+SERVER_EXCLUDES := --exclude="Server/src/main/resources/geo" --exclude="Server/src/main/resources/static" --exclude="Server/src/main/resources/mock-*.json"
+CLIENT_SRCS := Client/apps/web/src Client/apps/partner/src Client/apps/owner/src
+ARCHIVE_DIR := archives
+
+.PHONY: zip-server
+zip-server:
+	@node scripts/zip.js $(ARCHIVE_DIR) Server Server/src $(SERVER_EXCLUDES)
+
+.PHONY: zip-client
+zip-client:
+	@node scripts/zip.js $(ARCHIVE_DIR) Client $(CLIENT_SRCS)
+
+.PHONY: zip-all
+zip-all:
+	@node scripts/zip.js $(ARCHIVE_DIR) OmniBooking Server/src $(CLIENT_SRCS) $(SERVER_EXCLUDES)
+
 # Run CodeGraph to index and map code structure/flows
 .PHONY: codegraph
 codegraph:
@@ -166,3 +183,6 @@ help:
 	@echo "    make monitoring    - Start Prometheus and Grafana"
 	@echo "    make test-server   - Run server unit tests"
 	@echo "    make codegraph     - Index/update CodeGraph codebase flows"
+	@echo "    make zip-server    - Compress Server source code into Server.zip"
+	@echo "    make zip-client    - Compress Client source code into Client.zip"
+	@echo "    make zip-all       - Compress all source code into OmniBooking.zip"

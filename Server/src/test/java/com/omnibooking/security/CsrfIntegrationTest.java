@@ -17,6 +17,7 @@ import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
 import com.omnibooking.constant.SecurityConstants;
 import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.util.SecurityUtils;
+import com.omnibooking.util.CookieUtils;
 import com.omnibooking.repository.elasticsearch.DestinationElasticsearchRepository;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.KafkaAdmin;
@@ -92,7 +93,7 @@ public class CsrfIntegrationTest {
    public void shouldBlockProtectedStateChangingRequestWhenCsrfTokenIsInvalid() throws Exception {
       // /auth/resend-verification is POST, should require CSRF
       mockMvc.perform(post("/auth/resend-verification")
-            .cookie(new Cookie("csrf_token", "valid_cookie_value"))
+            .cookie(new Cookie(CookieUtils.CSRF_TOKEN, "valid_cookie_value"))
             .header("X-CSRF-Token", "invalid_header_value"))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.errorCode").value("SEC_001"))
@@ -106,7 +107,7 @@ public class CsrfIntegrationTest {
       // Since we don't supply authentication, it should fail with auth error
       // (TOKEN_EXPIRED / AUTH_006), NOT CSRF_TOKEN_INVALID
       mockMvc.perform(post("/auth/resend-verification")
-            .cookie(new Cookie("csrf_token", "my_token"))
+            .cookie(new Cookie(CookieUtils.CSRF_TOKEN, "my_token"))
             .header("X-CSRF-Token", "my_token"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.errorCode").value("AUTH_006")); // CSRF check passed, blocked by JWT filter
@@ -128,15 +129,15 @@ public class CsrfIntegrationTest {
             new RedisConnectionFailureException("Redis connection failed"));
 
       // Calculate the valid HMAC-based CSRF token for the session
-      String csrfToken = com.omnibooking.util.CookieUtils.calculateCsrfToken(sessionId.toString(),
-            com.omnibooking.util.CookieUtils.csrfSecret);
+      String csrfToken = CookieUtils.calculateCsrfToken(sessionId.toString(),
+            CookieUtils.csrfSecret);
 
       mockMvc.perform(post("/bookings")
-            .cookie(new Cookie("access_token", token))
-            .cookie(new Cookie("session_id", sessionId.toString()))
-            .cookie(new Cookie("x_fgp", fingerprint))
+            .cookie(new Cookie(CookieUtils.ACCESS_TOKEN, token))
+            .cookie(new Cookie(CookieUtils.SESSION_ID, sessionId.toString()))
+            .cookie(new Cookie(CookieUtils.FINGERPRINT, fingerprint))
             .header("x-fgp", fingerprint)
-            .cookie(new Cookie("csrf_token", csrfToken))
+            .cookie(new Cookie(CookieUtils.CSRF_TOKEN, csrfToken))
             .header("X-CSRF-Token", csrfToken))
             .andExpect(status().isServiceUnavailable())
             .andExpect(jsonPath("$.errorCode").value("SERVICE_UNAVAILABLE"))
@@ -161,7 +162,7 @@ public class CsrfIntegrationTest {
       // missing
       mockMvc.perform(MockMvcRequestBuilders.get("/health"))
             .andExpect(status().isOk())
-            .andExpect(MockMvcResultMatchers.cookie().exists("csrf_token"));
+            .andExpect(MockMvcResultMatchers.cookie().exists(CookieUtils.CSRF_TOKEN));
    }
 
    @Test
@@ -171,8 +172,8 @@ public class CsrfIntegrationTest {
       String wrongCsrfToken = UUID.randomUUID().toString();
 
       mockMvc.perform(post("/auth/resend-verification")
-            .cookie(new Cookie("session_id", sessionId.toString()))
-            .cookie(new Cookie("csrf_token", wrongCsrfToken))
+            .cookie(new Cookie(CookieUtils.SESSION_ID, sessionId.toString()))
+            .cookie(new Cookie(CookieUtils.CSRF_TOKEN, wrongCsrfToken))
             .header("X-CSRF-Token", wrongCsrfToken))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.errorCode").value("SEC_001"));
@@ -181,12 +182,12 @@ public class CsrfIntegrationTest {
    @Test
    public void shouldAllowRequestWhenCsrfTokenMatchesSessionHmac() throws Exception {
       UUID sessionId = UUID.randomUUID();
-      String correctCsrfToken = com.omnibooking.util.CookieUtils.calculateCsrfToken(sessionId.toString(),
-            com.omnibooking.util.CookieUtils.csrfSecret);
+      String correctCsrfToken = CookieUtils.calculateCsrfToken(sessionId.toString(),
+            CookieUtils.csrfSecret);
 
       mockMvc.perform(post("/auth/resend-verification")
-            .cookie(new Cookie("session_id", sessionId.toString()))
-            .cookie(new Cookie("csrf_token", correctCsrfToken))
+            .cookie(new Cookie(CookieUtils.SESSION_ID, sessionId.toString()))
+            .cookie(new Cookie(CookieUtils.CSRF_TOKEN, correctCsrfToken))
             .header("X-CSRF-Token", correctCsrfToken))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.errorCode").value("AUTH_006")); // Passes CSRF, fails on Auth (unauthorized)
@@ -197,7 +198,7 @@ public class CsrfIntegrationTest {
       // Test matching with trailing slash origin
       mockMvc.perform(post("/auth/resend-verification")
             .header("Origin", "http://localhost:3000/")
-            .cookie(new Cookie("csrf_token", "my_token"))
+            .cookie(new Cookie(CookieUtils.CSRF_TOKEN, "my_token"))
             .header("X-CSRF-Token", "my_token"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.errorCode").value("AUTH_006")); // Passes Origin and CSRF checks
@@ -207,7 +208,7 @@ public class CsrfIntegrationTest {
    public void shouldAllowAuthCsrfEndpointToReturnToken() throws Exception {
       mockMvc.perform(MockMvcRequestBuilders.get("/auth/csrf"))
             .andExpect(status().isOk())
-            .andExpect(MockMvcResultMatchers.cookie().exists("csrf_token"))
+            .andExpect(MockMvcResultMatchers.cookie().exists(CookieUtils.CSRF_TOKEN))
             .andExpect(jsonPath("$.data.csrfToken").exists());
    }
 

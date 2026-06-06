@@ -8,6 +8,7 @@ import com.omnibooking.security.Anonymous;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.services.auth.AuthService;
 import com.omnibooking.services.auth.TwoFactorAuthService;
+import com.omnibooking.util.CookieUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -99,6 +101,7 @@ public class TwoFactorController {
    @PostMapping("/login")
    public ResponseEntity<ApiResponse<AuthResponse>> loginWith2FA(
          @Valid @RequestBody TwoFactorLoginRequest request,
+         @CookieValue(name = CookieUtils.SESSION_ID, required = false) String oldSessionId,
          HttpServletRequest httpRequest,
          HttpServletResponse httpResponse) {
 
@@ -106,7 +109,7 @@ public class TwoFactorController {
       String userAgent = httpRequest.getHeader("User-Agent");
       String requestId = (String) httpRequest.getAttribute("requestId");
 
-      AuthResponse authResponse = authService.loginWith2FA(request, ip, userAgent, httpResponse);
+      AuthResponse authResponse = authService.loginWith2FA(request, ip, userAgent, httpResponse, oldSessionId);
       return ResponseEntity.ok(ApiResponse.success(authResponse, "2FA Login successful", requestId));
    }
 

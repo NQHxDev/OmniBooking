@@ -225,7 +225,7 @@ class AuthServiceImplTest {
                .build());
 
          // Act
-         AuthResponse result = authService.login(request, "ip", "ua", response);
+         AuthResponse result = authService.login(request, "ip", "ua", response, null);
 
          // Assert
          assertThat(result).isNotNull();
@@ -244,7 +244,7 @@ class AuthServiceImplTest {
          when(bloomFilterService.mightContain(request.getEmail())).thenReturn(false);
 
          // Act & Assert
-         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response))
+         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response, null))
                .isInstanceOf(AppException.class)
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.INVALID_CREDENTIALS);
 
@@ -266,7 +266,7 @@ class AuthServiceImplTest {
          when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
 
          // Act & Assert
-         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response))
+         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response, null))
                .isInstanceOf(AppException.class)
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.INVALID_CREDENTIALS);
       }
@@ -294,7 +294,7 @@ class AuthServiceImplTest {
          when(twoFactorAuthService.is2FAEnabledForUser(user.getId())).thenReturn(true);
 
          // Act & Assert
-         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response))
+         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response, null))
                .isInstanceOf(AppException.class)
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.TWO_FACTOR_REQUIRED);
       }

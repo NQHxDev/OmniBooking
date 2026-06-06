@@ -24,6 +24,7 @@ import com.omnibooking.services.partner.PartnerService;
 import com.omnibooking.dto.PartnerStatsResponse;
 import com.omnibooking.dto.PartnerBookingResponse;
 import com.omnibooking.dto.AuthResponse;
+import com.omnibooking.util.CookieUtils;
 import com.omnibooking.util.OtpUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -149,7 +150,7 @@ public class PartnerController {
    @PostMapping("/complete")
    public ResponseEntity<ApiResponse<AuthResponse>> completeRegistration(
          @AuthenticationPrincipal UserPrincipal principal,
-         @CookieValue(name = "session_id", required = false) String sessionId,
+         @CookieValue(name = CookieUtils.SESSION_ID, required = false) String sessionId,
          HttpServletRequest request,
          HttpServletResponse response) {
 
@@ -172,7 +173,7 @@ public class PartnerController {
          }
       }
 
-      AuthResponse authResponse = authService.upgradeToPartner(principal.getId(), ip, userAgent, response, rememberMe);
+      AuthResponse authResponse = authService.upgradeToPartner(principal.getId(), ip, userAgent, response, rememberMe, sessionId);
 
       log.info("User {} upgraded to partner (RequestId: {})", principal.getId(), requestId);
 

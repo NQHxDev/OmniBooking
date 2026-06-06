@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 import jakarta.servlet.http.Cookie;
+import com.omnibooking.util.CookieUtils;
 
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
@@ -104,7 +105,7 @@ public class BookingControllerTest {
       Mockito.when(bookingService.createBooking(any(CreateBookingRequest.class), any())).thenReturn(response);
 
       mockMvc.perform(post("/bookings")
-            .cookie(new Cookie("csrf_token", "test_csrf"))
+            .cookie(new Cookie(CookieUtils.CSRF_TOKEN, "test_csrf"))
             .header("X-CSRF-Token", "test_csrf")
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(request)))

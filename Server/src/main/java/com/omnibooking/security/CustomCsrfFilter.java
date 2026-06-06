@@ -108,10 +108,10 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
                   request.getRequestURI());
          }
 
-         String csrfCookie = getCookieValue(request, "csrf_token");
+         String csrfCookie = getCookieValue(request, CookieUtils.CSRF_TOKEN);
          String csrfHeader = request.getHeader("X-CSRF-Token");
 
-         // 1. General Double Submit match check
+         // General Double Submit match check
          if (csrfCookie == null || csrfHeader == null || !safeEquals(csrfCookie, csrfHeader)) {
             log.warn("CSRF validation failed for path {}: cookie token = {}, header token = {}",
                   request.getRequestURI(),
@@ -121,23 +121,25 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
             return;
          }
 
-         // 2. Session Binding Check (Task 1)
-         String sessionId = getCookieValue(request, "session_id");
+         // Session Binding Check (Task 1)
+         String sessionId = getCookieValue(request, CookieUtils.SESSION_ID);
          if (sessionId != null && !sessionId.isBlank()) {
             String expectedCsrf = CookieUtils.calculateCsrfToken(sessionId, csrfSecret);
             if (!safeEquals(csrfCookie, expectedCsrf)) {
-               log.warn("CSRF validation failed: Token is not bound to the active session. Path: {}", request.getRequestURI());
+               log.warn("CSRF validation failed: Token is not bound to the active session. Path: {}",
+                     request.getRequestURI());
                handleError(request, response, ErrorCode.CSRF_TOKEN_INVALID);
                return;
             }
          }
       } else if ("GET".equalsIgnoreCase(method)) {
-         // Auto-generate CSRF cookie for GET requests if missing so client SPA can retrieve it
-         String csrfCookie = getCookieValue(request, "csrf_token");
+         // Auto-generate CSRF cookie for GET requests if missing so client SPA can
+         // retrieve it
+         String csrfCookie = getCookieValue(request, CookieUtils.CSRF_TOKEN);
          if (csrfCookie == null || csrfCookie.isBlank()) {
-            String sessionId = getCookieValue(request, "session_id");
+            String sessionId = getCookieValue(request, CookieUtils.SESSION_ID);
             String newCsrfToken = CookieUtils.calculateCsrfToken(sessionId, csrfSecret);
-            CookieUtils.addCookie(response, "csrf_token", newCsrfToken, 86400, cookieSecure);
+            CookieUtils.addCookie(response, CookieUtils.CSRF_TOKEN, newCsrfToken, 86400, cookieSecure);
          }
       }
 
@@ -182,8 +184,11 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
                         return false;
                      }
                      // Port matching (normalized default port logic)
-                     int normalizedOriginPort = originPort == -1 ? ("https".equalsIgnoreCase(originScheme) ? 443 : 80) : originPort;
-                     int normalizedAllowedPort = allowedPort == -1 ? ("https".equalsIgnoreCase(allowedScheme) ? 443 : 80) : allowedPort;
+                     int normalizedOriginPort = originPort == -1 ? ("https".equalsIgnoreCase(originScheme) ? 443 : 80)
+                           : originPort;
+                     int normalizedAllowedPort = allowedPort == -1
+                           ? ("https".equalsIgnoreCase(allowedScheme) ? 443 : 80)
+                           : allowedPort;
 
                      return normalizedOriginPort == normalizedAllowedPort;
                   } catch (Exception e) {

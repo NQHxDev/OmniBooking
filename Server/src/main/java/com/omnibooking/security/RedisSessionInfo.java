@@ -35,4 +35,10 @@ public class RedisSessionInfo {
 
    private boolean rememberMe;
 
+   private Integer deviceVersion;
+
+   private String platform;
+
+   private String browserFamily;
+
 }

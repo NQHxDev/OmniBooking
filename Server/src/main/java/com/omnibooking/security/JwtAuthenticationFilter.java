@@ -24,6 +24,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Claims;
 import io.micrometer.common.lang.NonNull;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -61,16 +62,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
          String sessionIdFromCookie = CookieUtils.getCookieValue(request, CookieUtils.SESSION_ID);
 
          if (accessToken != null && sessionIdFromCookie != null) {
-            UUID userId = jwtService.extractUserId(accessToken);
-            UUID sessionIdFromJwt = jwtService.extractSessionId(accessToken);
-            String fgpHashFromJwt = jwtService.extractFingerprintHash(accessToken);
+            Claims claims = jwtService.extractAllClaims(accessToken);
+            String subject = claims.getSubject();
+            UUID userId = subject != null ? UUID.fromString(subject) : null;
+            
+            String sessionIdFromJwtStr = claims.get("sessionId", String.class);
+            UUID sessionIdFromJwt = sessionIdFromJwtStr != null ? UUID.fromString(sessionIdFromJwtStr) : null;
+            
+            String fgpHashFromJwt = claims.get("fgh", String.class);
             String fingerprintFromCookie = CookieUtils.getCookieValue(request, CookieUtils.FINGERPRINT);
             if (fingerprintFromCookie == null) {
                fingerprintFromCookie = request.getHeader("x-fgp");
             }
 
             // Verify SessionID consistency
-            if (sessionIdFromCookie == null || !sessionIdFromJwt.toString().equals(sessionIdFromCookie)) {
+            if (sessionIdFromCookie == null || sessionIdFromJwt == null || !sessionIdFromJwt.toString().equals(sessionIdFromCookie)) {
                log.warn("Session ID mismatch detected for user: {}", userId);
                filterChain.doFilter(request, response);
                return;
@@ -101,7 +107,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // Set Authentication
             if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                String versionKey = "user_token_version:" + userId;
-               Integer tokenVersionFromJwt = jwtService.extractTokenVersion(accessToken);
+               Integer tokenVersionFromJwt = claims.get("tokenVersion", Integer.class);
                String cachedVersionStr = null;
                try {
                   cachedVersionStr = redisTemplate.opsForValue().get(versionKey);
@@ -147,13 +153,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                }
 
                // Reconstruct UserPrincipal from JWT claims without DB hit! (Task 3)
-               Set<String> roles = jwtService.extractRoles(accessToken);
+               Set<String> roles = java.util.Collections.emptySet();
+               Object rolesObj = claims.get("roles");
+               if (rolesObj instanceof List<?> rolesList) {
+                  roles = rolesList.stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .collect(Collectors.toSet());
+               }
                List<SimpleGrantedAuthority> authorities = roles.stream()
                      .map(SimpleGrantedAuthority::new)
                      .collect(Collectors.toList());
 
-               String email = jwtService.extractEmail(accessToken);
-               String username = jwtService.extractUsername(accessToken);
+               String email = claims.get("email", String.class);
+               String username = claims.get("username", String.class);
 
                UserPrincipal principal = UserPrincipal.builder()
                      .id(userId)
