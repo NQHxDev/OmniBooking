@@ -81,7 +81,7 @@ public class UserCDCConsumer {
                log.error("Failed to release claim for event: {}", event.getEventId(), releaseEx);
             }
          }
-         // Kafka will retry based on configuration
+
          throw e;
       }
    }

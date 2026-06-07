@@ -29,6 +29,7 @@ import java.util.Arrays;
 public class LoggingAspect {
 
    private static final Logger requestSuccessLogger = LoggerFactory.getLogger("com.omnibooking.request.success");
+
    private static final Logger requestErrorLogger = LoggerFactory.getLogger("com.omnibooking.request.error");
 
    @Pointcut("within(com.omnibooking.controller..*)")
@@ -82,4 +83,5 @@ public class LoggingAspect {
          throw e;
       }
    }
+
 }

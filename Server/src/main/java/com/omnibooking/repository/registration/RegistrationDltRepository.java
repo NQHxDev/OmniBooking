@@ -10,7 +10,11 @@ import java.util.UUID;
 
 @Repository
 public interface RegistrationDltRepository extends JpaRepository<RegistrationDlt, UUID> {
+
    List<RegistrationDlt> findByStatus(RegistrationDltStatus status);
+
    List<RegistrationDlt> findByPartitionIdAndStatus(Integer partitionId, RegistrationDltStatus status);
+
    long countByStatus(RegistrationDltStatus status);
+
 }

@@ -3,6 +3,7 @@ package com.omnibooking.config.observability;
 import com.omnibooking.constant.ObservabilityConstants;
 import com.omnibooking.constant.ObservabilityConstants.Headers;
 import com.omnibooking.constant.ObservabilityConstants.MdcKeys;
+import com.omnibooking.constant.ObservabilityConstants.Spans;
 import com.omnibooking.context.RequestContext;
 import com.omnibooking.context.RequestContextHolder;
 
@@ -57,7 +58,7 @@ public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Obj
       MDC.put(MdcKeys.REQUEST_ID, requestId);
       MDC.put(MdcKeys.CORRELATION_ID, correlationId);
       MDC.put(MdcKeys.TRACE_ID, traceId);
-      MDC.put(MdcKeys.SPAN_ID, "kafka-consumer");
+      MDC.put(MdcKeys.SPAN_ID, Spans.KAFKA_CONSUMER);
       MDC.put(MdcKeys.USER_ID, userId != null ? userId : "anonymous");
       MDC.put(MdcKeys.TENANT_ID, tenantId != null ? tenantId : "default");
       MDC.put(MdcKeys.ENVIRONMENT, environment);
@@ -89,7 +90,7 @@ public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Obj
       RequestContext context = RequestContext.builder()
             .requestId(requestId)
             .traceId(traceId)
-            .spanId("kafka-consumer")
+            .spanId(Spans.KAFKA_CONSUMER)
             .correlationId(correlationId)
             .userId(userId)
             .tenantId(tenantId)

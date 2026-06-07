@@ -65,6 +65,22 @@ test-server:
 	@echo "Running Server unit tests..."
 	@cd Server && ./mvnw clean test
 
+# Performance & Load Testing with k6
+.PHONY: test-load
+test-load:
+	@echo "Running performance load test with default scenario (50 VUs)..."
+	@k6 run Server/load-tests/performance-test.js
+
+.PHONY: test-load-quick
+test-load-quick:
+	@echo "Running quick performance test check (10 VUs, 15 seconds)..."
+	@k6 run --vus 10 --duration 15s Server/load-tests/performance-test.js
+
+.PHONY: test-load-high
+test-load-high:
+	@echo "Running high-intensity stress test (200 VUs, ramp-up 1m, sustained 2m)..."
+	@k6 run --vus 200 --duration 3m Server/load-tests/performance-test.js
+
 # Seeding Commands
 .PHONY: generate-mock-users
 generate-mock-users:
@@ -182,6 +198,9 @@ help:
 	@echo "    make logs          - Tail Docker logs"
 	@echo "    make monitoring    - Start Prometheus and Grafana"
 	@echo "    make test-server   - Run server unit tests"
+	@echo "    make test-load     - Run full k6 performance load test (50 VUs)"
+	@echo "    make test-load-quick - Run quick k6 performance check (10 VUs, 15s)"
+	@echo "    make test-load-high - Run high-intensity k6 stress test (200 VUs, 3m)"
 	@echo "    make codegraph     - Index/update CodeGraph codebase flows"
 	@echo "    make zip-server    - Compress Server source code into Server.zip"
 	@echo "    make zip-client    - Compress Client source code into Client.zip"

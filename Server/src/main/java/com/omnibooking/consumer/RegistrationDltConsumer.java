@@ -22,7 +22,9 @@ import java.util.UUID;
 public class RegistrationDltConsumer {
 
    private final RegistrationDltRepository dltRepository;
+
    private final ObjectMapper objectMapper;
+
    private final MeterRegistry meterRegistry;
 
    @PostConstruct

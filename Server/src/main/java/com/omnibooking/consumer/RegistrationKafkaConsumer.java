@@ -33,11 +33,17 @@ import java.util.concurrent.TimeUnit;
 public class RegistrationKafkaConsumer {
 
    private final EncryptionService encryptionService;
+
    private final PasswordEncoder passwordEncoder;
+
    private final CachedRoleService cachedRoleService;
+
    private final RegistrationService registrationService;
+
    private final StringRedisTemplate redisTemplate;
+
    private final BloomFilterService bloomFilterService;
+
    private final Executor executor;
 
    public RegistrationKafkaConsumer(
@@ -57,11 +63,7 @@ public class RegistrationKafkaConsumer {
       this.executor = executor;
    }
 
-   @KafkaListener(
-         topics = "${omnibooking.kafka.registration.topic-name:registration-request-topic}",
-         groupId = "registration-workers",
-         containerFactory = "registrationListenerContainerFactory"
-   )
+   @KafkaListener(topics = "${omnibooking.kafka.registration.topic-name:registration-request-topic}", groupId = "registration-workers", containerFactory = "registrationListenerContainerFactory")
    public void consumeBatch(List<ConsumerRecord<String, RegistrationMessage>> records, Acknowledgment acknowledgment) {
       if (records == null || records.isEmpty()) {
          acknowledgment.acknowledge();
@@ -78,7 +80,7 @@ public class RegistrationKafkaConsumer {
       try {
          // Synchronously block the Consumer thread to manage backpressure
          batchTask.get();
-         
+
          // Acknowledge offset only after successful processing and DB commit
          acknowledgment.acknowledge();
          log.info("Batch of {} requests successfully processed and committed", records.size());
@@ -103,12 +105,13 @@ public class RegistrationKafkaConsumer {
 
       for (ConsumerRecord<String, RegistrationMessage> record : records) {
          RegistrationMessage msg = record.value();
-         if (msg == null) continue;
+         if (msg == null)
+            continue;
 
          UUID reqId = UUID.fromString(msg.getRequestId());
          String email = msg.getEmail();
 
-         // 1. Idempotency check using Redis
+         // Idempotency check using Redis
          String idempotencyKey = "registration_idempotency:" + msg.getRequestId();
          Boolean isNew = redisTemplate.opsForValue().setIfAbsent(idempotencyKey, "PROCESSING", 24, TimeUnit.HOURS);
          if (Boolean.FALSE.equals(isNew)) {
@@ -117,26 +120,27 @@ public class RegistrationKafkaConsumer {
          }
 
          try {
-            // 2. Update status to PROCESSING in PG Inbox
+            // Update status to PROCESSING in PG Inbox
             registrationService.updateInboxStatus(reqId, RegistrationInboxStatus.PROCESSING);
 
-            // 3. Bloom Filter optimized exists check (Optimization only)
+            // Bloom Filter optimized exists check (Optimization only)
             if (bloomFilterService.mightContain(email)) {
                if (registrationService.checkEmailExists(email)) {
                   log.warn("Email {} already exists in DB, marking request as FAILED", email);
                   registrationService.updateInboxStatus(reqId, RegistrationInboxStatus.FAILED);
-                  redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "FAILED_DUPLICATE_EMAIL", 24, TimeUnit.HOURS);
+                  redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "FAILED_DUPLICATE_EMAIL",
+                        24, TimeUnit.HOURS);
                   continue;
                }
             }
 
-            // 4. Decrypt password (CPU-bound)
+            // Decrypt password (CPU-bound)
             String decryptedPassword = encryptionService.decrypt(msg.getEncryptedPassword(), msg.getKeyId());
 
-            // 5. Argon2 Hashing (CPU-bound)
+            // Argon2 Hashing (CPU-bound)
             String hashedPassword = passwordEncoder.encode(decryptedPassword);
 
-            // 6. Build Entity instances (ready for fast batch insert)
+            // Build Entity instances (ready for fast batch insert)
             User user = User.builder()
                   .id(UUID.randomUUID()) // BaseEntity prePersist fallback, but set id here
                   .username(email.split("@")[0] + "_" + UUID.randomUUID().toString().substring(0, 5))

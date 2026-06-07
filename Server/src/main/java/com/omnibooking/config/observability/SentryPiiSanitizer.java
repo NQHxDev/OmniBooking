@@ -11,14 +11,17 @@ public final class SentryPiiSanitizer {
       // Prevent instantiation
    }
 
-   private static final Pattern JWT_PATTERN = Pattern.compile("ey[A-Za-z0-9-_=]+\\.[A-Za-z0-9-_=]+\\.?[A-Za-z0-9-_.+/=]*");
-   private static final Pattern EMAIL_PATTERN = Pattern.compile("[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}");
+   private static final Pattern JWT_PATTERN = Pattern
+         .compile("ey[A-Za-z0-9-_=]+\\.[A-Za-z0-9-_=]+\\.?[A-Za-z0-9-_.+/=]*");
+   private static final Pattern EMAIL_PATTERN = Pattern
+         .compile("[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}");
    // Simple phone pattern matching numbers with optional country prefix
-   private static final Pattern PHONE_PATTERN = Pattern.compile("(?:\\+?\\d{1,3}[-.\\s]?)?\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}");
+   private static final Pattern PHONE_PATTERN = Pattern
+         .compile("(?:\\+?\\d{1,3}[-.\\s]?)?\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}");
 
    private static final String[] SENSITIVE_KEYS = {
-      "password", "secret", "token", "authorization", "cookie", "card", "cvv", "payment",
-      "passwd", "key", "credential", "private", "salt", "signature"
+         "password", "secret", "token", "authorization", "cookie", "card", "cvv", "payment",
+         "passwd", "key", "credential", "private", "salt", "signature"
    };
 
    public static String sanitizeString(String input) {
@@ -93,4 +96,5 @@ public final class SentryPiiSanitizer {
       }
       return sanitizedMap;
    }
+
 }

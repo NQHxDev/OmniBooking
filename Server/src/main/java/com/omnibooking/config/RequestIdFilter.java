@@ -3,6 +3,7 @@ package com.omnibooking.config;
 import com.omnibooking.constant.ObservabilityConstants;
 import com.omnibooking.constant.ObservabilityConstants.Headers;
 import com.omnibooking.constant.ObservabilityConstants.MdcKeys;
+import com.omnibooking.constant.ObservabilityConstants.Spans;
 import com.omnibooking.context.RequestContext;
 import com.omnibooking.context.RequestContextHolder;
 import com.omnibooking.config.observability.ModuleTagResolver;
@@ -70,7 +71,7 @@ public class RequestIdFilter implements Filter {
          traceId = requestId;
       }
       if (spanId == null || spanId.isEmpty()) {
-         spanId = "root";
+         spanId = Spans.ROOT;
       }
 
       // Extract User Context if available

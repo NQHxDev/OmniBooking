@@ -9,5 +9,7 @@ import java.util.List;
 
 @Repository
 public interface RoomTypeRepository extends JpaRepository<RoomType, UUID> {
+
    List<RoomType> findByPropertyId(UUID propertyId);
+
 }

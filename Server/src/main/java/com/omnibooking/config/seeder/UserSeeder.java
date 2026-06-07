@@ -137,4 +137,5 @@ public class UserSeeder {
       private String address;
       private String nationality;
    }
+
 }

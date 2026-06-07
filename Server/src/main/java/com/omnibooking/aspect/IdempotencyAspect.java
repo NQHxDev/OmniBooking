@@ -35,10 +35,13 @@ import java.util.concurrent.TimeUnit;
 public class IdempotencyAspect {
 
    private static final String IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key";
+
    private static final String REDIS_PREFIX = "idempotency:";
+
    private static final String PROCESSING_VALUE = "PROCESSING";
 
    private final StringRedisTemplate redisTemplate;
+
    private final ObjectMapper objectMapper;
 
    @Around("@annotation(idempotent)")
