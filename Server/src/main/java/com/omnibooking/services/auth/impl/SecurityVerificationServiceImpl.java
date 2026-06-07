@@ -59,7 +59,7 @@ public class SecurityVerificationServiceImpl implements SecurityVerificationServ
       String key = OTP_KEY_PREFIX + userId.toString();
       String savedOtp = redisTemplate.opsForValue().get(key);
 
-      if (savedOtp != null && savedOtp.equals(otp)) {
+      if (savedOtp != null && savedOtp.trim().equalsIgnoreCase(otp.trim())) {
          redisTemplate.delete(key);
 
          String trustedKey = TRUSTED_SESSION_PREFIX + userId.toString();

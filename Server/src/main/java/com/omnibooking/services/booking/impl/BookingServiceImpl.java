@@ -259,8 +259,8 @@ public class BookingServiceImpl implements BookingService {
       }
 
       // Save Booking
-      boolean isPendingMomo = requiresDeposit && "momo".equalsIgnoreCase(request.getPaymentMethod());
-      BookingStatus initialStatus = isPendingMomo ? BookingStatus.PENDING : BookingStatus.CONFIRMED;
+      boolean isPendingOnlinePayment = requiresDeposit && ("momo".equalsIgnoreCase(request.getPaymentMethod()) || "visa".equalsIgnoreCase(request.getPaymentMethod()));
+      BookingStatus initialStatus = isPendingOnlinePayment ? BookingStatus.PENDING : BookingStatus.CONFIRMED;
 
       Booking booking = Booking.builder()
             .user(user)
@@ -292,7 +292,7 @@ public class BookingServiceImpl implements BookingService {
             .booking(booking)
             .oldStatus(null)
             .newStatus(initialStatus)
-            .reason(isPendingMomo ? "Initial booking created, pending MoMo deposit payment"
+            .reason(isPendingOnlinePayment ? "Initial booking created, pending MoMo deposit payment"
                   : "Initial booking created and confirmed")
             .changedBy(user)
             .build();
@@ -306,7 +306,7 @@ public class BookingServiceImpl implements BookingService {
 
       String bookingCode = booking.getId().toString().substring(0, 8).toUpperCase();
 
-      if (!isPendingMomo) {
+      if (!isPendingOnlinePayment) {
          String bookingCurrency = booking.getCurrency();
          BigDecimal convertedTotal = currencyService.convertFromBase(totalPrice, bookingCurrency);
          BigDecimal convertedFinal = currencyService.convertFromBase(finalPrice, bookingCurrency);

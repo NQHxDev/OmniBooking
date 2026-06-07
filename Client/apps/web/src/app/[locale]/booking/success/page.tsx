@@ -364,19 +364,19 @@ export default function BookingSuccessPage() {
                            <span>
                               {locale === "vi"
                                  ? `Đã đặt cọc trực tuyến qua ${
-                                      paymentMethod === "momo"
+                                      paymentMethod.toLowerCase() === "momo"
                                          ? "Ví MoMo"
-                                         : paymentMethod === "banking"
-                                           ? "Chuyển khoản"
-                                           : "Thẻ Visa/Master"
-                                   } (giả lập):`
+                                         : paymentMethod.toLowerCase() === "banking"
+                                           ? "Chuyển khoản (giả lập)"
+                                           : "Thẻ Visa/Master (qua MoMo)"
+                                   }:`
                                  : `Deposit paid via ${
-                                      paymentMethod === "momo"
+                                      paymentMethod.toLowerCase() === "momo"
                                          ? "MoMo"
-                                         : paymentMethod === "banking"
-                                           ? "Bank Transfer"
-                                           : "Visa/Mastercard"
-                                   } (simulated):`}
+                                         : paymentMethod.toLowerCase() === "banking"
+                                           ? "Bank Transfer (simulated)"
+                                           : "Visa/Mastercard (via MoMo)"
+                                   }:`}
                            </span>
                            <span>
                               <PriceDisplay

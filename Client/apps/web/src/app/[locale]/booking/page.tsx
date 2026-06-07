@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { differenceInDays, parseISO, format } from "date-fns";
 import { vi, enUS } from "date-fns/locale";
 import {
    User,
    Mail,
-   Phone,
    MessageSquare,
    CreditCard,
    ArrowRight,
@@ -27,9 +26,35 @@ import { authService } from "@/lib/api/services/authService";
 import { bookingService } from "@/lib/api/services/bookingService";
 import { paymentService } from "@/lib/api/services/paymentService";
 import PriceDisplay from "@/components/PriceDisplay";
+import Select from "react-select";
+import type { CountryCode } from "libphonenumber-js";
+import { profileService } from "@/lib/api/services/profileService";
+
+const countriesList: {
+   code: CountryCode;
+   callingCode: string;
+   label: string;
+   flag: string;
+}[] = [
+   { code: "VN", callingCode: "+84", label: "Vietnam (+84)", flag: "🇻🇳" },
+   { code: "US", callingCode: "+1", label: "United States (+1)", flag: "🇺🇸" },
+   { code: "GB", callingCode: "+44", label: "United Kingdom (+44)", flag: "🇬🇧" },
+   { code: "SG", callingCode: "+65", label: "Singapore (+65)", flag: "🇸🇬" },
+   { code: "TH", callingCode: "+66", label: "Thailand (+66)", flag: "🇹🇭" },
+   { code: "MY", callingCode: "+60", label: "Malaysia (+60)", flag: "🇲🇾" },
+   { code: "ID", callingCode: "+62", label: "Indonesia (+62)", flag: "🇮🇩" },
+   { code: "JP", callingCode: "+81", label: "Japan (+81)", flag: "🇯🇵" },
+   { code: "KR", callingCode: "+82", label: "South Korea (+82)", flag: "🇰🇷" },
+   { code: "FR", callingCode: "+33", label: "France (+33)", flag: "🇫🇷" },
+   { code: "DE", callingCode: "+49", label: "Germany (+49)", flag: "🇩🇪" },
+   { code: "AU", callingCode: "+61", label: "Australia (+61)", flag: "🇦🇺" },
+   { code: "CN", callingCode: "+86", label: "China (+86)", flag: "🇨🇳" },
+   { code: "IN", callingCode: "+91", label: "India (+91)", flag: "🇮🇳" },
+];
 
 export default function BookingPage() {
    const locale = useLocale();
+   const t = useTranslations("Booking");
    const router = useRouter();
    const searchParams = useSearchParams();
    const dateLocale = locale === "vi" ? vi : enUS;
@@ -46,11 +71,16 @@ export default function BookingPage() {
    // Form states
    const [guestName, setGuestName] = useState("");
    const [guestEmail, setGuestEmail] = useState("");
+   const [selectedCountry, setSelectedCountry] = useState(countriesList[0]);
    const [guestPhone, setGuestPhone] = useState("");
    const [specialRequests, setSpecialRequests] = useState("");
    const [appliedCoupon] = useState<{ id: string } | null>(null);
    const [paymentMethod, setPaymentMethod] = useState<"visa" | "momo" | "banking">("visa");
-   const [errors, setErrors] = useState<{ guestName?: string; guestEmail?: string }>({});
+   const [errors, setErrors] = useState<{
+      guestName?: string;
+      guestEmail?: string;
+      guestPhone?: string;
+   }>({});
 
    // UI States
    const [property, setProperty] = useState<PropertyDetailResponse | null>(null);
@@ -86,6 +116,30 @@ export default function BookingPage() {
       }
    }
 
+   // Fetch user profile to pre-fill phone number if logged in
+   useEffect(() => {
+      if (isLoggedIn) {
+         profileService
+            .getMyProfile()
+            .then((data) => {
+               if (data && data.phoneNumber) {
+                  const matchedCountry = countriesList.find((c) =>
+                     data.phoneNumber?.startsWith(c.callingCode)
+                  );
+                  if (matchedCountry) {
+                     setSelectedCountry(matchedCountry);
+                     setGuestPhone(data.phoneNumber.slice(matchedCountry.callingCode.length));
+                  } else {
+                     setGuestPhone(data.phoneNumber);
+                  }
+               }
+            })
+            .catch((err) => {
+               console.error("Failed to fetch user profile:", err);
+            });
+      }
+   }, [isLoggedIn]);
+
    // Fetch property details
    useEffect(() => {
       if (!propertyId) return;
@@ -97,11 +151,7 @@ export default function BookingPage() {
          })
          .catch((err) => {
             console.error(err);
-            setError(
-               locale === "vi"
-                  ? "Không thể tải thông tin khách sạn."
-                  : "Failed to load property details."
-            );
+            setError(t("failedToLoadPropertyDetails"));
             setLoading(false);
          });
    }, [propertyId, locale]);
@@ -111,11 +161,7 @@ export default function BookingPage() {
          <div className="min-h-screen flex items-center justify-center bg-zinc-50">
             <div className="flex flex-col items-center gap-4">
                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-               <p className="text-zinc-500 font-medium">
-                  {locale === "vi"
-                     ? "Đang tải thông tin đặt phòng..."
-                     : "Loading booking details..."}
-               </p>
+               <p className="text-zinc-500 font-medium">{t("loadingBookingDetails")}</p>
             </div>
          </div>
       );
@@ -126,20 +172,15 @@ export default function BookingPage() {
          <div className="min-h-screen flex items-center justify-center bg-zinc-50">
             <div className="bg-white p-8 rounded-2xl border border-zinc-200 shadow-sm max-w-md text-center space-y-4">
                <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
-               <h2 className="text-xl font-bold text-zinc-900">
-                  {locale === "vi" ? "Thông tin không hợp lệ" : "Invalid Information"}
-               </h2>
+               <h2 className="text-xl font-bold text-zinc-900">{t("invalidInformation")}</h2>
                <p className="text-zinc-500 text-sm">
-                  {error ||
-                     (locale === "vi"
-                        ? "Thiếu thông tin đặt phòng cần thiết."
-                        : "Missing required booking details.")}
+                  {error || t("missingRequiredBookingDetails")}
                </p>
                <button
                   onClick={() => router.back()}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"
                >
-                  {locale === "vi" ? "Quay lại" : "Go Back"}
+                  {t("goBack")}
                </button>
             </div>
          </div>
@@ -152,14 +193,12 @@ export default function BookingPage() {
          <div className="min-h-screen flex items-center justify-center bg-zinc-50">
             <div className="bg-white p-8 rounded-2xl border border-zinc-200 text-center max-w-md space-y-4">
                <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
-               <h2 className="text-xl font-bold text-zinc-900">
-                  {locale === "vi" ? "Loại phòng không tồn tại" : "Room Type Not Found"}
-               </h2>
+               <h2 className="text-xl font-bold text-zinc-900">{t("roomTypeNotFound")}</h2>
                <button
                   onClick={() => router.back()}
                   className="bg-blue-600 text-white px-6 py-2 rounded-xl"
                >
-                  {locale === "vi" ? "Quay lại" : "Go Back"}
+                  {t("goBack")}
                </button>
             </div>
          </div>
@@ -199,6 +238,10 @@ export default function BookingPage() {
       setSubmitting(true);
       setError(null);
 
+      const cleanDigits = guestPhone.replace(/\D/g, "");
+      const digitsToValidate = cleanDigits.startsWith("0") ? cleanDigits.slice(1) : cleanDigits;
+      const fullE164 = guestPhone ? selectedCountry.callingCode + digitsToValidate : undefined;
+
       try {
          const response = await bookingService.create({
             roomTypeId,
@@ -207,24 +250,20 @@ export default function BookingPage() {
             numRooms: roomsCount,
             guestName,
             guestEmail,
-            guestPhone: guestPhone || undefined,
+            guestPhone: fullE164,
             specialRequests: specialRequests || undefined,
             couponId: appliedCoupon?.id || undefined,
             currency,
             paymentMethod: paymentMethod.toUpperCase(),
          });
 
-         if (requiresDeposit && paymentMethod === "momo") {
+         if (requiresDeposit && (paymentMethod === "momo" || paymentMethod === "visa")) {
             const payData = await paymentService.createMomoPayment(response.id);
             if (payData && payData.payUrl) {
                window.location.href = payData.payUrl;
                return;
             } else {
-               throw new Error(
-                  locale === "vi"
-                     ? "Không thể tạo liên kết thanh toán MoMo."
-                     : "Failed to create MoMo payment link."
-               );
+               throw new Error(t("failedToCreateMomoPaymentLink"));
             }
          }
 
@@ -251,12 +290,7 @@ export default function BookingPage() {
       } catch (err) {
          console.error(err);
          const errorWithResponse = err as { response?: { data?: { message?: string } } };
-         setError(
-            errorWithResponse.response?.data?.message ||
-               (locale === "vi"
-                  ? "Đặt phòng thất bại. Vui lòng thử lại."
-                  : "Booking failed. Please try again.")
-         );
+         setError(errorWithResponse.response?.data?.message || t("bookingFailedPleaseTryAgain"));
          setSubmitting(false);
       }
    };
@@ -272,19 +306,28 @@ export default function BookingPage() {
    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
 
-      const newErrors: { guestName?: string; guestEmail?: string } = {};
+      const newErrors: { guestName?: string; guestEmail?: string; guestPhone?: string } = {};
       if (!guestName.trim()) {
-         newErrors.guestName =
-            locale === "vi" ? "Vui lòng nhập họ và tên của bạn" : "Please enter your full name";
+         newErrors.guestName = t("pleaseEnterYourFullName");
       }
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!guestEmail.trim()) {
-         newErrors.guestEmail =
-            locale === "vi" ? "Vui lòng nhập địa chỉ email" : "Please enter your email address";
+         newErrors.guestEmail = t("pleaseEnterYourEmailAddress");
       } else if (!emailRegex.test(guestEmail.trim())) {
-         newErrors.guestEmail =
-            locale === "vi" ? "Địa chỉ email không hợp lệ" : "Invalid email address";
+         newErrors.guestEmail = t("invalidEmailAddress");
+      }
+
+      if (!guestPhone.trim()) {
+         newErrors.guestPhone = t("pleaseEnterYourContactPhoneNum");
+      } else {
+         const { isValidPhoneNumber } = await import("libphonenumber-js");
+         const cleanDigits = guestPhone.replace(/\D/g, "");
+         const digitsToValidate = cleanDigits.startsWith("0") ? cleanDigits.slice(1) : cleanDigits;
+         const fullE164 = selectedCountry.callingCode + digitsToValidate;
+         if (!isValidPhoneNumber(fullE164, selectedCountry.code)) {
+            newErrors.guestPhone = t("invalidPhoneNumberForTheSelect");
+         }
       }
 
       if (Object.keys(newErrors).length > 0) {
@@ -294,7 +337,7 @@ export default function BookingPage() {
 
       setErrors({});
 
-      if (requiresDeposit && paymentMethod !== "momo") {
+      if (requiresDeposit && paymentMethod === "banking") {
          setShowPaymentModal(true);
       } else {
          await performBooking();
@@ -317,13 +360,9 @@ export default function BookingPage() {
                      <div className="p-3 bg-blue-50 rounded-full">
                         <Sparkles className="h-8 w-8 text-blue-600" />
                      </div>
-                     <h3 className="text-xl font-bold text-zinc-900">
-                        {locale === "vi" ? "Nhận Ưu Đãi Genius!" : "Get Genius Discounts!"}
-                     </h3>
+                     <h3 className="text-xl font-bold text-zinc-900">{t("getGeniusDiscounts")}</h3>
                      <p className="text-sm text-zinc-500 leading-relaxed">
-                        {locale === "vi"
-                           ? "Email này đã có tài khoản OmniBooking. Hãy đăng nhập để tự động điền thông tin và áp dụng các ưu đãi thành viên đặc biệt!"
-                           : "This email is already registered. Log in now to autofill details and enjoy Genius member discounts!"}
+                        {t("thisEmailIsAlreadyRegisteredLo")}
                      </p>
                      <div className="flex flex-col gap-2 w-full pt-4">
                         <button
@@ -334,13 +373,13 @@ export default function BookingPage() {
                            }
                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-all cursor-pointer shadow-md"
                         >
-                           {locale === "vi" ? "Đăng nhập ngay" : "Log In Now"}
+                           {t("logInNow")}
                         </button>
                         <button
                            onClick={() => setShowLoginPrompt(false)}
                            className="text-zinc-500 hover:text-zinc-700 font-bold py-2.5 text-xs transition-colors cursor-pointer"
                         >
-                           {locale === "vi" ? "Tiếp tục đặt phòng ẩn danh" : "Continue as Guest"}
+                           {t("continueAsGuest")}
                         </button>
                      </div>
                   </div>
@@ -358,7 +397,7 @@ export default function BookingPage() {
                   <ChevronLeft className="h-6 w-6 text-zinc-700" />
                </button>
                <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">
-                  {locale === "vi" ? "Yêu cầu đặt phòng của bạn" : "Confirm and Pay"}
+                  {t("confirmAndPay")}
                </h1>
             </div>
 
@@ -376,9 +415,7 @@ export default function BookingPage() {
                   <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200 shadow-xs space-y-6">
                      <div className="flex items-center gap-3 pb-4 border-b border-zinc-100">
                         <User className="h-5 w-5 text-blue-600" />
-                        <h2 className="text-lg font-bold text-zinc-900">
-                           {locale === "vi" ? "Thông tin liên hệ" : "Contact details"}
-                        </h2>
+                        <h2 className="text-lg font-bold text-zinc-900">{t("contactDetails")}</h2>
                      </div>
 
                      <form
@@ -389,7 +426,7 @@ export default function BookingPage() {
                      >
                         <div className="space-y-1.5">
                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
-                              {locale === "vi" ? "Họ và tên" : "Full Name"} *
+                              {t("fullName")} *
                            </label>
                            <div className="relative">
                               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-zinc-400">
@@ -397,7 +434,10 @@ export default function BookingPage() {
                               </span>
                               <input
                                  type="text"
-                                 placeholder={locale === "vi" ? "Nhập họ tên đầy đủ" : "John Doe"}
+                                 id="guestName"
+                                 name="name"
+                                 autoComplete="name"
+                                 placeholder={t("johnDoe")}
                                  value={guestName}
                                  onChange={(e) => {
                                     setGuestName(e.target.value);
@@ -422,7 +462,7 @@ export default function BookingPage() {
 
                         <div className="space-y-1.5">
                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
-                              {locale === "vi" ? "Địa chỉ Email" : "Email Address"} *
+                              {t("emailAddress")} *
                            </label>
                            <div className="relative">
                               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-zinc-400">
@@ -453,33 +493,101 @@ export default function BookingPage() {
                               </p>
                            )}
                            <p className="text-[10px] text-zinc-400 font-medium">
-                              {locale === "vi"
-                                 ? "OmniBooking sẽ gửi xác nhận đặt phòng và link kích hoạt tài khoản thành viên tới email này."
-                                 : "OmniBooking will send your booking confirmation and guest activation details here."}
+                              {t("omnibookingWillSendYourBooking")}
                            </p>
                         </div>
 
-                        <div className="space-y-1.5">
-                           <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
-                              {locale === "vi" ? "Số điện thoại" : "Phone Number"}
+                        <div className="space-y-1.5 animate-in fade-in duration-200">
+                           <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider block">
+                              {t("contactPhoneNumber")} *
                            </label>
-                           <div className="relative">
-                              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-zinc-400">
-                                 <Phone className="h-4.5 w-4.5" />
-                              </span>
+                           <div className="flex gap-2 items-center w-full">
+                              <div className="w-[155px] shrink-0">
+                                 <Select
+                                    inputId="countryCode"
+                                    name="countryCode"
+                                    options={countriesList}
+                                    value={selectedCountry}
+                                    onChange={(val) => {
+                                       if (val) setSelectedCountry(val);
+                                    }}
+                                    getOptionLabel={(option) =>
+                                       `${option.flag} ${option.code} (${option.callingCode})`
+                                    }
+                                    getOptionValue={(option) => option.code}
+                                    className="text-sm font-semibold text-zinc-700"
+                                    classNamePrefix="select"
+                                    isSearchable={true}
+                                    menuPortalTarget={
+                                       typeof document !== "undefined" ? document.body : null
+                                    }
+                                    styles={{
+                                       menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+                                       control: (base) => ({
+                                          ...base,
+                                          borderRadius: "0.75rem",
+                                          paddingTop: "4.5px",
+                                          paddingBottom: "4.5px",
+                                          borderColor: "#e4e4e7",
+                                          fontSize: "0.875rem",
+                                          fontFamily: "inherit",
+                                          fontWeight: "500",
+                                       }),
+                                    }}
+                                 />
+                              </div>
                               <input
                                  type="tel"
-                                 placeholder="e.g. +84 123 456 789"
+                                 id="guestPhone"
+                                 name="tel"
+                                 autoComplete="tel"
+                                 placeholder={t("enterPhoneNumber")}
                                  value={guestPhone}
-                                 onChange={(e) => setGuestPhone(e.target.value)}
-                                 className="w-full pl-10 pr-4 py-3 border border-zinc-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-hidden transition-all text-sm font-medium"
+                                 onChange={(e) => {
+                                    const val = e.target.value.replace(/\D/g, "");
+
+                                    // Automatically detect if a user pasted/autofilled a number containing country code
+                                    const matchedCountry = countriesList.find((c) => {
+                                       const cleanCallingCode = c.callingCode.replace(/\D/g, "");
+                                       return (
+                                          val.startsWith(cleanCallingCode) &&
+                                          val.length > cleanCallingCode.length
+                                       );
+                                    });
+
+                                    if (matchedCountry) {
+                                       const cleanCallingCode = matchedCountry.callingCode.replace(
+                                          /\D/g,
+                                          ""
+                                       );
+                                       setSelectedCountry(matchedCountry);
+                                       setGuestPhone(val.slice(cleanCallingCode.length));
+                                    } else {
+                                       setGuestPhone(val);
+                                    }
+
+                                    if (errors.guestPhone) {
+                                       setErrors((prev) => ({ ...prev, guestPhone: undefined }));
+                                    }
+                                 }}
+                                 className={`flex-1 px-4 py-3 border rounded-xl outline-hidden transition-all text-sm font-medium ${
+                                    errors.guestPhone
+                                       ? "border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                                       : "border-zinc-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                 }`}
                               />
                            </div>
+                           {errors.guestPhone && (
+                              <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1 animate-in fade-in duration-200">
+                                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                 <span>{errors.guestPhone}</span>
+                              </p>
+                           )}
                         </div>
 
                         <div className="space-y-1.5">
                            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
-                              {locale === "vi" ? "Yêu cầu đặc biệt" : "Special Requests"}
+                              {t("specialRequests")}
                            </label>
                            <div className="relative">
                               <span className="absolute top-3.5 left-3.5 text-zinc-400">
@@ -487,11 +595,7 @@ export default function BookingPage() {
                               </span>
                               <textarea
                                  rows={3}
-                                 placeholder={
-                                    locale === "vi"
-                                       ? "Nhập yêu cầu đặc biệt của bạn (nếu có)"
-                                       : "Smoking room, late check-in, etc."
-                                 }
+                                 placeholder={t("smokingRoomLateCheckInEtc")}
                                  value={specialRequests}
                                  onChange={(e) => setSpecialRequests(e.target.value)}
                                  className="w-full pl-10 pr-4 py-3 border border-zinc-200 rounded-xl focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-hidden transition-all text-sm font-medium resize-none"
@@ -505,9 +609,7 @@ export default function BookingPage() {
                   <div className="bg-white rounded-3xl p-6 sm:p-8 border border-zinc-200 shadow-xs space-y-6">
                      <div className="flex items-center gap-3 pb-4 border-b border-zinc-100">
                         <CreditCard className="h-5 w-5 text-blue-600" />
-                        <h2 className="text-lg font-bold text-zinc-900">
-                           {locale === "vi" ? "Hình thức thanh toán" : "Payment option"}
-                        </h2>
+                        <h2 className="text-lg font-bold text-zinc-900">{t("paymentOption")}</h2>
                      </div>
                      {requiresDeposit ? (
                         <div className="space-y-4">
@@ -515,20 +617,14 @@ export default function BookingPage() {
                               <CreditCard className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
                               <div>
                                  <h4 className="text-sm font-bold text-blue-800">
-                                    {locale === "vi"
-                                       ? "Yêu cầu đặt cọc 15%"
-                                       : "15% Deposit Required"}
+                                    {t("15DepositRequired")}
                                  </h4>
                                  <div className="text-xs text-blue-700/85 leading-relaxed mt-0.5">
-                                    {locale === "vi"
-                                       ? `Bạn cần thanh toán khoản đặt cọc thử nghiệm trị giá `
-                                       : `You need to pay a simulated deposit of `}
+                                    {t("simulatedDepositIntro")}
                                     <span className="font-bold">
                                        <PriceDisplay amount={depositAmount} size="sm" />
                                     </span>
-                                    {locale === "vi"
-                                       ? ` để xác nhận đặt phòng. Khoản cọc này tối đa bằng 1 đêm nghỉ.`
-                                       : ` to secure your booking. The deposit is capped at 1 night.`}
+                                    {t("simulatedDepositOutro")}
                                  </div>
                               </div>
                            </div>
@@ -536,28 +632,20 @@ export default function BookingPage() {
                               <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
                               <div>
                                  <h4 className="text-sm font-bold text-emerald-800">
-                                    {locale === "vi"
-                                       ? "Thanh toán phần còn lại tại chỗ nghỉ"
-                                       : "Pay remainder at the property"}
+                                    {t("payRemainderAtTheProperty")}
                                  </h4>
                                  <div className="text-xs text-emerald-700/85 leading-relaxed mt-0.5">
-                                    {locale === "vi"
-                                       ? `Số tiền còn lại `
-                                       : `The remaining amount of `}
+                                    {t("remainingAmountIntro")}
                                     <span className="font-bold">
                                        <PriceDisplay amount={payLaterAmount} size="sm" />
                                     </span>
-                                    {locale === "vi"
-                                       ? ` sẽ được thanh toán trực tiếp tại quầy lễ tân khi bạn nhận phòng.`
-                                       : ` will be paid directly at the reception desk during check-in.`}
+                                    {t("remainingAmountOutro")}
                                  </div>
                               </div>
                            </div>
                            <div className="pt-4 border-t border-zinc-100">
                               <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-3">
-                                 {locale === "vi"
-                                    ? "Chọn phương thức thanh toán tiền cọc"
-                                    : "Select payment method for deposit"}
+                                 {t("selectPaymentMethodForDeposit")}
                               </h3>
                               <div className="grid grid-cols-3 gap-3">
                                  <button
@@ -606,14 +694,10 @@ export default function BookingPage() {
                            <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
                            <div>
                               <h4 className="text-sm font-bold text-emerald-800">
-                                 {locale === "vi"
-                                    ? "Thanh toán trực tiếp tại chỗ nghỉ"
-                                    : "Pay at the property"}
+                                 {t("payAtTheProperty")}
                               </h4>
                               <p className="text-xs text-emerald-700/85 leading-relaxed mt-0.5">
-                                 {locale === "vi"
-                                    ? "Nhận phòng thành công mới cần trả tiền! OmniBooking không yêu cầu bạn trả trước bất kỳ khoản phí nào."
-                                    : "No upfront fees required! Simply pay at the hotel desk during check-in."}
+                                 {t("noUpfrontFeesRequiredSimplyPay")}
                               </p>
                            </div>
                         </div>
@@ -649,23 +733,17 @@ export default function BookingPage() {
 
                         <div className="border-t border-zinc-100 pt-4 space-y-2 text-xs font-semibold text-zinc-700">
                            <div className="flex items-center justify-between">
-                              <span className="text-zinc-500">
-                                 {locale === "vi" ? "Loại phòng" : "Room type"}
-                              </span>
+                              <span className="text-zinc-500">{t("roomType")}</span>
                               <span className="text-zinc-900 font-bold">{roomType.name}</span>
                            </div>
                            <div className="flex items-center justify-between">
-                              <span className="text-zinc-500">
-                                 {locale === "vi" ? "Số lượng phòng" : "Rooms"}
-                              </span>
+                              <span className="text-zinc-500">{t("rooms")}</span>
                               <span className="text-zinc-900 font-bold">{roomsCount}</span>
                            </div>
                            <div className="flex items-center justify-between">
-                              <span className="text-zinc-500">
-                                 {locale === "vi" ? "Số đêm lưu trú" : "Nights"}
-                              </span>
+                              <span className="text-zinc-500">{t("nights")}</span>
                               <span className="text-zinc-900 font-bold">
-                                 {nights} {locale === "vi" ? "đêm" : "nights"}
+                                 {nights} {t("nights2")}
                               </span>
                            </div>
                         </div>
@@ -673,7 +751,7 @@ export default function BookingPage() {
                         <div className="bg-zinc-50 rounded-2xl p-4 flex gap-4 text-center items-center justify-between text-xs font-semibold">
                            <div className="flex-1">
                               <span className="text-zinc-400 uppercase tracking-wider block text-[9px]">
-                                 {locale === "vi" ? "Nhận phòng" : "Check-in"}
+                                 {t("checkIn")}
                               </span>
                               <span className="text-zinc-900 font-bold text-sm block mt-1">
                                  {format(parseISO(checkin), "eee, dd MMM", { locale: dateLocale })}
@@ -682,7 +760,7 @@ export default function BookingPage() {
                            <div className="w-px h-8 bg-zinc-200"></div>
                            <div className="flex-1">
                               <span className="text-zinc-400 uppercase tracking-wider block text-[9px]">
-                                 {locale === "vi" ? "Trả phòng" : "Check-out"}
+                                 {t("checkOut")}
                               </span>
                               <span className="text-zinc-900 font-bold text-sm block mt-1">
                                  {format(parseISO(checkout), "eee, dd MMM", { locale: dateLocale })}
@@ -694,16 +772,13 @@ export default function BookingPage() {
 
                   {/* Price Calculations */}
                   <div className="bg-white rounded-3xl p-6 border border-zinc-200 shadow-xs space-y-4">
-                     <h3 className="text-sm font-bold text-zinc-900">
-                        {locale === "vi" ? "Chi tiết giá phòng" : "Pricing details"}
-                     </h3>
+                     <h3 className="text-sm font-bold text-zinc-900">{t("pricingDetails")}</h3>
 
                      <div className="space-y-2 text-xs font-semibold text-zinc-700">
                         <div className="flex justify-between">
                            <span className="text-zinc-500">
-                              {locale === "vi" ? "Giá gốc" : "Original price"} ({roomsCount}{" "}
-                              {locale === "vi" ? "phòng" : "rooms"} x {nights}{" "}
-                              {locale === "vi" ? "đêm" : "nights"})
+                              {t("originalPrice")} ({roomsCount} {t("rooms2")} x {nights}{" "}
+                              {t("nights2")})
                            </span>
                            <span className="text-zinc-800">
                               <PriceDisplay amount={basePrice} size="sm" />
@@ -711,38 +786,28 @@ export default function BookingPage() {
                         </div>
                         {appliedCoupon && (
                            <div className="flex justify-between text-emerald-600 font-bold">
-                              <span>{locale === "vi" ? "Mã giảm giá" : "Coupon Discount"}</span>
+                              <span>{t("couponDiscount")}</span>
                               <span>
                                  - <PriceDisplay amount={basePrice - finalPrice} size="sm" />
                               </span>
                            </div>
                         )}
                         <div className="flex justify-between text-zinc-500 font-medium">
-                           <span>{locale === "vi" ? "Thuế & phí dịch vụ" : "Taxes & fees"}</span>
-                           <span className="text-emerald-600 font-bold">
-                              {locale === "vi" ? "Đã bao gồm" : "Included"}
-                           </span>
+                           <span>{t("taxesFees")}</span>
+                           <span className="text-emerald-600 font-bold">{t("included")}</span>
                         </div>
                      </div>
 
                      {requiresDeposit && (
                         <div className="border-t border-zinc-100 pt-4 space-y-2 text-xs font-semibold text-zinc-700">
                            <div className="flex justify-between text-blue-600 font-bold">
-                              <span>
-                                 {locale === "vi"
-                                    ? "Số tiền cọc (15%):"
-                                    : "Deposit required (15%):"}
-                              </span>
+                              <span>{t("depositRequired15")}</span>
                               <span>
                                  <PriceDisplay amount={depositAmount} size="sm" />
                               </span>
                            </div>
                            <div className="flex justify-between text-zinc-500 font-medium">
-                              <span>
-                                 {locale === "vi"
-                                    ? "Thanh toán tại chỗ nghỉ:"
-                                    : "Pay at the property:"}
-                              </span>
+                              <span>{t("payAtTheProperty2")}</span>
                               <span>
                                  <PriceDisplay amount={payLaterAmount} size="sm" />
                               </span>
@@ -751,9 +816,7 @@ export default function BookingPage() {
                      )}
 
                      <div className="border-t border-zinc-100 pt-4 flex justify-between items-baseline">
-                        <span className="text-sm font-bold text-zinc-900">
-                           {locale === "vi" ? "Tổng cộng" : "Total Price"}
-                        </span>
+                        <span className="text-sm font-bold text-zinc-900">{t("totalPrice")}</span>
                         <div className="text-right">
                            <PriceDisplay
                               amount={finalPrice}
@@ -761,7 +824,7 @@ export default function BookingPage() {
                               className="text-[#006ce4] font-extrabold text-2xl"
                            />
                            <span className="text-[10px] text-zinc-400 block font-medium mt-0.5">
-                              {locale === "vi" ? "Không mất phí đặt trước" : "Zero booking fees"}
+                              {t("zeroBookingFees")}
                            </span>
                         </div>
                      </div>
@@ -777,9 +840,7 @@ export default function BookingPage() {
                               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                            ) : (
                               <>
-                                 <span>
-                                    {locale === "vi" ? "Hoàn tất đặt phòng" : "Complete Booking"}
-                                 </span>
+                                 <span>{t("completeBooking")}</span>
                                  <ArrowRight className="h-4.5 w-4.5" />
                               </>
                            )}
@@ -798,9 +859,7 @@ export default function BookingPage() {
                      <div className="absolute inset-0 bg-white/90 backdrop-blur-xs rounded-3xl flex flex-col items-center justify-center space-y-4 z-20">
                         <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                         <p className="text-sm font-bold text-zinc-900 animate-pulse">
-                           {locale === "vi"
-                              ? "Đang xử lý giao dịch giả lập..."
-                              : "Processing simulated payment..."}
+                           {t("processingSimulatedPayment")}
                         </p>
                      </div>
                   )}
@@ -818,7 +877,7 @@ export default function BookingPage() {
                         </div>
                         <div>
                            <h3 className="text-lg font-bold text-zinc-950">
-                              {locale === "vi" ? "Thanh toán đặt cọc giả lập" : "Simulated Deposit"}
+                              {t("simulatedDeposit")}
                            </h3>
                            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
                               OmniBooking Payment Sandbox
@@ -827,16 +886,14 @@ export default function BookingPage() {
                      </div>
 
                      <p className="text-xs text-zinc-500 leading-relaxed">
-                        {locale === "vi"
-                           ? "Hệ thống đang chạy chế độ thử nghiệm thanh toán giả lập. Bạn cần đóng trước tiền đặt cọc để xác nhận đơn đặt phòng."
-                           : "The system is running in payment sandbox mode. You need to prepay a deposit to confirm your reservation."}
+                        {t("theSystemIsRunningInPaymentSan")}
                      </p>
 
                      {paymentMethod === "visa" && (
                         <div className="space-y-3 border border-zinc-200/60 rounded-2xl p-4 bg-zinc-50/50">
                            <div className="space-y-1">
                               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-                                 {locale === "vi" ? "Số thẻ" : "Card Number"}
+                                 {t("cardNumber")}
                               </label>
                               <input
                                  type="text"
@@ -848,7 +905,7 @@ export default function BookingPage() {
                            <div className="grid grid-cols-2 gap-3">
                               <div className="space-y-1">
                                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-                                    {locale === "vi" ? "Hết hạn" : "Expiry Date"}
+                                    {t("expiryDate")}
                                  </label>
                                  <input
                                     type="text"
@@ -870,10 +927,7 @@ export default function BookingPage() {
                               </div>
                            </div>
                            <p className="text-[9px] text-zinc-400 font-medium">
-                              *{" "}
-                              {locale === "vi"
-                                 ? "Thông tin thẻ demo được điền tự động"
-                                 : "Demo card info is pre-filled"}
+                              * {t("demoCardInfoIsPreFilled")}
                            </p>
                         </div>
                      )}
@@ -909,14 +963,10 @@ export default function BookingPage() {
                            </div>
                            <div className="text-center">
                               <p className="text-xs font-bold text-pink-700">
-                                 {locale === "vi"
-                                    ? "Quét mã QR giả lập để thanh toán"
-                                    : "Scan simulated QR to pay"}
+                                 {t("scanSimulatedQrToPay")}
                               </p>
                               <p className="text-[10px] text-zinc-400 mt-1">
-                                 {locale === "vi"
-                                    ? "Mở app MoMo và quét mã này để hoàn tất đặt cọc"
-                                    : "Open MoMo app and scan to pay"}
+                                 {t("openMomoAppAndScanToPay")}
                               </p>
                            </div>
                         </div>
@@ -953,29 +1003,21 @@ export default function BookingPage() {
                            </div>
                            <div className="w-full space-y-1.5 text-xs font-semibold text-zinc-700">
                               <div className="flex justify-between border-b border-zinc-100 pb-1">
-                                 <span className="text-zinc-400">
-                                    {locale === "vi" ? "Ngân hàng" : "Bank"}
-                                 </span>
+                                 <span className="text-zinc-400">{t("bank")}</span>
                                  <span className="text-zinc-800 font-bold">Techcombank</span>
                               </div>
                               <div className="flex justify-between border-b border-zinc-100 pb-1">
-                                 <span className="text-zinc-400">
-                                    {locale === "vi" ? "Số tài khoản" : "Account No."}
-                                 </span>
+                                 <span className="text-zinc-400">{t("accountNo")}</span>
                                  <span className="text-zinc-800 font-bold">1902 8888 8888</span>
                               </div>
                               <div className="flex justify-between border-b border-zinc-100 pb-1">
-                                 <span className="text-zinc-400">
-                                    {locale === "vi" ? "Chủ tài khoản" : "Account Name"}
-                                 </span>
+                                 <span className="text-zinc-400">{t("accountName")}</span>
                                  <span className="text-zinc-800 font-bold">
                                     OMNIBOOKING SANDBOX
                                  </span>
                               </div>
                               <div className="flex justify-between">
-                                 <span className="text-zinc-400">
-                                    {locale === "vi" ? "Số tiền cọc" : "Deposit Amount"}
-                                 </span>
+                                 <span className="text-zinc-400">{t("depositAmount")}</span>
                                  <span className="text-emerald-600 font-extrabold">
                                     <PriceDisplay amount={depositAmount} size="sm" />
                                  </span>
@@ -986,30 +1028,20 @@ export default function BookingPage() {
 
                      <div className="bg-zinc-50 rounded-2xl p-4 space-y-2.5 text-xs font-semibold text-zinc-700 border border-zinc-100">
                         <div className="flex justify-between">
-                           <span className="text-zinc-500">
-                              {locale === "vi" ? "Tổng cộng đơn đặt" : "Booking Total"}
-                           </span>
+                           <span className="text-zinc-500">{t("bookingTotal")}</span>
                            <span className="text-zinc-900">
                               <PriceDisplay amount={finalPrice} />
                            </span>
                         </div>
                         <div className="flex justify-between text-blue-600 font-bold">
-                           <span>
-                              {locale === "vi"
-                                 ? "Tiền cọc cần thanh toán (15%)"
-                                 : "Deposit now (15%)"}
-                           </span>
+                           <span>{t("depositNow15")}</span>
                            <span>
                               <PriceDisplay amount={depositAmount} />
                            </span>
                         </div>
                         <div className="h-px bg-zinc-200/80 my-1"></div>
                         <div className="flex justify-between text-emerald-600">
-                           <span>
-                              {locale === "vi"
-                                 ? "Trả tại chỗ nghỉ nhận phòng"
-                                 : "Pay at property on check-in"}
-                           </span>
+                           <span>{t("payAtPropertyOnCheckIn")}</span>
                            <span>
                               <PriceDisplay amount={payLaterAmount} />
                            </span>
@@ -1021,17 +1053,13 @@ export default function BookingPage() {
                            onClick={handleSimulatedPayment}
                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all cursor-pointer shadow-md hover:shadow-lg flex items-center justify-center gap-2"
                         >
-                           <span>
-                              {locale === "vi"
-                                 ? "Xác nhận Thanh toán giả lập"
-                                 : "Confirm Simulated Payment"}
-                           </span>
+                           <span>{t("confirmSimulatedPayment")}</span>
                         </button>
                         <button
                            onClick={() => setShowPaymentModal(false)}
                            className="w-full text-zinc-400 hover:text-zinc-600 font-bold py-2 text-xs transition-colors cursor-pointer"
                         >
-                           {locale === "vi" ? "Hủy bỏ" : "Cancel"}
+                           {t("cancel")}
                         </button>
                      </div>
                   </div>

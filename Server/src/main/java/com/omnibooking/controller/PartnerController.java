@@ -134,7 +134,7 @@ public class PartnerController {
       String redisKey = "otp:partner:" + userId;
       String storedCode = redisTemplate.opsForValue().get(redisKey);
 
-      if (storedCode == null || !storedCode.equals(code)) {
+      if (storedCode == null || !storedCode.trim().equalsIgnoreCase(code.trim())) {
          return ResponseEntity.badRequest()
                .body(ApiResponse.error("Mã xác thực không chính xác hoặc đã hết hạn", "INVALID_OTP", null, requestId));
       }

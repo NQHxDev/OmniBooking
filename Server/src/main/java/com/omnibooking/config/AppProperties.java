@@ -120,7 +120,7 @@ public class AppProperties {
       private String activeKeyId;
       private Map<String, String> keys = new HashMap<>();
       private boolean twoFactorEnabled = true;
-      private String credentialEncryptionKeyVersion = "v1";
+      private String credentialEncryptionKeyVersion = "aes-v1";
       private String auditSecret = "defaultAuditSecretKeyForSignatureVerification";
       private String activeFingerprintPepperVersion = "v1";
       private Map<String, String> fingerprintPeppers = new HashMap<>();

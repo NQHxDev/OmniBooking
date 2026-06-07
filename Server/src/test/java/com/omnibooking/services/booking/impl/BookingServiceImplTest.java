@@ -337,6 +337,41 @@ class BookingServiceImplTest {
    }
 
    @Test
+   @DisplayName("Guest Booking with VISA: Should require deposit and start with PENDING status")
+   void testGuestBooking_RequiresDeposit_VisaPaymentMethod_ShouldBePending() {
+      LocalDate checkIn = LocalDate.now().plusDays(2);
+      LocalDate checkOut = checkIn.plusDays(3);
+      CreateBookingRequest request = CreateBookingRequest.builder()
+            .roomTypeId(mockRoomType.getId())
+            .checkInDate(checkIn)
+            .checkOutDate(checkOut)
+            .numRooms(1)
+            .guestName("John Doe")
+            .guestEmail("john@example.com")
+            .currency("USD")
+            .paymentMethod("VISA")
+            .build();
+
+      mockRoomAvailability(checkIn, checkOut, null);
+      when(userRepository.findByEmail("john@example.com")).thenReturn(Optional.empty());
+      when(cachedRoleService.getRoleByName(SecurityConstants.Roles.USER)).thenReturn(mockRole);
+      when(passwordEncoder.encode(anyString())).thenReturn("hashed_pass");
+      when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+         User u = invocation.getArgument(0);
+         u.setId(UUID.randomUUID());
+         return u;
+      });
+      when(verificationService.createVerificationToken(any(UUID.class))).thenReturn("verify_token");
+
+      // Act
+      BookingResponse response = bookingService.createBooking(request, null);
+
+      // Assert
+      assertThat(response.getRequiresDeposit()).isTrue();
+      assertThat(response.getStatus()).isEqualTo(BookingStatus.PENDING);
+   }
+
+   @Test
    @DisplayName("confirmBooking: Should update booking status to CONFIRMED and save Transaction")
    void testConfirmBooking_Success() {
       // Arrange

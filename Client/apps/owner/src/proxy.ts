@@ -153,9 +153,13 @@ export async function proxy(request: NextRequest) {
             ? `${apiUrl}auth/refresh`
             : `${apiUrl.replace(/\/$/, "")}/api/v1/auth/refresh`;
 
+         const userAgent = request.headers.get("user-agent");
          const headers: Record<string, string> = {
             "Content-Type": "application/json",
          };
+         if (userAgent) {
+            headers["User-Agent"] = userAgent;
+         }
          const cookiesToSend: string[] = [];
          if (sessionId) cookiesToSend.push(`session_id=${sessionId}`);
          if (refreshToken) cookiesToSend.push(`refresh_token=${refreshToken}`);
