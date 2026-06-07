@@ -1,5 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
+import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js";
+import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.1/index.js";
 
 // Configures load test execution stages and SLA thresholds
 export const options = {
@@ -18,7 +20,7 @@ export const options = {
 };
 
 // Base URL for API endpoints
-const BASE_URL = __ENV.API_URL || 'http://localhost:8080';
+const BASE_URL = __ENV.API_URL || 'http://localhost:8080/api/v1';
 
 // Popular destinations in Vietnam to simulate search queries
 const DESTINATIONS = [
@@ -57,7 +59,7 @@ export default function () {
       'featured properties list is returned': (r) => {
          try {
          const body = JSON.parse(r.body);
-         return body.success && Array.isArray(body.data);
+         return body.message === 'Success' && Array.isArray(body.data);
          } catch (e) {
          return false;
          }
@@ -72,7 +74,7 @@ export default function () {
       'new properties list is returned': (r) => {
          try {
          const body = JSON.parse(r.body);
-         return body.success && Array.isArray(body.data);
+         return body.message === 'Success' && Array.isArray(body.data);
          } catch (e) {
          return false;
          }
@@ -89,7 +91,7 @@ export default function () {
       'search results received': (r) => {
          try {
          const body = JSON.parse(r.body);
-         return body.success && body.data && Array.isArray(body.data.content);
+         return body.message === 'Success' && body.data && Array.isArray(body.data.content);
          } catch (e) {
          return false;
          }
@@ -99,7 +101,7 @@ export default function () {
    // Views details of a random hotel from search results if available
    try {
       const searchBody = JSON.parse(searchRes.body);
-      if (searchBody.success && searchBody.data && searchBody.data.content.length > 0) {
+      if (searchBody.message === 'Success' && searchBody.data && searchBody.data.content.length > 0) {
          sleep(2.5); // Simulates reading search results
 
          const hotels = searchBody.data.content;
@@ -111,7 +113,7 @@ export default function () {
          'detail data is valid': (r) => {
             try {
                const body = JSON.parse(r.body);
-               return body.success && body.data && body.data.id === randomHotel.id;
+               return body.message === 'Success' && body.data && body.data.id === randomHotel.id;
             } catch (e) {
                return false;
             }
@@ -123,4 +125,12 @@ export default function () {
    }
 
    sleep(3); // Simulates final think time before loop iteration
+}
+
+export function handleSummary(data) {
+   return {
+      "Server/load-tests/summary.html": htmlReport(data),
+      "Server/load-tests/summary.txt": textSummary(data, { indent: " ", enableColors: false }),
+      stdout: textSummary(data, { indent: " ", enableColors: true }),
+   };
 }

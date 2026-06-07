@@ -34,6 +34,17 @@ public enum ErrorCode {
    CSRF_TOKEN_INVALID("SEC_001", "CSRF token mismatch or missing", HttpStatus.FORBIDDEN),
    CSRF_ORIGIN_INVALID("SEC_002", "CSRF origin header invalid or untrusted", HttpStatus.FORBIDDEN),
 
+   // Review Errors
+   REVIEW_LOCK_TIMEOUT("REV_000", "Property lock acquisition timeout, please try again", HttpStatus.CONFLICT),
+   REVIEW_ALREADY_EXISTS("REV_001", "You have already reviewed this booking", HttpStatus.BAD_REQUEST),
+   INVALID_BOOKING_STATUS("REV_002", "Only completed stays can be reviewed", HttpStatus.BAD_REQUEST),
+   CHRONOLOGICAL_VALIDATION_FAILED("REV_003", "Stays can only be reviewed after the checkout date", HttpStatus.BAD_REQUEST),
+   MINIMUM_TEXT_LENGTH_VIOLATION("REV_004", "Review comment must be at least 10 characters", HttpStatus.BAD_REQUEST),
+   MAXIMUM_TEXT_LENGTH_VIOLATION("REV_005", "Review comment must be at most 1000 characters", HttpStatus.BAD_REQUEST),
+   NOT_BOOKING_OWNER("REV_006", "You do not own this booking", HttpStatus.FORBIDDEN),
+   NOT_PROPERTY_OWNER("REV_008", "You do not own this property", HttpStatus.FORBIDDEN),
+   REVIEW_NOT_FOUND("REV_009", "Review not found", HttpStatus.NOT_FOUND),
+
    // Idempotency Errors
    IDEMPOTENCY_KEY_REQUIRED("IDEM_001", "X-Idempotency-Key header is required", HttpStatus.BAD_REQUEST),
    IDEMPOTENCY_KEY_PROCESSING("IDEM_002", "Request is already being processed", HttpStatus.CONFLICT),

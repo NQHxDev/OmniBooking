@@ -42,6 +42,7 @@ import Footer from "@/components/Footer";
 import { propertyService, PropertyDetailResponse } from "@/services/propertyService";
 import { getTranslations } from "next-intl/server";
 import RoomPricingSection from "@/components/RoomPricingSection";
+import { ReviewResponse, PageResponse } from "@omnibooking/shared";
 
 const AMENITY_CONFIGS: Record<
    string,
@@ -161,10 +162,21 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
    const isVi = locale === "vi";
 
    let property: PropertyDetailResponse | null = null;
+   let reviewsData: PageResponse<ReviewResponse> = {
+      items: [],
+      currentPage: 0,
+      totalPages: 0,
+      totalElements: 0,
+      hasNext: false,
+      hasPrevious: false,
+   };
    try {
       property = await propertyService.getPropertyDetail(id);
+      if (property) {
+         reviewsData = await propertyService.getPropertyReviews(id, 0, 10);
+      }
    } catch (error) {
-      console.error("Failed to fetch property details on server", error);
+      console.error("Failed to fetch property details/reviews on server", error);
    }
 
    const t = await getTranslations({ locale, namespace: "PropertyDetail" });
@@ -200,8 +212,8 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
    const finalProperty = property;
 
    const starRating = finalProperty.starRating || 5;
-   const displayRating = 9.4; // Premium fixed rating for mock presentation
-   const displayReviewsCount = 384;
+   const displayRating = (finalProperty.averageRating || 0) * 2;
+   const displayReviewsCount = finalProperty.reviewCount || 0;
 
    const rawImageUrls = finalProperty.imageUrls || [];
    const uniqueRealImages = finalProperty.imageUrl
@@ -595,7 +607,7 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
                      roomTypes={finalProperty.roomTypes || []}
                   />
 
-                  {/* Real Reviews Mockup */}
+                  {/* Real Reviews */}
                   <section className="bg-white rounded-2xl p-6 md:p-8 border border-zinc-200/80 shadow-xs">
                      <h2 className="text-xl font-bold text-zinc-900 mb-6 pb-2 border-b border-zinc-100 flex items-center gap-2">
                         <MessageSquare className="h-5 w-5 text-[#006ce4]" />
@@ -607,54 +619,74 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
                         {t("verifiedReviews")}
                      </p>
 
-                     <div className="space-y-6">
-                        <div className="space-y-2">
-                           <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center font-bold text-indigo-700 text-xs shrink-0">
-                                 MH
-                              </div>
-                              <div>
-                                 <p className="text-sm font-bold text-zinc-900">Minh Hoàng</p>
-                                 <p className="text-[10px] text-zinc-400 font-medium">
-                                    Việt Nam · Gia đình trẻ
-                                 </p>
-                              </div>
-                              <div className="ml-auto bg-[#003580] text-white font-bold px-2 py-0.5 rounded text-xs">
-                                 10.0
-                              </div>
-                           </div>
-                           <p className="text-zinc-600 text-xs italic pl-12 leading-relaxed">
-                              &ldquo;
-                              {isVi
-                                 ? "Bể bơi vô cực siêu đẹp, phục vụ buffet sáng rất phong phú và ngon miệng. Các bạn nhân viên phục vụ cực kỳ tận tâm và lịch sự. Gia đình tôi chắc chắn sẽ quay lại."
-                                 : "Absolutely stunning infinity pool. The breakfast buffet was extensive and delicious. Staff were exceptionally polite and attentive. Highly recommend!"}
-                              &rdquo;
-                           </p>
+                     {reviewsData.items && reviewsData.items.length > 0 ? (
+                        <div className="space-y-6">
+                           {reviewsData.items.map((review: ReviewResponse, index: number) => {
+                              const name = review.userName || "Guest";
+                              const initials = name.substring(0, 2).toUpperCase();
+                              const ratingOutOfTen = (review.rating || 0) * 2;
+                              return (
+                                 <div
+                                    key={review.id}
+                                    className={`space-y-2 ${index > 0 ? "border-t border-zinc-100 pt-4" : ""}`}
+                                 >
+                                    <div className="flex items-center gap-3">
+                                       <div className="h-9 w-9 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center font-bold text-indigo-700 text-xs shrink-0">
+                                          {initials}
+                                       </div>
+                                       <div>
+                                          <p className="text-sm font-bold text-zinc-900">{name}</p>
+                                          <p className="text-[10px] text-zinc-400 font-medium">
+                                             {new Date(review.createdAt).toLocaleDateString()}
+                                          </p>
+                                       </div>
+                                       <div className="ml-auto bg-[#003580] text-white font-bold px-2 py-0.5 rounded text-xs">
+                                          {ratingOutOfTen.toFixed(1)}
+                                       </div>
+                                    </div>
+                                    {review.comment ? (
+                                       <p className="text-zinc-600 text-xs italic pl-12 leading-relaxed">
+                                          &ldquo;{review.comment}&rdquo;
+                                       </p>
+                                    ) : (
+                                       <p className="text-zinc-400 text-[11px] italic pl-12">
+                                          {isVi
+                                             ? "(Đánh giá chỉ có điểm số)"
+                                             : "(Rating-only review)"}
+                                       </p>
+                                    )}
+                                    {review.reply && (
+                                       <div className="ml-12 mt-2 bg-blue-50/50 rounded-xl p-3 border border-zinc-100/50 border-l-4 border-l-blue-500 space-y-1">
+                                          <div className="flex justify-between items-center text-[10px] font-bold text-blue-800 uppercase tracking-wider">
+                                             <span>
+                                                {isVi
+                                                   ? "Phản hồi từ Khách sạn"
+                                                   : "Response from Hotel"}
+                                             </span>
+                                             {review.replyUpdatedAt && (
+                                                <span className="text-zinc-400 font-normal">
+                                                   {new Date(
+                                                      review.replyUpdatedAt
+                                                   ).toLocaleDateString()}
+                                                </span>
+                                             )}
+                                          </div>
+                                          <p className="text-xs text-zinc-700 font-medium">
+                                             {review.reply}
+                                          </p>
+                                       </div>
+                                    )}
+                                 </div>
+                              );
+                           })}
                         </div>
-                        <div className="space-y-2 border-t border-zinc-100 pt-4">
-                           <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center font-bold text-amber-700 text-xs shrink-0">
-                                 ES
-                              </div>
-                              <div>
-                                 <p className="text-sm font-bold text-zinc-900">Emily Stone</p>
-                                 <p className="text-[10px] text-zinc-400 font-medium">
-                                    United Kingdom · Solo Traveller
-                                 </p>
-                              </div>
-                              <div className="ml-auto bg-[#003580] text-white font-bold px-2 py-0.5 rounded text-xs">
-                                 9.5
-                              </div>
-                           </div>
-                           <p className="text-zinc-600 text-xs italic pl-12 leading-relaxed">
-                              &ldquo;
-                              {isVi
-                                 ? "Resort vô cùng yên tĩnh và thư thái. Khu Spa đẳng cấp, tay nghề nhân viên trị liệu rất tốt. Dịch vụ quản gia hỗ trợ chu đáo từng li một."
-                                 : "Extremely peaceful and clean resort. World-class spa experience, the therapist had incredible skills. The butler helped with everything I needed."}
-                              &rdquo;
-                           </p>
+                     ) : (
+                        <div className="text-center py-6 text-zinc-400 text-sm">
+                           {isVi
+                              ? "Chưa có đánh giá nào cho chỗ nghỉ này."
+                              : "No reviews yet for this property."}
                         </div>
-                     </div>
+                     )}
                   </section>
                </div>
 

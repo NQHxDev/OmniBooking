@@ -51,4 +51,11 @@ export const bookingService = {
       );
       return response.data;
    },
+   getMyBookings: async (): Promise<BookingResponse[]> => {
+      const response = await apiClient.get<unknown, ApiResponse<BookingResponse[]>>(
+         "/bookings/mine",
+         { withCredentials: true }
+      );
+      return response.data;
+   },
 };

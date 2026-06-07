@@ -9,6 +9,7 @@ import {
    BarChart3,
    Settings,
    Home,
+   Star,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
@@ -18,6 +19,7 @@ const MENU_ITEMS = [
    { icon: LayoutDashboard, labelKey: "overview", href: "/dashboard" },
    { icon: Building2, labelKey: "properties", href: "/properties" },
    { icon: CalendarDays, labelKey: "bookings", href: "/bookings" },
+   { icon: Star, labelKey: "reviews", href: "/reviews" },
    { icon: MessageSquare, labelKey: "messages", href: "/messages" },
    { icon: BarChart3, labelKey: "reports", href: "/reports" },
    { icon: Settings, labelKey: "settings", href: "/settings" },

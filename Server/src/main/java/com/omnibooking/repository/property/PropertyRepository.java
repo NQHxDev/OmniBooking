@@ -10,6 +10,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.QueryHints;
+import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -42,5 +48,36 @@ public interface PropertyRepository extends JpaRepository<Property, UUID>, JpaSp
          +
          "ORDER BY p.createdAt DESC")
    List<Property> findNewProperties(Pageable pageable);
+
+   @Lock(LockModeType.PESSIMISTIC_WRITE)
+   @QueryHints({
+         @QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"),
+         @QueryHint(name = "javax.persistence.lock.timeout", value = "3000")
+   })
+   @Query("SELECT p FROM Property p WHERE p.id = :id")
+   Optional<Property> findByIdWithWriteLock(@Param("id") UUID id);
+
+   @Query(value = "SELECT pg_try_advisory_xact_lock(:lockId)", nativeQuery = true)
+   boolean tryAdvisoryXactLock(@Param("lockId") long lockId);
+
+   @Modifying
+   @Transactional
+   @Query(value = "UPDATE properties SET " +
+         "rating_sum = COALESCE(rating_sum, 0) + :rating, " +
+         "review_count = COALESCE(review_count, 0) + 1, " +
+         "average_rating = ROUND((COALESCE(rating_sum, 0) + :rating)::numeric / (COALESCE(review_count, 0) + 1), 2) " +
+         "WHERE id = :id", nativeQuery = true)
+   int incrementRating(@Param("id") UUID id, @Param("rating") int rating);
+
+   @Modifying
+   @Transactional
+   @Query(value = "UPDATE properties SET " +
+         "rating_sum = GREATEST(0, COALESCE(rating_sum, 0) - :rating), " +
+         "review_count = GREATEST(0, COALESCE(review_count, 0) - 1), " +
+         "average_rating = CASE WHEN COALESCE(review_count, 0) - 1 > 0 " +
+         "THEN ROUND(GREATEST(0, COALESCE(rating_sum, 0) - :rating)::numeric / (COALESCE(review_count, 0) - 1), 2) " +
+         "ELSE 0.00 END " +
+         "WHERE id = :id", nativeQuery = true)
+   int decrementRating(@Param("id") UUID id, @Param("rating") int rating);
 
 }

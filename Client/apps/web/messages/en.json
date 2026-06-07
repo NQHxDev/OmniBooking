@@ -145,7 +145,10 @@
       "description": "We apologize for the inconvenience. The system has logged the error and it is being processed.",
       "tryAgain": "Try again",
       "goHome": "Go home",
-      "devDetails": "[Dev Error Details]:"
+      "devDetails": "[Dev Error Details]:",
+      "REV_011": "Rate limit exceeded (5 reviews/hour)",
+      "REV_004": "Comment must be at least 10 characters",
+      "reviewSubmitFailed": "Failed to submit review"
    },
    "SecurityOTPModal": {
       "title": "Security Verification",
@@ -827,5 +830,49 @@
       "simulatedDepositOutro": " to secure your booking. The deposit is capped at 1 night.",
       "remainingAmountIntro": "The remaining amount of ",
       "remainingAmountOutro": " will be paid directly at the reception desk during check-in."
+   },
+   "Bookings": {
+      "failedLoadBookings": "Failed to load bookings",
+      "commentMinLength": "Comment must be at least 10 characters",
+      "commentMaxLength": "Comment must not exceed 1000 characters",
+      "selectRating": "Please select a rating score",
+      "reviewSubmitSuccess": "Review submitted successfully!",
+      "statusConfirmed": "Confirmed",
+      "statusPending": "Pending Payment",
+      "statusCompleted": "Completed",
+      "statusCancelled": "Cancelled",
+      "pageTitle": "My Bookings & Trips",
+      "pageSubtitle": "Manage and review hotels you have stayed at with OmniBooking",
+      "loadingTrips": "Loading trips...",
+      "noBookingsTitle": "You have no bookings yet",
+      "noBookingsDesc": "Find the best deals for your next journey today!",
+      "bookNow": "Book Now",
+      "roomsUnit": "rooms",
+      "totalPrice": "Total Price",
+      "writeReview": "Write Review",
+      "reviewed": "Reviewed",
+      "modalTitle": "PROPERTY REVIEW",
+      "ratingQuestion": "How do you rate your stay experience?",
+      "writeCommentLabel": "Write your review comment",
+      "optional": "Optional",
+      "commentPlaceholder": "Share your experience with room quality, staff service, hotel location... (minimum 10 characters)",
+      "modalNotice": "* Your review rating will be shared publicly and instantly synchronized with the property score.",
+      "cancel": "Cancel",
+      "submitReview": "Submit Review"
+   },
+   "Reviews": {
+      "failedLoad": "Failed to load your reviews",
+      "deleteConfirm": "Are you sure you want to delete this review?",
+      "deleteSuccess": "Review deleted successfully",
+      "deleteFailed": "Failed to delete review",
+      "pageTitle": "My Reviews",
+      "pageSubtitle": "History of reviews and responses from properties you have visited",
+      "loading": "Loading reviews...",
+      "noReviewsTitle": "No reviews yet",
+      "noReviewsDesc": "After finishing your stays, check back here to write and share your experiences!",
+      "viewBookings": "View Bookings",
+      "deleteButton": "Delete review",
+      "ratingOnly": "(Rating-only review)",
+      "propertyResponse": "Property Response"
    }
 }

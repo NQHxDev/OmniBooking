@@ -21,8 +21,8 @@ public interface PropertyDocumentMapper {
    @Mapping(target = "location", source = "property", qualifiedByName = "mapToGeoPoint")
    @Mapping(target = "amenities", source = "amenities", qualifiedByName = "mapAmenities")
    @Mapping(target = "minPrice", source = "roomTypes", qualifiedByName = "mapMinPrice")
-   @Mapping(target = "averageRating", constant = "0.0")
-   @Mapping(target = "reviewCount", constant = "0")
+   @Mapping(target = "averageRating", source = "averageRating")
+   @Mapping(target = "reviewCount", source = "reviewCount")
    @Mapping(target = "mainImageUrl", ignore = true) // Will be handled in service
    PropertyDocument toDocument(Property property);
 

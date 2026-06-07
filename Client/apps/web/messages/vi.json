@@ -145,7 +145,10 @@
       "description": "Chúng tôi rất tiếc vì sự gián đoạn này. Hệ thống đã ghi nhận lỗi và đang được xử lý",
       "tryAgain": "Thử lại",
       "goHome": "Về trang chủ",
-      "devDetails": "[Chi tiết lỗi (Dev)]:"
+      "devDetails": "[Chi tiết lỗi (Dev)]:",
+      "REV_011": "Bạn thao tác quá nhanh, tối đa 5 đánh giá/giờ",
+      "REV_004": "Đánh giá phải có ít nhất 10 ký tự",
+      "reviewSubmitFailed": "Gửi đánh giá thất bại"
    },
    "SecurityOTPModal": {
       "title": "Xác thực bảo mật",
@@ -827,5 +830,49 @@
       "simulatedDepositOutro": " để xác nhận đặt phòng. Khoản cọc này tối đa bằng 1 đêm nghỉ",
       "remainingAmountIntro": "Số tiền còn lại ",
       "remainingAmountOutro": " sẽ được thanh toán trực tiếp tại quầy lễ tân khi bạn nhận phòng"
+   },
+   "Bookings": {
+      "failedLoadBookings": "Không thể tải danh sách đặt phòng",
+      "commentMinLength": "Nhận xét phải có ít nhất 10 ký tự",
+      "commentMaxLength": "Nhận xét không được vượt quá 1000 ký tự",
+      "selectRating": "Vui lòng chọn điểm đánh giá (sao)",
+      "reviewSubmitSuccess": "Gửi đánh giá thành công! Cảm ơn bạn.",
+      "statusConfirmed": "Đã xác nhận",
+      "statusPending": "Đang chờ thanh toán",
+      "statusCompleted": "Đã lưu trú",
+      "statusCancelled": "Đã hủy",
+      "pageTitle": "Chuyến đi & Đơn đặt chỗ",
+      "pageSubtitle": "Quản lý và đánh giá các khách sạn bạn đã lưu trú cùng OmniBooking",
+      "loadingTrips": "Đang tải các chuyến đi...",
+      "noBookingsTitle": "Bạn chưa có đơn đặt phòng nào",
+      "noBookingsDesc": "Tìm ưu đãi tốt nhất cho chuyến du lịch tiếp theo của bạn ngay hôm nay!",
+      "bookNow": "Tìm phòng ngay",
+      "roomsUnit": "phòng",
+      "totalPrice": "Tổng tiền",
+      "writeReview": "Viết đánh giá",
+      "reviewed": "Đã viết nhận xét",
+      "modalTitle": "ĐÁNH GIÁ CHỖ NGHỈ",
+      "ratingQuestion": "Bạn đánh giá chất lượng lưu trú thế nào?",
+      "writeCommentLabel": "Viết nhận xét của bạn",
+      "optional": "Tùy chọn",
+      "commentPlaceholder": "Chia sẻ trải nghiệm của bạn về phòng ốc, dịch vụ, vị trí của khách sạn để giúp các du khách khác... (tối thiểu 10 ký tự)",
+      "modalNotice": "* Điểm đánh giá sẽ được chia sẻ công khai và cập nhật tức thì vào điểm chung của chỗ nghỉ.",
+      "cancel": "Hủy bỏ",
+      "submitReview": "Gửi nhận xét"
+   },
+   "Reviews": {
+      "failedLoad": "Không thể tải nhận xét của bạn",
+      "deleteConfirm": "Bạn có chắc chắn muốn xóa đánh giá này không?",
+      "deleteSuccess": "Xóa đánh giá thành công",
+      "deleteFailed": "Không thể xóa đánh giá",
+      "pageTitle": "Đánh giá của tôi",
+      "pageSubtitle": "Lịch sử nhận xét và phản hồi từ các chỗ nghỉ bạn đã ghé thăm",
+      "loading": "Đang tải các nhận xét...",
+      "noReviewsTitle": "Chưa có đánh giá nào",
+      "noReviewsDesc": "Sau khi kết thúc chuyến đi, hãy quay lại đây để chia sẻ trải nghiệm lưu trú nhé!",
+      "viewBookings": "Xem đơn đặt phòng",
+      "deleteButton": "Xóa nhận xét",
+      "ratingOnly": "(Đánh giá chỉ có điểm số)",
+      "propertyResponse": "Phản hồi từ Chỗ nghỉ"
    }
 }

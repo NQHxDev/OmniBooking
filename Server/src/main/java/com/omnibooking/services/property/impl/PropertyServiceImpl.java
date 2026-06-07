@@ -183,6 +183,8 @@ public class PropertyServiceImpl implements PropertyService {
             .city(saved.getCity())
             .country(saved.getCountry())
             .imageUrl(getMainImageUrl(saved.getId()))
+            .averageRating(saved.getAverageRating())
+            .reviewCount(saved.getReviewCount())
             .build();
    }
 
@@ -306,6 +308,8 @@ public class PropertyServiceImpl implements PropertyService {
                      .city(p.getCity())
                      .country(p.getCountry())
                      .imageUrl(mainMedia != null ? mainMedia.getUrl() : null)
+                     .averageRating(p.getAverageRating())
+                     .reviewCount(p.getReviewCount())
                      .build();
             })
             .toList();
@@ -463,6 +467,8 @@ public class PropertyServiceImpl implements PropertyService {
             .taxCode(decryptedTaxCode)
             .legalOwnerName(decryptedOwnerName)
             .amenities(amenities)
+            .averageRating(property.getAverageRating())
+            .reviewCount(property.getReviewCount())
             .roomTypes(roomTypes)
             .build();
    }
@@ -505,6 +511,8 @@ public class PropertyServiceImpl implements PropertyService {
             .imageUrl(getMainImageUrl(property.getId()))
             .imageUrls(getAllImageUrls(property.getId()))
             .amenities(amenities)
+            .averageRating(property.getAverageRating())
+            .reviewCount(property.getReviewCount())
             .roomTypes(roomTypes)
             .build();
    }

@@ -2,6 +2,7 @@ package com.omnibooking.services.booking;
 
 import com.omnibooking.dto.CreateBookingRequest;
 
+import java.util.List;
 import java.util.UUID;
 
 import com.omnibooking.dto.BookingResponse;
@@ -14,5 +15,7 @@ public interface BookingService {
    void confirmBooking(UUID bookingId, String paymentMethod, String providerTransactionId, String metadata);
 
    BookingResponse getBookingById(UUID bookingId);
+
+   List<BookingResponse> getMyBookings(UUID userId);
 
 }

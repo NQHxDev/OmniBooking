@@ -45,6 +45,10 @@ public class PropertyDetailResponse {
 
    private List<String> amenities;
 
+   private java.math.BigDecimal averageRating;
+
+   private Integer reviewCount;
+
    private List<RoomTypeResponse> roomTypes;
 
 }

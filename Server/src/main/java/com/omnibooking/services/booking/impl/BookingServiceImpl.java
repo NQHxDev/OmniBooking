@@ -44,6 +44,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -259,7 +260,8 @@ public class BookingServiceImpl implements BookingService {
       }
 
       // Save Booking
-      boolean isPendingOnlinePayment = requiresDeposit && ("momo".equalsIgnoreCase(request.getPaymentMethod()) || "visa".equalsIgnoreCase(request.getPaymentMethod()));
+      boolean isPendingOnlinePayment = requiresDeposit && ("momo".equalsIgnoreCase(request.getPaymentMethod())
+            || "visa".equalsIgnoreCase(request.getPaymentMethod()));
       BookingStatus initialStatus = isPendingOnlinePayment ? BookingStatus.PENDING : BookingStatus.CONFIRMED;
 
       Booking booking = Booking.builder()
@@ -502,6 +504,35 @@ public class BookingServiceImpl implements BookingService {
             .requiresDeposit(booking.getRequiresDeposit())
             .paymentMethod(booking.getPaymentMethod())
             .build();
+   }
+
+   @Override
+   @Transactional(readOnly = true)
+   public List<BookingResponse> getMyBookings(UUID userId) {
+      log.info("Fetching bookings for user ID: {}", userId);
+      return bookingRepository.findByUserId(userId).stream()
+            .map(booking -> {
+               String bookingCode = booking.getId().toString().substring(0, 8).toUpperCase();
+               return BookingResponse.builder()
+                     .id(booking.getId())
+                     .bookingCode(bookingCode)
+                     .guestName(booking.getGuestName())
+                     .guestEmail(booking.getGuestEmail())
+                     .propertyName(booking.getRoomType().getProperty().getName())
+                     .roomTypeName(booking.getRoomType().getName())
+                     .checkInDate(booking.getCheckInDate())
+                     .checkOutDate(booking.getCheckOutDate())
+                     .numRooms(booking.getNumRooms())
+                     .totalPrice(booking.getTotalPrice())
+                     .finalPrice(booking.getFinalPrice())
+                     .status(booking.getStatus())
+                     .currency(booking.getCurrency())
+                     .depositAmount(booking.getDepositAmount())
+                     .requiresDeposit(booking.getRequiresDeposit())
+                     .paymentMethod(booking.getPaymentMethod())
+                     .build();
+            })
+            .toList();
    }
 
    private String formatCurrency(BigDecimal amount, String currency) {
