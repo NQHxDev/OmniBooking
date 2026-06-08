@@ -13,7 +13,7 @@ export interface PartnerStatsResponse {
    newCustomers: string;
    newCustomersChange: string;
    newCustomersUp: boolean;
-   ratingScore: string;
+   ratingScore: number | null;
    ratingScoreChange: string;
    ratingScoreUp: boolean;
 }

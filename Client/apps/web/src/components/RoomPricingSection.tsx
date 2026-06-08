@@ -486,7 +486,7 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
                                  {room.bedType && (
                                     <span className="flex items-center gap-1 bg-zinc-50 px-2 py-1 rounded border border-zinc-200">
                                        <User className="h-3.5 w-3.5 text-zinc-500" />
-                                       {room.bedType}
+                                       {t("bedTypes." + room.bedType) || room.bedType}
                                     </span>
                                  )}
                                  <span className="flex items-center gap-1 bg-zinc-50 px-2 py-1 rounded border border-zinc-200">

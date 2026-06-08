@@ -110,17 +110,15 @@ docker-build:
 	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml up --build -d
 	@rm -f Client/.env
 
-.PHONY: docker-build-server
-docker-build-server:
-	@echo "Building and starting Server in Production Docker..."
-	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml up -d --build server
-
-.PHONY: docker-build-client
-docker-build-client:
+.PHONY: docker-rebuild
+docker-rebuild:
+	@echo "Stopping running production containers to free up RAM & CPU..."
+	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml stop
 	@cp env/.env.prod Client/.env
-	@echo "Building and starting Client services in Production Docker..."
-	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml up -d --build client-web client-partner client-owner
+	@echo "Building and starting all services in Production Docker..."
+	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml up --build -d
 	@rm -f Client/.env
+	@echo "Rebuild and restart completed successfully!"
 
 .PHONY: docker-restart-prod
 docker-restart-prod:
@@ -141,7 +139,7 @@ docker-stop-prod:
 		echo "Stopping all Production Docker services..."; \
 		docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml stop; \
 	else \
-		echo "Aborted."; \
+		echo "Aborted..."; \
 	fi
 
 .PHONY: docker-down-prod
@@ -152,7 +150,7 @@ docker-down-prod:
 		docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml down -v; \
 		echo "Production environment completely cleaned..."; \
 	else \
-		echo "Aborted."; \
+		echo "Aborted..."; \
 	fi
 
 .PHONY: docker-logs
@@ -238,11 +236,9 @@ help:
 	@echo "    make docker-stop   - Stop development infrastructure services"
 	@echo "    make docker-down   - Stop and clean development infrastructure (remove volumes)"
 	@echo "    make docker-restart - Rebuild and restart development infrastructure"
-	@echo ""
 	@echo "  Docker Production Stack:"
 	@echo "    make docker-build  - Build and start all services in Production Docker"
-	@echo "    make docker-build-server - Build and start production Server in Docker"
-	@echo "    make docker-build-client - Build and start production Client in Docker"
+	@echo "    make docker-rebuild - Stop, rebuild, and restart Production Docker services (optimal)"
 	@echo "    make docker-restart-prod - Rebuild and restart Production Docker services"
 	@echo "    make docker-stop-prod - Stop Production Docker services"
 	@echo "    make docker-down-prod - Stop and clean Production stack"

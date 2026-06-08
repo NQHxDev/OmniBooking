@@ -30,6 +30,19 @@ public interface ReviewRepository extends JpaRepository<Review, UUID>, JpaSpecif
    long countActiveReviewsByPropertyId(@Param("propertyId") UUID propertyId);
 
    @Query("SELECT SUM(r.rating) FROM Review r WHERE r.property.id = :propertyId AND r.deletedAt IS NULL AND r.status = com.omnibooking.model.enums.ReviewStatus.PUBLISHED")
-   Long sumActiveRatingsByPropertyId(@Param("propertyId") java.util.UUID propertyId);
+   Long sumActiveRatingsByPropertyId(@Param("propertyId") UUID propertyId);
+
+   /**
+    * Calculates the average rating score for a partner.
+    * Business rules:
+    * - Only includes active, published reviews (r.deletedAt IS NULL and status =
+    * PUBLISHED).
+    * - Excludes reviews belonging to soft-deleted properties (r.property.deletedAt
+    * IS NULL).
+    * - Includes reviews belonging to disabled/inactive properties
+    * (r.property.isActive is ignored) to reflect historical reputation.
+    */
+   @Query("SELECT AVG(r.rating) FROM Review r WHERE r.property.owner.id = :ownerId AND r.deletedAt IS NULL AND r.property.deletedAt IS NULL AND r.status = com.omnibooking.model.enums.ReviewStatus.PUBLISHED")
+   Double getAverageRatingByOwnerId(@Param("ownerId") UUID ownerId);
 
 }

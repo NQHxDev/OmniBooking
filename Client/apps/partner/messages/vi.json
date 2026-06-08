@@ -34,7 +34,8 @@
             "monthlyRevenue": "Doanh thu tháng",
             "totalBookings": "Lượt đặt phòng",
             "newCustomers": "Khách hàng mới",
-            "ratingScore": "Điểm đánh giá"
+            "ratingScore": "Điểm đánh giá",
+            "noReviewsYet": "Chưa có đánh giá"
          },
          "properties": {
             "title": "Danh sách chỗ nghỉ",
@@ -66,6 +67,16 @@
          "metaDesc": "Tham gia cùng OmniBooking và bắt đầu đón khách ngay hôm nay"
       },
       "createPropertyForm": {
+         "bedTypes": {
+            "SINGLE": "Giường đơn",
+            "DOUBLE": "Giường đôi",
+            "QUEEN": "Giường Queen",
+            "KING": "Giường King",
+            "TWIN": "2 giường đơn (Twin)",
+            "SOFA_BED": "Giường sofa",
+            "BUNK": "Giường tầng",
+            "TRIPLE": "Giường 3 người (Triple)"
+         },
          "step1": "Thông tin cơ bản",
          "step2": "Vị trí",
          "step3": "Thiết lập",
@@ -306,6 +317,8 @@
          "pageTitle": "Quản lý mã giảm giá",
          "pageDesc": "Thiết lập các mã coupon để thu hút thêm nhiều lượt đặt phòng",
          "selectPropertyPrompt": "Vui lòng chọn một chỗ nghỉ từ danh sách phía trên để quản lý khuyến mãi.",
+         "noPropertiesAvailable": "Không có chỗ nghỉ nào",
+         "noPropertiesDesc": "Bạn chưa đăng ký chỗ nghỉ nào. Vui lòng đăng ký chỗ nghỉ trước.",
          "createCoupon": "Tạo mã giảm giá",
          "createCouponTitle": "Tạo mã giảm giá mới",
          "editCouponTitle": "Chỉnh sửa mã giảm giá",
@@ -361,6 +374,8 @@
          "pageTitle": "Quy tắc điều chỉnh giá",
          "pageDesc": "Tự động tăng hoặc giảm giá phòng dựa trên các quy tắc thời gian và số khách",
          "selectPropertyPrompt": "Vui lòng chọn một chỗ nghỉ từ danh sách phía trên để quản lý quy tắc giá.",
+         "noPropertiesAvailable": "Không có chỗ nghỉ nào",
+         "noPropertiesDesc": "Bạn chưa đăng ký chỗ nghỉ nào. Vui lòng đăng ký chỗ nghỉ trước.",
          "createRule": "Tạo quy tắc mới",
          "createRuleTitle": "Tạo quy tắc điều chỉnh giá mới",
          "editRuleTitle": "Chỉnh sửa quy tắc điều chỉnh giá",

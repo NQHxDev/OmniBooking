@@ -657,6 +657,16 @@
       "copyright": "Copyright © 1996 - 2026 OmniBooking.com™. All rights reserved."
    },
    "PropertyDetail": {
+      "bedTypes": {
+         "SINGLE": "Single Bed",
+         "DOUBLE": "Double Bed",
+         "QUEEN": "Queen Bed",
+         "KING": "King Bed",
+         "TWIN": "Twin Beds",
+         "SOFA_BED": "Sofa Bed",
+         "BUNK": "Bunk Bed",
+         "TRIPLE": "Triple Bed"
+      },
       "back": "Back to search results",
       "nights": "1 night, 2 adults",
       "included": "Includes all taxes & fees",

@@ -657,6 +657,16 @@
       "copyright": "Bản quyền © 1996 - 2026 OmniBooking.com™. Bảo lưu mọi quyền."
    },
    "PropertyDetail": {
+      "bedTypes": {
+         "SINGLE": "Giường đơn",
+         "DOUBLE": "Giường đôi",
+         "QUEEN": "Giường Queen",
+         "KING": "Giường King",
+         "TWIN": "2 giường đơn (Twin)",
+         "SOFA_BED": "Giường sofa",
+         "BUNK": "Giường tầng",
+         "TRIPLE": "Giường 3 người (Triple)"
+      },
       "back": "Quay lại tìm kiếm",
       "nights": "1 đêm, 2 người lớn",
       "included": "Đã bao gồm thuế và phí",

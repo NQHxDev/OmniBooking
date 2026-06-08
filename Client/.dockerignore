@@ -1,0 +1,15 @@
+# Exclude local build and package modules from Client build context
+node_modules
+.next
+apps/web/.next
+apps/partner/.next
+apps/owner/.next
+apps/web/node_modules
+apps/partner/node_modules
+apps/owner/node_modules
+packages/shared/node_modules
+.env
+.env.local
+.env.production
+.env.development
+.env.staging

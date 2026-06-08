@@ -83,6 +83,14 @@ function parseSetCookie(setCookieStr: string): ParsedCookie | null {
 export async function proxy(request: NextRequest) {
    const { pathname } = request.nextUrl;
 
+   // 0. Edge-level redirects for root routes to preserve locale and avoid 404
+   if (pathname === "/" || pathname === "/en") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+   }
+   if (pathname === "/vi") {
+      return NextResponse.redirect(new URL("/vi/dashboard", request.url));
+   }
+
    // 1. Exclude static assets and api routes
    if (
       pathname.startsWith("/_next") ||

@@ -318,7 +318,7 @@ public class SessionRotationIntegrationTest {
 
       List<Object> args = scriptArgsCaptor.getAllValues();
       String encryptedBlob = (String) args.get(3);
-      assertThat(encryptedBlob).startsWith("v1:"); // Key version prepended
+      assertThat(encryptedBlob).startsWith("aes-v1:"); // Key version prepended
    }
 
    @Test

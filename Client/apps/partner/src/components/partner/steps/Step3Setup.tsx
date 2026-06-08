@@ -170,7 +170,7 @@ export default function Step3Setup({ onBack, onNext }: Step3SetupProps) {
                   onClick={() =>
                      append({
                         name: "",
-                        bedType: "Double bed",
+                        bedType: "DOUBLE",
                         roomSizeSqm: 25,
                         capacityAdults: 2,
                         capacityChildren: 0,
@@ -240,12 +240,14 @@ export default function Step3Setup({ onBack, onNext }: Step3SetupProps) {
                                  {...register(`roomTypes.${index}.bedType` as const)}
                                  className="w-full px-3 py-2 rounded-lg border border-zinc-200 focus:border-[#003580] focus:ring-2 focus:ring-blue-50 outline-none text-sm transition-all bg-white text-zinc-800"
                               >
-                                 <option value="Single bed">Single bed</option>
-                                 <option value="Double bed">Double bed</option>
-                                 <option value="Queen bed">Queen bed</option>
-                                 <option value="King bed">King bed</option>
-                                 <option value="Twin beds">Twin beds</option>
-                                 <option value="Sofa bed">Sofa bed</option>
+                                 <option value="SINGLE">{t("bedTypes.SINGLE")}</option>
+                                 <option value="DOUBLE">{t("bedTypes.DOUBLE")}</option>
+                                 <option value="QUEEN">{t("bedTypes.QUEEN")}</option>
+                                 <option value="KING">{t("bedTypes.KING")}</option>
+                                 <option value="TWIN">{t("bedTypes.TWIN")}</option>
+                                 <option value="SOFA_BED">{t("bedTypes.SOFA_BED")}</option>
+                                 <option value="BUNK">{t("bedTypes.BUNK")}</option>
+                                 <option value="TRIPLE">{t("bedTypes.TRIPLE")}</option>
                               </select>
                            </div>
                         </div>

@@ -33,7 +33,7 @@ interface PartnerPromotionsProps {
 export default function PartnerPromotions({ initialProperties }: PartnerPromotionsProps) {
    const t = useTranslations("Partner.promotions");
    const [selectedPropertyId, setSelectedPropertyId] = useState<string>(
-      initialProperties.length > 0 ? initialProperties[0].id : "all"
+      initialProperties.length > 0 ? initialProperties[0].id : "none"
    );
    const [coupons, setCoupons] = useState<CouponResponse[]>([]);
    const [loading, setLoading] = useState(false);
@@ -57,7 +57,7 @@ export default function PartnerPromotions({ initialProperties }: PartnerPromotio
 
    // Fetch coupons for property
    const fetchCoupons = useCallback(async () => {
-      if (selectedPropertyId === "all") {
+      if (selectedPropertyId === "all" || selectedPropertyId === "none") {
          setCoupons([]);
          return;
       }
@@ -251,15 +251,21 @@ export default function PartnerPromotions({ initialProperties }: PartnerPromotio
                   onChange={(e) => setSelectedPropertyId(e.target.value)}
                   className="px-4 py-2.5 rounded-2xl border border-zinc-200 text-sm focus:border-[#006ce4] focus:outline-none bg-white font-bold text-zinc-700 transition-colors"
                >
-                  {initialProperties.map((p) => (
-                     <option key={p.id} value={p.id}>
-                        {p.name}
+                  {initialProperties.length === 0 ? (
+                     <option value="none" disabled>
+                        {t("noPropertiesAvailable") || "No properties available"}
                      </option>
-                  ))}
+                  ) : (
+                     initialProperties.map((p) => (
+                        <option key={p.id} value={p.id}>
+                           {p.name}
+                        </option>
+                     ))
+                  )}
                </select>
             </div>
 
-            {selectedPropertyId !== "all" && (
+            {selectedPropertyId !== "all" && selectedPropertyId !== "none" && (
                <button
                   onClick={handleOpenCreateModal}
                   className="px-5 py-3 text-sm font-bold text-white bg-[#006ce4] hover:bg-[#0057b7] rounded-2xl shadow-md shadow-blue-100 hover:shadow-blue-200 transition-all flex items-center gap-2 cursor-pointer"
@@ -270,9 +276,12 @@ export default function PartnerPromotions({ initialProperties }: PartnerPromotio
             )}
          </div>
 
-         {selectedPropertyId === "all" ? (
+         {selectedPropertyId === "all" || selectedPropertyId === "none" ? (
             <div className="bg-white rounded-3xl border border-zinc-200/80 p-12 text-center text-zinc-500 shadow-xs">
-               {t("selectPropertyPrompt")}
+               {selectedPropertyId === "none"
+                  ? t("noPropertiesDesc") ||
+                    "You have no properties registered yet. Please register a property first."
+                  : t("selectPropertyPrompt")}
             </div>
          ) : (
             <>

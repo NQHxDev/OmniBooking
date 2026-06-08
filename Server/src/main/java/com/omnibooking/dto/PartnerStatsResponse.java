@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PartnerStatsResponse {
+
    private String monthlyRevenue;
    private String monthlyRevenueChange;
    private boolean monthlyRevenueUp;
@@ -22,7 +23,8 @@ public class PartnerStatsResponse {
    private String newCustomersChange;
    private boolean newCustomersUp;
 
-   private String ratingScore;
+   private Double ratingScore;
    private String ratingScoreChange;
    private boolean ratingScoreUp;
+
 }

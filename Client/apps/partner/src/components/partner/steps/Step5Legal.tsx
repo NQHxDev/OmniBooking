@@ -243,7 +243,8 @@ export default function Step5Legal({ images, isSubmitting, onBack }: Step5LegalP
                                           {room.name || `Room #${index + 1}`}
                                        </p>
                                        <p className="text-zinc-500">
-                                          {room.bedType} • Max {room.capacityAdults} Guests
+                                          {t("bedTypes." + room.bedType) || room.bedType} • Max{" "}
+                                          {room.capacityAdults} Guests
                                        </p>
                                     </div>
                                     <span className="font-bold text-[#003580]">

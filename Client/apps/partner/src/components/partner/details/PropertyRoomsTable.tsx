@@ -10,6 +10,7 @@ interface PropertyRoomsTableProps {
 
 export default function PropertyRoomsTable({ property }: PropertyRoomsTableProps) {
    const t = useTranslations("Partner.propertyDetail.rooms");
+   const tForm = useTranslations("Partner.createPropertyForm");
 
    return (
       <div className="rounded-[2rem] border border-zinc-100 bg-white p-6 shadow-xs mb-8 overflow-hidden">
@@ -71,7 +72,7 @@ export default function PropertyRoomsTable({ property }: PropertyRoomsTableProps
                            <td className="py-4 text-sm font-semibold text-zinc-700">
                               <div className="flex items-center gap-1.5">
                                  <Bed className="h-4 w-4 text-zinc-400" />
-                                 <span>{room.bedType}</span>
+                                 <span>{tForm("bedTypes." + room.bedType) || room.bedType}</span>
                               </div>
                            </td>
                            <td className="py-4 text-center text-sm font-bold text-zinc-900">

@@ -1,5 +1,6 @@
 package com.omnibooking.exception;
 
+import com.omnibooking.config.observability.ModuleTagResolver;
 import com.omnibooking.dto.ApiResponse;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,6 +10,9 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
@@ -28,6 +32,32 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.error(ex.getMessage(), ex.getErrorCode(), null, requestId));
    }
 
+   private String getLeafFieldName(java.util.List<JsonMappingException.Reference> path) {
+      if (path == null || path.isEmpty()) {
+         return "parameter";
+      }
+      for (int i = path.size() - 1; i >= 0; i--) {
+         String fieldName = path.get(i).getFieldName();
+         if (fieldName != null && !fieldName.isEmpty()) {
+            return fieldName;
+         }
+      }
+      return "parameter";
+   }
+
+   private String getLeafFieldName(String fieldPath) {
+      if (fieldPath == null || fieldPath.isEmpty()) {
+         return "parameter";
+      }
+      int lastDot = fieldPath.lastIndexOf('.');
+      String leaf = (lastDot != -1) ? fieldPath.substring(lastDot + 1) : fieldPath;
+      int bracket = leaf.indexOf('[');
+      if (bracket != -1) {
+         leaf = leaf.substring(0, bracket);
+      }
+      return leaf.isEmpty() ? fieldPath : leaf;
+   }
+
    @ExceptionHandler(MethodArgumentNotValidException.class)
    public ResponseEntity<ApiResponse<Object>> handleValidationExceptions(
          MethodArgumentNotValidException ex, HttpServletRequest request) {
@@ -37,7 +67,7 @@ public class GlobalExceptionHandler {
       ex.getBindingResult().getAllErrors().forEach((error) -> {
          String fieldName = ((FieldError) error).getField();
          String errorMessage = error.getDefaultMessage();
-         errors.put(fieldName, errorMessage);
+         errors.put(getLeafFieldName(fieldName), errorMessage);
       });
 
       return ResponseEntity.badRequest()
@@ -56,6 +86,28 @@ public class GlobalExceptionHandler {
                   requestId));
    }
 
+   @ExceptionHandler(HttpMessageNotReadableException.class)
+   public ResponseEntity<ApiResponse<Object>> handleHttpMessageNotReadableException(
+         HttpMessageNotReadableException ex, HttpServletRequest request) {
+
+      String requestId = (String) request.getAttribute("requestId");
+      String message = "Invalid JSON payload or format";
+
+      Throwable cause = ex.getCause();
+      if (cause instanceof InvalidFormatException) {
+         InvalidFormatException ife = (InvalidFormatException) cause;
+         String fieldName = getLeafFieldName(ife.getPath());
+         message = "Invalid value provided for field '" + fieldName + "'";
+      } else if (cause instanceof JsonMappingException) {
+         JsonMappingException jme = (JsonMappingException) cause;
+         String fieldName = getLeafFieldName(jme.getPath());
+         message = "Invalid format for field '" + fieldName + "'";
+      }
+
+      return ResponseEntity.badRequest()
+            .body(ApiResponse.error(message, ErrorCode.INVALID_KEY.getCode(), null, requestId));
+   }
+
    @ExceptionHandler(Exception.class)
    public ResponseEntity<ApiResponse<Object>> handleAllExceptions(Exception ex, HttpServletRequest request) {
 
@@ -66,7 +118,7 @@ public class GlobalExceptionHandler {
 
       // Check if Sentry has already captured this exception (via LoggingAspect)
       if (request.getAttribute("sentry_captured") == null) {
-         String module = com.omnibooking.config.observability.ModuleTagResolver.resolveModule(ex.getClass());
+         String module = ModuleTagResolver.resolveModule(ex.getClass());
          io.sentry.Sentry.setTag("module", module);
          io.sentry.Sentry.captureException(ex);
          request.setAttribute("sentry_captured", Boolean.TRUE);

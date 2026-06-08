@@ -107,6 +107,7 @@ public class BookingControllerTest {
       Mockito.when(bookingService.createBooking(any(CreateBookingRequest.class), any())).thenReturn(response);
 
       mockMvc.perform(post("/bookings")
+            .header("Origin", "http://localhost:3000")
             .cookie(new Cookie(CookieUtils.CSRF_TOKEN, "test_csrf"))
             .header("X-CSRF-Token", "test_csrf")
             .contentType(MediaType.APPLICATION_JSON)

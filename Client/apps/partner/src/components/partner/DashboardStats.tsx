@@ -19,6 +19,7 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
          change: stats?.monthlyRevenueChange ?? "0.0%",
          isUp: stats?.monthlyRevenueUp ?? true,
          icon: DollarSign,
+         hasChange: true,
       },
       {
          labelKey: "totalBookings",
@@ -26,6 +27,7 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
          change: stats?.totalBookingsChange ?? "0.0%",
          isUp: stats?.totalBookingsUp ?? true,
          icon: TrendingUp,
+         hasChange: true,
       },
       {
          labelKey: "newCustomers",
@@ -33,13 +35,18 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
          change: stats?.newCustomersChange ?? "0.0%",
          isUp: stats?.newCustomersUp ?? true,
          icon: Users,
+         hasChange: true,
       },
       {
          labelKey: "ratingScore",
-         value: stats?.ratingScore ?? "4.9",
+         value:
+            stats?.ratingScore !== undefined && stats?.ratingScore !== null
+               ? stats.ratingScore.toFixed(1)
+               : t("noReviewsYet"),
          change: stats?.ratingScoreChange ?? "+0.0%",
          isUp: stats?.ratingScoreUp ?? true,
          icon: Star,
+         hasChange: stats?.ratingScore !== undefined && stats?.ratingScore !== null,
       },
    ];
 
@@ -69,23 +76,25 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
                   <span className="text-2xl font-bold text-zinc-950">
                      {formatValue(stat.value)}
                   </span>
-                  <div
-                     className={`flex items-center gap-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${
-                        stat.labelKey === "ratingScore"
-                           ? "text-zinc-500 bg-zinc-50 border-zinc-100"
-                           : stat.isUp
-                             ? "text-emerald-700 bg-emerald-50 border-emerald-100"
-                             : "text-rose-700 bg-rose-50 border-rose-100"
-                     }`}
-                  >
-                     {stat.labelKey !== "ratingScore" &&
-                        (stat.isUp ? (
-                           <ArrowUpRight className="h-3 w-3 stroke-[2.5]" />
-                        ) : (
-                           <ArrowDownRight className="h-3 w-3 stroke-[2.5]" />
-                        ))}
-                     {formatValue(stat.change)}
-                  </div>
+                  {stat.hasChange && (
+                     <div
+                        className={`flex items-center gap-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${
+                           stat.labelKey === "ratingScore"
+                              ? "text-zinc-500 bg-zinc-50 border-zinc-100"
+                              : stat.isUp
+                                ? "text-emerald-700 bg-emerald-50 border-emerald-100"
+                                : "text-rose-700 bg-rose-50 border-rose-100"
+                        }`}
+                     >
+                        {stat.labelKey !== "ratingScore" &&
+                           (stat.isUp ? (
+                              <ArrowUpRight className="h-3 w-3 stroke-[2.5]" />
+                           ) : (
+                              <ArrowDownRight className="h-3 w-3 stroke-[2.5]" />
+                           ))}
+                        {formatValue(stat.change)}
+                     </div>
+                  )}
                </div>
             </div>
          ))}

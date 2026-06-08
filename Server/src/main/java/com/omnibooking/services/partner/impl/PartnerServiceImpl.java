@@ -2,10 +2,8 @@ package com.omnibooking.services.partner.impl;
 
 import com.omnibooking.dto.PartnerStatsResponse;
 import com.omnibooking.model.Booking;
-import com.omnibooking.model.Property;
 import com.omnibooking.model.enums.BookingStatus;
 import com.omnibooking.repository.booking.BookingRepository;
-import com.omnibooking.repository.property.PropertyRepository;
 import com.omnibooking.services.partner.PartnerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +21,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 import com.omnibooking.dto.PartnerBookingResponse;
+import com.omnibooking.repository.property.ReviewRepository;
 import com.omnibooking.services.core.EncryptionService;
 import org.springframework.cache.annotation.Cacheable;
 
@@ -33,7 +32,7 @@ public class PartnerServiceImpl implements PartnerService {
 
    private final BookingRepository bookingRepository;
 
-   private final PropertyRepository propertyRepository;
+   private final ReviewRepository reviewRepository;
 
    private final EncryptionService encryptionService;
 
@@ -108,23 +107,13 @@ public class PartnerServiceImpl implements PartnerService {
       boolean customersUp = currentCustomers >= previousCustomers;
 
       // Rating Score
-      List<Property> properties = propertyRepository.findByOwnerId(partnerId);
-      double avgRating = 4.9; // default fallback
-      if (!properties.isEmpty()) {
-         double sum = 0;
-         int count = 0;
-         for (Property p : properties) {
-            if (p.getStarRating() != null) {
-               sum += p.getStarRating();
-               count++;
-            }
-         }
-         if (count > 0) {
-            avgRating = (double) sum / count;
-         }
+      Double avgRating = reviewRepository.getAverageRatingByOwnerId(partnerId);
+      Double ratingScoreVal = null;
+      if (avgRating != null) {
+         ratingScoreVal = BigDecimal.valueOf(avgRating)
+               .setScale(1, RoundingMode.HALF_UP)
+               .doubleValue();
       }
-
-      String ratingStr = String.format(Locale.US, "%.1f", avgRating);
       String ratingChange = "+0.0";
       boolean ratingUp = true;
 
@@ -138,7 +127,7 @@ public class PartnerServiceImpl implements PartnerService {
             .newCustomers(customersStr)
             .newCustomersChange(customersChange)
             .newCustomersUp(customersUp)
-            .ratingScore(ratingStr)
+            .ratingScore(ratingScoreVal)
             .ratingScoreChange(ratingChange)
             .ratingScoreUp(ratingUp)
             .build();

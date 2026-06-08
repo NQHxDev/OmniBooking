@@ -103,6 +103,21 @@ class BookingServiceImplTest {
    @Mock
    private Cache cache;
 
+   @Mock
+   private com.omnibooking.services.pricing.PriceCalculationService priceCalculationService;
+   @Mock
+   private com.omnibooking.services.pricing.CouponReservationService couponReservationService;
+   @Mock
+   private com.omnibooking.repository.pricing.CouponReservationRepository couponReservationRepository;
+   @Mock
+   private com.omnibooking.repository.pricing.BookingPriceBreakdownRepository bookingPriceBreakdownRepository;
+   @Mock
+   private com.omnibooking.repository.pricing.BookingAppliedRuleVersionRepository bookingAppliedRuleVersionRepository;
+   @Mock
+   private com.omnibooking.repository.pricing.PriceRuleVersionRepository priceRuleVersionRepository;
+   @Mock
+   private com.omnibooking.services.pricing.PricingEngine pricingEngine;
+
    @InjectMocks
    private BookingServiceImpl bookingService;
 
@@ -160,6 +175,43 @@ class BookingServiceImplTest {
             .thenReturn(new EmailEvent());
 
       lenient().when(cacheManager.getCache("partner_bookings")).thenReturn(cache);
+
+      lenient().when(priceCalculationService.calculateStayPriceWithCoupon(
+            any(UUID.class), any(UUID.class), any(LocalDate.class), any(LocalDate.class), org.mockito.ArgumentMatchers.anyInt(), any()
+      )).thenAnswer(invocation -> {
+         LocalDate checkIn = invocation.getArgument(2);
+         LocalDate checkOut = invocation.getArgument(3);
+         long nights = java.time.temporal.ChronoUnit.DAYS.between(checkIn, checkOut);
+         
+         java.util.List<com.omnibooking.services.pricing.PriceCalculationService.DailyPrice> dailyPrices = new java.util.ArrayList<>();
+         BigDecimal totalBase = BigDecimal.ZERO;
+         for (int i = 0; i < nights; i++) {
+            com.omnibooking.services.pricing.PriceCalculationService.DailyPrice dp = new com.omnibooking.services.pricing.PriceCalculationService.DailyPrice(
+                  checkIn.plusDays(i),
+                  new BigDecimal("100.00"),
+                  BigDecimal.ZERO,
+                  BigDecimal.ZERO,
+                  BigDecimal.ZERO,
+                  new BigDecimal("100.00"),
+                  Collections.emptyList()
+            );
+            dailyPrices.add(dp);
+            totalBase = totalBase.add(new BigDecimal("100.00"));
+         }
+         return new com.omnibooking.services.pricing.PriceCalculationService.StayPriceResult(
+               dailyPrices,
+               totalBase,
+               BigDecimal.ZERO,
+               BigDecimal.ZERO,
+               BigDecimal.ZERO,
+               BigDecimal.ZERO,
+               totalBase,
+               null,
+               null
+         );
+      });
+
+      lenient().when(bookingPriceBreakdownRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
    }
 
    private void mockRoomAvailability(LocalDate checkIn, LocalDate checkOut, BigDecimal price) {

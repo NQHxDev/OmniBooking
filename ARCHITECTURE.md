@@ -73,6 +73,14 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 
 ## 5. Frontend Core Patterns
 
+### Edge-level Locale-Preserving Redirects
+
+- **Middleware Redirects**:
+   - To handle root `/` access, Next.js Edge Middleware (`apps/partner/src/middleware.ts` proxying `proxy.ts`) implements redirect rules.
+   - **Locale Preservation**: The middleware checks the requested path and redirects to the dashboard while preserving the user's active locale.
+   - English (default locale, prefix `as-needed` is blank) redirects: `/` and `/en` -> `/dashboard`.
+   - Vietnamese (secondary locale, prefix `/vi`) redirects: `/vi` -> `/vi/dashboard`.
+
 ### API Architecture
 
 - **Axios Client**: Centralized `apiClient` with interceptors for:
@@ -536,6 +544,40 @@ To provide a robust, production-ready reviews and ratings system, OmniBooking im
 - **GDPR / Compliance Anonymization**:
    - Under privacy regulations (Right to be Forgotten), when a user profile is deleted, their reviews are **anonymized** (setting `user_id` to a generic system-null user and clearing name/email from the guest metadata) instead of deleted, preserving the historical ratings of properties while ensuring full compliance.
 
+### 19.16. Partner Average Rating Score Calculation (Issue #28 Updates)
+
+- **Business Logic Rules**:
+   - The rating score shown on the Partner Dashboard (`ratingScore` in `PartnerStatsResponse`) is calculated dynamically as the average rating of active reviews across all properties owned by that partner.
+   - **Soft-Deleted Properties Excluded**: Reviews belonging to properties that have been soft-deleted (`property.deletedAt IS NOT NULL`) are **excluded** from the calculation, matching the logic: `r.property.deletedAt IS NULL`.
+   - **Inactive Properties Included**: Reviews belonging to properties that are temporarily inactive (`isActive = false` but not soft-deleted) **are included** in the average rating calculation. This ensures historical reputation is preserved and not temporarily hidden if a property goes offline.
+- **Contract & Empty State**:
+   - The `ratingScore` API field uses the contract type `number | null` (not string / "N/A" / "0.0").
+   - If a partner has no properties, or there are no published reviews for their properties, the API returns `"ratingScore": null`. The partner portal UI handles this case by displaying "No reviews yet" (or "Chưa có đánh giá" in Vietnamese) and hiding the percentage change indicator.
+- **Database Optimistic Locking & Schema Integrity**:
+   - The `reviews` table utilizes Hibernate `@Version` for optimistic locking (`version` column).
+   - An audit of all 24 entities inheriting from `BaseEntity` confirmed only `reviews` was missing this version column, which has been resolved via Flyway migration `V2__Add_Review_Version.sql`.
+- **Flyway Migration Verification Procedure**:
+   - Post-migration, DevOps / QA can verify the schema structure in PostgreSQL using the following query:
+      ```sql
+      SELECT column_name, is_nullable, column_default, data_type
+      FROM information_schema.columns
+      WHERE table_name = 'reviews' AND column_name = 'version';
+      ```
+   - Expected results:
+      - `column_name`: `version`
+      - `is_nullable`: `NO`
+      - `column_default`: `0`
+      - `data_type`: `bigint`
+- **Jackson & Validation Path Sanitization**:
+   - To prevent internal DTO structure exposure (e.g., paths like `roomTypes[0].bedType`), nested validation path errors and deserialization mapping exception field names are sanitized. Both `MethodArgumentNotValidException` and `HttpMessageNotReadableException` extract and return only the leaf property field name (e.g. `'bedType'`).
+   - In `GlobalExceptionHandler`, helper methods `getLeafFieldName` parse property paths and Jackson path references, extracting the last element only. This ensures error responses remain user-friendly and internal structure details are never leaked.
+- **Future Dashboard Rating Optimization (Backlog)**:
+   - Calculating average ratings dynamically at runtime via `AVG(r.rating)` can become expensive as the review volume grows.
+   - **Roadmap / Backlog**: A future ticket should optimize this by caching dashboard statistics in Redis (e.g. 10-minute TTL) or pre-computing and storing rating aggregates asynchronously via Kafka event consumers.
+- **Public Web Client Regression Test Coverage**:
+   - Real-world validation is extended to the Public Web Client via Test Group F (Public Property Detail Page verification).
+   - **Verification Scenarios**: Ensure all 8 `BedType` enums (e.g. `BUNK`, `SOFA_BED`, `TRIPLE`) are correctly localized across supported locales (en, vi) on the property detail page, and that raw uppercase enum strings are never displayed to end users.
+
 ---
 
-_Last Updated: 2026-06-07_
+_Last Updated: 2026-06-08_

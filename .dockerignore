@@ -1,0 +1,19 @@
+# Exclude local dependency and build folders from the Docker build context
+node_modules
+.next
+.git
+.vscode
+.antigravity
+.codegraph
+archives
+logs
+target
+Client/node_modules
+Client/apps/web/.next
+Client/apps/partner/.next
+Client/apps/owner/.next
+Server/target
+Server/bin
+*.log
+*.zip
+*.tar.gz

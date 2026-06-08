@@ -34,7 +34,8 @@
             "monthlyRevenue": "Monthly Revenue",
             "totalBookings": "Total Bookings",
             "newCustomers": "New Customers",
-            "ratingScore": "Rating Score"
+            "ratingScore": "Rating Score",
+            "noReviewsYet": "No reviews yet"
          },
          "properties": {
             "title": "Property List",
@@ -66,6 +67,16 @@
          "metaDesc": "Join OmniBooking and start welcoming guests today"
       },
       "createPropertyForm": {
+         "bedTypes": {
+            "SINGLE": "Single Bed",
+            "DOUBLE": "Double Bed",
+            "QUEEN": "Queen Bed",
+            "KING": "King Bed",
+            "TWIN": "Twin Beds",
+            "SOFA_BED": "Sofa Bed",
+            "BUNK": "Bunk Bed",
+            "TRIPLE": "Triple Bed"
+         },
          "step1": "Basic Info",
          "step2": "Location",
          "step3": "Setup",
@@ -306,6 +317,8 @@
          "pageTitle": "Manage Coupons",
          "pageDesc": "Set up discount codes to attract more bookings",
          "selectPropertyPrompt": "Please select a property from the list above to manage coupons.",
+         "noPropertiesAvailable": "No properties available",
+         "noPropertiesDesc": "You have no properties registered yet. Please register a property first.",
          "createCoupon": "Create Coupon",
          "createCouponTitle": "Create New Coupon",
          "editCouponTitle": "Edit Coupon",
@@ -361,6 +374,8 @@
          "pageTitle": "Dynamic Pricing Rules",
          "pageDesc": "Automatically adjust room rates based on seasonality, weekends, or guest counts",
          "selectPropertyPrompt": "Please select a property from the list above to manage pricing rules.",
+         "noPropertiesAvailable": "No properties available",
+         "noPropertiesDesc": "You have no properties registered yet. Please register a property first.",
          "createRule": "Create New Rule",
          "createRuleTitle": "Create Pricing Rule",
          "editRuleTitle": "Edit Pricing Rule",
