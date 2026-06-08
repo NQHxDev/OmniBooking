@@ -2,6 +2,7 @@ package com.omnibooking.config;
 
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -132,6 +133,7 @@ public class AppProperties {
       private boolean cookieSecure;
       private String cookieDomain;
       private String csrfSecret;
+      private List<String> trustedHosts = new ArrayList<>();
       private List<String> csrfBypassPatterns = Arrays.asList(
             "/auth/login", "/auth/login/**",
             "/**/auth/login", "/**/auth/login/**",

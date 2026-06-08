@@ -720,11 +720,18 @@ Applied to state-changing HTTP methods: `POST`, `PUT`, `DELETE`, `PATCH`.
 
 **Three-Layer CSRF Validation:**
 
-| Layer | Check                         | Details                                                                                                          |
-| :---- | :---------------------------- | :--------------------------------------------------------------------------------------------------------------- |
-| ①     | **Origin/Referer Validation** | Checks `Origin` or `Referer` header against `app.cors.allowed-origins`. Uses URI-based normalized port matching. |
-| ②     | **Double-Submit Match**       | `csrf_token` cookie value must match `X-CSRF-Token` header (timing-safe comparison via `MessageDigest.isEqual`)  |
-| ③     | **Session Binding**           | If `session_id` cookie exists, verifies `csrf_token = HMAC-SHA256(session_id, csrfSecret)`                       |
+| Layer | Check                         | Details                                                                                                                                                                                                                                                                             |
+| :---- | :---------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ①     | **Origin/Referer Validation** | Checks `Origin` or `Referer` header using a dynamic Same-Origin match against the request Host header and proxy validation (via `X-Forwarded-Host` compared to `app.security.trusted-hosts`). State-changing requests lacking both `Origin` and `Referer` are rejected immediately. |
+| ②     | **Double-Submit Match**       | `csrf_token` cookie value must match `X-CSRF-Token` header (timing-safe comparison via `MessageDigest.isEqual`)                                                                                                                                                                     |
+| ③     | **Session Binding**           | If `session_id` cookie exists, verifies `csrf_token = HMAC-SHA256(session_id, csrfSecret)`                                                                                                                                                                                          |
+
+**Proxy & Same-Origin Verification:**
+
+- To prevent Host Header Injection and proxy host spoofing, when `X-Forwarded-Host` is provided (e.g. behind a gateway or load balancer), its hostname is validated against the whitelist defined in `app.security.trusted-hosts`.
+- Dynamic Same-Origin matching ensures that the request's origin matches the target host of the server (taking proxy headers into account).
+- If validation fails, metrics `csrf_rejected_total` and `csrf_origin_invalid_total` are incremented.
+- If CSRF token mismatch occurs, `csrf_rejected_total` and `csrf_token_invalid_total` are incremented.
 
 **CSRF Token Generation:**
 
@@ -1147,24 +1154,26 @@ All administrative endpoints require `ROLE_ADMIN` authentication.
 
 ### Key Configuration Properties
 
-| Property                                      | Default                      | Description                           |
-| :-------------------------------------------- | :--------------------------- | :------------------------------------ |
-| `app.security.jwt-secret`                     | —                            | HMAC-SHA signing key for JWT          |
-| `app.security.jwt-expiration-ms`              | `900000` (15 min)            | JWT access token TTL                  |
-| `app.security.cookie-secure`                  | `false`                      | Set to `true` in production (HTTPS)   |
-| `app.security.csrf-secret`                    | Falls back to `jwt-secret`   | HMAC-SHA256 key for CSRF tokens       |
-| `app.security.csrf-bypass-patterns`           | —                            | List of paths to skip CSRF validation |
-| `app.security.two-factor-enabled`             | —                            | Feature flag for 2FA                  |
-| `COOKIE_DOMAIN`                               | Empty (local)                | `.yourdomain.com` in production       |
-| `app.cors.allowed-origins`                    | `http://localhost:3000`      | Comma-separated list                  |
-| `app.turnstile.enabled`                       | —                            | Toggle Cloudflare Turnstile CAPTCHA   |
-| `app.turnstile.secret-key`                    | —                            | Cloudflare Turnstile server secret    |
-| `app.turnstile.verify-url`                    | Cloudflare API               | Verification endpoint                 |
-| `app.security.active-key-id`                  | `aes-v1`                     | Active encryption key version         |
-| `app.security.keys.*`                         | —                            | Map of active/expired encryption keys |
-| `omnibooking.kafka.registration.topic-name`   | `registration-request-topic` | Kafka registration topic              |
-| `omnibooking.kafka.registration.partitions`   | `16`                         | Sizing partitions for consumer scale  |
-| `omnibooking.kafka.registration.replications` | `1`                          | Replication count                     |
+| Property                                      | Default                      | Description                                                                                   |
+| :-------------------------------------------- | :--------------------------- | :-------------------------------------------------------------------------------------------- |
+| `app.security.jwt-secret`                     | —                            | HMAC-SHA signing key for JWT                                                                  |
+| `app.security.jwt-expiration-ms`              | `900000` (15 min)            | JWT access token TTL                                                                          |
+| `app.security.cookie-secure`                  | `false`                      | Set to `true` in production (HTTPS)                                                           |
+| `app.security.csrf-secret`                    | Falls back to `jwt-secret`   | HMAC-SHA256 key for CSRF tokens                                                               |
+| `app.security.csrf-bypass-patterns`           | —                            | List of paths to skip CSRF validation                                                         |
+| `app.security.two-factor-enabled`             | —                            | Feature flag for 2FA                                                                          |
+| `COOKIE_DOMAIN`                               | Empty (local)                | `.yourdomain.com` in production                                                               |
+| `app.cors.allowed-origins`                    | `http://localhost:3000`      | Comma-separated list                                                                          |
+| `app.client-url`                              | —                            | Client Web Application URL. Validated at startup in production to prevent localhost fallback. |
+| `app.security.trusted-hosts`                  | `localhost,127.0.0.1`        | Whitelisted hosts/proxies for Same-Origin check & proxy headers validation.                   |
+| `app.turnstile.enabled`                       | —                            | Toggle Cloudflare Turnstile CAPTCHA                                                           |
+| `app.turnstile.secret-key`                    | —                            | Cloudflare Turnstile server secret                                                            |
+| `app.turnstile.verify-url`                    | Cloudflare API               | Verification endpoint                                                                         |
+| `app.security.active-key-id`                  | `aes-v1`                     | Active encryption key version                                                                 |
+| `app.security.keys.*`                         | —                            | Map of active/expired encryption keys                                                         |
+| `omnibooking.kafka.registration.topic-name`   | `registration-request-topic` | Kafka registration topic                                                                      |
+| `omnibooking.kafka.registration.partitions`   | `16`                         | Sizing partitions for consumer scale                                                          |
+| `omnibooking.kafka.registration.replications` | `1`                          | Replication count                                                                             |
 
 ### Operational Constants
 
@@ -1199,18 +1208,28 @@ All administrative endpoints require `ROLE_ADMIN` authentication.
 
 ### Monitoring Metrics (Micrometer)
 
-| Metric                                            | Type                       | Description                                      |
-| :------------------------------------------------ | :------------------------- | :----------------------------------------------- |
-| `omnibooking.auth.lock.contention`                | Counter                    | Refresh lock contention events                   |
-| `omnibooking.auth.redis.failures`                 | Counter (tagged: `reason`) | Redis failures during authentication             |
-| `omnibooking.auth.rejections`                     | Counter (tagged: `reason`) | Authentication rejections                        |
-| `omnibooking.registration.retry.count`            | Counter                    | Ingress/processing registration retry attempts   |
-| `omnibooking.registration.failed_permanent.count` | Counter                    | Registration permanent failures (limit reached)  |
-| `omnibooking.dlt.pending`                         | Gauge                      | Count of pending DLT records in database         |
-| `omnibooking.dlt.replayed`                        | Counter                    | Successful DLT replay actions                    |
-| `omnibooking.auth.token_version.cache.hit`        | Counter                    | Token version Redis cache hits                   |
-| `omnibooking.auth.token_version.cache.miss`       | Counter                    | Token version Redis cache misses                 |
-| `omnibooking.bloom.rebuild.duration`              | Timer                      | Bloom Filter rebuild duration                    |
-| `omnibooking.bloom.rebuild.users_processed`       | Counter                    | Count of users processed in Bloom Filter rebuild |
-| `omnibooking.auth.refresh.lock.renewal`           | Counter                    | Successful refresh lock heartbeat renewals       |
-| `omnibooking.auth.refresh.lock.timeout`           | Counter                    | Refresh lock lost/timeout events                 |
+| Metric                                            | Type                       | Description                                        |
+| :------------------------------------------------ | :------------------------- | :------------------------------------------------- |
+| `omnibooking.auth.lock.contention`                | Counter                    | Refresh lock contention events                     |
+| `omnibooking.auth.redis.failures`                 | Counter (tagged: `reason`) | Redis failures during authentication               |
+| `omnibooking.auth.rejections`                     | Counter (tagged: `reason`) | Authentication rejections                          |
+| `omnibooking.registration.retry.count`            | Counter                    | Ingress/processing registration retry attempts     |
+| `omnibooking.registration.failed_permanent.count` | Counter                    | Registration permanent failures (limit reached)    |
+| `omnibooking.dlt.pending`                         | Gauge                      | Count of pending DLT records in database           |
+| `omnibooking.dlt.replayed`                        | Counter                    | Successful DLT replay actions                      |
+| `omnibooking.auth.token_version.cache.hit`        | Counter                    | Token version Redis cache hits                     |
+| `omnibooking.auth.token_version.cache.miss`       | Counter                    | Token version Redis cache misses                   |
+| `omnibooking.bloom.rebuild.duration`              | Timer                      | Bloom Filter rebuild duration                      |
+| `omnibooking.bloom.rebuild.users_processed`       | Counter                    | Count of users processed in Bloom Filter rebuild   |
+| `omnibooking.auth.refresh.lock.renewal`           | Counter                    | Successful refresh lock heartbeat renewals         |
+| `omnibooking.auth.refresh.lock.timeout`           | Counter                    | Refresh lock lost/timeout events                   |
+| `registration_success_total`                      | Counter                    | Total async registration flow successes            |
+| `registration_failed_total`                       | Counter                    | Total async registration flow failures             |
+| `registration_sse_success_total`                  | Counter                    | Total successful registration SSE broadcasts       |
+| `registration_polling_fallback_total`             | Counter                    | Total client fallbacks to registration polling     |
+| `registration_polling_success_total`              | Counter                    | Total successful client registration poll requests |
+| `registration_polling_timeout_total`              | Counter                    | Total registration poll requests that timed out    |
+| `registration_status_rate_limited_total`          | Counter                    | Total status rate limiting rejection events        |
+| `csrf_rejected_total`                             | Counter                    | Total CSRF request block events                    |
+| `csrf_origin_invalid_total`                       | Counter                    | Total invalid Same-Origin check block events       |
+| `csrf_token_invalid_total`                        | Counter                    | Total invalid CSRF token block events              |

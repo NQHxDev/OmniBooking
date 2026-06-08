@@ -25,6 +25,27 @@ public class CookieDomainInitializer {
       boolean isProd = env.acceptsProfiles(Profiles.of("prod", "production"));
 
       if (isProd) {
+         String clientUrl = appProperties.getClientUrl();
+         if (clientUrl == null || clientUrl.isBlank()) {
+            throw new IllegalStateException("CLIENT_URL (or app.client-url) must be configured in production profile!");
+         }
+         try {
+            java.net.URI uri = new java.net.URI(clientUrl);
+            String host = uri.getHost();
+            if (host == null || host.isBlank()) {
+               throw new IllegalStateException("CLIENT_URL '" + clientUrl + "' is malformed. It must have a valid host.");
+            }
+            if (host.equalsIgnoreCase("localhost") || host.equals("127.0.0.1") || host.equals("::1")) {
+               throw new IllegalStateException("CLIENT_URL '" + clientUrl + "' is invalid for production. Localhost / loopback addresses are not allowed.");
+            }
+            String scheme = uri.getScheme();
+            if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+               throw new IllegalStateException("CLIENT_URL '" + clientUrl + "' has an invalid protocol. It must be http or https.");
+            }
+         } catch (java.net.URISyntaxException e) {
+            throw new IllegalStateException("CLIENT_URL '" + clientUrl + "' is malformed: " + e.getMessage());
+         }
+
          if (domain == null || domain.isBlank()) {
             throw new IllegalStateException("COOKIE_DOMAIN must be configured in production profile!");
          }

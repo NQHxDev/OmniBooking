@@ -22,6 +22,8 @@ import com.omnibooking.services.core.BloomFilterService;
 import com.omnibooking.constant.SecurityConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.slf4j.MDC;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -33,7 +35,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -115,20 +119,33 @@ public class RegistrationService {
             final String finalRequestId = msg.getRequestId();
             final User finalUser = user;
             final UserProfile finalProfile = profile;
+            final String finalEmail = user.getEmail();
 
             TransactionSynchronizationManager.registerSynchronization(
                   new TransactionSynchronization() {
                      @Override
                      public void afterCommit() {
-                        // Mark inbox status to SUCCESS
-                        updateInboxStatus(UUID.fromString(finalRequestId), RegistrationInboxStatus.SUCCESS);
+                        MDC.put("requestId", finalRequestId);
+                        try {
+                           // Mark inbox status to SUCCESS
+                           updateInboxStatus(UUID.fromString(finalRequestId), RegistrationInboxStatus.SUCCESS);
 
-                        // Cache result in Redis for 24 hours (Durable Result)
-                        String resultKey = "registration_result:" + finalRequestId;
-                        redisTemplate.opsForValue().set(resultKey, "SUCCESS", 24, TimeUnit.HOURS);
+                           // Cache result in Redis for 10 minutes (Durable Result)
+                           String resultKey = "registration_result:" + finalRequestId;
+                           redisTemplate.opsForValue().set(resultKey, "SUCCESS", 10, TimeUnit.MINUTES);
 
-                        // Send real-time notify
-                        notifyClient(finalRequestId, finalUser, finalProfile);
+                           // Increment success metric
+                           meterRegistry.counter("registration_success_total").increment();
+
+                           // Log JSON success event
+                           logJson("registration_db_committed", finalRequestId, finalEmail,
+                                 "Registration request successfully saved to database");
+
+                           // Send real-time notify
+                           notifyClient(finalRequestId, finalUser, finalProfile);
+                        } finally {
+                           MDC.remove("requestId");
+                        }
                      }
                   });
          }
@@ -145,13 +162,17 @@ public class RegistrationService {
    @Transactional(propagation = Propagation.REQUIRES_NEW)
    public void saveIndividual(User user, UserProfile profile, RegistrationMessage msg) {
       UUID reqId = UUID.fromString(msg.getRequestId());
+      MDC.put("requestId", msg.getRequestId());
       try {
          // Double check DB existence to be safe
          if (userRepository.existsByEmail(user.getEmail())) {
             log.warn("Email {} already exists during individual fallback insert. Rejecting.", user.getEmail());
             updateInboxStatus(reqId, RegistrationInboxStatus.FAILED);
-            redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "FAILED_DUPLICATE_EMAIL", 24,
-                  TimeUnit.HOURS);
+            redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "FAILED_DUPLICATE_EMAIL", 10,
+                  TimeUnit.MINUTES);
+            meterRegistry.counter("registration_failed_total").increment();
+            logJson("registration_db_failed_duplicate", msg.getRequestId(), user.getEmail(),
+                  "Registration failed: Email already exists during individual insert fallback");
             return;
          }
 
@@ -171,40 +192,62 @@ public class RegistrationService {
                new TransactionSynchronization() {
                   @Override
                   public void afterCommit() {
-                     updateInboxStatus(reqId, RegistrationInboxStatus.SUCCESS);
-                     redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "SUCCESS", 24,
-                           TimeUnit.HOURS);
-                     notifyClient(msg.getRequestId(), user, profile);
+                     MDC.put("requestId", msg.getRequestId());
+                     try {
+                        updateInboxStatus(reqId, RegistrationInboxStatus.SUCCESS);
+                        redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "SUCCESS", 10,
+                              TimeUnit.MINUTES);
+                        meterRegistry.counter("registration_success_total").increment();
+                        logJson("registration_db_committed", msg.getRequestId(), user.getEmail(),
+                              "Registration request successfully saved to database (individual fallback)");
+                        notifyClient(msg.getRequestId(), user, profile);
+                     } finally {
+                        MDC.remove("requestId");
+                     }
                   }
                });
       } catch (Exception e) {
          log.error("Failed to save individual user record during fallback for requestId: {}", msg.getRequestId(), e);
          handleProcessingFailure(reqId, e);
+      } finally {
+         MDC.remove("requestId");
       }
    }
 
    @Transactional(propagation = Propagation.REQUIRES_NEW)
    public void handleProcessingFailure(UUID reqId, Throwable ex) {
-      registrationInboxRepository.findById(reqId).ifPresent(inbox -> {
-         int nextRetryCount = inbox.getRetryCount() + 1;
-         inbox.setRetryCount(nextRetryCount);
-         inbox.setLastError(ex != null ? ex.getMessage() : "Unknown consumer processing failure");
+      MDC.put("requestId", reqId.toString());
+      try {
+         registrationInboxRepository.findById(reqId).ifPresent(inbox -> {
+            int nextRetryCount = inbox.getRetryCount() + 1;
+            inbox.setRetryCount(nextRetryCount);
+            inbox.setLastError(ex != null ? ex.getMessage() : "Unknown consumer processing failure");
 
-         if (nextRetryCount > 10) {
-            inbox.setStatus(RegistrationInboxStatus.FAILED_PERMANENT);
-            inbox.setProcessedAt(Instant.now());
-            redisTemplate.opsForValue().set("registration_result:" + reqId, "FAILED_PERMANENT", 24, TimeUnit.HOURS);
-            meterRegistry.counter("omnibooking.registration.failed_permanent.count").increment();
-            log.warn("Processing request {} exceeded max retries. Marked as FAILED_PERMANENT.", reqId);
-         } else {
-            inbox.setStatus(RegistrationInboxStatus.PENDING);
-            int backoffSec = getBackoffSeconds(nextRetryCount);
-            inbox.setNextRetryAt(Instant.now().plusSeconds(backoffSec));
-            meterRegistry.counter("omnibooking.registration.retry.count").increment();
-            log.info("Processing request {} failed, retryCount={}, nextRetryIn={}s", reqId, nextRetryCount, backoffSec);
-         }
-         registrationInboxRepository.save(inbox);
-      });
+            if (nextRetryCount > 10) {
+               inbox.setStatus(RegistrationInboxStatus.FAILED_PERMANENT);
+               inbox.setProcessedAt(Instant.now());
+               redisTemplate.opsForValue().set("registration_result:" + reqId, "FAILED_PERMANENT", 10,
+                     TimeUnit.MINUTES);
+               meterRegistry.counter("omnibooking.registration.failed_permanent.count").increment();
+               meterRegistry.counter("registration_failed_total").increment();
+               logJson("registration_failed_permanent", reqId.toString(), null,
+                     "Consumer processing failed permanently after exceeding max retries");
+               log.warn("Processing request {} exceeded max retries. Marked as FAILED_PERMANENT.", reqId);
+            } else {
+               inbox.setStatus(RegistrationInboxStatus.PENDING);
+               int backoffSec = getBackoffSeconds(nextRetryCount);
+               inbox.setNextRetryAt(Instant.now().plusSeconds(backoffSec));
+               meterRegistry.counter("omnibooking.registration.retry.count").increment();
+               logJson("registration_processing_retry", reqId.toString(), null,
+                     "Consumer processing failed temporarily, scheduling retry " + nextRetryCount);
+               log.info("Processing request {} failed, retryCount={}, nextRetryIn={}s", reqId, nextRetryCount,
+                     backoffSec);
+            }
+            registrationInboxRepository.save(inbox);
+         });
+      } finally {
+         MDC.remove("requestId");
+      }
    }
 
    private int getBackoffSeconds(int retryCount) {
@@ -297,14 +340,35 @@ public class RegistrationService {
                "async-registration");
          authResponse.setAccessToken(accessToken);
 
+         // Store the temporary token in Redis with a 10-minute TTL
+         String tokenKey = "registration_token:" + requestId;
+         redisTemplate.opsForValue().set(tokenKey, accessToken, 10, TimeUnit.MINUTES);
+
          String dataJson = objectMapper.writeValueAsString(authResponse);
 
          // Format: requestId|jsonData
          String message = requestId + "|" + dataJson;
          redisTemplate.convertAndSend(RedisPubSubConfig.REGISTRATION_TOPIC, message);
-         log.debug("Published registration completion for requestId: {}", requestId);
+         logJson("registration_published_pubsub", requestId, user.getEmail(),
+               "Published registration completion event to Redis Pub/Sub");
       } catch (JsonProcessingException e) {
          log.error("Failed to serialize AuthResponse for SSE notification", e);
+      }
+   }
+
+   private void logJson(String event, String requestId, String email, String message) {
+      try {
+         Map<String, Object> logPayload = new HashMap<>();
+         logPayload.put("requestId", requestId);
+         logPayload.put("event", event);
+         if (email != null) {
+            logPayload.put("email", email);
+         }
+         logPayload.put("message", message);
+         logPayload.put("timestamp", Instant.now().toString());
+         log.info(objectMapper.writeValueAsString(logPayload));
+      } catch (Exception e) {
+         log.error("Failed to write JSON log", e);
       }
    }
 

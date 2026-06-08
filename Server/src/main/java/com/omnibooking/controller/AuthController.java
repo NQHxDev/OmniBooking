@@ -62,6 +62,10 @@ public class AuthController {
 
    private final AppProperties appProperties;
 
+   private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
+   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+
    private final RegistrationQueueService registrationQueueService;
 
    private final SseNotificationService sseNotificationService;
@@ -70,60 +74,93 @@ public class AuthController {
 
    private final SessionService sessionService;
 
-   @Anonymous
-   @Idempotent
-   @PostMapping("/register")
-   public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request,
-         HttpServletRequest httpRequest) {
+    @Anonymous
+    @Idempotent
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request,
+          HttpServletRequest httpRequest) {
+ 
+       // Verify CAPTCHA
+       String ip = getClientIp(httpRequest);
+       turnstileService.verifyToken(request.getTurnstileToken(), ip);
+ 
+       String requestId = (String) httpRequest.getAttribute("requestId");
+       request.setRequestId(requestId);
+ 
+       org.slf4j.MDC.put("requestId", requestId);
+       try {
+          logJson("registration_received", requestId, request.getEmail(), "Received registration request");
+          // Push to Redis Queue for Batch Processing
+          registrationQueueService.pushToQueue(request);
+       } finally {
+          org.slf4j.MDC.remove("requestId");
+       }
+ 
+       return ResponseEntity.status(HttpStatus.ACCEPTED)
+             .body(ApiResponse.success(null, "Registration request received and is being processed", requestId));
+    }
+ 
+    @Anonymous
+    @PostMapping("/finalize-registration")
+    public ResponseEntity<ApiResponse<AuthResponse>> finalizeRegistration(
+          @RequestBody Map<String, String> body,
+          @CookieValue(name = CookieUtils.SESSION_ID, required = false) String oldSessionId,
+          HttpServletRequest httpRequest,
+          HttpServletResponse httpResponse) {
+ 
+       String accessToken = body.get("accessToken");
+       String ip = getClientIp(httpRequest);
+       String userAgent = httpRequest.getHeader("User-Agent");
+       String requestId = (String) httpRequest.getAttribute("requestId");
+ 
+       AuthResponse authResponse = authService.finalizeRegistration(accessToken, ip, userAgent, httpResponse,
+             oldSessionId);
+       return ResponseEntity.ok(ApiResponse.success(authResponse, "Session synchronized successfully", requestId));
+    }
+ 
+    @Anonymous
+    @GetMapping(value = "/subscribe/{requestId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter subscribe(@PathVariable String requestId) {
+       return sseNotificationService.subscribe(requestId);
+    }
+ 
+    @Anonymous
+    @GetMapping("/registration-status/{requestId}")
+    public ResponseEntity<ApiResponse<RegistrationStatusResponse>> getRegistrationStatus(
+          @PathVariable String requestId,
+          @RequestParam(required = false, defaultValue = "false") boolean timeout,
+          HttpServletRequest httpRequest) {
+ 
+       String reqId = (String) httpRequest.getAttribute("requestId");
+       org.slf4j.MDC.put("requestId", requestId);
+       try {
+          if (timeout) {
+             meterRegistry.counter("registration_polling_timeout_total").increment();
+             logJson("registration_polling_timeout", requestId, null, "Client reported polling timeout");
+          }
+          logJson("registration_status_checked", requestId, null, "Checking registration status");
+          RegistrationStatusResponse statusResponse = authService.getRegistrationStatus(requestId);
+          return ResponseEntity.ok(ApiResponse.success(statusResponse, "Registration status retrieved", reqId));
+       } finally {
+          org.slf4j.MDC.remove("requestId");
+       }
+    }
 
-      // Verify CAPTCHA
-      String ip = getClientIp(httpRequest);
-      turnstileService.verifyToken(request.getTurnstileToken(), ip);
-
-      String requestId = (String) httpRequest.getAttribute("requestId");
-      request.setRequestId(requestId);
-
-      // Push to Redis Queue for Batch Processing
-      registrationQueueService.pushToQueue(request);
-
-      return ResponseEntity.status(HttpStatus.ACCEPTED)
-            .body(ApiResponse.success(null, "Registration request received and is being processed", requestId));
-   }
-
-   @Anonymous
-   @PostMapping("/finalize-registration")
-   public ResponseEntity<ApiResponse<AuthResponse>> finalizeRegistration(
-         @RequestBody Map<String, String> body,
-         @CookieValue(name = CookieUtils.SESSION_ID, required = false) String oldSessionId,
-         HttpServletRequest httpRequest,
-         HttpServletResponse httpResponse) {
-
-      String accessToken = body.get("accessToken");
-      String ip = getClientIp(httpRequest);
-      String userAgent = httpRequest.getHeader("User-Agent");
-      String requestId = (String) httpRequest.getAttribute("requestId");
-
-      AuthResponse authResponse = authService.finalizeRegistration(accessToken, ip, userAgent, httpResponse,
-            oldSessionId);
-      return ResponseEntity.ok(ApiResponse.success(authResponse, "Session synchronized successfully", requestId));
-   }
-
-   @Anonymous
-   @GetMapping(value = "/subscribe/{requestId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-   public SseEmitter subscribe(@PathVariable String requestId) {
-      return sseNotificationService.subscribe(requestId);
-   }
-
-   @Anonymous
-   @GetMapping("/registration-status/{requestId}")
-   public ResponseEntity<ApiResponse<RegistrationStatusResponse>> getRegistrationStatus(
-         @PathVariable String requestId,
-         HttpServletRequest httpRequest) {
-
-      String reqId = (String) httpRequest.getAttribute("requestId");
-      RegistrationStatusResponse statusResponse = authService.getRegistrationStatus(requestId);
-      return ResponseEntity.ok(ApiResponse.success(statusResponse, "Registration status retrieved", reqId));
-   }
+    private void logJson(String event, String requestId, String email, String message) {
+       try {
+          java.util.Map<String, Object> logPayload = new java.util.HashMap<>();
+          logPayload.put("requestId", requestId);
+          logPayload.put("event", event);
+          if (email != null) {
+             logPayload.put("email", email);
+          }
+          logPayload.put("message", message);
+          logPayload.put("timestamp", java.time.Instant.now().toString());
+          log.info(objectMapper.writeValueAsString(logPayload));
+       } catch (Exception e) {
+          log.error("Failed to write JSON log", e);
+       }
+    }
 
    @Anonymous
    @PostMapping("/login")

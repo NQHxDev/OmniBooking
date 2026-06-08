@@ -1268,10 +1268,26 @@ public class AuthServiceImpl implements AuthService {
          throw new AppException(ErrorCode.INVALID_TOKEN, "Invalid requestId format");
       }
 
-      // 1. Try Redis first
+      // 1. Rate Limiting Check: 10 requests per 1 minute per requestId
+      String limitKey = "rate_limit:registration_status:" + requestId;
+      // Capacity = 10, refillRate = 10.0 / 60.0 = 0.1667 (tokens per second)
+      if (!checkRateLimit(limitKey, 10, 0.1667)) {
+         meterRegistry.counter("registration_status_rate_limited_total").increment();
+         throw new AppException(ErrorCode.RATE_LIMIT_EXCEEDED, "Too many status check requests");
+      }
+
+      // 2. Track Polling Fallback (first status check counts as fallback initiation)
+      String pollingKey = "registration_polling_started:" + requestId;
+      Boolean isFirstPoll = redisTemplate.opsForValue().setIfAbsent(pollingKey, "true", 10, TimeUnit.MINUTES);
+      if (Boolean.TRUE.equals(isFirstPoll)) {
+         meterRegistry.counter("registration_polling_fallback_total").increment();
+      }
+
+      // 3. Try Redis first
       String redisKey = "registration_result:" + requestId;
       String redisVal = redisTemplate.opsForValue().get(redisKey);
 
+      RegistrationStatusResponse response;
       if (redisVal != null) {
          String status = redisVal;
          String message = "Status retrieved from cache";
@@ -1279,30 +1295,41 @@ public class AuthServiceImpl implements AuthService {
             status = "FAILED";
             message = redisVal;
          }
-         return RegistrationStatusResponse.builder()
+         response = RegistrationStatusResponse.builder()
                .requestId(requestId)
                .status(status)
                .message(message)
                .completedAt(null)
                .build();
+      } else {
+         // 4. Fallback to DB
+         RegistrationInbox inbox = registrationInboxRepository.findById(reqId)
+               .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Registration request not found"));
+
+         String message = "Status retrieved from database";
+         if (inbox.getStatus() == RegistrationInboxStatus.FAILED
+               || inbox.getStatus() == RegistrationInboxStatus.FAILED_PERMANENT) {
+            message = inbox.getLastError() != null ? inbox.getLastError() : "Processing failed";
+         }
+
+         response = RegistrationStatusResponse.builder()
+               .requestId(requestId)
+               .status(inbox.getStatus().name())
+               .message(message)
+               .completedAt(inbox.getProcessedAt())
+               .build();
       }
 
-      // 2. Fallback to DB
-      RegistrationInbox inbox = registrationInboxRepository.findById(reqId)
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Registration request not found"));
-
-      String message = "Status retrieved from database";
-      if (inbox.getStatus() == RegistrationInboxStatus.FAILED
-            || inbox.getStatus() == RegistrationInboxStatus.FAILED_PERMANENT) {
-         message = inbox.getLastError() != null ? inbox.getLastError() : "Processing failed";
+      // 5. Track Polling Success (first successful status check completion)
+      if ("SUCCESS".equalsIgnoreCase(response.getStatus())) {
+         String successPolledKey = "registration_polling_success_tracked:" + requestId;
+         Boolean isFirstSuccess = redisTemplate.opsForValue().setIfAbsent(successPolledKey, "true", 10, TimeUnit.MINUTES);
+         if (Boolean.TRUE.equals(isFirstSuccess)) {
+            meterRegistry.counter("registration_polling_success_total").increment();
+         }
       }
 
-      return RegistrationStatusResponse.builder()
-            .requestId(requestId)
-            .status(inbox.getStatus().name())
-            .message(message)
-            .completedAt(inbox.getProcessedAt())
-            .build();
+      return response;
    }
 
    private static final Logger auditLogger = LoggerFactory.getLogger("AUDIT_LOGGER");

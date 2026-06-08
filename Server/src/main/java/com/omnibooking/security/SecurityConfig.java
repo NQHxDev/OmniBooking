@@ -109,7 +109,8 @@ public class SecurityConfig {
                   && !appProperties.getSecurity().getCsrfSecret().isBlank()
                         ? appProperties.getSecurity().getCsrfSecret()
                         : appProperties.getSecurity().getJwtSecret(),
-            sessionService);
+            sessionService,
+            appProperties.getSecurity().getTrustedHosts());
 
       http
             .csrf(AbstractHttpConfigurer::disable)
@@ -121,7 +122,7 @@ public class SecurityConfig {
                   .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh", "/auth/logout",
                         "/auth/2fa/login",
                         "/auth/forgot-password", "/auth/reset-password", "/auth/google/**", "/auth/subscribe/**",
-                        "/auth/finalize-registration",
+                        "/auth/finalize-registration", "/auth/registration-status/**",
                         "/auth/check-email", "/auth/activate-guest", "/auth/csrf")
                   .permitAll()
                   .requestMatchers(HttpMethod.POST, "/bookings").permitAll()

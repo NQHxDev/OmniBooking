@@ -9,6 +9,7 @@ import com.omnibooking.services.auth.CachedRoleService;
 import com.omnibooking.services.core.BloomFilterService;
 import com.omnibooking.services.core.EncryptionService;
 import com.omnibooking.services.user.RegistrationService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.constant.SecurityConstants;
 
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -46,6 +48,8 @@ public class RegistrationKafkaConsumer {
 
    private final Executor executor;
 
+   private final ObjectMapper objectMapper;
+
    public RegistrationKafkaConsumer(
          EncryptionService encryptionService,
          PasswordEncoder passwordEncoder,
@@ -53,7 +57,8 @@ public class RegistrationKafkaConsumer {
          RegistrationService registrationService,
          StringRedisTemplate redisTemplate,
          BloomFilterService bloomFilterService,
-         @Qualifier("registrationCpuExecutor") Executor executor) {
+         @Qualifier("registrationCpuExecutor") Executor executor,
+         ObjectMapper objectMapper) {
       this.encryptionService = encryptionService;
       this.passwordEncoder = passwordEncoder;
       this.cachedRoleService = cachedRoleService;
@@ -61,6 +66,7 @@ public class RegistrationKafkaConsumer {
       this.redisTemplate = redisTemplate;
       this.bloomFilterService = bloomFilterService;
       this.executor = executor;
+      this.objectMapper = objectMapper;
    }
 
    @KafkaListener(topics = "${omnibooking.kafka.registration.topic-name:registration-request-topic}", groupId = "registration-workers", containerFactory = "registrationListenerContainerFactory")
@@ -111,15 +117,19 @@ public class RegistrationKafkaConsumer {
          UUID reqId = UUID.fromString(msg.getRequestId());
          String email = msg.getEmail();
 
-         // Idempotency check using Redis
-         String idempotencyKey = "registration_idempotency:" + msg.getRequestId();
-         Boolean isNew = redisTemplate.opsForValue().setIfAbsent(idempotencyKey, "PROCESSING", 24, TimeUnit.HOURS);
-         if (Boolean.FALSE.equals(isNew)) {
-            log.warn("Duplicate request detected in consumer for requestId: {}. Skipping.", msg.getRequestId());
-            continue;
-         }
-
+         // Set MDC context for the current record
+         org.slf4j.MDC.put("requestId", msg.getRequestId());
          try {
+            logJson("registration_consumed", msg.getRequestId(), email, "Kafka consumer started processing request");
+
+            // Idempotency check using Redis
+            String idempotencyKey = "registration_idempotency:" + msg.getRequestId();
+            Boolean isNew = redisTemplate.opsForValue().setIfAbsent(idempotencyKey, "PROCESSING", 24, TimeUnit.HOURS);
+            if (Boolean.FALSE.equals(isNew)) {
+               log.warn("Duplicate request detected in consumer for requestId: {}. Skipping.", msg.getRequestId());
+               continue;
+            }
+
             // Update status to PROCESSING in PG Inbox
             registrationService.updateInboxStatus(reqId, RegistrationInboxStatus.PROCESSING);
 
@@ -129,7 +139,7 @@ public class RegistrationKafkaConsumer {
                   log.warn("Email {} already exists in DB, marking request as FAILED", email);
                   registrationService.updateInboxStatus(reqId, RegistrationInboxStatus.FAILED);
                   redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "FAILED_DUPLICATE_EMAIL",
-                        24, TimeUnit.HOURS);
+                        10, TimeUnit.MINUTES);
                   continue;
                }
             }
@@ -142,7 +152,8 @@ public class RegistrationKafkaConsumer {
 
             // Build Entity instances (ready for fast batch insert)
             User user = User.builder()
-                  .id(com.github.f4b6a3.uuid.UuidCreator.getTimeOrderedEpoch()) // BaseEntity prePersist fallback, but set UUIDv7 here
+                  .id(com.github.f4b6a3.uuid.UuidCreator.getTimeOrderedEpoch()) // BaseEntity prePersist fallback, but
+                                                                                // set UUIDv7 here
                   .username(email.split("@")[0] + "_" + UUID.randomUUID().toString().substring(0, 5))
                   .email(email)
                   .password(hashedPassword)
@@ -166,12 +177,30 @@ public class RegistrationKafkaConsumer {
          } catch (Exception e) {
             log.error("Failed to prepare registration message for requestId: {}", msg.getRequestId(), e);
             registrationService.handleProcessingFailure(reqId, e);
+         } finally {
+            org.slf4j.MDC.remove("requestId");
          }
       }
 
       // 7. Perform batch insert inside a fast database transaction
       if (!usersToSave.isEmpty()) {
          registrationService.saveBatchProcessed(usersToSave, profilesToSave, messagesToSave);
+      }
+   }
+
+   private void logJson(String event, String requestId, String email, String message) {
+      try {
+         Map<String, Object> logPayload = new java.util.HashMap<>();
+         logPayload.put("requestId", requestId);
+         logPayload.put("event", event);
+         if (email != null) {
+            logPayload.put("email", email);
+         }
+         logPayload.put("message", message);
+         logPayload.put("timestamp", java.time.Instant.now().toString());
+         log.info(objectMapper.writeValueAsString(logPayload));
+      } catch (Exception e) {
+         log.error("Failed to write JSON log", e);
       }
    }
 

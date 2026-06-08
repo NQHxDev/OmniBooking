@@ -23,6 +23,8 @@ import com.omnibooking.services.auth.SessionService;
 
 import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
+
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -44,17 +46,30 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
 
    private final SessionService sessionService;
 
+   private final List<String> trustedHosts;
+
+   private final Counter csrfRejectedCounter;
+
+   private final Counter csrfOriginInvalidCounter;
+
+   private final Counter csrfTokenInvalidCounter;
+
    private static final List<String> STATE_CHANGING_METHODS = Arrays.asList("POST", "PUT", "DELETE", "PATCH");
 
    public CustomCsrfFilter(ObjectMapper objectMapper, String allowedOrigins,
          MeterRegistry meterRegistry, List<String> bypassPatterns, boolean cookieSecure, String csrfSecret,
-         SessionService sessionService) {
+         SessionService sessionService, List<String> trustedHosts) {
       this.objectMapper = objectMapper;
       this.allowedOrigins = allowedOrigins;
       this.meterRegistry = meterRegistry;
       this.cookieSecure = cookieSecure;
       this.csrfSecret = csrfSecret;
       this.sessionService = sessionService;
+      this.trustedHosts = trustedHosts != null ? trustedHosts : List.of();
+
+      this.csrfRejectedCounter = meterRegistry.counter("csrf_rejected_total");
+      this.csrfOriginInvalidCounter = meterRegistry.counter("csrf_origin_invalid_total");
+      this.csrfTokenInvalidCounter = meterRegistry.counter("csrf_token_invalid_total");
 
       if (bypassPatterns != null) {
          log.info("Initialized CustomCsrfFilter with bypass patterns: {}", bypassPatterns);
@@ -93,7 +108,7 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
          boolean isOriginValid = false;
 
          if (origin != null && !origin.isBlank()) {
-            isOriginValid = checkOrigin(origin);
+            isOriginValid = checkOrigin(origin, request);
             if (!isOriginValid) {
                log.warn("CSRF validation failed: Origin '{}' is not allowed for path {}", origin,
                      request.getRequestURI());
@@ -102,7 +117,7 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
             }
          } else if (referer != null && !referer.isBlank()) {
             // Fallback to Referer validation
-            isOriginValid = checkReferer(referer);
+            isOriginValid = checkReferer(referer, request);
             if (!isOriginValid) {
                log.warn("CSRF validation failed: Referer '{}' is not allowed for path {}", referer,
                      request.getRequestURI());
@@ -111,8 +126,10 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
             }
          } else {
             // Standard browser state-changing request should have Origin or Referer
-            log.debug("CSRF validation: Request missing both Origin and Referer headers for path {}",
+            log.warn("CSRF validation failed: Request missing both Origin and Referer headers for path {}",
                   request.getRequestURI());
+            handleError(request, response, ErrorCode.CSRF_ORIGIN_INVALID);
+            return;
          }
 
          String csrfCookie = getCookieValue(request, CookieUtils.CSRF_TOKEN);
@@ -184,8 +201,8 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
       return matched;
    }
 
-   private boolean checkOrigin(String origin) {
-      if (allowedOrigins == null || allowedOrigins.isBlank() || origin == null || origin.isBlank()) {
+   private boolean checkOrigin(String origin, HttpServletRequest request) {
+      if (origin == null || origin.isBlank()) {
          return false;
       }
       try {
@@ -194,6 +211,39 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
          String originHost = originUri.getHost();
          int originPort = originUri.getPort();
          if (originHost == null) {
+            return false;
+         }
+
+         // Dynamic same-origin check against the current request host details
+         String requestScheme = request.getScheme();
+         String requestHost = request.getServerName();
+         int requestPort = request.getServerPort();
+
+         int normalizedOriginPort = originPort == -1 ? ("https".equalsIgnoreCase(originScheme) ? 443 : 80) : originPort;
+         int normalizedRequestPort = requestPort == -1 ? ("https".equalsIgnoreCase(requestScheme) ? 443 : 80)
+               : requestPort;
+
+         if (originHost.equalsIgnoreCase(requestHost)
+               && (originScheme != null && originScheme.equalsIgnoreCase(requestScheme))
+               && normalizedOriginPort == normalizedRequestPort) {
+
+            // Host must belong to trusted hosts list
+            boolean isTrusted = false;
+            if (trustedHosts != null && !trustedHosts.isEmpty()) {
+               isTrusted = trustedHosts.stream()
+                     .map(String::trim)
+                     .anyMatch(host -> host.equalsIgnoreCase(requestHost));
+            }
+            if (isTrusted) {
+               return true;
+            } else {
+               log.warn("CSRF same-origin validation failed: Request host '{}' is not in trusted-hosts list",
+                     requestHost);
+            }
+         }
+
+         // Fallback to allowedOrigins configuration list
+         if (allowedOrigins == null || allowedOrigins.isBlank()) {
             return false;
          }
 
@@ -216,8 +266,6 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
                         return false;
                      }
                      // Port matching (normalized default port logic)
-                     int normalizedOriginPort = originPort == -1 ? ("https".equalsIgnoreCase(originScheme) ? 443 : 80)
-                           : originPort;
                      int normalizedAllowedPort = allowedPort == -1
                            ? ("https".equalsIgnoreCase(allowedScheme) ? 443 : 80)
                            : allowedPort;
@@ -233,8 +281,8 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
       }
    }
 
-   private boolean checkReferer(String referer) {
-      if (allowedOrigins == null || allowedOrigins.isBlank() || referer == null || referer.isBlank()) {
+   private boolean checkReferer(String referer, HttpServletRequest request) {
+      if (referer == null || referer.isBlank()) {
          return false;
       }
       try {
@@ -246,7 +294,7 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
             return false;
          }
          String refererOrigin = scheme + "://" + host + (port != -1 ? ":" + port : "");
-         return checkOrigin(refererOrigin);
+         return checkOrigin(refererOrigin, request);
       } catch (Exception e) {
          log.debug("Failed to parse referer header: {}", referer, e);
          return false;
@@ -264,6 +312,13 @@ public class CustomCsrfFilter extends OncePerRequestFilter {
    private void handleError(HttpServletRequest request, HttpServletResponse response, ErrorCode error)
          throws IOException {
       String requestId = (String) request.getAttribute("requestId");
+
+      csrfRejectedCounter.increment();
+      if (error == ErrorCode.CSRF_ORIGIN_INVALID) {
+         csrfOriginInvalidCounter.increment();
+      } else if (error == ErrorCode.CSRF_TOKEN_INVALID) {
+         csrfTokenInvalidCounter.increment();
+      }
 
       meterRegistry.counter("omnibooking.auth.csrf.rejections", "reason", error.name().toLowerCase()).increment();
       meterRegistry.counter("omnibooking.auth.rejections", "reason", "csrf_invalid").increment();
