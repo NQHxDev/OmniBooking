@@ -157,6 +157,10 @@ docker-down-prod:
 docker-logs:
 	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml logs -f
 
+.PHONY: docker-logs-server
+docker-logs-server:
+	@docker logs -f omnibooking-server-prod
+
 # Install dependencies for both projects
 .PHONY: install
 install:
@@ -243,6 +247,7 @@ help:
 	@echo "    make docker-stop-prod - Stop Production Docker services"
 	@echo "    make docker-down-prod - Stop and clean Production stack"
 	@echo "    make docker-logs   - Tail production Docker logs"
+	@echo "    make docker-logs-server - Tail production Server (backend) logs"
 	@echo ""
 	@echo "  Maintenance:"
 	@echo "    make install       - Install all dependencies"

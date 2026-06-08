@@ -17,7 +17,7 @@ export default function StepByStep() {
                   </div>
                </div>
                <div className="flex-1 w-full max-w-md lg:max-w-none">
-                  <div className="aspect-4/3 rounded-3xl bg-blue-50 flex items-center justify-center border border-blue-100 shadow-inner relative overflow-hidden">
+                  <div className="aspect-[4/3] rounded-3xl bg-blue-50 flex items-center justify-center border border-blue-100 shadow-inner relative overflow-hidden">
                      <div className="absolute top-0 right-0 p-8">
                         <div className="h-32 w-32 bg-blue-200/50 rounded-full blur-3xl animate-pulse"></div>
                      </div>

@@ -159,7 +159,7 @@ export default function DiscoverDestinationsCarousel({
                      className="w-[140px] xs:w-[160px] sm:w-[185px] md:w-[210px] lg:w-[220px] xl:w-[230px] shrink-0 snap-start group cursor-pointer select-none hover:-translate-y-1 transition-all duration-300"
                   >
                      {/* Image Section */}
-                     <div className="relative aspect-4/3 w-full overflow-hidden rounded-xl bg-zinc-100 shadow-[0_4px_15px_rgba(0,0,0,0.04)] border border-zinc-100 group-hover:shadow-[0_12px_25px_rgba(0,0,0,0.08)] transition-all duration-300">
+                     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-zinc-100 shadow-[0_4px_15px_rgba(0,0,0,0.04)] border border-zinc-100 group-hover:shadow-[0_12px_25px_rgba(0,0,0,0.08)] transition-all duration-300">
                         <Image
                            src={imageUrl}
                            alt={dest.name}

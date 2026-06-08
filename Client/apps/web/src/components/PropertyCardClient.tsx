@@ -153,18 +153,18 @@ export default function PropertyCardClient({
 
                {/* Pricing Section */}
                <div className="mt-4 pt-3 border-t border-zinc-100/80 flex flex-col gap-1">
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex items-baseline gap-1.5 flex-nowrap whitespace-nowrap overflow-hidden">
                      {/* Original Price (pale red strike-through) */}
                      <PriceDisplay
                         amount={originalPrice}
-                        size="sm"
-                        className="text-xs text-red-500/70 line-through font-medium leading-none"
+                        size="custom"
+                        className="text-[11px] text-red-500/70 line-through font-medium leading-none shrink-0"
                      />
                      {/* Final Price (modern bold grayish black) */}
                      <PriceDisplay
                         amount={basePrice}
                         size="custom"
-                        className="text-zinc-700 font-bold text-lg tracking-tight leading-none"
+                        className="text-zinc-700 font-bold text-lg tracking-tight leading-none shrink-0"
                      />
                   </div>
                   {/* Stay duration & Taxes info */}

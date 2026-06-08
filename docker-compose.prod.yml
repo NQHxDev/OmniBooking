@@ -2,6 +2,7 @@ services:
   db:
     image: postgres:16-alpine
     container_name: omnibooking-db-prod
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -12,12 +13,14 @@ services:
   redis:
     image: redis/redis-stack-server:latest
     container_name: omnibooking-redis-prod
+    restart: unless-stopped
     volumes:
       - redis_data:/data
 
   kafka:
     image: apache/kafka:latest
     container_name: omnibooking-kafka-prod
+    restart: unless-stopped
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -44,6 +47,7 @@ services:
   server:
     build: ./Server
     container_name: omnibooking-server-prod
+    restart: unless-stopped
     env_file:
       - env/.env.prod
     environment:
@@ -71,6 +75,7 @@ services:
       context: .
       dockerfile: elasticsearch.Dockerfile
     container_name: omnibooking-elastic-prod
+    restart: unless-stopped
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -103,6 +108,7 @@ services:
       args:
         - APP_NAME=web
     container_name: omnibooking-client-web-prod
+    restart: unless-stopped
     env_file:
       - env/.env.prod
     environment:
@@ -118,6 +124,7 @@ services:
       args:
         - APP_NAME=partner
     container_name: omnibooking-client-partner-prod
+    restart: unless-stopped
     env_file:
       - env/.env.prod
     environment:
@@ -133,6 +140,7 @@ services:
       args:
         - APP_NAME=owner
     container_name: omnibooking-client-owner-prod
+    restart: unless-stopped
     env_file:
       - env/.env.prod
     environment:

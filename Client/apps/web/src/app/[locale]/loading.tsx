@@ -28,7 +28,7 @@ export default function Loading() {
                   <div className="h-6 w-1/2 bg-zinc-50 rounded-lg animate-pulse" />
                   <div className="h-14 w-full bg-zinc-100 rounded-xl animate-pulse" />
                </div>
-               <div className="aspect-4/3 w-full bg-zinc-100 rounded-[2.5rem] animate-pulse relative overflow-hidden">
+               <div className="aspect-[4/3] w-full bg-zinc-100 rounded-[2.5rem] animate-pulse relative overflow-hidden">
                   {/* Internal shimmer */}
                   <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
                </div>
