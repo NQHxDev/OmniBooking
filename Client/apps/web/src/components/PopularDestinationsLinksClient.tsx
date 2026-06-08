@@ -325,7 +325,7 @@ export default function PopularDestinationsLinksClient({
          </h3>
 
          {/* Tabs Selector */}
-         <div className="flex gap-2 mt-4 overflow-x-auto pb-2 scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none]">
+         <div className="flex gap-2 mt-4 overflow-x-auto pb-2 no-scrollbar">
             {tabs.map((tab) => {
                const selected = activeTab === tab.id;
                return (

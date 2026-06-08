@@ -14,11 +14,10 @@ import apiClient from "@/lib/api/apiClient";
 
 interface BudgetFilterProps {
    currency: string;
-   rates?: Record<string, number>;
    searchParams: ReturnType<typeof useSearchParams>;
 }
 
-function BudgetFilter({ currency, rates, searchParams }: BudgetFilterProps) {
+function BudgetFilter({ currency, searchParams }: BudgetFilterProps) {
    const ts = useTranslations("Search");
    const isVnd = currency === "VND";
    const sliderMin = isVnd ? 200000 : 10;
@@ -339,7 +338,6 @@ export default function SearchResultsPage() {
                      <BudgetFilter
                         key={`${currency}-${searchParams.get("minPrice")}-${searchParams.get("maxPrice")}`}
                         currency={currency}
-                        rates={rates}
                         searchParams={searchParams}
                      />
 

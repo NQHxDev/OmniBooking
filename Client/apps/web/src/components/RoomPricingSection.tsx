@@ -18,9 +18,11 @@ import {
    ChevronDown,
    Search,
    AlertTriangle,
+   Loader2,
 } from "lucide-react";
 import PriceDisplay from "./PriceDisplay";
 import DateRangePicker from "./DateRangePicker";
+import { bookingService, StayPriceResult } from "@omnibooking/shared";
 
 interface RoomType {
    id: string;
@@ -31,12 +33,18 @@ interface RoomType {
    bedType?: string;
    capacityAdults: number;
    capacityChildren: number;
+   currentPrice?: number;
 }
 
 interface RoomPricingSectionProps {
    propertyId: string;
    roomTypes: RoomType[];
 }
+
+const dateLocales: Record<string, typeof vi> = {
+   vi,
+   en: enUS,
+};
 
 export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricingSectionProps) {
    const t = useTranslations("PropertyDetail");
@@ -45,7 +53,7 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
    const router = useRouter();
    const pathname = usePathname();
    const searchParams = useSearchParams();
-   const dateLocale = locale === "vi" ? vi : enUS;
+   const dateLocale = dateLocales[locale] || enUS;
 
    // Parse current searchParams
    const checkinParam = searchParams.get("checkin");
@@ -80,6 +88,52 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
    const [isDateOpen, setIsDateOpen] = useState(false);
    const [isGuestOpen, setIsGuestOpen] = useState(false);
    const [isEditing, setIsEditing] = useState(!hasDates);
+
+   const [calculatedPrices, setCalculatedPrices] = useState<Record<string, StayPriceResult>>({});
+   const [pricingLoading, setPricingLoading] = useState(false);
+
+   useEffect(() => {
+      if (hasDates && propertyId && roomTypes.length > 0) {
+         let active = true;
+         const fetchPricing = async () => {
+            setPricingLoading(true);
+            try {
+               const promises = roomTypes.map((room) =>
+                  bookingService.calculatePrice({
+                     propertyId,
+                     roomTypeId: room.id,
+                     checkIn: checkinParam!,
+                     checkOut: checkoutParam!,
+                     guestCount: adultsParam + childrenParam,
+                  })
+               );
+               const results = await Promise.all(promises);
+               if (active) {
+                  const pricingMap: Record<string, StayPriceResult> = {};
+                  roomTypes.forEach((room, index) => {
+                     pricingMap[room.id] = results[index];
+                  });
+                  setCalculatedPrices(pricingMap);
+               }
+            } catch (error) {
+               console.error("Failed to calculate dynamic pricing", error);
+            } finally {
+               if (active) {
+                  setPricingLoading(false);
+               }
+            }
+         };
+
+         fetchPricing();
+         return () => {
+            active = false;
+         };
+      } else {
+         Promise.resolve().then(() => {
+            setCalculatedPrices((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+         });
+      }
+   }, [hasDates, propertyId, roomTypes, checkinParam, checkoutParam, adultsParam, childrenParam]);
 
    const dateRef = useRef<HTMLDivElement>(null);
    const guestRef = useRef<HTMLDivElement>(null);
@@ -180,10 +234,10 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
       });
    };
 
-   const formatDateRange = () => {
-      if (!date?.from) return locale === "vi" ? "Chọn ngày nhận phòng" : "Choose check-in date";
+   const getCheckinStr = () => {
+      if (!date?.from) return t("chooseDatesPrompt");
       if (!date.to) return `${format(date.from, "eee, d MMM yyyy", { locale: dateLocale })}`;
-      return `${format(date.from, "eee, d MMM", { locale: dateLocale })} — ${format(date.to, "eee, d MMM yyyy", { locale: dateLocale })} (${differenceInDays(date.to, date.from)} ${locale === "vi" ? "đêm" : "nights"})`;
+      return `${format(date.from, "eee, d MMM", { locale: dateLocale })} — ${format(date.to, "eee, d MMM yyyy", { locale: dateLocale })} (${t("nightsCount", { count: differenceInDays(date.to, date.from) })})`;
    };
 
    return (
@@ -206,25 +260,23 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
                         {format(parseISO(checkoutParam!), "dd/MM/yyyy")}
                      </span>
                      <span className="text-zinc-300 select-none">·</span>
-                     <span>
-                        {nights} {locale === "vi" ? "đêm" : "nights"}
-                     </span>
-                     <span className="text-zinc-300 select-none">·</span>
-                     <span>
-                        {adultsParam} {locale === "vi" ? "người lớn" : "adults"}
-                        {childrenParam > 0 &&
-                           `, ${childrenParam} ${locale === "vi" ? "trẻ em" : "children"}`}
-                     </span>
-                     <span className="text-zinc-300 select-none">·</span>
-                     <span>
-                        {roomsParam} {locale === "vi" ? "phòng" : "rooms"}
-                     </span>
+                     <div className="flex-1 min-w-0">
+                        <div className="text-sm font-bold text-zinc-900 truncate">
+                           {t("nightsCount", { count: nights })}
+                        </div>
+                        <div className="text-xs text-zinc-500 truncate mt-0.5">
+                           {t("adultsCount", { count: Number(adultsParam) })}
+                           {childrenParam > 0 &&
+                              `, ${t("childrenCount", { count: Number(childrenParam) })}`}
+                           {` · ${t("roomsCount", { count: Number(roomsParam) })}`}
+                        </div>
+                     </div>
                   </div>
                   <button
                      onClick={() => setIsEditing(true)}
-                     className="font-bold text-[#006ce4] hover:text-[#0057b7] cursor-pointer transition-colors shrink-0 bg-white border border-blue-100 rounded-lg px-2.5 py-1 shadow-2xs"
+                     className="px-4 py-2 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-600 hover:bg-zinc-50 active:scale-95 transition-all cursor-pointer"
                   >
-                     {locale === "vi" ? "Thay đổi" : "Edit"}
+                     {t("edit")}
                   </button>
                </div>
             )}
@@ -244,12 +296,12 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
                         className="bg-white border border-zinc-200 rounded-xl p-3.5 hover:border-zinc-300 transition-colors flex items-center gap-3 cursor-pointer h-full"
                      >
                         <Calendar className="h-4.5 w-4.5 text-[#006ce4] shrink-0" />
-                        <div className="flex flex-col flex-1 min-w-0">
-                           <span className="text-[9px] uppercase font-bold text-zinc-400 tracking-wider">
-                              {locale === "vi" ? "Ngày nhận & trả phòng" : "Check-in & Check-out"}
+                        <div className="flex flex-col min-w-0">
+                           <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                              {t("checkInOut")}
                            </span>
                            <span className="text-xs font-bold text-zinc-800 truncate">
-                              {formatDateRange()}
+                              {getCheckinStr()}
                            </span>
                         </div>
                         <ChevronDown className="h-4 w-4 text-zinc-400 shrink-0" />
@@ -277,15 +329,15 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
                         className="bg-white border border-zinc-200 rounded-xl p-3.5 hover:border-zinc-300 transition-colors flex items-center gap-3 cursor-pointer h-full"
                      >
                         <Users className="h-4.5 w-4.5 text-[#006ce4] shrink-0" />
-                        <div className="flex flex-col flex-1 min-w-0">
-                           <span className="text-[9px] uppercase font-bold text-zinc-400 tracking-wider">
-                              {locale === "vi" ? "Số khách & phòng" : "Guests & Rooms"}
+                        <div className="flex flex-col min-w-0">
+                           <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                              {t("guestsRooms")}
                            </span>
                            <span className="text-xs font-bold text-zinc-800 truncate">
-                              {guests.adults} {locale === "vi" ? "người lớn" : "adults"}
+                              {t("adultsCount", { count: guests.adults })}
                               {guests.children > 0 &&
-                                 `, ${guests.children} ${locale === "vi" ? "trẻ em" : "children"}`}
-                              {` · ${guests.rooms} ${locale === "vi" ? "phòng" : "rooms"}`}
+                                 `, ${t("childrenCount", { count: guests.children })}`}
+                              {` · ${t("roomsCount", { count: guests.rooms })}`}
                            </span>
                         </div>
                         <ChevronDown className="h-4 w-4 text-zinc-400 shrink-0" />
@@ -296,7 +348,7 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
                            <div className="space-y-4">
                               <div className="flex items-center justify-between">
                                  <span className="text-xs font-bold text-zinc-800">
-                                    {locale === "vi" ? "Người lớn" : "Adults"}
+                                    {t("adultsLabel")}
                                  </span>
                                  <div className="flex items-center gap-3">
                                     <button
@@ -322,7 +374,7 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
 
                               <div className="flex items-center justify-between">
                                  <span className="text-xs font-bold text-zinc-800">
-                                    {locale === "vi" ? "Trẻ em" : "Children"}
+                                    {t("childrenLabel")}
                                  </span>
                                  <div className="flex items-center gap-3">
                                     <button
@@ -348,7 +400,7 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
 
                               <div className="flex items-center justify-between">
                                  <span className="text-xs font-bold text-zinc-800">
-                                    {locale === "vi" ? "Số lượng phòng" : "Rooms"}
+                                    {t("roomsLabel")}
                                  </span>
                                  <div className="flex items-center gap-3">
                                     <button
@@ -388,22 +440,14 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
                <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2">
                   <div className="flex items-center gap-2 text-zinc-500 text-xs font-medium">
                      <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-                     <span>
-                        {locale === "vi"
-                           ? "Vui lòng chọn thời gian và kiểm tra để xem giá chính xác theo ngày đặt."
-                           : "Please select dates and check to view matching prices."}
-                     </span>
+                     <span>{t("selectDatesPrompt")}</span>
                   </div>
                   <button
                      onClick={handleSearch}
                      className="w-full sm:w-auto bg-[#006ce4] hover:bg-[#0057b7] text-white px-6 py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 cursor-pointer"
                   >
                      <Search className="h-4 w-4" />
-                     <span>
-                        {locale === "vi"
-                           ? "Kiểm tra giá & phòng trống"
-                           : "Check availability & prices"}
-                     </span>
+                     <span>{t("checkAvailability")}</span>
                   </button>
                </div>
             </div>
@@ -447,9 +491,9 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
                                  )}
                                  <span className="flex items-center gap-1 bg-zinc-50 px-2 py-1 rounded border border-zinc-200">
                                     <User className="h-3.5 w-3.5 text-zinc-500" />
-                                    {room.capacityAdults} {locale === "vi" ? "Người lớn" : "Adults"}
+                                    {t("capacityAdultsCount", { count: room.capacityAdults })}
                                     {room.capacityChildren > 0 &&
-                                       ` + ${room.capacityChildren} ${locale === "vi" ? "Trẻ em" : "Children"}`}
+                                       ` ${t("capacityChildrenCount", { count: room.capacityChildren })}`}
                                  </span>
                               </div>
 
@@ -488,9 +532,18 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
                                        />
                                     </span>
                                     {/* Price */}
-                                    <div className="flex items-baseline justify-end gap-1.5">
+                                    <div
+                                       className={`flex items-baseline justify-end gap-1.5 transition-opacity duration-200 ${pricingLoading ? "opacity-50" : "opacity-100"}`}
+                                    >
+                                       {pricingLoading && (
+                                          <Loader2 className="h-4 w-4 text-[#006ce4] animate-spin self-center mr-1" />
+                                       )}
                                        <PriceDisplay
-                                          amount={room.basePrice}
+                                          amount={
+                                             calculatedPrices[room.id]
+                                                ? calculatedPrices[room.id].totalFinalPrice / nights
+                                                : room.basePrice
+                                          }
                                           size="lg"
                                           className="text-[#006ce4] font-extrabold text-2xl leading-none"
                                        />
@@ -499,15 +552,48 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
                                        {t("included")}
                                     </span>
 
+                                    {/* Adjustment Badges */}
+                                    {calculatedPrices[room.id] && !pricingLoading && (
+                                       <div className="flex flex-wrap gap-1 justify-end mt-1 max-w-[200px]">
+                                          {calculatedPrices[room.id].totalSeasonalAdjustment >
+                                             0 && (
+                                             <span className="text-[9px] font-black text-amber-700 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded">
+                                                {t("seasonalRate")}
+                                             </span>
+                                          )}
+                                          {calculatedPrices[room.id].totalWeekendAdjustment > 0 && (
+                                             <span className="text-[9px] font-black text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                                                {t("weekendRate")}
+                                             </span>
+                                          )}
+                                          {calculatedPrices[room.id].totalOccupancyAdjustment >
+                                             0 && (
+                                             <span className="text-[9px] font-black text-rose-700 bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">
+                                                {t("extraGuests")}
+                                             </span>
+                                          )}
+                                          {calculatedPrices[room.id].totalSeasonalAdjustment <
+                                             0 && (
+                                             <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">
+                                                {t("seasonalDiscount")}
+                                             </span>
+                                          )}
+                                       </div>
+                                    )}
+
                                     {/* Duration summary pricing */}
                                     {nights > 1 && (
-                                       <div className="text-[10px] font-bold text-zinc-700 bg-zinc-50 border border-zinc-100 rounded px-1.5 py-0.5 mt-2">
-                                          {locale === "vi"
-                                             ? `Tổng ${nights} đêm: `
-                                             : `Total for ${nights} nights: `}
+                                       <div
+                                          className={`text-[10px] font-bold text-zinc-700 bg-zinc-50 border border-zinc-100 rounded px-1.5 py-0.5 mt-2 transition-opacity duration-200 ${pricingLoading ? "opacity-50" : "opacity-100"}`}
+                                       >
+                                          {t("totalNightsPrice", { count: nights })}
                                           <span className="text-[#006ce4] font-extrabold">
                                              <PriceDisplay
-                                                amount={room.basePrice * nights}
+                                                amount={
+                                                   calculatedPrices[room.id]
+                                                      ? calculatedPrices[room.id].totalFinalPrice
+                                                      : room.basePrice * nights
+                                                }
                                                 size="sm"
                                                 className="inline-block"
                                              />
@@ -541,9 +627,7 @@ export default function RoomPricingSection({ propertyId, roomTypes }: RoomPricin
                                        }}
                                        className="bg-[#006ce4]/10 hover:bg-[#006ce4]/20 text-[#006ce4] border border-[#006ce4]/20 px-5 py-3 rounded-lg font-bold text-xs transition-all active:scale-[0.98] cursor-pointer w-full md:w-auto"
                                     >
-                                       {locale === "vi"
-                                          ? "Chọn ngày để xem giá"
-                                          : "Choose dates to view rates"}
+                                       {t("chooseDatesToViewRates")}
                                     </button>
                                  </div>
                               )}

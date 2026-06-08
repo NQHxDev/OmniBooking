@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import PropertyCardClient from "./PropertyCardClient";
 import { PropertyResponse } from "@/services/propertyService";
@@ -19,7 +19,7 @@ export default function PropertyCarouselClient({ properties }: PropertyCarouselC
    const itemsPerPage = 4;
    const totalPages = Math.ceil(properties.length / itemsPerPage);
 
-   const handleScroll = () => {
+   const handleScroll = useCallback(() => {
       if (scrollerRef.current) {
          const { scrollLeft, scrollWidth, clientWidth } = scrollerRef.current;
          setCanScrollLeft(scrollLeft > 2);
@@ -32,7 +32,7 @@ export default function PropertyCarouselClient({ properties }: PropertyCarouselC
             setActiveDot(Math.min(Math.round(ratio * (totalPages - 1)), totalPages - 1));
          }
       }
-   };
+   }, [totalPages]);
 
    useEffect(() => {
       const scroller = scrollerRef.current;
@@ -45,7 +45,7 @@ export default function PropertyCarouselClient({ properties }: PropertyCarouselC
             window.removeEventListener("resize", handleScroll);
          };
       }
-   }, [properties, totalPages]);
+   }, [handleScroll]);
 
    const handleNext = () => {
       if (scrollerRef.current) {
@@ -104,7 +104,7 @@ export default function PropertyCarouselClient({ properties }: PropertyCarouselC
          {/* Properties Horizontal Scroller Container */}
          <div
             ref={scrollerRef}
-            className="overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y scroll-smooth snap-x snap-mandatory scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pt-4 pb-2"
+            className="overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y scroll-smooth snap-x snap-mandatory no-scrollbar pt-4 pb-2"
          >
             <div className="flex gap-4 w-max min-w-full">
                {properties.map((property, idx) => (

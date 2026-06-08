@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/routing";
 import { useLocale, useTranslations } from "next-intl";
+import Image from "next/image";
 import { differenceInDays, parseISO, format } from "date-fns";
 import { vi, enUS } from "date-fns/locale";
 import {
@@ -18,17 +20,20 @@ import {
    X,
    Wallet,
    Landmark,
+   Ticket,
+   Loader2,
 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useSettingStore } from "@/store/useSettingStore";
 import { propertyService, PropertyDetailResponse } from "@/services/propertyService";
 import { authService } from "@/lib/api/services/authService";
-import { bookingService } from "@/lib/api/services/bookingService";
+import { bookingService, StayPriceResult } from "@/lib/api/services/bookingService";
 import { paymentService } from "@/lib/api/services/paymentService";
 import PriceDisplay from "@/components/PriceDisplay";
 import Select from "react-select";
 import type { CountryCode } from "libphonenumber-js";
 import { profileService } from "@/lib/api/services/profileService";
+import { couponService } from "@omnibooking/shared";
 
 const countriesList: {
    code: CountryCode;
@@ -52,12 +57,20 @@ const countriesList: {
    { code: "IN", callingCode: "+91", label: "India (+91)", flag: "🇮🇳" },
 ];
 
+interface AppliedCoupon {
+   id?: string;
+   code?: string;
+   discountAmount: number;
+   calculation: StayPriceResult;
+}
+
+const dateLocales: Record<string, typeof enUS> = { vi, en: enUS };
+
 export default function BookingPage() {
-   const locale = useLocale();
    const t = useTranslations("Booking");
    const router = useRouter();
    const searchParams = useSearchParams();
-   const dateLocale = locale === "vi" ? vi : enUS;
+   const dateLocale = dateLocales[useLocale()] || enUS;
 
    const propertyId = searchParams.get("propertyId");
    const roomTypeId = searchParams.get("roomTypeId");
@@ -74,8 +87,84 @@ export default function BookingPage() {
    const [selectedCountry, setSelectedCountry] = useState(countriesList[0]);
    const [guestPhone, setGuestPhone] = useState("");
    const [specialRequests, setSpecialRequests] = useState("");
-   const [appliedCoupon] = useState<{ id: string } | null>(null);
+   const [couponInput, setCouponInput] = useState("");
+   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+   const [reservationToken, setReservationToken] = useState<string | null>(null);
+   const [couponLoading, setCouponLoading] = useState(false);
+   const [couponError, setCouponError] = useState<string | null>(null);
+   const [pricingBreakdown, setPricingBreakdown] = useState<StayPriceResult | null>(null);
    const [paymentMethod, setPaymentMethod] = useState<"visa" | "momo" | "banking">("visa");
+
+   // Fetch pricing breakdown on load
+   useEffect(() => {
+      if (propertyId && roomTypeId && checkin && checkout) {
+         bookingService
+            .calculatePrice({
+               propertyId,
+               roomTypeId,
+               checkIn: checkin,
+               checkOut: checkout,
+               guestCount: roomsCount * 2,
+            })
+            .then((result) => {
+               setPricingBreakdown(result);
+            })
+            .catch((err) => {
+               console.error("Failed to load initial pricing breakdown:", err);
+            });
+      }
+   }, [propertyId, roomTypeId, checkin, checkout, roomsCount]);
+
+   const handleApplyCoupon = async () => {
+      if (!couponInput.trim() || !propertyId || !roomTypeId || !checkin || !checkout) return;
+      setCouponLoading(true);
+      setCouponError(null);
+      try {
+         const result = await bookingService.calculatePrice({
+            propertyId,
+            roomTypeId,
+            checkIn: checkin,
+            checkOut: checkout,
+            guestCount: roomsCount * 2,
+            couponCode: couponInput.trim().toUpperCase(),
+         });
+
+         if (!result.appliedCouponCode || result.totalCouponDiscount === 0) {
+            setCouponError(t("couponInvalid"));
+            return;
+         }
+
+         // Reserve coupon capacity hold
+         const bookingSessionId = "session_" + Math.random().toString(36).substring(2, 15);
+         const reservation = await couponService.reserve({
+            couponId: result.appliedCouponId!,
+            bookingSessionId,
+            propertyId,
+         });
+
+         setAppliedCoupon({
+            id: result.appliedCouponId,
+            code: result.appliedCouponCode,
+            discountAmount: result.totalCouponDiscount,
+            calculation: result,
+         });
+         setReservationToken(reservation.reservationToken);
+         setCouponError(null);
+      } catch (err) {
+         console.error("Apply coupon error:", err);
+         const errorWithResponse = err as { response?: { data?: { message?: string } } };
+         setCouponError(errorWithResponse.response?.data?.message || t("couponError"));
+      } finally {
+         setCouponLoading(false);
+      }
+   };
+
+   const handleRemoveCoupon = () => {
+      setAppliedCoupon(null);
+      setReservationToken(null);
+      setCouponInput("");
+      setCouponError(null);
+   };
    const [errors, setErrors] = useState<{
       guestName?: string;
       guestEmail?: string;
@@ -154,7 +243,7 @@ export default function BookingPage() {
             setError(t("failedToLoadPropertyDetails"));
             setLoading(false);
          });
-   }, [propertyId, locale]);
+   }, [propertyId, t]);
 
    if (loading) {
       return (
@@ -207,7 +296,9 @@ export default function BookingPage() {
 
    const nights = Math.max(1, differenceInDays(parseISO(checkout), parseISO(checkin)));
    const basePrice = roomType.basePrice * nights * roomsCount;
-   const finalPrice = basePrice; // In real flow, handle coupon discount on backend response
+
+   const activeBreakdown = appliedCoupon ? appliedCoupon.calculation : pricingBreakdown;
+   const finalPrice = activeBreakdown ? activeBreakdown.totalFinalPrice * roomsCount : basePrice;
 
    const checkinDate = parseISO(checkin);
    const todayDate = new Date();
@@ -215,7 +306,10 @@ export default function BookingPage() {
    const daysUntilCheckin = differenceInDays(checkinDate, todayDate);
    const requiresDeposit = !isLoggedIn || daysUntilCheckin >= 5;
 
-   const firstNightPrice = roomType.basePrice * roomsCount;
+   const firstNightPrice =
+      activeBreakdown && activeBreakdown.dailyPrices && activeBreakdown.dailyPrices.length > 0
+         ? activeBreakdown.dailyPrices[0].finalPrice * roomsCount
+         : roomType.basePrice * roomsCount;
    const fifteenPercent = finalPrice * 0.15;
    const depositAmount = requiresDeposit ? Math.min(fifteenPercent, firstNightPrice) : 0;
    const payLaterAmount = finalPrice - depositAmount;
@@ -253,6 +347,7 @@ export default function BookingPage() {
             guestPhone: fullE164,
             specialRequests: specialRequests || undefined,
             couponId: appliedCoupon?.id || undefined,
+            reservationToken: reservationToken || undefined,
             currency,
             paymentMethod: paymentMethod.toUpperCase(),
          });
@@ -269,7 +364,7 @@ export default function BookingPage() {
 
          // Navigate to success page with details in query params
          const successUrl =
-            `/${locale}/booking/success` +
+            `/booking/success` +
             `?bookingId=${response.id}` +
             `&code=${response.bookingCode}` +
             `&name=${encodeURIComponent(response.guestName)}` +
@@ -368,7 +463,7 @@ export default function BookingPage() {
                         <button
                            onClick={() =>
                               router.push(
-                                 `/${locale}/auth/login?callbackUrl=${encodeURIComponent(window.location.href)}`
+                                 `/auth/login?callbackUrl=${encodeURIComponent(window.location.href)}`
                               )
                            }
                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-all cursor-pointer shadow-md"
@@ -711,10 +806,12 @@ export default function BookingPage() {
                   <div className="bg-white rounded-3xl border border-zinc-200 shadow-xs overflow-hidden">
                      {property.imageUrl && (
                         <div className="h-44 relative bg-zinc-100">
-                           <img
+                           <Image
                               src={property.imageUrl}
                               alt={property.name}
-                              className="w-full h-full object-cover"
+                              fill
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                              className="object-cover"
                            />
                         </div>
                      )}
@@ -770,6 +867,59 @@ export default function BookingPage() {
                      </div>
                   </div>
 
+                  {/* Coupon Input Box */}
+                  <div className="bg-white rounded-3xl p-6 border border-zinc-200 shadow-xs space-y-3">
+                     <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
+                        <Ticket className="h-4.5 w-4.5 text-[#006ce4]" />
+                        <span>{t("promoCode")}</span>
+                     </h3>
+                     <div className="flex gap-2">
+                        <input
+                           type="text"
+                           placeholder={t("enterCouponCode")}
+                           value={couponInput}
+                           onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                           disabled={!!appliedCoupon || couponLoading}
+                           className="flex-1 px-4 py-2.5 rounded-2xl border border-zinc-200 text-sm focus:border-[#006ce4] focus:outline-none transition-all placeholder:text-zinc-400 font-bold uppercase tracking-wider disabled:bg-zinc-50 disabled:text-zinc-400"
+                        />
+                        {appliedCoupon ? (
+                           <button
+                              type="button"
+                              onClick={handleRemoveCoupon}
+                              disabled={couponLoading}
+                              className="px-4 py-2.5 border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-2xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
+                           >
+                              {t("remove")}
+                           </button>
+                        ) : (
+                           <button
+                              type="button"
+                              onClick={handleApplyCoupon}
+                              disabled={!couponInput.trim() || couponLoading}
+                              className="px-5 py-2.5 bg-[#006ce4] hover:bg-[#0057b7] text-white rounded-2xl text-xs font-bold shadow-md shadow-blue-100 hover:shadow-blue-200 transition-all flex items-center justify-center cursor-pointer disabled:opacity-50"
+                           >
+                              {couponLoading ? (
+                                 <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                 t("apply")
+                              )}
+                           </button>
+                        )}
+                     </div>
+                     {couponError && (
+                        <p className="text-xs text-rose-600 font-semibold flex items-center gap-1">
+                           <AlertCircle className="h-3.5 w-3.5" />
+                           {couponError}
+                        </p>
+                     )}
+                     {appliedCoupon && (
+                        <p className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                           <CheckCircle className="h-3.5 w-3.5" />
+                           {t("couponAppliedSuccess", { code: appliedCoupon.code || "" })}
+                        </p>
+                     )}
+                  </div>
+
                   {/* Price Calculations */}
                   <div className="bg-white rounded-3xl p-6 border border-zinc-200 shadow-xs space-y-4">
                      <h3 className="text-sm font-bold text-zinc-900">{t("pricingDetails")}</h3>
@@ -781,14 +931,73 @@ export default function BookingPage() {
                               {t("nights2")})
                            </span>
                            <span className="text-zinc-800">
-                              <PriceDisplay amount={basePrice} size="sm" />
+                              <PriceDisplay
+                                 amount={
+                                    activeBreakdown
+                                       ? activeBreakdown.totalBasePrice * roomsCount
+                                       : basePrice
+                                 }
+                                 size="sm"
+                              />
                            </span>
                         </div>
-                        {appliedCoupon && (
+                        {activeBreakdown && activeBreakdown.totalSeasonalAdjustment !== 0 && (
+                           <div className="flex justify-between text-zinc-700">
+                              <span className="text-zinc-500">
+                                 {activeBreakdown.totalSeasonalAdjustment > 0
+                                    ? t("seasonalSurcharge")
+                                    : t("seasonalDiscount")}
+                              </span>
+                              <span
+                                 className={
+                                    activeBreakdown.totalSeasonalAdjustment > 0
+                                       ? "text-zinc-800"
+                                       : "text-emerald-600 font-bold"
+                                 }
+                              >
+                                 {activeBreakdown.totalSeasonalAdjustment > 0 ? "+" : ""}
+                                 <PriceDisplay
+                                    amount={activeBreakdown.totalSeasonalAdjustment * roomsCount}
+                                    size="sm"
+                                 />
+                              </span>
+                           </div>
+                        )}
+                        {activeBreakdown && activeBreakdown.totalWeekendAdjustment !== 0 && (
+                           <div className="flex justify-between text-zinc-700">
+                              <span className="text-zinc-500">{t("weekendSurcharge")}</span>
+                              <span className="text-zinc-800">
+                                 +{" "}
+                                 <PriceDisplay
+                                    amount={activeBreakdown.totalWeekendAdjustment * roomsCount}
+                                    size="sm"
+                                 />
+                              </span>
+                           </div>
+                        )}
+                        {activeBreakdown && activeBreakdown.totalOccupancyAdjustment !== 0 && (
+                           <div className="flex justify-between text-zinc-700">
+                              <span className="text-zinc-500">{t("extraGuestFee")}</span>
+                              <span className="text-zinc-800">
+                                 +{" "}
+                                 <PriceDisplay
+                                    amount={activeBreakdown.totalOccupancyAdjustment * roomsCount}
+                                    size="sm"
+                                 />
+                              </span>
+                           </div>
+                        )}
+                        {activeBreakdown && activeBreakdown.totalCouponDiscount > 0 && (
                            <div className="flex justify-between text-emerald-600 font-bold">
-                              <span>{t("couponDiscount")}</span>
                               <span>
-                                 - <PriceDisplay amount={basePrice - finalPrice} size="sm" />
+                                 {t("couponDiscount")} ({activeBreakdown.appliedCouponCode})
+                              </span>
+                              <span>
+                                 -{" "}
+                                 <PriceDisplay
+                                    amount={activeBreakdown.totalCouponDiscount * roomsCount}
+                                    size="sm"
+                                 />
                               </span>
                            </div>
                         )}

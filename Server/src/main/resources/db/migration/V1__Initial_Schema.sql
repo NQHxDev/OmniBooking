@@ -99,6 +99,59 @@ CREATE TABLE IF NOT EXISTS currencies (
    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
+CREATE TABLE IF NOT EXISTS registration_inbox (
+   request_id UUID PRIMARY KEY,
+   payload JSONB NOT NULL,
+   status VARCHAR(20) NOT NULL, -- PENDING, SENT, PROCESSING, SUCCESS, FAILED
+   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+   published_at TIMESTAMP WITH TIME ZONE,
+   retry_count INTEGER NOT NULL DEFAULT 0,
+   last_error TEXT,
+   next_retry_at TIMESTAMP WITH TIME ZONE,
+   processed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE IF NOT EXISTS registration_dlt (
+   request_id UUID PRIMARY KEY,
+   email VARCHAR(255) NOT NULL,
+   payload JSONB NOT NULL,
+   partition_id INTEGER NOT NULL,
+   offset_val BIGINT NOT NULL,
+   original_error TEXT,
+   status VARCHAR(20) NOT NULL, -- PENDING, REPLAYED, FAILED
+   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+   last_replayed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE IF NOT EXISTS registration_dlt_audit (
+   id UUID PRIMARY KEY,
+   request_id UUID NOT NULL,
+   replayed_by VARCHAR(255) NOT NULL,
+   replayed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+   original_error TEXT,
+   replay_result VARCHAR(50) NOT NULL,
+   error_message TEXT
+);
+
+CREATE TABLE IF NOT EXISTS pricing_audit_logs (
+   id UUID PRIMARY KEY,
+   entity_type VARCHAR(20) NOT NULL,
+   entity_id UUID NOT NULL,
+   operation_type VARCHAR(20) NOT NULL,
+   actor_id UUID NOT NULL,
+   old_values JSONB,
+   new_values JSONB,
+   correlation_id UUID NOT NULL,
+   created_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS shedlock (
+   name VARCHAR(64) PRIMARY KEY,
+   lock_until TIMESTAMP WITH TIME ZONE NOT NULL,
+   locked_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   locked_by VARCHAR(255) NOT NULL
+);
+
 -- 2. Dependent Tables (With Foreign Keys)
 CREATE TABLE IF NOT EXISTS user_profiles (
    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -156,7 +209,12 @@ CREATE TABLE IF NOT EXISTS properties (
    deleted_at TIMESTAMP WITH TIME ZONE,
    business_registration_number VARCHAR(255),
    tax_code VARCHAR(255),
-   legal_owner_name VARCHAR(255)
+   legal_owner_name VARCHAR(255),
+
+   -- Aggregated Rating Fields (from V4)
+   average_rating NUMERIC(4,2) DEFAULT 0.00,
+   review_count INTEGER DEFAULT 0,
+   rating_sum BIGINT DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS room_types (
@@ -269,19 +327,18 @@ CREATE TABLE IF NOT EXISTS media (
    format VARCHAR(20),
    resource_type VARCHAR(20),
    bytes BIGINT,
-   
+
    -- Relation fields
    entity_id UUID NOT NULL,
    entity_type VARCHAR(50) NOT NULL, -- PROPERTY, ROOM_TYPE, USER_AVATAR
    is_main BOOLEAN DEFAULT FALSE,
-   
+
    version BIGINT DEFAULT 0,
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    deleted_at TIMESTAMP WITH TIME ZONE
 );
 
--- Infrastructure & Analytics Tables
 CREATE TABLE IF NOT EXISTS outbox_events (
    id UUID PRIMARY KEY,
    aggregate_id UUID NOT NULL,
@@ -318,7 +375,7 @@ CREATE TABLE IF NOT EXISTS search_logs (
    country_code VARCHAR(10),
    ip_address VARCHAR(45),
    is_boosted BOOLEAN DEFAULT FALSE,
-   
+
    version BIGINT DEFAULT 0,
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -390,6 +447,126 @@ CREATE TABLE IF NOT EXISTS processed_events (
    PRIMARY KEY (event_id, consumer_group)
 );
 
+-- Reviews Schema (from V4 + V5)
+CREATE TABLE IF NOT EXISTS reviews (
+   id UUID PRIMARY KEY,
+   booking_id UUID NOT NULL UNIQUE,
+   property_id UUID NOT NULL,
+   user_id UUID, -- Nullable to support anonymization (ON DELETE SET NULL)
+   rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+   comment VARCHAR(1000) CHECK (char_length(comment) >= 10),
+   reply TEXT,
+   status VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED',
+   reply_updated_at TIMESTAMP WITH TIME ZONE,
+   deleted_at TIMESTAMP WITH TIME ZONE,
+   deleted_by UUID,
+   deletion_reason VARCHAR(255),
+   moderated_at TIMESTAMP WITH TIME ZONE,
+   moderated_by UUID,
+   moderation_reason VARCHAR(255),
+   created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+
+   CONSTRAINT reviews_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE RESTRICT,
+   CONSTRAINT reviews_property_id_fkey FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
+   CONSTRAINT reviews_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+   FOREIGN KEY (deleted_by) REFERENCES users(id) ON DELETE SET NULL,
+   FOREIGN KEY (moderated_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Price Rules & Versioning (from V6)
+CREATE TABLE IF NOT EXISTS price_rules (
+   id UUID PRIMARY KEY,
+   property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+   room_type_id UUID REFERENCES room_types(id) ON DELETE CASCADE,
+   name VARCHAR(100) NOT NULL,
+   rule_type VARCHAR(20) NOT NULL,
+   start_date DATE,
+   end_date DATE,
+   adjustment_type VARCHAR(20) NOT NULL,
+   adjustment_value NUMERIC(12,2) NOT NULL,
+   occupancy_threshold INT,
+   priority INT NOT NULL DEFAULT 0,
+   is_active BOOLEAN NOT NULL DEFAULT true,
+   version INT NOT NULL DEFAULT 0,
+   created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+
+   CONSTRAINT chk_rule_adjustment_nonzero CHECK (adjustment_value <> 0.00),
+   CONSTRAINT chk_rule_priority_nonnegative CHECK (priority >= 0),
+   CONSTRAINT chk_rule_dates_valid CHECK (start_date IS NULL OR end_date IS NULL OR start_date <= end_date),
+   CONSTRAINT chk_rule_occupancy_valid CHECK (rule_type <> 'OCCUPANCY' OR occupancy_threshold > 0)
+);
+
+CREATE TABLE IF NOT EXISTS price_rule_versions (
+   id UUID PRIMARY KEY,
+   price_rule_id UUID NOT NULL REFERENCES price_rules(id) ON DELETE CASCADE,
+   version INT NOT NULL,
+   name VARCHAR(100) NOT NULL,
+   rule_type VARCHAR(20) NOT NULL,
+   start_date DATE,
+   end_date DATE,
+   adjustment_type VARCHAR(20) NOT NULL,
+   adjustment_value NUMERIC(12,2) NOT NULL,
+   occupancy_threshold INT,
+   priority INT NOT NULL,
+   is_active BOOLEAN NOT NULL,
+   created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   created_by UUID NOT NULL,
+
+   CONSTRAINT uq_rule_version UNIQUE (price_rule_id, version),
+   CONSTRAINT chk_version_occupancy_valid CHECK (rule_type <> 'OCCUPANCY' OR occupancy_threshold > 0)
+);
+
+-- Coupon Reservations (from V6)
+CREATE TABLE IF NOT EXISTS coupon_reservations (
+   id UUID PRIMARY KEY,
+   coupon_id UUID NOT NULL REFERENCES coupons(id) ON DELETE CASCADE,
+   booking_session_id VARCHAR(100) NOT NULL UNIQUE,
+   reservation_token VARCHAR(255) NOT NULL UNIQUE,
+   customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+   property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+   status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+   reserved_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   CONSTRAINT chk_reservation_status CHECK (status IN ('ACTIVE', 'CONSUMED', 'EXPIRED'))
+);
+
+-- Booking Price Breakdowns (from V6)
+CREATE TABLE IF NOT EXISTS booking_price_breakdowns (
+   id UUID PRIMARY KEY,
+   booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+   stay_date DATE NOT NULL,
+   base_price NUMERIC(12,2) NOT NULL,
+   seasonal_adjustment NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+   weekend_adjustment NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+   occupancy_adjustment NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+   coupon_discount NUMERIC(12,2) NOT NULL DEFAULT 0.00,
+   final_price NUMERIC(12,2) NOT NULL,
+   applied_coupon_id UUID,
+   applied_coupon_code VARCHAR(50),
+   created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   UNIQUE(booking_id, stay_date),
+   CONSTRAINT chk_breakdown_final_price CHECK (final_price >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS booking_applied_rule_versions (
+   id UUID PRIMARY KEY,
+   booking_breakdown_id UUID NOT NULL REFERENCES booking_price_breakdowns(id) ON DELETE CASCADE,
+   rule_version_id UUID NOT NULL REFERENCES price_rule_versions(id) ON DELETE RESTRICT,
+   adjustment_amount NUMERIC(12,2) NOT NULL,
+   created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   CONSTRAINT chk_applied_rule_adj_nonzero CHECK (adjustment_amount <> 0)
+);
+
+-- Update coupons table with scope property_id and reserved_count (from V6)
+ALTER TABLE coupons ADD COLUMN property_id UUID REFERENCES properties(id) ON DELETE CASCADE;
+ALTER TABLE coupons ADD COLUMN reserved_count INT NOT NULL DEFAULT 0;
+
+ALTER TABLE coupons ADD CONSTRAINT chk_coupon_reserved_nonnegative CHECK (reserved_count >= 0);
+ALTER TABLE coupons ADD CONSTRAINT chk_coupon_used_nonnegative CHECK (used_count >= 0);
+ALTER TABLE coupons ADD CONSTRAINT chk_coupon_limit_nonnegative CHECK (usage_limit IS NULL OR usage_limit >= 0);
+
 -- 3. Indexes
 CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email);
@@ -422,6 +599,22 @@ CREATE UNIQUE INDEX idx_user_passkeys_credential_id_active ON user_passkeys(cred
 CREATE INDEX idx_user_two_factor_user_id ON user_two_factor(user_id);
 CREATE INDEX idx_partner_legal_profiles_partner_active ON partner_legal_profiles(partner_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_processed_events_time ON processed_events(processed_at);
+
+-- Registration inbox & DLT indexes (from V2 + V3)
+CREATE INDEX IF NOT EXISTS idx_reg_inbox_status_retry ON registration_inbox(status, next_retry_at) WHERE status IN ('PENDING', 'PROCESSING');
+CREATE INDEX IF NOT EXISTS idx_reg_dlt_status ON registration_dlt(status);
+
+-- Reviews indexes (from V4)
+CREATE INDEX idx_reviews_property_created ON reviews(property_id, created_at DESC) WHERE deleted_at IS NULL AND status = 'PUBLISHED';
+CREATE INDEX idx_reviews_user ON reviews(user_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_reviews_booking ON reviews(booking_id);
+CREATE INDEX idx_reviews_moderation ON reviews(status, created_at) WHERE deleted_at IS NULL;
+
+-- Pricing audit & reservation indexes (from V6)
+CREATE INDEX idx_coupon_res_active_expiry ON coupon_reservations(expires_at) WHERE status = 'ACTIVE';
+CREATE INDEX idx_audit_old_values ON pricing_audit_logs USING gin (old_values);
+CREATE INDEX idx_audit_new_values ON pricing_audit_logs USING gin (new_values);
+CREATE INDEX idx_audit_correlation ON pricing_audit_logs(correlation_id);
 
 COMMENT ON COLUMN user_passkeys.deleted_at IS 'Timestamp of soft deletion';
 

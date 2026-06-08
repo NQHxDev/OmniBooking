@@ -39,6 +39,7 @@ import com.omnibooking.model.PartnerLegalProfile;
 import com.omnibooking.repository.user.PartnerLegalProfileRepository;
 import com.omnibooking.services.core.EncryptionService;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,6 +76,8 @@ public class PropertyServiceImpl implements PropertyService {
    private final PropertyImagesCacheService propertyImagesCacheService;
 
    private final CacheManager cacheManager;
+
+   private final com.omnibooking.services.pricing.PriceCalculationService priceCalculationService;
 
    private final ConcurrentHashMap<String, Object> locks = new ConcurrentHashMap<>();
 
@@ -437,17 +440,27 @@ public class PropertyServiceImpl implements PropertyService {
             : List.of();
 
       List<RoomTypeResponse> roomTypes = roomTypeRepository.findByPropertyId(propertyId).stream()
-            .map(r -> RoomTypeResponse.builder()
-                  .id(r.getId())
-                  .name(r.getName())
-                  .description(r.getDescription())
-                  .basePrice(r.getBasePrice())
-                  .capacityAdults(r.getCapacityAdults())
-                  .capacityChildren(r.getCapacityChildren())
-                  .totalRooms(r.getTotalRooms())
-                  .roomSizeSqm(r.getRoomSizeSqm())
-                  .bedType(r.getBedType())
-                  .build())
+            .map(r -> {
+               BigDecimal currentPrice;
+               try {
+                  var result = priceCalculationService.calculateStayPrice(r.getProperty().getId(), r.getId(), LocalDate.now(), LocalDate.now().plusDays(1), 2);
+                  currentPrice = result.totalFinalPrice();
+               } catch (Exception e) {
+                  currentPrice = r.getBasePrice();
+               }
+               return RoomTypeResponse.builder()
+                     .id(r.getId())
+                     .name(r.getName())
+                     .description(r.getDescription())
+                     .basePrice(r.getBasePrice())
+                     .capacityAdults(r.getCapacityAdults())
+                     .capacityChildren(r.getCapacityChildren())
+                     .totalRooms(r.getTotalRooms())
+                     .roomSizeSqm(r.getRoomSizeSqm())
+                     .bedType(r.getBedType())
+                     .currentPrice(currentPrice)
+                     .build();
+            })
             .toList();
 
       return PropertyDetailResponse.builder()
@@ -484,17 +497,27 @@ public class PropertyServiceImpl implements PropertyService {
             : List.of();
 
       List<RoomTypeResponse> roomTypes = roomTypeRepository.findByPropertyId(propertyId).stream()
-            .map(r -> RoomTypeResponse.builder()
-                  .id(r.getId())
-                  .name(r.getName())
-                  .description(r.getDescription())
-                  .basePrice(r.getBasePrice())
-                  .capacityAdults(r.getCapacityAdults())
-                  .capacityChildren(r.getCapacityChildren())
-                  .totalRooms(r.getTotalRooms())
-                  .roomSizeSqm(r.getRoomSizeSqm())
-                  .bedType(r.getBedType())
-                  .build())
+            .map(r -> {
+               BigDecimal currentPrice;
+               try {
+                  var result = priceCalculationService.calculateStayPrice(r.getProperty().getId(), r.getId(), LocalDate.now(), LocalDate.now().plusDays(1), 2);
+                  currentPrice = result.totalFinalPrice();
+               } catch (Exception e) {
+                  currentPrice = r.getBasePrice();
+               }
+               return RoomTypeResponse.builder()
+                     .id(r.getId())
+                     .name(r.getName())
+                     .description(r.getDescription())
+                     .basePrice(r.getBasePrice())
+                     .capacityAdults(r.getCapacityAdults())
+                     .capacityChildren(r.getCapacityChildren())
+                     .totalRooms(r.getTotalRooms())
+                     .roomSizeSqm(r.getRoomSizeSqm())
+                     .bedType(r.getBedType())
+                     .currentPrice(currentPrice)
+                     .build();
+            })
             .toList();
 
       return PropertyDetailResponse.builder()

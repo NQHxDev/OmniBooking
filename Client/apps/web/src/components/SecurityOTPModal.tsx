@@ -95,7 +95,7 @@ export default function SecurityOTPModal({ isOpen, onClose, onSuccess }: Securit
          setTimer(60);
          setOtp(new Array(6).fill(""));
          toast.success(t("successResend"));
-      } catch (_error) {
+      } catch {
          toast.error(t("errorResend"));
       } finally {
          setResending(false);

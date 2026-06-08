@@ -32,4 +32,6 @@ public class RoomTypeResponse {
 
    private BedType bedType;
 
+   private BigDecimal currentPrice;
+
 }

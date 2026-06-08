@@ -5,15 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/useAuthStore";
 import { reviewService, ReviewResponse } from "@omnibooking/shared";
 import { toast } from "sonner";
-import {
-   Loader2,
-   Calendar,
-   Star,
-   Trash2,
-   MessageSquare,
-   AlertCircle,
-   Sparkles,
-} from "lucide-react";
+import { Loader2, Star, Trash2, MessageSquare, Sparkles } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useTranslations } from "next-intl";

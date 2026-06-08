@@ -142,7 +142,7 @@ public class RegistrationKafkaConsumer {
 
             // Build Entity instances (ready for fast batch insert)
             User user = User.builder()
-                  .id(UUID.randomUUID()) // BaseEntity prePersist fallback, but set id here
+                  .id(com.github.f4b6a3.uuid.UuidCreator.getTimeOrderedEpoch()) // BaseEntity prePersist fallback, but set UUIDv7 here
                   .username(email.split("@")[0] + "_" + UUID.randomUUID().toString().substring(0, 5))
                   .email(email)
                   .password(hashedPassword)

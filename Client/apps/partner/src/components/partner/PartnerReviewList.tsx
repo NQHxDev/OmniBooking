@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useTranslations } from "next-intl";
+import Image from "next/image";
 import { reviewService, ReviewResponse, PropertyResponse } from "@omnibooking/shared";
 import {
    Search,
@@ -325,9 +326,12 @@ export default function PartnerReviewList({ initialProperties }: PartnerReviewLi
                            <div className="flex items-center gap-3">
                               <div className="h-11 w-11 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[#006ce4] font-black text-sm uppercase shadow-xs overflow-hidden">
                                  {review.userAvatarUrl ? (
-                                    <img
+                                    <Image
                                        src={review.userAvatarUrl}
-                                       alt={review.userName}
+                                       alt={review.userName || "Avatar"}
+                                       width={44}
+                                       height={44}
+                                       unoptimized
                                        className="h-full w-full object-cover"
                                     />
                                  ) : review.userName ? (

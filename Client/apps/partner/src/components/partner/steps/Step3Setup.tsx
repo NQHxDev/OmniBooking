@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useFormContext, useFieldArray, useWatch, Controller } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { Bed, Plus, Trash2, Check, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";

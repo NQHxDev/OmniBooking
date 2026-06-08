@@ -5,6 +5,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -57,5 +59,13 @@ public class Coupon extends BaseEntity {
    @Builder.Default
    @Column(name = "is_active")
    private Boolean isActive = true;
+
+   @ManyToOne
+   @JoinColumn(name = "property_id")
+   private Property property;
+
+   @Builder.Default
+   @Column(name = "reserved_count", nullable = false)
+   private Integer reservedCount = 0;
 
 }

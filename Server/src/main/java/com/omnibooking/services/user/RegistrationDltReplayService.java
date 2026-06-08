@@ -25,9 +25,13 @@ import java.util.UUID;
 public class RegistrationDltReplayService {
 
    private final RegistrationDltRepository dltRepository;
+
    private final RegistrationDltAuditRepository auditRepository;
+
    private final KafkaTemplate<String, Object> kafkaTemplate;
+
    private final ObjectMapper objectMapper;
+
    private final MeterRegistry meterRegistry;
 
    @Value("${omnibooking.kafka.registration.topic-name:registration-request-topic}")
@@ -72,7 +76,6 @@ public class RegistrationDltReplayService {
 
       // Write audit trail
       RegistrationDltAudit audit = RegistrationDltAudit.builder()
-            .id(UUID.randomUUID())
             .requestId(requestId)
             .replayedBy(initiator)
             .replayedAt(Instant.now())
@@ -98,15 +101,19 @@ public class RegistrationDltReplayService {
 
    @Transactional
    public int replayPartition(int partitionId, String initiator) {
-      List<RegistrationDlt> pendingRecords = dltRepository.findByPartitionIdAndStatus(partitionId, RegistrationDltStatus.PENDING);
-      List<RegistrationDlt> failedRecords = dltRepository.findByPartitionIdAndStatus(partitionId, RegistrationDltStatus.FAILED);
-      
+      List<RegistrationDlt> pendingRecords = dltRepository.findByPartitionIdAndStatus(partitionId,
+            RegistrationDltStatus.PENDING);
+      List<RegistrationDlt> failedRecords = dltRepository.findByPartitionIdAndStatus(partitionId,
+            RegistrationDltStatus.FAILED);
+
       int successCount = 0;
       for (RegistrationDlt record : pendingRecords) {
-         if (replayRequest(record.getRequestId(), initiator)) successCount++;
+         if (replayRequest(record.getRequestId(), initiator))
+            successCount++;
       }
       for (RegistrationDlt record : failedRecords) {
-         if (replayRequest(record.getRequestId(), initiator)) successCount++;
+         if (replayRequest(record.getRequestId(), initiator))
+            successCount++;
       }
       return successCount;
    }
@@ -118,10 +125,12 @@ public class RegistrationDltReplayService {
 
       int successCount = 0;
       for (RegistrationDlt record : pendingRecords) {
-         if (replayRequest(record.getRequestId(), initiator)) successCount++;
+         if (replayRequest(record.getRequestId(), initiator))
+            successCount++;
       }
       for (RegistrationDlt record : failedRecords) {
-         if (replayRequest(record.getRequestId(), initiator)) successCount++;
+         if (replayRequest(record.getRequestId(), initiator))
+            successCount++;
       }
       return successCount;
    }

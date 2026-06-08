@@ -24,7 +24,7 @@ interface PartnerBookingListProps {
 const ITEMS_PER_PAGE = 5;
 
 export default function PartnerBookingList({ initialBookings }: PartnerBookingListProps) {
-   const [bookings, setBookings] = useState<PartnerBookingResponse[]>(initialBookings);
+   const bookings = initialBookings;
    const [searchTerm, setSearchTerm] = useState("");
    const [currentPage, setCurrentPage] = useState(1);
 

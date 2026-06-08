@@ -6,6 +6,8 @@ import com.omnibooking.dto.CreateBookingRequest;
 import com.omnibooking.security.Anonymous;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.services.booking.BookingService;
+import com.omnibooking.services.pricing.PriceCalculationService;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,10 +22,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.security.access.prepost.PreAuthorize;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.web.bind.annotation.RestController;
+
+import org.springframework.web.bind.annotation.RequestParam;
 
 @CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true", allowedHeaders = "*")
 @RestController
@@ -33,6 +38,34 @@ import org.springframework.web.bind.annotation.RestController;
 public class BookingController {
 
    private final BookingService bookingService;
+
+   private final PriceCalculationService priceCalculationService;
+
+   @Anonymous
+   @GetMapping("/calculate-price")
+   public ResponseEntity<ApiResponse<PriceCalculationService.StayPriceResult>> calculatePrice(
+         @RequestParam UUID propertyId,
+         @RequestParam UUID roomTypeId,
+         @RequestParam String checkIn,
+         @RequestParam String checkOut,
+         @RequestParam int guestCount,
+         @RequestParam(required = false) String couponCode,
+         HttpServletRequest httpRequest) {
+
+      String requestId = (String) httpRequest.getAttribute("requestId");
+      LocalDate checkInDate = LocalDate.parse(checkIn);
+      LocalDate checkOutDate = LocalDate.parse(checkOut);
+
+      var response = priceCalculationService.calculateStayPriceWithCoupon(
+            propertyId,
+            roomTypeId,
+            checkInDate,
+            checkOutDate,
+            guestCount,
+            couponCode);
+
+      return ResponseEntity.ok(ApiResponse.success(response, "Price calculation computed successfully", requestId));
+   }
 
    @Anonymous
    @PostMapping

@@ -8,6 +8,8 @@ import com.omnibooking.dto.event.EmailEvent;
 import com.omnibooking.exception.AppException;
 import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.Booking;
+import com.omnibooking.model.BookingAppliedRuleVersion;
+import com.omnibooking.model.BookingPriceBreakdown;
 import com.omnibooking.model.BookingStatusLog;
 import com.omnibooking.model.Coupon;
 import com.omnibooking.model.Role;
@@ -16,7 +18,7 @@ import com.omnibooking.model.RoomType;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
 import com.omnibooking.model.enums.BookingStatus;
-import com.omnibooking.model.enums.DiscountType;
+import com.omnibooking.model.enums.RuleType;
 import com.omnibooking.model.enums.TransactionStatus;
 import com.omnibooking.model.enums.TransactionType;
 import com.omnibooking.repository.booking.BookingRepository;
@@ -35,6 +37,7 @@ import com.omnibooking.services.core.BloomFilterService;
 import com.omnibooking.services.core.CurrencyService;
 import com.omnibooking.services.core.EncryptionService;
 import com.omnibooking.services.core.OutboxService;
+import com.omnibooking.services.pricing.PricingRuleHandler;
 import com.omnibooking.services.user.VerificationService;
 import com.omnibooking.services.auth.CachedRoleService;
 import java.math.BigDecimal;
@@ -42,7 +45,6 @@ import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -94,6 +96,14 @@ public class BookingServiceImpl implements BookingService {
    private final PasswordEncoder passwordEncoder;
 
    private final org.springframework.cache.CacheManager cacheManager;
+
+   private final com.omnibooking.services.pricing.PriceCalculationService priceCalculationService;
+   private final com.omnibooking.services.pricing.CouponReservationService couponReservationService;
+   private final com.omnibooking.repository.pricing.CouponReservationRepository couponReservationRepository;
+   private final com.omnibooking.repository.pricing.BookingPriceBreakdownRepository bookingPriceBreakdownRepository;
+   private final com.omnibooking.repository.pricing.BookingAppliedRuleVersionRepository bookingAppliedRuleVersionRepository;
+   private final com.omnibooking.repository.pricing.PriceRuleVersionRepository priceRuleVersionRepository;
+   private final com.omnibooking.services.pricing.PricingEngine pricingEngine;
 
    @Override
    @Transactional
@@ -158,7 +168,6 @@ public class BookingServiceImpl implements BookingService {
       }
 
       // Room Availability Check & Locks (Pessimistic write locks for each day)
-      BigDecimal basePriceSum = BigDecimal.ZERO;
       LocalDate date = request.getCheckInDate();
       while (date.isBefore(request.getCheckOutDate())) {
          final LocalDate finalDate = date;
@@ -184,56 +193,65 @@ public class BookingServiceImpl implements BookingService {
          availability.setAvailableCount(availability.getAvailableCount() - request.getNumRooms());
          roomAvailabilityRepository.save(availability);
 
-         // Price Override check
-         BigDecimal dayPrice = availability.getPriceOverride() != null ? availability.getPriceOverride()
-               : roomType.getBasePrice();
-         basePriceSum = basePriceSum.add(dayPrice);
-
          date = date.plusDays(1);
       }
 
-      BigDecimal totalPrice = basePriceSum.multiply(BigDecimal.valueOf(request.getNumRooms()));
-      BigDecimal finalPrice = totalPrice;
+      // Get guest count (defaults to room type capacities)
+      int guestCount = request.getGuestCount() != null ? request.getGuestCount()
+            : (roomType.getCapacityAdults()
+                  + (roomType.getCapacityChildren() != null ? roomType.getCapacityChildren() : 0));
 
-      // Coupon processing
+      // Resolve Coupon and Coupon Reservation
+      String couponCode = null;
       Coupon coupon = null;
-      if (request.getCouponId() != null) {
+
+      if (request.getReservationToken() != null && !request.getReservationToken().trim().isEmpty()) {
+         String token = request.getReservationToken().trim();
+         var reservation = couponReservationRepository.findByReservationToken(token)
+               .orElseThrow(
+                     () -> new AppException("BOOKING_003", "Coupon reservation not found", HttpStatus.BAD_REQUEST));
+         if (reservation.getStatus() != com.omnibooking.model.enums.ReservationStatus.ACTIVE) {
+            throw new AppException("BOOKING_003", "Coupon reservation is not active", HttpStatus.BAD_REQUEST);
+         }
+         coupon = reservation.getCoupon();
+         couponCode = coupon.getCode();
+
+         // Consume the reservation atomically
+         couponReservationService.consumeReservation(token);
+      } else if (request.getCouponId() != null) {
+         // Fallback/Legacy API support: atomically reserve and consume
          coupon = couponRepository.findById(request.getCouponId())
                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Coupon not found"));
+         couponCode = coupon.getCode();
 
-         if (Boolean.FALSE.equals(coupon.getIsActive()) ||
-               coupon.getValidFrom().isAfter(Instant.now()) ||
-               coupon.getValidUntil().isBefore(Instant.now())) {
-            throw new AppException("BOOKING_003", "Coupon is inactive or expired", HttpStatus.BAD_REQUEST);
+         int reserved = couponRepository.incrementReservedCountAtomically(coupon.getId());
+         if (reserved == 0) {
+            throw new AppException("BOOKING_005", "Coupon usage limit reached or coupon inactive",
+                  HttpStatus.BAD_REQUEST);
          }
-
-         if (totalPrice.compareTo(coupon.getMinBookingAmount()) < 0) {
-            throw new AppException("BOOKING_004", "Minimum booking amount for coupon not met", HttpStatus.BAD_REQUEST);
+         int consumed = couponRepository.consumeReservedCouponAtomically(coupon.getId());
+         if (consumed == 0) {
+            throw new AppException("BOOKING_005", "Coupon consumption failed", HttpStatus.BAD_REQUEST);
          }
-
-         if (coupon.getUsageLimit() != null && coupon.getUsedCount() >= coupon.getUsageLimit()) {
-            throw new AppException("BOOKING_005", "Coupon usage limit reached", HttpStatus.BAD_REQUEST);
-         }
-
-         BigDecimal discount = BigDecimal.ZERO;
-         if (coupon.getDiscountType() == DiscountType.PERCENT) {
-            discount = totalPrice.multiply(coupon.getDiscountValue()).divide(BigDecimal.valueOf(100));
-         } else if (coupon.getDiscountType() == DiscountType.FIXED_AMOUNT) {
-            discount = coupon.getDiscountValue();
-         }
-
-         if (coupon.getMaxDiscountAmount() != null && discount.compareTo(coupon.getMaxDiscountAmount()) > 0) {
-            discount = coupon.getMaxDiscountAmount();
-         }
-
-         finalPrice = totalPrice.subtract(discount);
-         if (finalPrice.compareTo(BigDecimal.ZERO) < 0) {
-            finalPrice = BigDecimal.ZERO;
-         }
-
-         coupon.setUsedCount(coupon.getUsedCount() + 1);
-         couponRepository.save(coupon);
       }
+
+      // Calculate stay price with coupon
+      com.omnibooking.services.pricing.PriceCalculationService.StayPriceResult stayPrice = priceCalculationService
+            .calculateStayPriceWithCoupon(
+                  roomType.getProperty().getId(),
+                  roomType.getId(),
+                  request.getCheckInDate(),
+                  request.getCheckOutDate(),
+                  guestCount,
+                  couponCode);
+
+      BigDecimal numRoomsDec = BigDecimal.valueOf(request.getNumRooms());
+      BigDecimal totalPrice = stayPrice.totalBasePrice()
+            .add(stayPrice.totalSeasonalAdjustment())
+            .add(stayPrice.totalWeekendAdjustment())
+            .add(stayPrice.totalOccupancyAdjustment())
+            .multiply(numRoomsDec);
+      BigDecimal finalPrice = stayPrice.totalFinalPrice().multiply(numRoomsDec);
 
       // Calculate Deposit Requirements
       boolean requiresDeposit = false;
@@ -288,6 +306,68 @@ public class BookingServiceImpl implements BookingService {
             .build();
 
       booking = bookingRepository.save(booking);
+
+      // Save Booking Price Breakdown and Applied Rule Versions
+      for (var dp : stayPrice.dailyPrices()) {
+         BigDecimal dayBase = dp.basePrice().multiply(numRoomsDec);
+         BigDecimal daySeasonal = dp.seasonalAdjustment().multiply(numRoomsDec);
+         BigDecimal dayWeekend = dp.weekendAdjustment().multiply(numRoomsDec);
+         BigDecimal dayOccupancy = dp.occupancyAdjustment().multiply(numRoomsDec);
+         BigDecimal preCouponDayPrice = dayBase.add(daySeasonal).add(dayWeekend).add(dayOccupancy);
+         BigDecimal dayFinal = dp.finalPrice().multiply(numRoomsDec);
+         BigDecimal dayDiscount = preCouponDayPrice.subtract(dayFinal);
+
+         BookingPriceBreakdown breakdown = BookingPriceBreakdown.builder()
+               .booking(booking)
+               .stayDate(dp.date())
+               .basePrice(dayBase)
+               .seasonalAdjustment(daySeasonal)
+               .weekendAdjustment(dayWeekend)
+               .occupancyAdjustment(dayOccupancy)
+               .couponDiscount(dayDiscount)
+               .finalPrice(dayFinal)
+               .appliedCouponId(coupon != null ? coupon.getId() : null)
+               .appliedCouponCode(coupon != null ? coupon.getCode() : null)
+               .build();
+
+         breakdown = bookingPriceBreakdownRepository.save(breakdown);
+
+         for (UUID ruleId : dp.appliedRuleIds()) {
+            Integer maxVer = priceRuleVersionRepository.findMaxVersionByPriceRuleId(ruleId);
+            if (maxVer != null && maxVer > 0) {
+               var ruleVer = priceRuleVersionRepository.findByPriceRuleIdAndVersion(ruleId, maxVer)
+                     .orElseThrow(() -> new IllegalStateException(
+                           "Price rule version not found for rule: " + ruleId + ", version: " + maxVer));
+
+               BigDecimal ruleAdjustment = BigDecimal.ZERO;
+               if (ruleVer.getRuleType() == RuleType.SEASONAL) {
+                  ruleAdjustment = daySeasonal;
+               } else if (ruleVer.getRuleType() == RuleType.WEEKEND) {
+                  ruleAdjustment = dayWeekend;
+               } else if (ruleVer.getRuleType() == RuleType.OCCUPANCY) {
+                  ruleAdjustment = dayOccupancy;
+               }
+
+               if (ruleAdjustment.compareTo(BigDecimal.ZERO) == 0) {
+                  PricingRuleHandler handler = pricingEngine
+                        .getHandler(ruleVer.getRuleType());
+                  ruleAdjustment = handler
+                        .calculateAdjustment(ruleVer.getAdjustmentType(), ruleVer.getAdjustmentValue(), dp.basePrice())
+                        .multiply(numRoomsDec);
+               }
+
+               if (ruleAdjustment.compareTo(BigDecimal.ZERO) != 0) {
+                  BookingAppliedRuleVersion appliedRuleVer = BookingAppliedRuleVersion
+                        .builder()
+                        .bookingPriceBreakdown(breakdown)
+                        .priceRuleVersion(ruleVer)
+                        .adjustmentAmount(ruleAdjustment)
+                        .build();
+                  bookingAppliedRuleVersionRepository.save(appliedRuleVer);
+               }
+            }
+         }
+      }
 
       // Create Booking Status Log
       BookingStatusLog logEntry = BookingStatusLog.builder()

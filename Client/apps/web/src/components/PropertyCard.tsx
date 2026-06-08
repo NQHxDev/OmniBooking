@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Star, Heart, Check, ChevronRight, Info, ThumbsUp, Plus } from "lucide-react";
+import { Star, Heart, Check, ChevronRight, ThumbsUp, Plus } from "lucide-react";
 import { PropertyDocument } from "@/lib/api/services/propertyService";
 import { useTranslations, useLocale } from "next-intl";
 import PriceDisplay from "./PriceDisplay";
@@ -33,7 +33,7 @@ export default function PropertyCard({ property, index }: PropertyCardProps) {
          const checkoutDate = new Date(checkoutParam);
          const timeDiff = checkoutDate.getTime() - checkinDate.getTime();
          nights = Math.max(1, Math.round(timeDiff / (1000 * 60 * 60 * 24)));
-      } catch (e) {
+      } catch {
          nights = 1;
       }
    }

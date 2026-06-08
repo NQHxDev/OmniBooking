@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Lock, Eye, EyeOff, Loader2, Check } from "lucide-react";
+import { X, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { profileService } from "@/lib/api/services/profileService";
 import { toast } from "sonner";

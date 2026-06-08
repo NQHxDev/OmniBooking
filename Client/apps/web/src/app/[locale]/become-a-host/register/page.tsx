@@ -8,7 +8,6 @@ import { partnerService } from "@/lib/api/services/partnerService";
 import PartnerNavbar from "@/components/PartnerNavbar";
 import { useAuthStore } from "@/store/useAuthStore";
 import { getPartnerUrl } from "@omnibooking/shared";
-import { env } from "@/env";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 

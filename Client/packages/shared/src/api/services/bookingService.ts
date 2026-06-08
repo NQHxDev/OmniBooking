@@ -11,8 +11,10 @@ export interface CreateBookingRequest {
    guestPhone?: string;
    specialRequests?: string;
    couponId?: string;
+   reservationToken?: string;
    currency?: string;
    paymentMethod?: string;
+   guestCount?: number;
 }
 
 export interface BookingResponse {
@@ -35,6 +37,26 @@ export interface BookingResponse {
    paymentMethod?: string;
 }
 
+export interface StayPriceResult {
+   dailyPrices: {
+      date: string;
+      basePrice: number;
+      seasonalAdjustment: number;
+      weekendAdjustment: number;
+      occupancyAdjustment: number;
+      finalPrice: number;
+      appliedRuleIds: string[];
+   }[];
+   totalBasePrice: number;
+   totalSeasonalAdjustment: number;
+   totalWeekendAdjustment: number;
+   totalOccupancyAdjustment: number;
+   totalCouponDiscount: number;
+   totalFinalPrice: number;
+   appliedCouponId?: string;
+   appliedCouponCode?: string;
+}
+
 export const bookingService = {
    create: async (request: CreateBookingRequest): Promise<BookingResponse> => {
       const response = await apiClient.post<unknown, ApiResponse<BookingResponse>>(
@@ -55,6 +77,23 @@ export const bookingService = {
       const response = await apiClient.get<unknown, ApiResponse<BookingResponse[]>>(
          "/bookings/mine",
          { withCredentials: true }
+      );
+      return response.data;
+   },
+   calculatePrice: async (params: {
+      propertyId: string;
+      roomTypeId: string;
+      checkIn: string;
+      checkOut: string;
+      guestCount: number;
+      couponCode?: string;
+   }): Promise<StayPriceResult> => {
+      const response = await apiClient.get<unknown, ApiResponse<StayPriceResult>>(
+         "/bookings/calculate-price",
+         {
+            params,
+            withCredentials: true,
+         }
       );
       return response.data;
    },

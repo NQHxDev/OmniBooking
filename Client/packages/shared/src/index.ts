@@ -12,6 +12,10 @@ export { profileService } from "./api/services/profileService";
 export { securityService } from "./api/services/securityService";
 export { reviewService } from "./api/services/reviewService";
 export * from "./api/services/reviewService";
+export { priceRuleService } from "./api/services/priceRuleService";
+export * from "./api/services/priceRuleService";
+export { couponService } from "./api/services/couponService";
+export * from "./api/services/couponService";
 
 // Export Types
 export * from "./types/api";
@@ -24,7 +28,11 @@ export type {
    PropertyDetailResponse,
    PartnerLegalProfileResponse,
 } from "./api/propertyService";
-export type { BookingResponse, CreateBookingRequest } from "./api/services/bookingService";
+export type {
+   BookingResponse,
+   CreateBookingRequest,
+   StayPriceResult,
+} from "./api/services/bookingService";
 export type { PartnerBookingResponse, PartnerStatsResponse } from "./api/services/partnerService";
 export type { UserProfile, UpdateProfileRequest } from "./api/services/profileService";
 export type { SecurityStatusResponse } from "./api/services/securityService";

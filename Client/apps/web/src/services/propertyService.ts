@@ -23,6 +23,7 @@ export interface RoomTypeResponse {
    totalRooms: number;
    roomSizeSqm?: number;
    bedType?: string;
+   currentPrice?: number;
 }
 
 export interface PropertyDetailResponse {

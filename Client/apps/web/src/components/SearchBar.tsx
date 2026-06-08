@@ -204,11 +204,13 @@ const translateCountryName = (country: string, locale: string): string => {
    return country;
 };
 
+const dateLocales: Record<string, typeof enUS> = { vi, en: enUS };
+
 export default function SearchBar() {
    const t = useTranslations("Common");
    const locale = useLocale();
    const router = useRouter();
-   const dateLocale = locale === "vi" ? vi : enUS;
+   const dateLocale = dateLocales[locale] || enUS;
 
    // Search/Location State
    const [destination, setDestination] = useState("");

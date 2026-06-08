@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { useLocale } from "next-intl";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/routing";
+import { useLocale, useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
 import { vi, enUS } from "date-fns/locale";
 import { CheckCircle, Home, Lock, ArrowRight, AlertCircle, Sparkles } from "lucide-react";
@@ -14,11 +15,13 @@ import { paymentService } from "@/lib/api/services/paymentService";
 import PriceDisplay from "@/components/PriceDisplay";
 import Barcode from "@/components/Barcode";
 
+const dateLocales: Record<string, typeof enUS> = { vi, en: enUS };
+
 export default function BookingSuccessPage() {
-   const locale = useLocale();
+   const t = useTranslations("BookingSuccess");
    const router = useRouter();
    const searchParams = useSearchParams();
-   const dateLocale = locale === "vi" ? vi : enUS;
+   const dateLocale = dateLocales[useLocale()] || enUS;
 
    const rawBookingId = searchParams.get("bookingId") || searchParams.get("orderId");
    const bookingId =
@@ -48,17 +51,13 @@ export default function BookingSuccessPage() {
             })
             .catch((err) => {
                console.error("Failed to fetch booking details:", err);
-               setFetchError(
-                  locale === "vi"
-                     ? "Không thể tải thông tin đặt phòng."
-                     : "Failed to load booking details."
-               );
+               setFetchError(t("fetchError"));
             })
             .finally(() => {
                setLoading(false);
             });
       }
-   }, [bookingId, locale]);
+   }, [bookingId, t]);
 
    const handleRetryPayment = async () => {
       if (!bookingId) return;
@@ -68,19 +67,11 @@ export default function BookingSuccessPage() {
          if (payData && payData.payUrl) {
             window.location.href = payData.payUrl;
          } else {
-            alert(
-               locale === "vi"
-                  ? "Không thể tạo liên kết thanh toán MoMo."
-                  : "Failed to create MoMo payment link."
-            );
+            alert(t("momoLinkError"));
          }
       } catch (err) {
          console.error("Retry payment error:", err);
-         alert(
-            locale === "vi"
-               ? "Có lỗi xảy ra khi tạo liên kết thanh toán."
-               : "An error occurred while creating the payment link."
-         );
+         alert(t("paymentLinkError"));
       } finally {
          setRetrying(false);
       }
@@ -130,18 +121,12 @@ export default function BookingSuccessPage() {
       if (!token) return;
 
       if (password !== confirmPassword) {
-         setActivationError(
-            locale === "vi" ? "Mật khẩu xác nhận không khớp." : "Passwords do not match."
-         );
+         setActivationError(t("passwordMismatch"));
          return;
       }
 
       if (password.length < 6) {
-         setActivationError(
-            locale === "vi"
-               ? "Mật khẩu phải chứa ít nhất 6 ký tự."
-               : "Password must be at least 6 characters."
-         );
+         setActivationError(t("passwordLength"));
          return;
       }
 
@@ -153,17 +138,12 @@ export default function BookingSuccessPage() {
          setAuth(user);
          setActivatedSuccessfully(true);
          setTimeout(() => {
-            router.push(`/${locale}/profile`);
+            router.push("/profile");
          }, 2000);
       } catch (err) {
          console.error(err);
          const errorWithResponse = err as { response?: { data?: { message?: string } } };
-         setActivationError(
-            errorWithResponse.response?.data?.message ||
-               (locale === "vi"
-                  ? "Kích hoạt tài khoản thất bại. Vui lòng thử lại."
-                  : "Activation failed. Please try again.")
-         );
+         setActivationError(errorWithResponse.response?.data?.message || t("activationFailed"));
          setActivating(false);
       }
    };
@@ -173,11 +153,7 @@ export default function BookingSuccessPage() {
          <div className="min-h-screen bg-zinc-50/50 py-12 px-4 sm:px-6 lg:px-8 font-sans flex flex-col justify-center items-center">
             <div className="max-w-xl w-full space-y-8 flex flex-col items-center">
                <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-               <p className="text-sm font-semibold text-zinc-500">
-                  {locale === "vi"
-                     ? "Đang tải thông tin đặt phòng..."
-                     : "Loading booking details..."}
-               </p>
+               <p className="text-sm font-semibold text-zinc-500">{t("loading")}</p>
             </div>
          </div>
       );
@@ -190,16 +166,14 @@ export default function BookingSuccessPage() {
                <div className="inline-flex p-3 bg-red-50 rounded-full border border-red-100 shadow-sm">
                   <AlertCircle className="h-10 w-10 text-red-600" />
                </div>
-               <h1 className="text-xl font-bold text-zinc-950">
-                  {locale === "vi" ? "Lỗi tải thông tin" : "Error Loading Details"}
-               </h1>
+               <h1 className="text-xl font-bold text-zinc-950">{t("errorTitle")}</h1>
                <p className="text-sm text-zinc-500 font-medium">{fetchError}</p>
                <button
-                  onClick={() => router.push(`/${locale}`)}
+                  onClick={() => router.push("/")}
                   className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3 px-6 rounded-xl transition-all cursor-pointer shadow-md text-xs flex items-center justify-center gap-2"
                >
                   <Home className="h-4 w-4" />
-                  <span>{locale === "vi" ? "Về trang chủ" : "Return Home"}</span>
+                  <span>{t("returnHome")}</span>
                </button>
             </div>
          </div>
@@ -216,12 +190,10 @@ export default function BookingSuccessPage() {
                      <CheckCircle className="h-14 w-14 text-emerald-600" />
                   </div>
                   <h1 className="text-3xl font-bold text-zinc-950 tracking-tight">
-                     {locale === "vi" ? "Đặt phòng thành công!" : "Booking Confirmed!"}
+                     {t("successTitle")}
                   </h1>
                   <p className="text-sm text-zinc-500 font-medium max-w-sm mx-auto">
-                     {locale === "vi"
-                        ? "Cảm ơn bạn đã lựa chọn OmniBooking. Chúng tôi đã gửi email xác nhận chi tiết tới địa chỉ email của bạn."
-                        : "Thank you for booking with OmniBooking. We've sent a confirmation email to your address."}
+                     {t("successDesc")}
                   </p>
                </div>
             ) : (
@@ -230,12 +202,10 @@ export default function BookingSuccessPage() {
                      <AlertCircle className="h-14 w-14 text-rose-600" />
                   </div>
                   <h1 className="text-3xl font-bold text-zinc-950 tracking-tight">
-                     {locale === "vi" ? "Thanh toán thất bại!" : "Payment Unsuccessful!"}
+                     {t("failTitle")}
                   </h1>
                   <p className="text-sm text-zinc-500 font-medium max-w-sm mx-auto">
-                     {locale === "vi"
-                        ? "Giao dịch thanh toán qua MoMo đã bị hủy hoặc không thành công. Yêu cầu đặt phòng của bạn tạm thời chưa được xác nhận."
-                        : "The MoMo payment transaction was cancelled or failed. Your booking has not been confirmed yet."}
+                     {t("failDesc")}
                   </p>
                </div>
             )}
@@ -252,11 +222,11 @@ export default function BookingSuccessPage() {
                      <div className="flex items-center gap-2">
                         {isPaymentSuccess ? (
                            <div className="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider border border-emerald-100">
-                              {locale === "vi" ? "Đã xác nhận" : "Confirmed"}
+                              {t("confirmed")}
                            </div>
                         ) : (
                            <div className="bg-rose-50 text-rose-700 font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider border border-rose-100">
-                              {locale === "vi" ? "Chưa thanh toán" : "Unpaid"}
+                              {t("unpaid")}
                            </div>
                         )}
                      </div>
@@ -269,7 +239,7 @@ export default function BookingSuccessPage() {
                      <div className="grid grid-cols-2 gap-4">
                         <div>
                            <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                              {locale === "vi" ? "Khách hàng" : "Passenger"}
+                              {t("passenger")}
                            </span>
                            <span className="text-zinc-900 font-bold text-sm block mt-0.5 truncate">
                               {guestName || "Guest User"}
@@ -277,7 +247,7 @@ export default function BookingSuccessPage() {
                         </div>
                         <div>
                            <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                              {locale === "vi" ? "Mã đặt phòng" : "Booking Code"}
+                              {t("bookingCode")}
                            </span>
                            <span className="text-blue-600 font-black text-sm block mt-0.5 tracking-wider">
                               {bookingCode}
@@ -288,7 +258,7 @@ export default function BookingSuccessPage() {
                      <div className="grid grid-cols-2 gap-4 border-t border-zinc-100 pt-4">
                         <div>
                            <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                              {locale === "vi" ? "Chỗ nghỉ / Khách sạn" : "Property / Hotel"}
+                              {t("property")}
                            </span>
                            <span className="text-zinc-900 font-bold text-sm block mt-0.5 truncate">
                               {propertyName}
@@ -296,7 +266,7 @@ export default function BookingSuccessPage() {
                         </div>
                         <div>
                            <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                              {locale === "vi" ? "Loại phòng" : "Room Type"}
+                              {t("roomType")}
                            </span>
                            <span className="text-zinc-900 font-bold block mt-0.5 truncate">
                               {roomTypeName}
@@ -316,7 +286,7 @@ export default function BookingSuccessPage() {
                   <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-zinc-700">
                      <div>
                         <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                           {locale === "vi" ? "Ngày nhận phòng" : "Check-in Date"}
+                           {t("checkInDate")}
                         </span>
                         <span className="text-zinc-900 font-bold block mt-0.5">
                            {checkin
@@ -331,7 +301,7 @@ export default function BookingSuccessPage() {
                      </div>
                      <div>
                         <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                           {locale === "vi" ? "Ngày trả phòng" : "Check-out Date"}
+                           {t("checkOutDate")}
                         </span>
                         <span className="text-zinc-900 font-bold block mt-0.5">
                            {checkout
@@ -349,9 +319,7 @@ export default function BookingSuccessPage() {
                   {requiresDeposit ? (
                      <div className="border-t border-zinc-100 pt-4 space-y-3">
                         <div className="flex justify-between items-baseline text-xs font-semibold text-zinc-500">
-                           <span>
-                              {locale === "vi" ? "Tổng cộng giá trị đơn:" : "Total booking value:"}
-                           </span>
+                           <span>{t("totalValue")}</span>
                            <span>
                               <PriceDisplay
                                  amount={finalPrice}
@@ -362,21 +330,15 @@ export default function BookingSuccessPage() {
                         </div>
                         <div className="flex justify-between items-baseline text-xs font-semibold text-blue-600">
                            <span>
-                              {locale === "vi"
-                                 ? `Đã đặt cọc trực tuyến qua ${
-                                      paymentMethod.toLowerCase() === "momo"
-                                         ? "Ví MoMo"
-                                         : paymentMethod.toLowerCase() === "banking"
-                                           ? "Chuyển khoản (giả lập)"
-                                           : "Thẻ Visa/Master (qua MoMo)"
-                                   }:`
-                                 : `Deposit paid via ${
-                                      paymentMethod.toLowerCase() === "momo"
-                                         ? "MoMo"
-                                         : paymentMethod.toLowerCase() === "banking"
-                                           ? "Bank Transfer (simulated)"
-                                           : "Visa/Mastercard (via MoMo)"
-                                   }:`}
+                              {t("depositPaid", {
+                                 method: t(
+                                    paymentMethod.toLowerCase() === "momo"
+                                       ? "paymentMomo"
+                                       : paymentMethod.toLowerCase() === "banking"
+                                         ? "paymentBanking"
+                                         : "paymentVisa"
+                                 ),
+                              })}
                            </span>
                            <span>
                               <PriceDisplay
@@ -388,9 +350,7 @@ export default function BookingSuccessPage() {
                         </div>
                         <div className="flex justify-between items-baseline border-t border-zinc-100/50 pt-3">
                            <span className="text-xs font-bold text-zinc-900">
-                              {locale === "vi"
-                                 ? "Còn lại thanh toán tại chỗ nghỉ"
-                                 : "Remaining to pay at property"}
+                              {t("remainingAmount")}
                            </span>
                            <div className="text-right">
                               <PriceDisplay
@@ -408,11 +368,7 @@ export default function BookingSuccessPage() {
                      </div>
                   ) : (
                      <div className="border-t border-zinc-100 pt-4 flex justify-between items-baseline">
-                        <span className="text-xs font-bold text-zinc-900">
-                           {locale === "vi"
-                              ? "Tổng thanh toán tại chỗ nghỉ"
-                              : "Total to pay at property"}
-                        </span>
+                        <span className="text-xs font-bold text-zinc-900">{t("totalToPay")}</span>
                         <div className="text-right">
                            <PriceDisplay
                               amount={finalPrice}
@@ -441,9 +397,7 @@ export default function BookingSuccessPage() {
                         />
                      </div>
                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
-                        {locale === "vi"
-                           ? "Quét mã này tại quầy lễ tân"
-                           : "Scan barcode at reception"}
+                        {t("scanBarcode")}
                      </span>
                   </div>
                </div>
@@ -459,15 +413,9 @@ export default function BookingSuccessPage() {
                         <Sparkles className="h-3.5 w-3.5" />
                         <span>Genius Member Club</span>
                      </div>
-                     <h3 className="text-lg font-extrabold text-zinc-900">
-                        {locale === "vi"
-                           ? "Kích hoạt tài khoản thành viên"
-                           : "Activate Your Membership"}
-                     </h3>
+                     <h3 className="text-lg font-extrabold text-zinc-900">{t("activateTitle")}</h3>
                      <p className="text-xs text-zinc-500 leading-relaxed font-medium">
-                        {locale === "vi"
-                           ? "Chúng tôi đã tạo tài khoản tạm thời liên kết với email của bạn. Chỉ cần đặt mật khẩu dưới đây để kích hoạt thành viên, mở khóa ưu đãi Genius giảm tới 20% cho lần sau!"
-                           : "We created a temporary account for you. Set your password below to activate and unlock up to 20% off future bookings!"}
+                        {t("activateDesc")}
                      </p>
                   </div>
 
@@ -482,7 +430,7 @@ export default function BookingSuccessPage() {
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                         <div className="space-y-1">
                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-                              {locale === "vi" ? "Mật khẩu" : "Password"}
+                              {t("password")}
                            </label>
                            <div className="relative">
                               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-400">
@@ -501,7 +449,7 @@ export default function BookingSuccessPage() {
 
                         <div className="space-y-1">
                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-                              {locale === "vi" ? "Xác nhận mật khẩu" : "Confirm Password"}
+                              {t("confirmPassword")}
                            </label>
                            <div className="relative">
                               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-400">
@@ -528,11 +476,7 @@ export default function BookingSuccessPage() {
                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                         ) : (
                            <>
-                              <span>
-                                 {locale === "vi"
-                                    ? "Kích hoạt & Đăng nhập ngay"
-                                    : "Activate & Log In Now"}
-                              </span>
+                              <span>{t("activateBtn")}</span>
                               <ArrowRight className="h-3.5 w-3.5" />
                            </>
                         )}
@@ -545,14 +489,10 @@ export default function BookingSuccessPage() {
                <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 text-center space-y-3 animate-in fade-in duration-300">
                   <CheckCircle className="h-10 w-10 text-emerald-600 mx-auto" />
                   <h3 className="text-base font-bold text-emerald-950">
-                     {locale === "vi"
-                        ? "Kích hoạt tài khoản thành viên thành công!"
-                        : "Membership Activated Successfully!"}
+                     {t("activatedSuccessTitle")}
                   </h3>
                   <p className="text-xs text-emerald-800/80 leading-relaxed font-semibold">
-                     {locale === "vi"
-                        ? "Hệ thống đang tự động đăng nhập và đưa bạn tới trang hồ sơ cá nhân..."
-                        : "Logging you in and redirecting to your profile dashboard..."}
+                     {t("activatedSuccessDesc")}
                   </p>
                </div>
             )}
@@ -561,11 +501,11 @@ export default function BookingSuccessPage() {
             <div className="text-center pt-4">
                {isPaymentSuccess ? (
                   <button
-                     onClick={() => router.push(`/${locale}`)}
+                     onClick={() => router.push("/")}
                      className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-800 text-sm font-bold border border-zinc-200 bg-white rounded-xl px-6 py-3 cursor-pointer transition-colors shadow-2xs hover:shadow-xs"
                   >
                      <Home className="h-4.5 w-4.5" />
-                     <span>{locale === "vi" ? "Về trang chủ" : "Return Home"}</span>
+                     <span>{t("returnHome")}</span>
                   </button>
                ) : (
                   <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
@@ -577,15 +517,15 @@ export default function BookingSuccessPage() {
                         {retrying ? (
                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                         ) : (
-                           <span>{locale === "vi" ? "Thử thanh toán lại" : "Retry Payment"}</span>
+                           <span>{t("retryPayment")}</span>
                         )}
                      </button>
                      <button
-                        onClick={() => router.push(`/${locale}`)}
+                        onClick={() => router.push("/")}
                         className="inline-flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-800 text-sm font-bold border border-zinc-200 bg-white rounded-xl px-6 py-3 cursor-pointer transition-colors shadow-2xs hover:shadow-xs w-full sm:w-auto"
                      >
                         <Home className="h-4.5 w-4.5" />
-                        <span>{locale === "vi" ? "Về trang chủ" : "Return Home"}</span>
+                        <span>{t("returnHome")}</span>
                      </button>
                   </div>
                )}

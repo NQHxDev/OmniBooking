@@ -33,7 +33,7 @@ export default function PropertyCardClient({
          const checkoutDate = new Date(checkoutParam);
          const timeDiff = checkoutDate.getTime() - checkinDate.getTime();
          nights = Math.max(1, Math.round(timeDiff / (1000 * 60 * 60 * 24)));
-      } catch (e) {
+      } catch {
          nights = 1;
       }
    }
