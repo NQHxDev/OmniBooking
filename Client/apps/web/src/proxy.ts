@@ -134,10 +134,11 @@ export async function proxy(request: NextRequest) {
    // Nếu access token (accessToken) đã hết hạn hoặc không tồn tại, nhưng có refresh token
    if ((!accessToken || isTokenExpired(accessToken)) && refreshToken) {
       try {
-         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8080/api/v1/";
-         const refreshUrl = apiUrl.endsWith("/api/v1/")
-            ? `${apiUrl}auth/refresh`
-            : `${apiUrl.replace(/\/$/, "")}/api/v1/auth/refresh`;
+         const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8080";
+         const cleanBackend = backendUrl.replace(/\/$/, "");
+         const refreshUrl = cleanBackend.endsWith("/api/v1")
+            ? `${cleanBackend}/auth/refresh`
+            : `${cleanBackend}/api/v1/auth/refresh`;
 
          const userAgent = request.headers.get("user-agent");
          const headers: Record<string, string> = {

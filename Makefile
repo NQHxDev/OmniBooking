@@ -1,5 +1,5 @@
-ifneq (,$(wildcard .env))
-	include .env
+ifneq (,$(wildcard env/.env))
+	include env/.env
 	export
 endif
 
@@ -41,22 +41,10 @@ dev-owner:
 	@echo "Starting Next.js Owner Client on port 3005..."
 	@PORT=3005 npm run dev --workspace=apps/owner --prefix Client
 
-# Docker Infrastructure Commands
-.PHONY: docker-infra
-docker-infra:
-	@echo "Starting infrastructure..."
-	@docker-compose up -d db redis kafka kafdrop elasticsearch kibana prometheus grafana
-	@echo "Waiting for Elasticsearch to be ready..."
-	@until [ "$$(docker inspect --format='{{.State.Health.Status}}' omnibooking-elastic)" = "healthy" ]; do \
-		printf '.'; \
-		sleep 2; \
-	done
-	@echo "\nInfrastructure (DB, Redis, Kafka, ES, Prometheus, Grafana) is Ready..."
-
 .PHONY: monitoring
 monitoring:
 	@echo "Starting Prometheus and Grafana..."
-	@docker-compose up -d prometheus grafana
+	@docker-compose -p omnibooking-dev --env-file env/.env up -d prometheus grafana
 	@echo "Prometheus is running at http://localhost:9090"
 	@echo "Grafana is running at http://localhost:3001"
 
@@ -87,25 +75,89 @@ generate-mock-users:
 	@echo "Generating 10,000 mock users..."
 	@node scripts/generate-users.js
 
-# Docker Full Stack Commands
-.PHONY: docker-up
-docker-up:
-	@echo "Starting all services in Docker (detached)..."
-	@docker-compose up -d
-
-.PHONY: docker-down
-docker-down:
-	@echo "Stopping all Docker services..."
-	@docker-compose down -v
+# Docker Development (Local Infrastructure)
+.PHONY: docker-infra
+docker-infra:
+	@echo "Starting infrastructure..."
+	@docker-compose -p omnibooking-dev --env-file env/.env up -d db redis kafka kafdrop elasticsearch kibana prometheus grafana
+	@echo "Waiting for Elasticsearch to be ready..."
+	@until [ "$$(docker inspect --format='{{.State.Health.Status}}' omnibooking-elastic)" = "healthy" ]; do \
+		printf '.'; \
+		sleep 2; \
+	done
+	@echo "\nInfrastructure (DB, Redis, Kafka, ES, Prometheus, Grafana) is Ready..."
 
 .PHONY: docker-stop
 docker-stop:
-	@echo "Stopping all Docker services..."
-	@docker-compose stop
+	@echo "Stopping Development Docker infrastructure services..."
+	@docker-compose -p omnibooking-dev --env-file env/.env stop
 
-.PHONY: logs
-logs:
-	@docker-compose logs -f
+.PHONY: docker-down
+docker-down:
+	@echo "Stopping and removing Development Docker infrastructure services..."
+	@docker-compose -p omnibooking-dev --env-file env/.env down -v
+
+.PHONY: docker-restart
+docker-restart:
+	@echo "Rebuilding and restarting all Development Docker infrastructure services..."
+	@docker-compose -p omnibooking-dev --env-file env/.env up -d --build
+
+# Docker Production Stack
+.PHONY: docker-build
+docker-build:
+	@cp env/.env.prod Client/.env
+	@echo "Building and starting all services in Production Docker..."
+	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml up --build -d
+	@rm -f Client/.env
+
+.PHONY: docker-build-server
+docker-build-server:
+	@echo "Building and starting Server in Production Docker..."
+	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml up -d --build server
+
+.PHONY: docker-build-client
+docker-build-client:
+	@cp env/.env.prod Client/.env
+	@echo "Building and starting Client services in Production Docker..."
+	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml up -d --build client-web client-partner client-owner
+	@rm -f Client/.env
+
+.PHONY: docker-restart-prod
+docker-restart-prod:
+	@read -p "Are you sure you want to rebuild and restart all Production Docker services? (y/n): " ans; \
+	if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
+		cp env/.env.prod Client/.env; \
+		echo "Rebuilding and restarting all Production Docker services..."; \
+		docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml up -d --build; \
+		rm -f Client/.env; \
+	else \
+		echo "Aborted..."; \
+	fi
+
+.PHONY: docker-stop-prod
+docker-stop-prod:
+	@read -p "Are you sure you want to stop all Production Docker services? (y/n): " ans; \
+	if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
+		echo "Stopping all Production Docker services..."; \
+		docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml stop; \
+	else \
+		echo "Aborted."; \
+	fi
+
+.PHONY: docker-down-prod
+docker-down-prod:
+	@read -p "Are you sure you want to stop and delete ALL Production containers and volumes? (y/n): " ans; \
+	if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
+		echo "Stopping all Production Docker services and removing volumes..."; \
+		docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml down -v; \
+		echo "Production environment completely cleaned..."; \
+	else \
+		echo "Aborted."; \
+	fi
+
+.PHONY: docker-logs
+docker-logs:
+	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml logs -f
 
 # Install dependencies for both projects
 .PHONY: install
@@ -116,11 +168,6 @@ install:
 	@cd Server && ./mvnw dependency:resolve
 	@echo "Installing Client dependencies..."
 	@npm install --prefix Client
-
-.PHONY: restart
-restart:
-	@echo "Rebuilding and restarting all Docker services..."
-	@docker-compose up -d --build
 
 # Build projects for production
 .PHONY: build
@@ -186,16 +233,24 @@ help:
 	@echo "    make dev-partner   - Run Partner client only (Port 3002)"
 	@echo "    make seed-db       - Generate mock-users.json and run Server with --seed argument"
 	@echo ""
-	@echo "  Docker Full Stack:"
-	@echo "    make docker-up     - Start everything in Docker"
-	@echo "    make docker-down   - Stop everything"
-	@echo "    make docker-stop   - Stop Docker containers"
-	@echo "    make restart       - Rebuild and restart Docker containers"
+	@echo "  Docker Development (Local Infrastructure):"
+	@echo "    make docker-infra  - Start DB, Redis, Kafka, ES, etc. in Docker"
+	@echo "    make docker-stop   - Stop development infrastructure services"
+	@echo "    make docker-down   - Stop and clean development infrastructure (remove volumes)"
+	@echo "    make docker-restart - Rebuild and restart development infrastructure"
+	@echo ""
+	@echo "  Docker Production Stack:"
+	@echo "    make docker-build  - Build and start all services in Production Docker"
+	@echo "    make docker-build-server - Build and start production Server in Docker"
+	@echo "    make docker-build-client - Build and start production Client in Docker"
+	@echo "    make docker-restart-prod - Rebuild and restart Production Docker services"
+	@echo "    make docker-stop-prod - Stop Production Docker services"
+	@echo "    make docker-down-prod - Stop and clean Production stack"
+	@echo "    make docker-logs   - Tail production Docker logs"
 	@echo ""
 	@echo "  Maintenance:"
 	@echo "    make install       - Install all dependencies"
 	@echo "    make clean         - Remove build artifacts"
-	@echo "    make logs          - Tail Docker logs"
 	@echo "    make monitoring    - Start Prometheus and Grafana"
 	@echo "    make test-server   - Run server unit tests"
 	@echo "    make test-load     - Run full k6 performance load test (50 VUs)"

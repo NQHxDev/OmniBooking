@@ -12,9 +12,10 @@ node_modules/
 
 *.zip
 
-.env
-.env.local
-.env.*.local
+env/.env
+env/.env.local
+env/.env.prod
+env/.env.*.local
 
 Todo.md
 NOTE.md

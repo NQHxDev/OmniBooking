@@ -2,6 +2,7 @@ package com.omnibooking.config.seeder;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -12,12 +13,19 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class DatabaseSeeder implements CommandLineRunner {
 
+   @Value("${app.seeding.enabled:true}")
+   private boolean seedingEnabled;
+
    private final UserSeeder userSeeder;
 
    private final PropertySeeder propertySeeder;
 
    @Override
    public void run(String... args) throws Exception {
+      if (!seedingEnabled) {
+         log.info("Database mock seeding is disabled.");
+         return;
+      }
       boolean hasSeedArg = false;
       for (String arg : args) {
          if ("--seed".equals(arg)) {

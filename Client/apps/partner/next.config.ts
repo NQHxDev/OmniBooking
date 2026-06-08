@@ -7,7 +7,21 @@ import { withSentryConfig } from "@sentry/nextjs";
 // Load environment variables from root .env
 function loadRootEnv() {
    try {
-      const envPath = path.resolve(__dirname, "../../../.env");
+      // 1. Try to load from env/.env.prod if in production, or env/.env if in development
+      const isProd = process.env.NODE_ENV === "production";
+      const envFile = isProd ? ".env.prod" : ".env";
+      let envPath = path.resolve(__dirname, `../../../env/${envFile}`);
+
+      // 2. Fallback to root of Client folder (e.g. during docker build) or monorepo root
+      if (!fs.existsSync(envPath)) {
+         const clientRootEnv = path.resolve(__dirname, "../../.env");
+         if (fs.existsSync(clientRootEnv)) {
+            envPath = clientRootEnv;
+         } else {
+            envPath = path.resolve(__dirname, "../../../.env");
+         }
+      }
+
       if (fs.existsSync(envPath)) {
          console.log("Loading root .env from:", envPath);
          const envContent = fs.readFileSync(envPath, "utf8");
@@ -55,6 +69,7 @@ const partnerHost = getHostname(partnerUrl);
 const rootDomain = webHost.split(".").slice(-2).join(".");
 
 const nextConfig: NextConfig = {
+   output: "standalone",
    transpilePackages: ["@omnibooking/shared"],
    allowedDevOrigins: [webHost, partnerHost, `*.${rootDomain}`],
    env: {
@@ -69,10 +84,11 @@ const nextConfig: NextConfig = {
       JWT_SECRET: process.env.JWT_SECRET,
    },
    async rewrites() {
+      const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8080";
       return [
          {
             source: "/api/v1/:path*",
-            destination: "http://127.0.0.1:8080/api/v1/:path*",
+            destination: `${backendUrl}/api/v1/:path*`,
          },
       ];
    },

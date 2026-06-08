@@ -1,29 +1,23 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: omnibooking-db
+    container_name: omnibooking-db-prod
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
     image: redis/redis-stack-server:latest
-    container_name: omnibooking-redis
-    ports:
-      - "${REDIS_PORT}:6379"
+    container_name: omnibooking-redis-prod
     volumes:
       - redis_data:/data
 
   kafka:
     image: apache/kafka:latest
-    container_name: omnibooking-kafka
-    ports:
-      - "9092:9092"
+    container_name: omnibooking-kafka-prod
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -39,21 +33,44 @@ services:
 
   kafdrop:
     image: obsidiandynamics/kafdrop:latest
-    container_name: omnibooking-kafdrop
+    container_name: omnibooking-kafdrop-prod
     depends_on:
       - kafka
-    ports:
-      - "9000:9000"
     environment:
       KAFKA_BROKERCONNECT: kafka:29092
       JVM_OPTS: "-Xms32M -Xmx64M"
       SERVER_SERVLET_CONTEXTPATH: "/"
 
+  server:
+    build: ./Server
+    container_name: omnibooking-server-prod
+    env_file:
+      - env/.env.prod
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - KAFKA_SERVERS=kafka:29092
+      - ELASTICSEARCH_URIS=http://elasticsearch:9200
+    depends_on:
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+
   elasticsearch:
     build:
       context: .
       dockerfile: elasticsearch.Dockerfile
-    container_name: omnibooking-elastic
+    container_name: omnibooking-elastic-prod
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -63,8 +80,6 @@ services:
       memlock:
         soft: -1
         hard: -1
-    ports:
-      - "${ES_PORT:-9200}:9200"
     volumes:
       - elastic_data:/usr/share/elasticsearch/data
     healthcheck:
@@ -75,28 +90,67 @@ services:
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.12.0
-    container_name: omnibooking-kibana
+    container_name: omnibooking-kibana-prod
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    ports:
-      - "5601:5601"
     depends_on:
       - elasticsearch
 
+  client-web:
+    build:
+      context: ./Client
+      dockerfile: Dockerfile
+      args:
+        - APP_NAME=web
+    container_name: omnibooking-client-web-prod
+    env_file:
+      - env/.env.prod
+    environment:
+      - NEXT_PUBLIC_API_URL=http://server:8080/api/v1/
+      - BACKEND_URL=http://server:8080
+    depends_on:
+      - server
+
+  client-partner:
+    build:
+      context: ./Client
+      dockerfile: Dockerfile
+      args:
+        - APP_NAME=partner
+    container_name: omnibooking-client-partner-prod
+    env_file:
+      - env/.env.prod
+    environment:
+      - NEXT_PUBLIC_API_URL=http://server:8080/api/v1/
+      - BACKEND_URL=http://server:8080
+    depends_on:
+      - server
+
+  client-owner:
+    build:
+      context: ./Client
+      dockerfile: Dockerfile
+      args:
+        - APP_NAME=owner
+    container_name: omnibooking-client-owner-prod
+    env_file:
+      - env/.env.prod
+    environment:
+      - NEXT_PUBLIC_API_URL=http://server:8080/api/v1/
+      - BACKEND_URL=http://server:8080
+    depends_on:
+      - server
+
   prometheus:
     image: prom/prometheus:latest
-    container_name: omnibooking-prometheus
-    ports:
-      - "9090:9090"
+    container_name: omnibooking-prometheus-prod
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
 
   grafana:
     image: grafana/grafana:latest
-    container_name: omnibooking-grafana
-    ports:
-      - "3001:3000"
+    container_name: omnibooking-grafana-prod
     volumes:
       - grafana_data:/var/lib/grafana
       - ./infra/grafana/provisioning:/etc/grafana/provisioning
@@ -104,6 +158,17 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
     depends_on:
       - prometheus
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: omnibooking-cloudflared-prod
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    restart: unless-stopped
+    depends_on:
+      - client-web
+      - client-partner
+      - client-owner
+      - server
 
 volumes:
   postgres_data:
