@@ -80,6 +80,17 @@ public class Booking extends BaseEntity {
    @Column(name = "special_requests", columnDefinition = "TEXT")
    private String specialRequests;
 
+   @Column(name = "payment_method", length = 50)
+   private String paymentMethod;
+
+   @Builder.Default
+   @Column(name = "deposit_amount", nullable = false, precision = 19, scale = 4)
+   private BigDecimal depositAmount = BigDecimal.ZERO;
+
+   @Builder.Default
+   @Column(name = "requires_deposit", nullable = false)
+   private Boolean requiresDeposit = false;
+
    @OneToMany(mappedBy = "booking")
    private Set<BookingStatusLog> statusLogs;
 

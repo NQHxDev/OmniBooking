@@ -7,8 +7,8 @@ import com.omnibooking.exception.AppException;
 import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
-import com.omnibooking.repository.UserRepository;
-import com.omnibooking.repository.UserProfileRepository;
+import com.omnibooking.repository.user.UserRepository;
+import com.omnibooking.repository.user.UserProfileRepository;
 import com.omnibooking.services.core.EncryptionService;
 import com.omnibooking.services.user.UserProfileService;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +17,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.omnibooking.services.auth.SessionService;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
 @Service
@@ -31,6 +34,10 @@ public class UserProfileServiceImpl implements UserProfileService {
    private final UserRepository userRepository;
 
    private final PasswordEncoder passwordEncoder;
+
+   private final SessionService sessionService;
+
+   private final StringRedisTemplate redisTemplate;
 
    @Override
    public UserProfileResponse getProfile(UUID userId) {
@@ -122,8 +129,25 @@ public class UserProfileServiceImpl implements UserProfileService {
       }
 
       user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+      user.setTokenVersion(user.getTokenVersion() + 1);
       userRepository.save(user);
-      log.info("Password updated successfully for user: {}", userId);
+
+      // Update Redis token version cache
+      try {
+         String versionKey = "user_token_version:" + user.getId();
+         redisTemplate.opsForValue().set(versionKey, String.valueOf(user.getTokenVersion()), 30, TimeUnit.DAYS);
+      } catch (Exception ex) {
+         log.error("Failed to update token version cache in Redis during changePassword: {}", ex.getMessage());
+      }
+
+      // Revoke all active sessions (Refresh tokens and ZSet index)
+      try {
+         sessionService.revokeAllUserSessions(user.getId());
+      } catch (Exception ex) {
+         log.error("Failed to revoke all sessions for user {} after password change: {}", user.getId(), ex.getMessage());
+      }
+
+      log.info("Password updated successfully and all active sessions revoked for user: {}", userId);
    }
 
 }

@@ -50,6 +50,14 @@ public final class ObservabilityConstants {
       public static final String TENANT_ID = "X-Tenant-ID";
    }
 
+   public static final class Spans {
+      private Spans() {
+      }
+
+      public static final String ROOT = "root";
+      public static final String KAFKA_CONSUMER = "kafka-consumer";
+   }
+
    public static final class Kafka {
       private Kafka() {
       }

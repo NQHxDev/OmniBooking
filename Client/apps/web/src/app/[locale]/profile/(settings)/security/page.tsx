@@ -130,7 +130,7 @@ export default function SecurityPage() {
          await securityService.requestOTP();
          setPendingAction({ type: action, data });
          setIsOtpModalOpen(true);
-      } catch (_error) {
+      } catch {
          toast.error("Không thể khởi tạo xác thực bảo mật. Vui lòng thử lại.");
       }
    };

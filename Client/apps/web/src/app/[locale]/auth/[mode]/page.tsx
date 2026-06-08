@@ -180,15 +180,58 @@ export default function AuthPage() {
             const requestId = registerResponse.requestId;
 
             if (requestId) {
-               // Ensure the URL always goes through /api/v1 context path to avoid 404
-               const host = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1/";
-               const baseUrl = host.includes("/api/v1")
-                  ? host.split("/api/v1")[0]
-                  : host.replace(/\/$/, "");
-               const fullSseUrl = `${baseUrl}/api/v1/auth/subscribe/${requestId}`;
+               // Use relative path to EventSource so next proxy rewrite handles it correctly
+               const fullSseUrl = `/api/v1/auth/subscribe/${requestId}`;
 
                const eventSource = new EventSource(fullSseUrl);
                let sseCompleted = false;
+
+               const startPollingFallback = () => {
+                  let attempt = 0;
+                  const backoffIntervals = [3000, 5000, 8000, 13000, 21000];
+
+                  const poll = async () => {
+                     if (sseCompleted) return;
+
+                     try {
+                        const isLastAttempt = attempt >= backoffIntervals.length;
+                        const response = await authService.getRegistrationStatus(
+                           requestId,
+                           isLastAttempt
+                        );
+
+                        if (response.data && response.data.status === "SUCCESS") {
+                           toast.success(t("successRegister"), {
+                              description:
+                                 t("successRegisterDesc") ||
+                                 "Vui lòng kiểm tra email để kích hoạt tài khoản.",
+                              duration: 6000,
+                           });
+                           setLoading(false);
+                           router.push("/auth/login");
+                           return;
+                        } else if (response.data && response.data.status.startsWith("FAILED")) {
+                           setError(te(response.data.message) || te("GEN_999"));
+                           setLoading(false);
+                           return;
+                        }
+                     } catch (err) {
+                        console.error("Polling status check failed:", err);
+                     }
+
+                     if (attempt < backoffIntervals.length) {
+                        const nextDelay = backoffIntervals[attempt];
+                        attempt++;
+                        setTimeout(poll, nextDelay);
+                     } else {
+                        // Polling timeout reached
+                        setError(te("GEN_999"));
+                        setLoading(false);
+                     }
+                  };
+
+                  setTimeout(poll, backoffIntervals[0]);
+               };
 
                eventSource.addEventListener("REGISTRATION_COMPLETE", async (e) => {
                   try {
@@ -231,13 +274,14 @@ export default function AuthPage() {
                });
 
                eventSource.onerror = (err) => {
-                  // Only show error if we haven't successfully completed the registration flow
+                  // Only fall back to polling if we haven't successfully completed the registration flow
                   if (!sseCompleted) {
-                     console.error("SSE Error:", err);
-                     setError(te("GEN_999"));
-                     setLoading(false);
+                     console.error("SSE Error, falling back to polling:", err);
+                     eventSource.close();
+                     startPollingFallback();
+                  } else {
+                     eventSource.close();
                   }
-                  eventSource.close();
                };
             }
          }

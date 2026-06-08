@@ -1,0 +1,178 @@
+[
+   {
+      "name": "Grand Plaza Hotel",
+      "description": "A luxurious hotel in the business district of Hanoi, featuring gold-decorated rooms, a full-service spa, an indoor pool, and international dining options.",
+      "address": "117 Tran Duy Hung, Cau Giay, Hanoi",
+      "city": "Hà Nội",
+      "latitude": 21.0091,
+      "longitude": 105.7984
+   },
+   {
+      "name": "Riverside Luxury Resort",
+      "description": "Set along the picturesque Han River in Da Nang, this resort offers private villas, an infinity pool, upscale dining, and breathtaking city skyline views.",
+      "address": "505 Tran Hung Dao, Son Tra, Da Nang",
+      "city": "Đà Nẵng",
+      "latitude": 16.0601,
+      "longitude": 108.2272
+   },
+   {
+      "name": "Mountain Retreat Homestay",
+      "description": "Nestled in the misty hills of Sapa, this rustic homestay offers stunning terraced rice field views, cozy fireplace rooms, and local cultural experiences.",
+      "address": "Muong Hoa Valley Road, Sapa, Lao Cai",
+      "city": "Sapa",
+      "latitude": 22.3275,
+      "longitude": 103.8569
+   },
+   {
+      "name": "Royal Palace Hotel",
+      "description": "Located in Hanoi's historic Old Quarter, this elegant hotel features classic French colonial design, premium bedding, and a rooftop bar with Hoan Kiem Lake views.",
+      "address": "18 Hang Trong, Hoan Kiem, Hanoi",
+      "city": "Hà Nội",
+      "latitude": 21.0298,
+      "longitude": 105.8502
+   },
+   {
+      "name": "Ocean Breeze Villa",
+      "description": "A stunning beachfront villa in Nha Trang featuring private direct beach access, an outdoor terrace, private swimming pool, and modern seaside design.",
+      "address": "80 Tran Phu, Loc Tho, Nha Trang",
+      "city": "Nha Trang",
+      "latitude": 12.2355,
+      "longitude": 109.1982
+   },
+   {
+      "name": "Golden Sun Hotel",
+      "description": "Centrally located in Ho Chi Minh City near Ben Thanh Market, offering bright contemporary rooms, a fitness center, and a beautiful rooftop pool.",
+      "address": "120 Le Lai, Ben Thanh, District 1, Ho Chi Minh City",
+      "city": "Thành Phố Hồ Chí Minh",
+      "latitude": 10.7712,
+      "longitude": 106.6945
+   },
+   {
+      "name": "Elite Boutique Hotel",
+      "description": "A charming boutique property in Hoi An blending local heritage with modern design, featuring a quiet courtyard pool and wellness spa.",
+      "address": "15 Phan Boi Chau, Cam Chau, Hoi An",
+      "city": "Hội An",
+      "latitude": 15.8785,
+      "longitude": 108.3340
+   },
+   {
+      "name": "Sunrise Garden Resort",
+      "description": "An eco-friendly resort on Phu Quoc Island surrounded by tropical gardens, offering spacious bungalows and private white-sand beach access.",
+      "address": "Bai Truong, Duong To, Phu Quoc",
+      "city": "Phú Quốc",
+      "latitude": 10.1555,
+      "longitude": 103.9620
+   },
+   {
+      "name": "Valley View Lodge",
+      "description": "Perched on a pine-forested hill in Da Lat, this lodge offers panoramic valley views, cozy timber architecture, and private balconies.",
+      "address": "25 Dong Da, Ward 3, Da Lat",
+      "city": "Đà Lạt",
+      "latitude": 11.9288,
+      "longitude": 108.4385
+   },
+   {
+      "name": "Serene Oasis Apartment",
+      "description": "Modern high-rise apartments in Ho Chi Minh City offering city skyline views, fully equipped kitchens, a shared pool, and fitness center.",
+      "address": "208 Nguyen Huu Canh, Binh Thanh, Ho Chi Minh City",
+      "city": "Thành Phố Hồ Chí Minh",
+      "latitude": 10.7915,
+      "longitude": 106.7212
+   },
+   {
+      "name": "Infinity Blue Resort",
+      "description": "A secluded luxury resort in Phu Quoc offering private pool villas, a private white-sand beach, and world-class spa facilities.",
+      "address": "Ganh Dau Beach, Phu Quoc",
+      "city": "Phú Quốc",
+      "latitude": 10.3340,
+      "longitude": 103.8560
+   },
+   {
+      "name": "Imperial Hotel & Spa",
+      "description": "Combining regal heritage with premium spa therapies, this hotel offers traditional royal architecture, central location, and a panoramic sky bar.",
+      "address": "8 Hung Vuong, Minh An, Hoi An",
+      "city": "Hội An",
+      "latitude": 15.8795,
+      "longitude": 108.3290
+   },
+   {
+      "name": "The Heritage Hotel",
+      "description": "A historic colonial property in downtown Hanoi, offering boutique accommodations, a French restaurant, and curated local art galleries.",
+      "address": "80 Ly Thuong Kiet, Hoan Kiem, Hanoi",
+      "city": "Hà Nội",
+      "latitude": 21.0245,
+      "longitude": 105.8452
+   },
+   {
+      "name": "Signature Suite Apartment",
+      "description": "Luxury executive suites in Ho Chi Minh City's District 1, featuring floor-to-ceiling windows, river views, and premium business amenities.",
+      "address": "15 Ton Duc Thang, District 1, Ho Chi Minh City",
+      "city": "Thành Phố Hồ Chí Minh",
+      "latitude": 10.7788,
+      "longitude": 106.7088
+   },
+   {
+      "name": "Green Eco Homestay",
+      "description": "A rustic bamboo-built homestay located in the heart of Sapa's hills, offering organic home-cooked meals and local trekking paths.",
+      "address": "Ta Van Village, Sapa, Lao Cai",
+      "city": "Sapa",
+      "latitude": 22.3022,
+      "longitude": 103.8820
+   },
+   {
+      "name": "Metropolitan Hotel",
+      "description": "Centrally located overlooking Ha Long Bay, this hotel offers comfortable modern rooms, a fitness center, and a scenic sky bar.",
+      "address": "88 Ha Long Road, Bai Chay, Ha Long",
+      "city": "Hạ Long",
+      "latitude": 20.9588,
+      "longitude": 107.0345
+   },
+   {
+      "name": "Prism Luxury Hotel",
+      "description": "A modern architectural marvel near Vung Tau's Back Beach, featuring sleek minimalist rooms, a rooftop pool, and ocean view suites.",
+      "address": "15 Le Hong Phong, Ward 7, Vung Tau",
+      "city": "Vũng Tàu",
+      "latitude": 10.3540,
+      "longitude": 107.0988
+   },
+   {
+      "name": "Vista Del Sol Villa",
+      "description": "A Spanish-themed luxury villa in Nha Trang with a private garden, outdoor dining terrace, private pool, and sweeping ocean views.",
+      "address": "15 Nguyen Dinh Chieu, Ham Tien, Nha Trang",
+      "city": "Nha Trang",
+      "latitude": 12.2212,
+      "longitude": 109.2155
+   },
+   {
+      "name": "Central Park Hotel",
+      "description": "Located next to Ho Chi Minh City's botanical gardens, this hotel features spacious executive rooms, a swimming pool, and conference facilities.",
+      "address": "2A Le Duan, District 1, Ho Chi Minh City",
+      "city": "Thành Phố Hồ Chí Minh",
+      "latitude": 10.7825,
+      "longitude": 106.7012
+   },
+   {
+      "name": "The Classic Boutique",
+      "description": "Exuding old-world charm, this Hoi An boutique hotel features private balconies, colonial architecture, and custom tailoring services.",
+      "address": "200 Tran Hung Dao, Hoi An",
+      "city": "Hội An",
+      "latitude": 15.8790,
+      "longitude": 108.3255
+   },
+   {
+      "name": "Splendid Star Hotel",
+      "description": "A boutique hotel located in a quiet alley next to Hoan Kiem Lake, offering cozy accommodations and personalized local tour services.",
+      "address": "28 Hang Hanh, Hoan Kiem, Hanoi",
+      "city": "Hà Nội",
+      "latitude": 21.0312,
+      "longitude": 105.8495
+   },
+   {
+      "name": "Dreamy Woods Chalet",
+      "description": "A secluded wooden chalet surrounded by Da Lat's mist-covered pine trees, featuring an outdoor campfire pit and wrap-around deck.",
+      "address": "Pine Forest Road, Ward 11, Da Lat",
+      "city": "Đà Lạt",
+      "latitude": 11.9485,
+      "longitude": 108.4820
+   }
+]

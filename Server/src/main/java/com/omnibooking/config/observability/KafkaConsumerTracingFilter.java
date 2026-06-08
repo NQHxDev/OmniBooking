@@ -3,8 +3,13 @@ package com.omnibooking.config.observability;
 import com.omnibooking.constant.ObservabilityConstants;
 import com.omnibooking.constant.ObservabilityConstants.Headers;
 import com.omnibooking.constant.ObservabilityConstants.MdcKeys;
+import com.omnibooking.constant.ObservabilityConstants.Spans;
 import com.omnibooking.context.RequestContext;
 import com.omnibooking.context.RequestContextHolder;
+
+import io.sentry.Sentry;
+import io.sentry.protocol.User;
+
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
@@ -18,7 +23,8 @@ import java.nio.charset.StandardCharsets;
 public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Object> {
 
    @Override
-   public ConsumerRecord<String, Object> intercept(ConsumerRecord<String, Object> record, Consumer<String, Object> consumer) {
+   public ConsumerRecord<String, Object> intercept(ConsumerRecord<String, Object> record,
+         Consumer<String, Object> consumer) {
       String requestId = getHeaderValue(record, Headers.REQUEST_ID);
       String correlationId = getHeaderValue(record, Headers.CORRELATION_ID);
       String traceId = getHeaderValue(record, Headers.SENTRY_TRACE);
@@ -52,7 +58,7 @@ public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Obj
       MDC.put(MdcKeys.REQUEST_ID, requestId);
       MDC.put(MdcKeys.CORRELATION_ID, correlationId);
       MDC.put(MdcKeys.TRACE_ID, traceId);
-      MDC.put(MdcKeys.SPAN_ID, "kafka-consumer");
+      MDC.put(MdcKeys.SPAN_ID, Spans.KAFKA_CONSUMER);
       MDC.put(MdcKeys.USER_ID, userId != null ? userId : "anonymous");
       MDC.put(MdcKeys.TENANT_ID, tenantId != null ? tenantId : "default");
       MDC.put(MdcKeys.ENVIRONMENT, environment);
@@ -66,7 +72,7 @@ public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Obj
       final String finalCorrelationId = correlationId;
       final String finalTenantId = tenantId;
       final String finalModule = module;
-      io.sentry.Sentry.configureScope(scope -> {
+      Sentry.configureScope(scope -> {
          scope.setTag(MdcKeys.REQUEST_ID, finalRequestId);
          scope.setTag(MdcKeys.CORRELATION_ID, finalCorrelationId);
          scope.setTag(MdcKeys.MODULE, finalModule);
@@ -74,7 +80,7 @@ public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Obj
             scope.setTag(MdcKeys.TENANT_ID, finalTenantId);
          }
          if (finalUserId != null) {
-            io.sentry.protocol.User sentryUser = new io.sentry.protocol.User();
+            User sentryUser = new User();
             sentryUser.setId(finalUserId);
             scope.setUser(sentryUser);
          }
@@ -84,7 +90,7 @@ public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Obj
       RequestContext context = RequestContext.builder()
             .requestId(requestId)
             .traceId(traceId)
-            .spanId("kafka-consumer")
+            .spanId(Spans.KAFKA_CONSUMER)
             .correlationId(correlationId)
             .userId(userId)
             .tenantId(tenantId)
@@ -108,4 +114,5 @@ public class KafkaConsumerTracingFilter implements RecordInterceptor<String, Obj
       Header header = record.headers().lastHeader(headerName);
       return header != null ? new String(header.value(), StandardCharsets.UTF_8) : null;
    }
+
 }

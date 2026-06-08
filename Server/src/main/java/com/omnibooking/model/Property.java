@@ -96,4 +96,16 @@ public class Property extends BaseEntity {
    @Column(name = "legal_owner_name", length = 255)
    private String legalOwnerName;
 
+   @Builder.Default
+   @Column(name = "average_rating", precision = 4, scale = 2)
+   private BigDecimal averageRating = BigDecimal.ZERO;
+
+   @Builder.Default
+   @Column(name = "review_count")
+   private Integer reviewCount = 0;
+
+   @Builder.Default
+   @Column(name = "rating_sum")
+   private Long ratingSum = 0L;
+
 }

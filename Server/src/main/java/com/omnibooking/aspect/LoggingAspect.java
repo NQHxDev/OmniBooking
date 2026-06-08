@@ -7,10 +7,19 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import com.omnibooking.config.observability.ModuleTagResolver;
 import com.omnibooking.exception.AppException;
+
+import io.sentry.Sentry;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Arrays;
 
@@ -20,6 +29,7 @@ import java.util.Arrays;
 public class LoggingAspect {
 
    private static final Logger requestSuccessLogger = LoggerFactory.getLogger("com.omnibooking.request.success");
+
    private static final Logger requestErrorLogger = LoggerFactory.getLogger("com.omnibooking.request.error");
 
    @Pointcut("within(com.omnibooking.controller..*)")
@@ -46,8 +56,8 @@ public class LoggingAspect {
       } catch (Throwable e) {
          long duration = System.currentTimeMillis() - start;
 
-         String module = com.omnibooking.config.observability.ModuleTagResolver.resolveModule(className);
-         org.slf4j.MDC.put("module", module);
+         String module = ModuleTagResolver.resolveModule(className);
+         MDC.put("module", module);
 
          if (e instanceof AppException ||
                e instanceof MethodArgumentNotValidException ||
@@ -59,15 +69,13 @@ public class LoggingAspect {
                   duration, className, methodName, e.getClass().getSimpleName(), e.getMessage());
 
             // Set tag module and capture to Sentry
-            io.sentry.Sentry.setTag("module", module);
-            io.sentry.Sentry.captureException(e);
+            Sentry.setTag("module", module);
+            Sentry.captureException(e);
 
             // Set flag to prevent duplicate capture in GlobalExceptionHandler
-            org.springframework.web.context.request.RequestAttributes attrs =
-                  org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
-            if (attrs instanceof org.springframework.web.context.request.ServletRequestAttributes) {
-               jakarta.servlet.http.HttpServletRequest request =
-                     ((org.springframework.web.context.request.ServletRequestAttributes) attrs).getRequest();
+            RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+            if (attrs instanceof ServletRequestAttributes) {
+               HttpServletRequest request = ((ServletRequestAttributes) attrs).getRequest();
                request.setAttribute("sentry_captured", Boolean.TRUE);
             }
          }
@@ -75,5 +83,5 @@ public class LoggingAspect {
          throw e;
       }
    }
-}
 
+}

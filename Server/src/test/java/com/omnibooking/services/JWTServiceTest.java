@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.omnibooking.constant.SecurityConstants;
 import com.omnibooking.services.auth.JWTService;
 
 import java.util.ArrayList;
@@ -36,7 +37,7 @@ class JWTServiceTest {
       // Arrange
       UUID userId = UUID.randomUUID();
       UUID sessionId = UUID.randomUUID();
-      List<String> roles = List.of("ROLE_USER", "ROLE_PARTNER");
+      List<String> roles = List.of(SecurityConstants.Roles.USER, SecurityConstants.Roles.PARTNER);
       String fingerprintHash = "sample_hash";
 
       // Act
@@ -61,7 +62,8 @@ class JWTServiceTest {
             }
          }
       }
-      assertThat(extractedRoles).containsExactlyInAnyOrder("ROLE_USER", "ROLE_PARTNER");
+      assertThat(extractedRoles).containsExactlyInAnyOrder(SecurityConstants.Roles.USER,
+            SecurityConstants.Roles.PARTNER);
    }
 
    @Test
@@ -93,7 +95,7 @@ class JWTServiceTest {
       // Arrange
       UUID userId = UUID.randomUUID();
       UUID sessionId = UUID.randomUUID();
-      List<String> roles = List.of("ROLE_USER");
+      List<String> roles = List.of(SecurityConstants.Roles.USER);
       String fingerprintHash = "sample_hash";
       Integer tokenVersion = 3;
 
@@ -104,4 +106,5 @@ class JWTServiceTest {
       assertThat(token).isNotBlank();
       assertThat(jwtService.extractTokenVersion(token)).isEqualTo(tokenVersion);
    }
+
 }

@@ -126,20 +126,27 @@ export async function proxy(request: NextRequest) {
       ? segments[1]
       : routing.defaultLocale;
 
+   const getLocalePrefix = (loc: string) => (loc === routing.defaultLocale ? "" : `/${loc}`);
+
    const refreshedCookies: ParsedCookie[] = [];
    let isRefreshSuccess = false;
 
    // Nếu access token (accessToken) đã hết hạn hoặc không tồn tại, nhưng có refresh token
    if ((!accessToken || isTokenExpired(accessToken)) && refreshToken) {
       try {
-         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8080/api/v1/";
-         const refreshUrl = apiUrl.endsWith("/api/v1/")
-            ? `${apiUrl}auth/refresh`
-            : `${apiUrl.replace(/\/$/, "")}/api/v1/auth/refresh`;
+         const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8080";
+         const cleanBackend = backendUrl.replace(/\/$/, "");
+         const refreshUrl = cleanBackend.endsWith("/api/v1")
+            ? `${cleanBackend}/auth/refresh`
+            : `${cleanBackend}/api/v1/auth/refresh`;
 
+         const userAgent = request.headers.get("user-agent");
          const headers: Record<string, string> = {
             "Content-Type": "application/json",
          };
+         if (userAgent) {
+            headers["User-Agent"] = userAgent;
+         }
          const cookiesToSend: string[] = [];
          if (sessionId) cookiesToSend.push(`session_id=${sessionId}`);
          if (refreshToken) cookiesToSend.push(`refresh_token=${refreshToken}`);
@@ -177,7 +184,7 @@ export async function proxy(request: NextRequest) {
          } else {
             // Refresh thất bại (ví dụ refresh token cũng hết hạn) -> Xóa cookie và đẩy về trang đăng nhập
             const browserUrl = getBrowserUrl(request);
-            const loginUrl = new URL(`/${locale}/auth/login`, browserUrl);
+            const loginUrl = new URL(`${getLocalePrefix(locale)}/auth/login`, browserUrl);
             loginUrl.searchParams.set("callbackUrl", pathname);
             const response = NextResponse.redirect(loginUrl);
             response.cookies.delete("access_token");
@@ -217,7 +224,7 @@ export async function proxy(request: NextRequest) {
    const hasSession = !!(sessionId || refreshToken);
 
    // GUEST GUARD: Nếu đã đăng nhập thì không cho vào trang đăng nhập/đăng ký
-   const isAuthPage = /^\/([a-z]{2})\/auth\/(?!verify)/.test(pathname);
+   const isAuthPage = /^\/(?:[a-z]{2}\/)?auth\/(?!verify)/.test(pathname);
    if (isAuthPage && hasSession) {
       const browserUrl = getBrowserUrl(request);
       const browserHost =
@@ -225,7 +232,7 @@ export async function proxy(request: NextRequest) {
       const rootDomain = getRootDomain(browserHost);
       const callbackUrl = request.nextUrl.searchParams.get("callbackUrl");
 
-      let targetUrl = `/${locale}`;
+      let targetUrl = getLocalePrefix(locale) || "/";
       if (callbackUrl && isValidCallbackUrl(callbackUrl, rootDomain)) {
          targetUrl = callbackUrl;
       }
@@ -245,7 +252,7 @@ export async function proxy(request: NextRequest) {
 
    if (isProtected && !hasSession) {
       const browserUrl = getBrowserUrl(request);
-      const loginUrl = new URL(`/${locale}/auth/login`, browserUrl);
+      const loginUrl = new URL(`${getLocalePrefix(locale)}/auth/login`, browserUrl);
       loginUrl.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(loginUrl);
    }

@@ -1,6 +1,11 @@
 package com.omnibooking.worker;
 
 import com.omnibooking.services.core.CurrencyService;
+
+import io.sentry.CheckIn;
+import io.sentry.CheckInStatus;
+import io.sentry.Sentry;
+import io.sentry.protocol.SentryId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,22 +25,19 @@ public class CurrencyWorker {
    public void updateExchangeRates() {
       log.info("Starting scheduled exchange rate update...");
 
-      io.sentry.protocol.SentryId checkInId = io.sentry.Sentry.captureCheckIn(
-            new io.sentry.CheckIn("currency-worker", io.sentry.CheckInStatus.IN_PROGRESS)
-      );
+      SentryId checkInId = Sentry.captureCheckIn(
+            new CheckIn("currency-worker", CheckInStatus.IN_PROGRESS));
 
       try {
          currencyService.updateRates();
          log.info("Exchange rate update completed!");
-         io.sentry.Sentry.captureCheckIn(
-               new io.sentry.CheckIn(checkInId, "currency-worker", io.sentry.CheckInStatus.OK)
-         );
+         Sentry.captureCheckIn(
+               new CheckIn(checkInId, "currency-worker", CheckInStatus.OK));
       } catch (Exception e) {
          log.error("Failed to update exchange rates in CurrencyWorker", e);
-         io.sentry.Sentry.captureCheckIn(
-               new io.sentry.CheckIn(checkInId, "currency-worker", io.sentry.CheckInStatus.ERROR)
-         );
+         Sentry.captureCheckIn(
+               new CheckIn(checkInId, "currency-worker", CheckInStatus.ERROR));
       }
    }
-}
 
+}

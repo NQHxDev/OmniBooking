@@ -7,12 +7,13 @@ import io.micrometer.core.instrument.Timer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
+import io.micrometer.core.instrument.binder.MeterBinder;
 
 @Configuration
 public class MetricsConfig {
 
    @Bean
-   public io.micrometer.core.instrument.binder.MeterBinder outboxQueueSizeBinder(JdbcTemplate jdbcTemplate) {
+   public MeterBinder outboxQueueSizeBinder(JdbcTemplate jdbcTemplate) {
       return registry -> Gauge.builder("omnibooking.outbox.queue.size", () -> {
          try {
             return jdbcTemplate.queryForObject(
@@ -21,12 +22,12 @@ public class MetricsConfig {
             return 0;
          }
       })
-      .description("Number of pending events in transactional outbox")
-      .register(registry);
+            .description("Number of pending events in transactional outbox")
+            .register(registry);
    }
 
    @Bean
-   public io.micrometer.core.instrument.binder.MeterBinder outboxPendingCountBinder(JdbcTemplate jdbcTemplate) {
+   public MeterBinder outboxPendingCountBinder(JdbcTemplate jdbcTemplate) {
       return registry -> Gauge.builder("omnibooking.outbox.pending.count", () -> {
          try {
             return jdbcTemplate.queryForObject(
@@ -35,12 +36,12 @@ public class MetricsConfig {
             return 0;
          }
       })
-      .description("Number of pending events in transactional outbox")
-      .register(registry);
+            .description("Number of pending events in transactional outbox")
+            .register(registry);
    }
 
    @Bean
-   public io.micrometer.core.instrument.binder.MeterBinder outboxProcessingCountBinder(JdbcTemplate jdbcTemplate) {
+   public MeterBinder outboxProcessingCountBinder(JdbcTemplate jdbcTemplate) {
       return registry -> Gauge.builder("omnibooking.outbox.processing.count", () -> {
          try {
             return jdbcTemplate.queryForObject(
@@ -49,12 +50,12 @@ public class MetricsConfig {
             return 0;
          }
       })
-      .description("Number of processing events in transactional outbox")
-      .register(registry);
+            .description("Number of processing events in transactional outbox")
+            .register(registry);
    }
 
    @Bean
-   public io.micrometer.core.instrument.binder.MeterBinder outboxDeadCountBinder(JdbcTemplate jdbcTemplate) {
+   public MeterBinder outboxDeadCountBinder(JdbcTemplate jdbcTemplate) {
       return registry -> Gauge.builder("omnibooking.outbox.dead.count", () -> {
          try {
             return jdbcTemplate.queryForObject(
@@ -63,12 +64,12 @@ public class MetricsConfig {
             return 0;
          }
       })
-      .description("Number of dead/failed events in transactional outbox")
-      .register(registry);
+            .description("Number of dead/failed events in transactional outbox")
+            .register(registry);
    }
 
    @Bean
-   public io.micrometer.core.instrument.binder.MeterBinder outboxRetryCountBinder(JdbcTemplate jdbcTemplate) {
+   public MeterBinder outboxRetryCountBinder(JdbcTemplate jdbcTemplate) {
       return registry -> Gauge.builder("omnibooking.outbox.retry.count", () -> {
          try {
             return jdbcTemplate.queryForObject(
@@ -77,8 +78,8 @@ public class MetricsConfig {
             return 0;
          }
       })
-      .description("Total retry attempts across all events in transactional outbox")
-      .register(registry);
+            .description("Total retry attempts across all events in transactional outbox")
+            .register(registry);
    }
 
    @Bean
@@ -116,4 +117,5 @@ public class MetricsConfig {
             .description("Total number of skipped Kafka events due to idempotency")
             .register(registry);
    }
+
 }

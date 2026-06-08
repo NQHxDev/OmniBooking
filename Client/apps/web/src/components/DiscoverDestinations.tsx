@@ -16,10 +16,10 @@ export default async function DiscoverDestinations({
 
    try {
       destinations = await destinationService.getTrending(locale, clientIp);
-      // Filter out "Hạ Long" (ID: 12) to avoid duplication with Quảng Ninh
       destinations = destinations.filter(
          (dest) => dest.id !== "12" && dest.name !== "Hạ Long" && dest.name !== "Ha Long"
       );
+      destinations = destinations.slice(0, 13);
    } catch (error) {
       console.error("Failed to fetch trending destinations", error);
    }

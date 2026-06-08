@@ -7,6 +7,7 @@ import com.omnibooking.model.RoomType;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
+import org.mapstruct.Builder;
 import org.springframework.data.elasticsearch.core.geo.GeoPoint;
 
 import java.math.BigDecimal;
@@ -14,14 +15,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", builder = @Builder(disableBuilder = true))
 public interface PropertyDocumentMapper {
 
    @Mapping(target = "location", source = "property", qualifiedByName = "mapToGeoPoint")
    @Mapping(target = "amenities", source = "amenities", qualifiedByName = "mapAmenities")
    @Mapping(target = "minPrice", source = "roomTypes", qualifiedByName = "mapMinPrice")
-   @Mapping(target = "averageRating", constant = "0.0")
-   @Mapping(target = "reviewCount", constant = "0")
+   @Mapping(target = "averageRating", source = "averageRating")
+   @Mapping(target = "reviewCount", source = "reviewCount")
    @Mapping(target = "mainImageUrl", ignore = true) // Will be handled in service
    PropertyDocument toDocument(Property property);
 

@@ -141,7 +141,7 @@ export default function DiscoverDestinationsCarousel({
          {/* Horizontal Scroller Container */}
          <div
             ref={scrollerRef}
-            className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y scroll-smooth snap-x snap-mandatory scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pt-4 pb-2"
+            className="flex gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-y scroll-smooth snap-x snap-mandatory no-scrollbar pt-4 pb-2"
          >
             {destinations.map((dest, idx) => {
                const imageUrl = getDestinationImageUrl(dest.name, dest.imageUrl);

@@ -22,6 +22,7 @@ import java.net.InetAddress;
 public class GeoLocationServiceImpl implements GeoLocationService {
 
    private final AppProperties appProperties;
+
    private DatabaseReader databaseReader;
 
    @PostConstruct
@@ -74,4 +75,5 @@ public class GeoLocationServiceImpl implements GeoLocationService {
          }
       }
    }
+
 }

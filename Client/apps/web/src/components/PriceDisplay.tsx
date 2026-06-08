@@ -57,7 +57,11 @@ export default function PriceDisplay({ amount, className = "", size = "md" }: Pr
       );
    }
 
-   const formatter = new Intl.NumberFormat(locale === "vi" ? "vi-VN" : "en-US", {
+   const localeMap: Record<string, string> = {
+      vi: "vi-VN",
+      en: "en-US",
+   };
+   const formatter = new Intl.NumberFormat(localeMap[locale] || locale, {
       style: "currency",
       currency: targetCurrency,
       minimumFractionDigits: 2,

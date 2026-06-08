@@ -1,10 +1,11 @@
 package com.omnibooking.controller;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.services.communication.MailService;
 import com.omnibooking.services.core.OutboxService;
-import com.omnibooking.repository.UserProfileRepository;
+import com.omnibooking.repository.user.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -23,6 +24,7 @@ import com.omnibooking.services.partner.PartnerService;
 import com.omnibooking.dto.PartnerStatsResponse;
 import com.omnibooking.dto.PartnerBookingResponse;
 import com.omnibooking.dto.AuthResponse;
+import com.omnibooking.util.CookieUtils;
 import com.omnibooking.util.OtpUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -111,7 +113,7 @@ public class PartnerController {
       outboxService.saveEvent(
             userId,
             "PARTNER",
-            "PARTNER_OTP_SEND",
+            EventConstants.PARTNER_OTP_SEND,
             emailEvent);
 
       log.info("Partner OTP recorded in outbox for email: {} (RequestId: {})", email, requestId);
@@ -132,7 +134,7 @@ public class PartnerController {
       String redisKey = "otp:partner:" + userId;
       String storedCode = redisTemplate.opsForValue().get(redisKey);
 
-      if (storedCode == null || !storedCode.equals(code)) {
+      if (storedCode == null || !storedCode.trim().equalsIgnoreCase(code.trim())) {
          return ResponseEntity.badRequest()
                .body(ApiResponse.error("Mã xác thực không chính xác hoặc đã hết hạn", "INVALID_OTP", null, requestId));
       }
@@ -148,7 +150,7 @@ public class PartnerController {
    @PostMapping("/complete")
    public ResponseEntity<ApiResponse<AuthResponse>> completeRegistration(
          @AuthenticationPrincipal UserPrincipal principal,
-         @CookieValue(name = "session_id", required = false) String sessionId,
+         @CookieValue(name = CookieUtils.SESSION_ID, required = false) String sessionId,
          HttpServletRequest request,
          HttpServletResponse response) {
 
@@ -171,7 +173,7 @@ public class PartnerController {
          }
       }
 
-      AuthResponse authResponse = authService.upgradeToPartner(principal.getId(), ip, userAgent, response, rememberMe);
+      AuthResponse authResponse = authService.upgradeToPartner(principal.getId(), ip, userAgent, response, rememberMe, sessionId);
 
       log.info("User {} upgraded to partner (RequestId: {})", principal.getId(), requestId);
 

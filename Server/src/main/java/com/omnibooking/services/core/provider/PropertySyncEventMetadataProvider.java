@@ -32,6 +32,7 @@ public class PropertySyncEventMetadataProvider implements EventMetadataProvider 
          metadata.put("propertyId", event.getPropertyId() != null ? event.getPropertyId().toString() : "");
          metadata.put("operation", event.getOperation() != null ? event.getOperation() : "");
       }
+
       return metadata;
    }
 

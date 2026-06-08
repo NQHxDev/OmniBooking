@@ -32,6 +32,7 @@ public class MediaUploadEventMetadataProvider implements EventMetadataProvider {
          metadata.put("correlationId", event.getCorrelationId() != null ? event.getCorrelationId() : "");
          metadata.put("entityId", event.getEntityId() != null ? event.getEntityId() : "");
       }
+
       return metadata;
    }
 

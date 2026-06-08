@@ -43,6 +43,8 @@ public class ResendEmailService {
 
    public void sendEmailFallback(String to, String subject, String htmlContent, Throwable t) {
       log.error("[Fallback] Resilience4j triggered for email to {}. Reason: {}", to, t.getMessage());
-      // Here you could save the email to a 'failed_emails' table for later manual retry
+      // Here you could save the email to a 'failed_emails' table for later manual
+      // retry
    }
+
 }

@@ -1,7 +1,8 @@
 package com.omnibooking.services.property.impl;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.model.Property;
-import com.omnibooking.repository.PropertyRepository;
+import com.omnibooking.repository.property.PropertyRepository;
 import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
 import com.omnibooking.dto.event.PropertySyncEvent;
 import com.omnibooking.services.core.OutboxService;
@@ -19,7 +20,9 @@ import java.util.List;
 public class SearchReconciliationServiceImpl implements SearchReconciliationService {
 
    private final PropertyRepository propertyRepository;
+
    private final PropertyElasticsearchRepository propertyElasticsearchRepository;
+
    private final OutboxService outboxService;
 
    @Override
@@ -44,12 +47,11 @@ public class SearchReconciliationServiceImpl implements SearchReconciliationServ
             outboxService.saveEvent(
                   property.getId(),
                   "PROPERTY",
-                  "PROPERTY_SYNC",
+                  EventConstants.PROPERTY_SYNC,
                   PropertySyncEvent.builder()
                         .propertyId(property.getId())
                         .operation("CREATE")
-                        .build()
-            );
+                        .build());
             driftCount++;
          }
       }

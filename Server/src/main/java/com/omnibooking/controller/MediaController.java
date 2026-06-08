@@ -3,6 +3,7 @@ package com.omnibooking.controller;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.event.MediaUploadEvent;
 import com.omnibooking.services.media.MediaProducer;
+import com.omnibooking.constant.MediaConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +43,7 @@ public class MediaController {
       MediaUploadEvent event = MediaUploadEvent.builder()
             .correlationId(correlationId)
             .fileBytes(file.getBytes())
-            .folder("properties/" + entityId)
+            .folder(MediaConstants.getPropertyFolder(entityId))
             .fileName(file.getOriginalFilename())
             .entityId(entityId)
             .entityType(entityType)
@@ -51,7 +52,7 @@ public class MediaController {
 
       mediaProducer.sendUploadEvent(event);
 
-      return ApiResponse.success("Media upload started. Processing in background with ID: " + correlationId);
+      return ApiResponse.success("Media upload started! Processing in background with ID: " + correlationId);
    }
 
 }

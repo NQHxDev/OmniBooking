@@ -2,6 +2,12 @@ package com.omnibooking.config;
 
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -112,9 +118,42 @@ public class AppProperties {
       private String encryptionSecret;
       @NotBlank
       private String hashPepper;
+      private String activeKeyId;
+      private Map<String, String> keys = new HashMap<>();
       private boolean twoFactorEnabled = true;
+      private String credentialEncryptionKeyVersion = "aes-v1";
+      private String auditSecret = "defaultAuditSecretKeyForSignatureVerification";
+      private String activeFingerprintPepperVersion = "v1";
+      private Map<String, String> fingerprintPeppers = new HashMap<>();
+      private long refreshGracePeriodMs = 15000;
+      private boolean allowLegacyFingerprint = true;
+      private boolean enableFingerprintVersioning = true;
+      private boolean enableCsrfRotation = true;
+      private boolean enableRefreshReplayDetection = true;
       private boolean cookieSecure;
       private String cookieDomain;
+      private String csrfSecret;
+      private List<String> trustedHosts = new ArrayList<>();
+      private List<String> csrfBypassPatterns = Arrays.asList(
+            "/auth/login", "/auth/login/**",
+            "/**/auth/login", "/**/auth/login/**",
+            "/auth/register", "/auth/register/**",
+            "/**/auth/register", "/**/auth/register/**",
+            "/auth/refresh", "/auth/refresh/**",
+            "/**/auth/refresh", "/**/auth/refresh/**",
+            "/auth/logout", "/auth/logout/**",
+            "/**/auth/logout", "/**/auth/logout/**",
+            "/auth/2fa/login", "/auth/2fa/login/**",
+            "/**/auth/2fa/login", "/**/auth/2fa/login/**",
+            "/auth/forgot-password", "/auth/forgot-password/**",
+            "/**/auth/forgot-password", "/**/auth/forgot-password/**",
+            "/auth/reset-password", "/auth/reset-password/**",
+            "/**/auth/reset-password", "/**/auth/reset-password/**",
+            "/auth/activate-guest", "/auth/activate-guest/**",
+            "/**/auth/activate-guest", "/**/auth/activate-guest/**",
+            "/auth/finalize-registration", "/auth/finalize-registration/**",
+            "/**/auth/finalize-registration", "/**/auth/finalize-registration/**",
+            "/payments/*/callback", "/**/payments/*/callback");
    }
 
    @Data

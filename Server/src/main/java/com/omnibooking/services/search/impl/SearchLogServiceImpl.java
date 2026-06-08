@@ -1,7 +1,7 @@
 package com.omnibooking.services.search.impl;
 
 import com.omnibooking.model.SearchLog;
-import com.omnibooking.repository.SearchLogRepository;
+import com.omnibooking.repository.infra.SearchLogRepository;
 import com.omnibooking.services.search.SearchLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,4 +48,5 @@ public class SearchLogServiceImpl implements SearchLogService {
          log.error("Failed to log search query: {}", query, e);
       }
    }
+
 }

@@ -1,5 +1,6 @@
 import apiClient from "@/lib/api/apiClient";
 import { ApiResponse } from "@/lib/api/services/authService";
+import { PageResponse, ReviewResponse } from "@omnibooking/shared";
 
 export interface PropertyResponse {
    id: string;
@@ -22,6 +23,7 @@ export interface RoomTypeResponse {
    totalRooms: number;
    roomSizeSqm?: number;
    bedType?: string;
+   currentPrice?: number;
 }
 
 export interface PropertyDetailResponse {
@@ -39,6 +41,8 @@ export interface PropertyDetailResponse {
    imageUrls?: string[];
    amenities?: string[];
    roomTypes?: RoomTypeResponse[];
+   averageRating?: number;
+   reviewCount?: number;
 }
 
 export const propertyService = {
@@ -65,6 +69,38 @@ export const propertyService = {
       } catch (error) {
          console.error("Failed to fetch property detail", error);
          return null;
+      }
+   },
+
+   getPropertyReviews: async (
+      propertyId: string,
+      page = 0,
+      size = 10
+   ): Promise<PageResponse<ReviewResponse>> => {
+      try {
+         const response = await apiClient.get<unknown, ApiResponse<PageResponse<ReviewResponse>>>(
+            `/reviews/properties/${propertyId}?page=${page}&size=${size}`
+         );
+         return (
+            response.data || {
+               items: [],
+               currentPage: 0,
+               totalPages: 0,
+               totalElements: 0,
+               hasNext: false,
+               hasPrevious: false,
+            }
+         );
+      } catch (error) {
+         console.error("Failed to fetch property reviews", error);
+         return {
+            items: [],
+            currentPage: 0,
+            totalPages: 0,
+            totalElements: 0,
+            hasNext: false,
+            hasPrevious: false,
+         };
       }
    },
 };

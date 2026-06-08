@@ -8,7 +8,11 @@ import com.omnibooking.services.auth.OAuth2ProviderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -22,12 +26,17 @@ import java.util.concurrent.TimeUnit;
 public class GoogleOAuth2ServiceImpl implements OAuth2ProviderService {
 
    private final AppProperties appProperties;
+
    private final RestTemplate restTemplate;
+
    private final StringRedisTemplate redisTemplate;
 
    private static final String GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
+
    private static final String GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+
    private static final String GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo";
+
    private static final String STATE_PREFIX = "oauth2:state:";
 
    @Override
@@ -106,4 +115,5 @@ public class GoogleOAuth2ServiceImpl implements OAuth2ProviderService {
 
       return response.getBody();
    }
+
 }

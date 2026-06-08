@@ -6,8 +6,10 @@ import com.omnibooking.services.core.EventUpcasterStrategy;
 import org.springframework.stereotype.Component;
 
 /**
- * Migration strategy to upgrade USER_REGISTERED_MAIL events from version 1 to 2.
- * Renames 'content' field to 'htmlContent' and adds a default 'tenantId' if missing.
+ * Migration strategy to upgrade USER_REGISTERED_MAIL events from version 1 to
+ * 2.
+ * Renames 'content' field to 'htmlContent' and adds a default 'tenantId' if
+ * missing.
  */
 @Component
 public class UserRegisteredMailV1ToV2Strategy implements EventUpcasterStrategy {
@@ -27,6 +29,7 @@ public class UserRegisteredMailV1ToV2Strategy implements EventUpcasterStrategy {
             objectNode.put("tenantId", "default");
          }
       }
+
       return payload;
    }
 

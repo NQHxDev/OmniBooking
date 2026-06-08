@@ -95,21 +95,92 @@ Sự kết hợp giữa `LoggingAspect` và `GlobalExceptionHandler` được đ
 
 ## 4. Operational Monitoring Stack (Prometheus & Grafana)
 
-Dữ liệu vận hành hạ tầng (Metrics) được scrape chủ động theo mô hình Pull:
+Dữ liệu vận hành hạ tầng và ứng dụng (Metrics) được scrape chủ động theo mô hình Pull:
 
 - **Actuator Endpoint**: `/api/v1/actuator/prometheus` public access cho Docker network.
 - **Scrape Interval**: Prometheus kéo dữ liệu mỗi **15 giây**.
 - **Hạ Tầng Tích Hợp**:
    - **Prometheus**: Lấy metrics từ Spring Boot và lưu trữ.
-   - **Grafana**: Tích hợp sẵn Prometheus làm default datasource, sẵn sàng cung cấp các dashboards:
-      - `jvm-metrics.json`: Giám sát bộ nhớ Heap, non-Heap, trạng thái Garbage Collection, CPU, Thread pool.
-      - `api-metrics.json`: Giám sát Request rate (RPS), Error rate, Latency percentiles.
-      - `hikari-metrics.json`: Theo dõi kết nối rảnh/bận trong Hikari Connection Pool.
-      - `kafka-metrics.json`: Theo dõi consumer lag, throughput và kích thước hàng đợi DLQ.
+   - **Grafana**: Tích hợp sẵn Prometheus làm default datasource.
+
+### A. Danh sách Metrics Vận hành Luồng Đăng ký & Bảo mật (Issue #26)
+
+Hệ thống cung cấp các counters đo lường qua Micrometer phục vụ giám sát thời gian thực:
+
+| Tên Metric (Prometheus Counter)          | Mô tả / Ý nghĩa                                                                           |
+| :--------------------------------------- | :---------------------------------------------------------------------------------------- |
+| `registration_success_total`             | Tổng số đăng ký thành công qua luồng bất đồng bộ (sau khi lưu DB thành công).             |
+| `registration_failed_total`              | Tổng số đăng ký thất bại (lỗi logic trùng email, hoặc lỗi nghiêm trọng FAILED_PERMANENT). |
+| `registration_sse_success_total`         | Số kết nối SSE đăng ký được hoàn thành và gửi payload thành công tới client.              |
+| `registration_polling_fallback_total`    | Số lần client Next.js phải chuyển từ SSE sang cơ chế Polling dự phòng.                    |
+| `registration_polling_success_total`     | Số lần Polling trạng thái đăng ký thành công (status = SUCCESS).                          |
+| `registration_polling_timeout_total`     | Số lần client Polling quá thời gian chờ (hết 5 lần thử backoff và timeout).               |
+| `csrf_rejected_total`                    | Tổng số request bị bộ lọc `CustomCsrfFilter` chặn lại do vi phạm CSRF.                    |
+| `csrf_origin_invalid_total`              | Số lần request bị chặn do Origin/Referer không hợp lệ hoặc không thuộc `trusted-hosts`.   |
+| `csrf_token_invalid_total`               | Số lần request bị chặn do Token CSRF bị sai lệch hoặc không trùng khớp với Session.       |
+| `registration_status_rate_limited_total` | Số lần API kiểm tra trạng thái `/registration-status/{requestId}` bị rate limit.          |
+
+### B. Thiết kế Dashboard Grafana đề xuất
+
+1. **Dashboard Đăng ký (Registration Flow Dashboard)**:
+   - **Tỉ lệ Thành công Đăng ký (Success Rate)**: Tính bằng tỉ lệ `registration_success_total / (registration_success_total + registration_failed_total)`.
+   - **Tỉ lệ Chuyển đổi SSE vs Polling**: Biểu đồ hình tròn biểu thị phần trăm hoàn thành bằng SSE so với số lần chuyển sang Polling fallback (`registration_polling_fallback_total`).
+   - **Tỉ lệ Polling Timeout**: Thống kê số lần polling thất bại do quá thời gian chờ (`registration_polling_timeout_total`).
+2. **Dashboard Bảo mật (Security & CSRF Dashboard)**:
+   - **Tỉ lệ Chặn CSRF (Rejection Rate)**: Biểu đồ đường vẽ tần suất `csrf_rejected_total` tăng lên.
+   - **Phân loại lỗi CSRF**: Chia tỷ lệ giữa `csrf_origin_invalid_total` (lỗi Origin/Host giả mạo) và `csrf_token_invalid_total` (lỗi token sai).
+   - **Sự kiện Rate Limiting**: Theo dõi biểu đồ số lần API status bị giới hạn tần suất (`registration_status_rate_limited_total`).
+
+### C. Ngưỡng Cảnh báo Vận hành (Alerting Rules)
+
+Các quy tắc cảnh báo (Alerts) cấu hình trong Prometheus:
+
+- **Registration Failure Spike (Critical)**:
+   - _Điều kiện_: `rate(registration_failed_total[5m]) / (rate(registration_success_total[5m]) + rate(registration_failed_total[5m])) > 0.02`
+   - _Ý nghĩa_: Tỉ lệ lỗi đăng ký vượt quá **2%** trong vòng 5 phút. Kích hoạt thông báo Rollback ngay lập tức.
+- **CSRF Attack Spike (Warning)**:
+   - _Điều kiện_: `increase(csrf_rejected_total[5m]) > 50`
+   - _Ý nghĩa_: Số lần từ chối CSRF tăng đột biến trên 50 lần trong 5 phút. Cảnh báo dấu hiệu tấn công CSRF / Host Header Injection diện rộng hoặc cấu hình sai Origin.
+- **Polling Fallback Spike (Warning)**:
+   - _Điều kiện_: `rate(registration_polling_fallback_total[5m]) / rate(registration_success_total[5m]) > 0.10`
+   - _Ý nghĩa_: Trên **10%** người dùng phải sử dụng cơ chế Polling dự phòng thay vì SSE. Báo hiệu lỗi kết nối SSE hoặc proxy/gateway chặn EventStream.
+- **Rate Limit Spike (Warning)**:
+   - _Điều kiện_: `increase(registration_status_rate_limited_total[5m]) > 20`
+   - _Ý nghĩa_: Có dấu hiệu client polling quá tần suất quy định hoặc bị cào dữ liệu status hàng loạt.
 
 ---
 
-## 5. Giám Sát Cơ Sở Dữ Liệu & Kafka
+## 5. Quy trình Điều tra Lỗi & Vận hành (Troubleshooting Guide)
+
+Khi xảy ra sự cố luồng Đăng ký hoặc Bảo mật, kỹ sư vận hành thực hiện theo quy trình sau:
+
+### Bước 1: Thu thập Correlation ID (RequestId)
+
+- Lấy `requestId` từ thông tin lỗi phía client (hiển thị trên giao diện hoặc trong console log dạng UUID).
+
+### Bước 2: Truy vấn Log JSON có cấu trúc
+
+- Sử dụng các công cụ Log Aggregator (Grafana Loki, Kibana) truy vấn bằng khoá `requestId`:
+  `{service="omnibooking-server"} |= "019d5cbf-35c8-7323-afc6-d92ea01201fa"`
+- Các sự kiện log theo chuỗi thời gian sẽ xuất hiện:
+   1. `{"event":"registration_received"}` (Controller nhận request).
+   2. `{"event":"registration_queued_inbox"}` (Đã lưu inbox PG và chuẩn bị gửi Kafka).
+   3. `{"event":"registration_queued"}` (Gửi Kafka thành công).
+   4. `{"event":"registration_consumed"}` (Kafka Consumer bắt đầu xử lý).
+   5. `{"event":"registration_db_committed"}` (Ghi DB thành công, gửi Pub/Sub).
+   6. `{"event":"registration_pubsub_received"}` (Lắng nghe Pub/Sub, chuyển SSE).
+   7. `{"event":"registration_sse_sent"}` (Gửi gói tin hoàn tất qua SSE về Client).
+   8. Nếu có Polling: `{"event":"registration_status_checked"}` (Client gọi API status kiểm tra dự phòng).
+
+### Bước 3: Khoanh vùng lỗi trong 1 phút
+
+- **Nếu thiếu bước 3 (registration_queued)**: Kiểm tra Kafka Broker, hàng đợi Kafka, hoặc cơ chế mã hóa mật khẩu AES.
+- **Nếu thiếu bước 5 (registration_db_committed)**: Kiểm tra log lỗi DB (ví dụ: trùng khóa email, deadlock, đầy Pool Hikari).
+- **Nếu thiếu bước 7 (registration_sse_sent)**: Lỗi mạng client, hoặc proxy nginx/gateway chặn kết nối SSE.
+
+---
+
+## 6. Giám Sát Cơ Sở Dữ Liệu & Kafka
 
 ### A. Hibernate Slow Query & N+1 Warning
 

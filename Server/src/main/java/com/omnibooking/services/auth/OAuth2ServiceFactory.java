@@ -21,9 +21,12 @@ public class OAuth2ServiceFactory {
 
    public OAuth2ProviderService getService(String provider) {
       OAuth2ProviderService service = services.get(provider.toLowerCase());
+
       if (service == null) {
          throw new RuntimeException("OAuth2 provider not supported: " + provider);
       }
+
       return service;
    }
+
 }

@@ -17,7 +17,9 @@ import com.omnibooking.services.core.LeaseRenewer;
 public class EmailConsumer {
 
    private final ResendEmailService resendEmailService;
+
    private final IdempotencyService idempotencyService;
+
    private final MeterRegistry meterRegistry;
 
    @KafkaListener(topics = KafkaConfig.MAIL_TOPIC, groupId = "omnibooking-mail-group")
@@ -26,7 +28,7 @@ public class EmailConsumer {
       if (event.getEventId() != null) {
          boolean claimed = idempotencyService.claimEvent(event.getEventId(), consumerGroup);
          if (!claimed) {
-            log.warn("[Kafka Consumer] Duplicate email event detected and skipped: eventId={}, to={}", 
+            log.warn("[Kafka Consumer] Duplicate email event detected and skipped: eventId={}, to={}",
                   event.getEventId(), event.getTo());
             meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
             meterRegistry.counter("omnibooking.kafka.consumer.skipped").increment();

@@ -14,33 +14,40 @@ import com.omnibooking.model.RoomAvailability;
 import com.omnibooking.model.Amenity;
 import com.omnibooking.model.enums.AmenityCategory;
 import com.omnibooking.model.enums.PropertyType;
-import com.omnibooking.repository.MediaRepository;
-import com.omnibooking.repository.PropertyRepository;
-import com.omnibooking.repository.RoomTypeRepository;
-import com.omnibooking.repository.UserRepository;
-import com.omnibooking.repository.RoomAvailabilityRepository;
-import com.omnibooking.repository.AmenityRepository;
+import com.omnibooking.repository.infra.MediaRepository;
+import com.omnibooking.repository.property.PropertyRepository;
+import com.omnibooking.repository.property.RoomTypeRepository;
+import com.omnibooking.repository.user.UserRepository;
+import com.omnibooking.repository.property.RoomAvailabilityRepository;
+import com.omnibooking.repository.property.AmenityRepository;
 import com.omnibooking.services.property.PropertyService;
 import com.omnibooking.services.property.PropertyImagesCacheService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import com.omnibooking.model.Media;
 import org.springframework.transaction.annotation.Transactional;
 import com.omnibooking.dto.PartnerLegalProfileResponse;
 import com.omnibooking.model.PartnerLegalProfile;
-import com.omnibooking.repository.PartnerLegalProfileRepository;
+import com.omnibooking.repository.user.PartnerLegalProfileRepository;
 import com.omnibooking.services.core.EncryptionService;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import java.time.LocalDate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -68,6 +75,12 @@ public class PropertyServiceImpl implements PropertyService {
 
    private final PropertyImagesCacheService propertyImagesCacheService;
 
+   private final CacheManager cacheManager;
+
+   private final com.omnibooking.services.pricing.PriceCalculationService priceCalculationService;
+
+   private final ConcurrentHashMap<String, Object> locks = new ConcurrentHashMap<>();
+
    @Override
    @Transactional
    @Caching(evict = {
@@ -93,7 +106,7 @@ public class PropertyServiceImpl implements PropertyService {
             .description(request.getDescription())
             .propertyType(PropertyType.valueOf(request.getPropertyType()))
             .address(request.getAddress())
-            .city(request.getCity())
+            .city(normalizeCityName(request.getCity()))
             .country(request.getCountry())
             .starRating(
                   request.getStarRating() != null && request.getStarRating() == 0 ? null : request.getStarRating())
@@ -161,8 +174,10 @@ public class PropertyServiceImpl implements PropertyService {
          }
       }
 
-      // Immediate sync to Elasticsearch has been removed because property images are processed asynchronously.
-      // The property will be indexed in Elasticsearch once the main image upload finishes in MediaConsumer.
+      // Immediate sync to Elasticsearch has been removed because property images are
+      // processed asynchronously.
+      // The property will be indexed in Elasticsearch once the main image upload
+      // finishes in MediaConsumer.
 
       return PropertyResponse.builder()
             .id(saved.getId())
@@ -171,6 +186,8 @@ public class PropertyServiceImpl implements PropertyService {
             .city(saved.getCity())
             .country(saved.getCountry())
             .imageUrl(getMainImageUrl(saved.getId()))
+            .averageRating(saved.getAverageRating())
+            .reviewCount(saved.getReviewCount())
             .build();
    }
 
@@ -194,59 +211,116 @@ public class PropertyServiceImpl implements PropertyService {
       log.info("Evicting all public properties cache");
    }
 
-    @Override
-    @Cacheable(value = "properties", key = "'featured:' + #limit")
-    public List<PropertyResponse> getFeaturedProperties(int limit) {
-       log.info("Fetching {} featured properties", limit);
-       Instant startDate = Instant.now().minus(30, ChronoUnit.DAYS);
-       List<Property> properties = propertyRepository
-             .findFeaturedProperties(startDate, org.springframework.data.domain.PageRequest.of(0, limit));
-       return mapToPropertyResponses(properties);
-    }
+   private List<PropertyResponse> getCachedList(Cache cache, String key) {
+      if (cache == null) return null;
+      List<?> rawList = cache.get(key, List.class);
+      if (rawList == null || rawList.isEmpty()) return null;
 
-    @Override
-    @Cacheable(value = "properties", key = "'new:' + #limit")
-    public List<PropertyResponse> getNewProperties(int limit) {
-       log.info("Fetching {} new properties", limit);
-       List<Property> properties = propertyRepository
-             .findNewProperties(org.springframework.data.domain.PageRequest.of(0, limit));
-       return mapToPropertyResponses(properties);
-    }
+      List<PropertyResponse> cachedList = new java.util.ArrayList<>();
+      for (Object obj : rawList) {
+         if (obj instanceof PropertyResponse) {
+            cachedList.add((PropertyResponse) obj);
+         }
+      }
+      return cachedList.isEmpty() ? null : cachedList;
+   }
 
-    private List<PropertyResponse> mapToPropertyResponses(List<Property> properties) {
-       if (properties.isEmpty()) {
-          return List.of();
-       }
+   @Override
+   public List<PropertyResponse> getFeaturedProperties(int limit) {
+      String key = "featured:" + limit;
+      Cache cache = cacheManager != null ? cacheManager.getCache("properties") : null;
 
-       List<UUID> propertyIds = properties.stream().map(Property::getId).toList();
-       List<Media> mainImages = mediaRepository.findMainImagesByEntityIds(propertyIds);
+      List<PropertyResponse> cached = getCachedList(cache, key);
+      if (cached != null) {
+         return cached;
+      }
 
-       // Defensive mapping: pick the first main image if duplicates exist
-       java.util.Map<UUID, Media> mainImageMap = mainImages.stream()
-             .collect(java.util.stream.Collectors.toMap(
-                   Media::getEntityId,
-                   m -> m,
-                   (existing, replacement) -> existing
-             ));
+      Object lock = locks.computeIfAbsent(key, k -> new Object());
+      synchronized (lock) {
+         cached = getCachedList(cache, key);
+         if (cached != null) {
+            return cached;
+         }
 
-       return properties.stream()
-             .map(p -> {
-                Media mainMedia = mainImageMap.get(p.getId());
-                return PropertyResponse.builder()
-                      .id(p.getId())
-                      .name(p.getName())
-                      .propertyType(p.getPropertyType().name())
-                      .city(p.getCity())
-                      .country(p.getCountry())
-                      .imageUrl(mainMedia != null ? mainMedia.getUrl() : null)
-                      .build();
-             })
-             .toList();
-    }
+         log.info("Fetching {} featured properties from DB (Cache stampede mitigation)...", limit);
+         Instant startDate = Instant.now().minus(30, ChronoUnit.DAYS);
+         List<Property> properties = propertyRepository
+               .findFeaturedProperties(startDate, PageRequest.of(0, limit));
+         List<PropertyResponse> response = mapToPropertyResponses(properties);
+
+         if (cache != null && !response.isEmpty()) {
+            cache.put(key, response);
+         }
+
+         return response;
+      }
+   }
+
+   @Override
+   public List<PropertyResponse> getNewProperties(int limit) {
+      String key = "new:" + limit;
+      Cache cache = cacheManager != null ? cacheManager.getCache("properties") : null;
+
+      List<PropertyResponse> cached = getCachedList(cache, key);
+      if (cached != null) {
+         return cached;
+      }
+
+      Object lock = locks.computeIfAbsent(key, k -> new Object());
+      synchronized (lock) {
+         cached = getCachedList(cache, key);
+         if (cached != null) {
+            return cached;
+         }
+
+         log.info("Fetching {} new properties from DB (Cache stampede mitigation)...", limit);
+         List<Property> properties = propertyRepository
+               .findNewProperties(PageRequest.of(0, limit));
+         List<PropertyResponse> response = mapToPropertyResponses(properties);
+
+         if (cache != null && !response.isEmpty()) {
+            cache.put(key, response);
+         }
+
+         return response;
+      }
+   }
+
+   private List<PropertyResponse> mapToPropertyResponses(List<Property> properties) {
+      if (properties.isEmpty()) {
+         return List.of();
+      }
+
+      List<UUID> propertyIds = properties.stream().map(Property::getId).toList();
+      List<Media> mainImages = mediaRepository.findMainImagesByEntityIds(propertyIds);
+
+      // Defensive mapping: pick the first main image if duplicates exist
+      Map<UUID, Media> mainImageMap = mainImages.stream()
+            .collect(Collectors.toMap(
+                  Media::getEntityId,
+                  m -> m,
+                  (existing, replacement) -> existing));
+
+      return properties.stream()
+            .map(p -> {
+               Media mainMedia = mainImageMap.get(p.getId());
+               return PropertyResponse.builder()
+                     .id(p.getId())
+                     .name(p.getName())
+                     .propertyType(p.getPropertyType().name())
+                     .city(p.getCity())
+                     .country(p.getCountry())
+                     .imageUrl(mainMedia != null ? mainMedia.getUrl() : null)
+                     .averageRating(p.getAverageRating())
+                     .reviewCount(p.getReviewCount())
+                     .build();
+            })
+            .toList();
+   }
 
    private String getMainImageUrl(UUID propertyId) {
       return mediaRepository.findFirstByEntityIdAndEntityTypeAndIsMainTrue(propertyId, "PROPERTY")
-            .map(com.omnibooking.model.Media::getUrl)
+            .map(Media::getUrl)
             .orElse(null);
    }
 
@@ -277,7 +351,7 @@ public class PropertyServiceImpl implements PropertyService {
             .toList();
    }
 
-   private void savePartnerLegalProfile(com.omnibooking.model.User partner, String regNum, String taxCode,
+   private void savePartnerLegalProfile(User partner, String regNum, String taxCode,
          String ownerName) {
       if (regNum == null || regNum.isBlank() ||
             taxCode == null || taxCode.isBlank() ||
@@ -366,17 +440,27 @@ public class PropertyServiceImpl implements PropertyService {
             : List.of();
 
       List<RoomTypeResponse> roomTypes = roomTypeRepository.findByPropertyId(propertyId).stream()
-            .map(r -> RoomTypeResponse.builder()
-                  .id(r.getId())
-                  .name(r.getName())
-                  .description(r.getDescription())
-                  .basePrice(r.getBasePrice())
-                  .capacityAdults(r.getCapacityAdults())
-                  .capacityChildren(r.getCapacityChildren())
-                  .totalRooms(r.getTotalRooms())
-                  .roomSizeSqm(r.getRoomSizeSqm())
-                  .bedType(r.getBedType())
-                  .build())
+            .map(r -> {
+               BigDecimal currentPrice;
+               try {
+                  var result = priceCalculationService.calculateStayPrice(r.getProperty().getId(), r.getId(), LocalDate.now(), LocalDate.now().plusDays(1), 2);
+                  currentPrice = result.totalFinalPrice();
+               } catch (Exception e) {
+                  currentPrice = r.getBasePrice();
+               }
+               return RoomTypeResponse.builder()
+                     .id(r.getId())
+                     .name(r.getName())
+                     .description(r.getDescription())
+                     .basePrice(r.getBasePrice())
+                     .capacityAdults(r.getCapacityAdults())
+                     .capacityChildren(r.getCapacityChildren())
+                     .totalRooms(r.getTotalRooms())
+                     .roomSizeSqm(r.getRoomSizeSqm())
+                     .bedType(r.getBedType())
+                     .currentPrice(currentPrice)
+                     .build();
+            })
             .toList();
 
       return PropertyDetailResponse.builder()
@@ -396,6 +480,8 @@ public class PropertyServiceImpl implements PropertyService {
             .taxCode(decryptedTaxCode)
             .legalOwnerName(decryptedOwnerName)
             .amenities(amenities)
+            .averageRating(property.getAverageRating())
+            .reviewCount(property.getReviewCount())
             .roomTypes(roomTypes)
             .build();
    }
@@ -411,17 +497,27 @@ public class PropertyServiceImpl implements PropertyService {
             : List.of();
 
       List<RoomTypeResponse> roomTypes = roomTypeRepository.findByPropertyId(propertyId).stream()
-            .map(r -> RoomTypeResponse.builder()
-                  .id(r.getId())
-                  .name(r.getName())
-                  .description(r.getDescription())
-                  .basePrice(r.getBasePrice())
-                  .capacityAdults(r.getCapacityAdults())
-                  .capacityChildren(r.getCapacityChildren())
-                  .totalRooms(r.getTotalRooms())
-                  .roomSizeSqm(r.getRoomSizeSqm())
-                  .bedType(r.getBedType())
-                  .build())
+            .map(r -> {
+               BigDecimal currentPrice;
+               try {
+                  var result = priceCalculationService.calculateStayPrice(r.getProperty().getId(), r.getId(), LocalDate.now(), LocalDate.now().plusDays(1), 2);
+                  currentPrice = result.totalFinalPrice();
+               } catch (Exception e) {
+                  currentPrice = r.getBasePrice();
+               }
+               return RoomTypeResponse.builder()
+                     .id(r.getId())
+                     .name(r.getName())
+                     .description(r.getDescription())
+                     .basePrice(r.getBasePrice())
+                     .capacityAdults(r.getCapacityAdults())
+                     .capacityChildren(r.getCapacityChildren())
+                     .totalRooms(r.getTotalRooms())
+                     .roomSizeSqm(r.getRoomSizeSqm())
+                     .bedType(r.getBedType())
+                     .currentPrice(currentPrice)
+                     .build();
+            })
             .toList();
 
       return PropertyDetailResponse.builder()
@@ -438,8 +534,25 @@ public class PropertyServiceImpl implements PropertyService {
             .imageUrl(getMainImageUrl(property.getId()))
             .imageUrls(getAllImageUrls(property.getId()))
             .amenities(amenities)
+            .averageRating(property.getAverageRating())
+            .reviewCount(property.getReviewCount())
             .roomTypes(roomTypes)
             .build();
+   }
+
+   private String normalizeCityName(String cityName) {
+      if (cityName == null)
+         return null;
+      String trimmed = cityName.trim();
+      if (trimmed.equalsIgnoreCase("Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("Thành Phố Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("Thành phố Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("TP Hồ Chí Minh") ||
+            trimmed.equalsIgnoreCase("TP. Hồ Chí Minh")) {
+         return "Thành Phố Hồ Chí Minh";
+      }
+
+      return trimmed.replaceAll("^(?i)(Thành\\s+phố|Tỉnh|TP\\.?)\\s+", "").trim();
    }
 
 }

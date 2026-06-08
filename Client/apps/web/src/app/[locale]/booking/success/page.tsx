@@ -1,31 +1,110 @@
 "use client";
 
-import { useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { useLocale } from "next-intl";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/routing";
+import { useLocale, useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
 import { vi, enUS } from "date-fns/locale";
 import { CheckCircle, Home, Lock, ArrowRight, AlertCircle, Sparkles } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useSettingStore } from "@/store/useSettingStore";
 import { authService } from "@/lib/api/services/authService";
+import { bookingService, BookingResponse } from "@/lib/api/services/bookingService";
+import { paymentService } from "@/lib/api/services/paymentService";
 import PriceDisplay from "@/components/PriceDisplay";
 import Barcode from "@/components/Barcode";
 
+const dateLocales: Record<string, typeof enUS> = { vi, en: enUS };
+
 export default function BookingSuccessPage() {
-   const locale = useLocale();
+   const t = useTranslations("BookingSuccess");
    const router = useRouter();
    const searchParams = useSearchParams();
-   const dateLocale = locale === "vi" ? vi : enUS;
+   const dateLocale = dateLocales[useLocale()] || enUS;
 
-   const bookingCode = searchParams.get("code") || "N/A";
-   const guestName = searchParams.get("name") || "";
-   const propertyName = searchParams.get("property") || "";
-   const roomTypeName = searchParams.get("room") || "";
-   const checkin = searchParams.get("checkin");
-   const checkout = searchParams.get("checkout");
-   const finalPrice = Number(searchParams.get("final")) || 0;
-   const token = searchParams.get("token"); // Guest activation token
+   const rawBookingId = searchParams.get("bookingId") || searchParams.get("orderId");
+   const bookingId =
+      rawBookingId && rawBookingId.includes("_") ? rawBookingId.split("_")[0] : rawBookingId;
+   const [bookingDetails, setBookingDetails] = useState<BookingResponse | null>(null);
+   const [loading, setLoading] = useState(!!bookingId);
+   const [fetchError, setFetchError] = useState<string | null>(null);
+   const [retrying, setRetrying] = useState(false);
+
+   const resultCode = searchParams.get("resultCode");
+   const isPaymentSuccess = resultCode === null || resultCode === "0";
+
+   const [prevBookingId, setPrevBookingId] = useState(bookingId);
+   if (bookingId !== prevBookingId) {
+      setPrevBookingId(bookingId);
+      setLoading(true);
+      setBookingDetails(null);
+      setFetchError(null);
+   }
+
+   useEffect(() => {
+      if (bookingId) {
+         bookingService
+            .getById(bookingId)
+            .then((details) => {
+               setBookingDetails(details);
+            })
+            .catch((err) => {
+               console.error("Failed to fetch booking details:", err);
+               setFetchError(t("fetchError"));
+            })
+            .finally(() => {
+               setLoading(false);
+            });
+      }
+   }, [bookingId, t]);
+
+   const handleRetryPayment = async () => {
+      if (!bookingId) return;
+      setRetrying(true);
+      try {
+         const payData = await paymentService.createMomoPayment(bookingId);
+         if (payData && payData.payUrl) {
+            window.location.href = payData.payUrl;
+         } else {
+            alert(t("momoLinkError"));
+         }
+      } catch (err) {
+         console.error("Retry payment error:", err);
+         alert(t("paymentLinkError"));
+      } finally {
+         setRetrying(false);
+      }
+   };
+
+   const bookingCode = bookingDetails
+      ? bookingDetails.bookingCode
+      : searchParams.get("code") || "N/A";
+   const guestName = bookingDetails ? bookingDetails.guestName : searchParams.get("name") || "";
+   const propertyName = bookingDetails
+      ? bookingDetails.propertyName
+      : searchParams.get("property") || "";
+   const roomTypeName = bookingDetails
+      ? bookingDetails.roomTypeName
+      : searchParams.get("room") || "";
+   const checkin = bookingDetails ? bookingDetails.checkInDate : searchParams.get("checkin");
+   const checkout = bookingDetails ? bookingDetails.checkOutDate : searchParams.get("checkout");
+   const finalPrice = bookingDetails
+      ? bookingDetails.finalPrice || 0
+      : Number(searchParams.get("final")) || 0;
+   const depositAmount = bookingDetails
+      ? bookingDetails.depositAmount || 0
+      : Number(searchParams.get("deposit")) || 0;
+   const requiresDeposit = bookingDetails
+      ? bookingDetails.requiresDeposit || false
+      : searchParams.get("requiresDeposit") === "true";
+   const payLaterAmount = finalPrice - depositAmount;
+   const paymentMethod = bookingDetails
+      ? bookingDetails.paymentMethod || "visa"
+      : searchParams.get("paymentMethod") || "visa";
+   const token = bookingDetails
+      ? bookingDetails.activationToken || null
+      : searchParams.get("token"); // Guest activation token
 
    const { setAuth } = useAuthStore();
    const { currency } = useSettingStore();
@@ -42,18 +121,12 @@ export default function BookingSuccessPage() {
       if (!token) return;
 
       if (password !== confirmPassword) {
-         setActivationError(
-            locale === "vi" ? "Mật khẩu xác nhận không khớp." : "Passwords do not match."
-         );
+         setActivationError(t("passwordMismatch"));
          return;
       }
 
       if (password.length < 6) {
-         setActivationError(
-            locale === "vi"
-               ? "Mật khẩu phải chứa ít nhất 6 ký tự."
-               : "Password must be at least 6 characters."
-         );
+         setActivationError(t("passwordLength"));
          return;
       }
 
@@ -65,38 +138,77 @@ export default function BookingSuccessPage() {
          setAuth(user);
          setActivatedSuccessfully(true);
          setTimeout(() => {
-            router.push(`/${locale}/profile`);
+            router.push("/profile");
          }, 2000);
       } catch (err) {
          console.error(err);
          const errorWithResponse = err as { response?: { data?: { message?: string } } };
-         setActivationError(
-            errorWithResponse.response?.data?.message ||
-               (locale === "vi"
-                  ? "Kích hoạt tài khoản thất bại. Vui lòng thử lại."
-                  : "Activation failed. Please try again.")
-         );
+         setActivationError(errorWithResponse.response?.data?.message || t("activationFailed"));
          setActivating(false);
       }
    };
+
+   if (loading) {
+      return (
+         <div className="min-h-screen bg-zinc-50/50 py-12 px-4 sm:px-6 lg:px-8 font-sans flex flex-col justify-center items-center">
+            <div className="max-w-xl w-full space-y-8 flex flex-col items-center">
+               <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+               <p className="text-sm font-semibold text-zinc-500">{t("loading")}</p>
+            </div>
+         </div>
+      );
+   }
+
+   if (fetchError) {
+      return (
+         <div className="min-h-screen bg-zinc-50/50 py-12 px-4 sm:px-6 lg:px-8 font-sans flex flex-col justify-center items-center">
+            <div className="max-w-md w-full bg-white rounded-3xl border border-zinc-200 shadow-sm p-8 text-center space-y-6">
+               <div className="inline-flex p-3 bg-red-50 rounded-full border border-red-100 shadow-sm">
+                  <AlertCircle className="h-10 w-10 text-red-600" />
+               </div>
+               <h1 className="text-xl font-bold text-zinc-950">{t("errorTitle")}</h1>
+               <p className="text-sm text-zinc-500 font-medium">{fetchError}</p>
+               <button
+                  onClick={() => router.push("/")}
+                  className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3 px-6 rounded-xl transition-all cursor-pointer shadow-md text-xs flex items-center justify-center gap-2"
+               >
+                  <Home className="h-4 w-4" />
+                  <span>{t("returnHome")}</span>
+               </button>
+            </div>
+         </div>
+      );
+   }
 
    return (
       <div className="min-h-screen bg-zinc-50/50 py-12 px-4 sm:px-6 lg:px-8 font-sans flex flex-col justify-center items-center">
          <div className="max-w-xl w-full space-y-8">
             {/* Header Success Status */}
-            <div className="text-center space-y-4 animate-in fade-in duration-300">
-               <div className="inline-flex p-3 bg-emerald-50 rounded-full border border-emerald-100 shadow-sm">
-                  <CheckCircle className="h-14 w-14 text-emerald-600" />
+            {isPaymentSuccess ? (
+               <div className="text-center space-y-4 animate-in fade-in duration-300">
+                  <div className="inline-flex p-3 bg-emerald-50 rounded-full border border-emerald-100 shadow-sm">
+                     <CheckCircle className="h-14 w-14 text-emerald-600" />
+                  </div>
+                  <h1 className="text-3xl font-bold text-zinc-950 tracking-tight">
+                     {t("successTitle")}
+                  </h1>
+                  <p className="text-sm text-zinc-500 font-medium max-w-sm mx-auto">
+                     {t("successDesc")}
+                  </p>
                </div>
-               <h1 className="text-3xl font-extrabold text-zinc-950 tracking-tight">
-                  {locale === "vi" ? "Đặt phòng thành công!" : "Booking Confirmed!"}
-               </h1>
-               <p className="text-sm text-zinc-500 font-medium max-w-sm mx-auto">
-                  {locale === "vi"
-                     ? "Cảm ơn bạn đã lựa chọn OmniBooking. Chúng tôi đã gửi email xác nhận chi tiết tới địa chỉ email của bạn."
-                     : "Thank you for booking with OmniBooking. We've sent a confirmation email to your address."}
-               </p>
-            </div>
+            ) : (
+               <div className="text-center space-y-4 animate-in fade-in duration-300">
+                  <div className="inline-flex p-3 bg-rose-50 rounded-full border border-rose-100 shadow-sm">
+                     <AlertCircle className="h-14 w-14 text-rose-600" />
+                  </div>
+                  <h1 className="text-3xl font-bold text-zinc-950 tracking-tight">
+                     {t("failTitle")}
+                  </h1>
+                  <p className="text-sm text-zinc-500 font-medium max-w-sm mx-auto">
+                     {t("failDesc")}
+                  </p>
+               </div>
+            )}
 
             {/* Booking Ticket Card (Boarding Pass Style) */}
             <div className="relative bg-white rounded-3xl border border-zinc-200 shadow-sm overflow-visible">
@@ -108,9 +220,15 @@ export default function BookingSuccessPage() {
                <div className="p-6 sm:p-8 space-y-6">
                   <div className="flex justify-between items-center pb-4 border-b border-zinc-100">
                      <div className="flex items-center gap-2">
-                        <div className="bg-emerald-50 text-emerald-700 font-extrabold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider border border-emerald-100">
-                           {locale === "vi" ? "Đã xác nhận" : "Confirmed"}
-                        </div>
+                        {isPaymentSuccess ? (
+                           <div className="bg-emerald-50 text-emerald-700 font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider border border-emerald-100">
+                              {t("confirmed")}
+                           </div>
+                        ) : (
+                           <div className="bg-rose-50 text-rose-700 font-bold text-[10px] px-2.5 py-1 rounded-full uppercase tracking-wider border border-rose-100">
+                              {t("unpaid")}
+                           </div>
+                        )}
                      </div>
                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                         OmniBooking Boarding Pass
@@ -121,7 +239,7 @@ export default function BookingSuccessPage() {
                      <div className="grid grid-cols-2 gap-4">
                         <div>
                            <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                              {locale === "vi" ? "Khách hàng" : "Passenger"}
+                              {t("passenger")}
                            </span>
                            <span className="text-zinc-900 font-bold text-sm block mt-0.5 truncate">
                               {guestName || "Guest User"}
@@ -129,7 +247,7 @@ export default function BookingSuccessPage() {
                         </div>
                         <div>
                            <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                              {locale === "vi" ? "Mã đặt phòng" : "Booking Code"}
+                              {t("bookingCode")}
                            </span>
                            <span className="text-blue-600 font-black text-sm block mt-0.5 tracking-wider">
                               {bookingCode}
@@ -140,7 +258,7 @@ export default function BookingSuccessPage() {
                      <div className="grid grid-cols-2 gap-4 border-t border-zinc-100 pt-4">
                         <div>
                            <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                              {locale === "vi" ? "Chỗ nghỉ / Khách sạn" : "Property / Hotel"}
+                              {t("property")}
                            </span>
                            <span className="text-zinc-900 font-bold text-sm block mt-0.5 truncate">
                               {propertyName}
@@ -148,7 +266,7 @@ export default function BookingSuccessPage() {
                         </div>
                         <div>
                            <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                              {locale === "vi" ? "Loại phòng" : "Room Type"}
+                              {t("roomType")}
                            </span>
                            <span className="text-zinc-900 font-bold block mt-0.5 truncate">
                               {roomTypeName}
@@ -168,7 +286,7 @@ export default function BookingSuccessPage() {
                   <div className="grid grid-cols-2 gap-4 text-xs font-semibold text-zinc-700">
                      <div>
                         <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                           {locale === "vi" ? "Ngày nhận phòng" : "Check-in Date"}
+                           {t("checkInDate")}
                         </span>
                         <span className="text-zinc-900 font-bold block mt-0.5">
                            {checkin
@@ -183,7 +301,7 @@ export default function BookingSuccessPage() {
                      </div>
                      <div>
                         <span className="text-zinc-400 block text-[9px] uppercase tracking-wider font-bold">
-                           {locale === "vi" ? "Ngày trả phòng" : "Check-out Date"}
+                           {t("checkOutDate")}
                         </span>
                         <span className="text-zinc-900 font-bold block mt-0.5">
                            {checkout
@@ -198,25 +316,73 @@ export default function BookingSuccessPage() {
                      </div>
                   </div>
 
-                  <div className="border-t border-zinc-100 pt-4 flex justify-between items-baseline">
-                     <span className="text-xs font-bold text-zinc-900">
-                        {locale === "vi"
-                           ? "Tổng thanh toán tại chỗ nghỉ"
-                           : "Total to pay at property"}
-                     </span>
-                     <div className="text-right">
-                        <PriceDisplay
-                           amount={finalPrice}
-                           size="lg"
-                           className="text-emerald-600 font-extrabold text-lg block"
-                        />
-                        {currency === "VND" && (
-                           <span className="text-[10px] text-zinc-400 font-bold block mt-0.5">
-                              (${finalPrice.toFixed(2)} USD)
+                  {requiresDeposit ? (
+                     <div className="border-t border-zinc-100 pt-4 space-y-3">
+                        <div className="flex justify-between items-baseline text-xs font-semibold text-zinc-500">
+                           <span>{t("totalValue")}</span>
+                           <span>
+                              <PriceDisplay
+                                 amount={finalPrice}
+                                 size="sm"
+                                 className="text-zinc-700 font-bold"
+                              />
                            </span>
-                        )}
+                        </div>
+                        <div className="flex justify-between items-baseline text-xs font-semibold text-blue-600">
+                           <span>
+                              {t("depositPaid", {
+                                 method: t(
+                                    paymentMethod.toLowerCase() === "momo"
+                                       ? "paymentMomo"
+                                       : paymentMethod.toLowerCase() === "banking"
+                                         ? "paymentBanking"
+                                         : "paymentVisa"
+                                 ),
+                              })}
+                           </span>
+                           <span>
+                              <PriceDisplay
+                                 amount={depositAmount}
+                                 size="sm"
+                                 className="font-black text-blue-600"
+                              />
+                           </span>
+                        </div>
+                        <div className="flex justify-between items-baseline border-t border-zinc-100/50 pt-3">
+                           <span className="text-xs font-bold text-zinc-900">
+                              {t("remainingAmount")}
+                           </span>
+                           <div className="text-right">
+                              <PriceDisplay
+                                 amount={payLaterAmount}
+                                 size="lg"
+                                 className="text-emerald-600 font-extrabold text-lg block"
+                              />
+                              {currency === "VND" && (
+                                 <span className="text-[10px] text-zinc-400 font-bold block mt-0.5">
+                                    (${payLaterAmount.toFixed(2)} USD)
+                                 </span>
+                              )}
+                           </div>
+                        </div>
                      </div>
-                  </div>
+                  ) : (
+                     <div className="border-t border-zinc-100 pt-4 flex justify-between items-baseline">
+                        <span className="text-xs font-bold text-zinc-900">{t("totalToPay")}</span>
+                        <div className="text-right">
+                           <PriceDisplay
+                              amount={finalPrice}
+                              size="lg"
+                              className="text-emerald-600 font-extrabold text-lg block"
+                           />
+                           {currency === "VND" && (
+                              <span className="text-[10px] text-zinc-400 font-bold block mt-0.5">
+                                 (${finalPrice.toFixed(2)} USD)
+                              </span>
+                           )}
+                        </div>
+                     </div>
+                  )}
 
                   {/* Scannable Barcode */}
                   <div className="border-t border-zinc-100 pt-6 flex flex-col items-center justify-center space-y-2">
@@ -231,16 +397,14 @@ export default function BookingSuccessPage() {
                         />
                      </div>
                      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
-                        {locale === "vi"
-                           ? "Quét mã này tại quầy lễ tân"
-                           : "Scan barcode at reception"}
+                        {t("scanBarcode")}
                      </span>
                   </div>
                </div>
             </div>
 
             {/* Lazy Sign-up Box */}
-            {token && !activatedSuccessfully && (
+            {isPaymentSuccess && token && !activatedSuccessfully && (
                <div className="bg-blue-50/70 rounded-3xl border border-blue-100 p-6 sm:p-8 space-y-6 relative overflow-hidden shadow-xs">
                   <div className="absolute -top-6 -right-6 w-20 h-20 bg-blue-100 rounded-full opacity-50 blur-xl"></div>
 
@@ -249,15 +413,9 @@ export default function BookingSuccessPage() {
                         <Sparkles className="h-3.5 w-3.5" />
                         <span>Genius Member Club</span>
                      </div>
-                     <h3 className="text-lg font-extrabold text-zinc-900">
-                        {locale === "vi"
-                           ? "Kích hoạt tài khoản thành viên"
-                           : "Activate Your Membership"}
-                     </h3>
+                     <h3 className="text-lg font-extrabold text-zinc-900">{t("activateTitle")}</h3>
                      <p className="text-xs text-zinc-500 leading-relaxed font-medium">
-                        {locale === "vi"
-                           ? "Chúng tôi đã tạo tài khoản tạm thời liên kết với email của bạn. Chỉ cần đặt mật khẩu dưới đây để kích hoạt thành viên, mở khóa ưu đãi Genius giảm tới 20% cho lần sau!"
-                           : "We created a temporary account for you. Set your password below to activate and unlock up to 20% off future bookings!"}
+                        {t("activateDesc")}
                      </p>
                   </div>
 
@@ -272,7 +430,7 @@ export default function BookingSuccessPage() {
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                         <div className="space-y-1">
                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-                              {locale === "vi" ? "Mật khẩu" : "Password"}
+                              {t("password")}
                            </label>
                            <div className="relative">
                               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-400">
@@ -291,7 +449,7 @@ export default function BookingSuccessPage() {
 
                         <div className="space-y-1">
                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
-                              {locale === "vi" ? "Xác nhận mật khẩu" : "Confirm Password"}
+                              {t("confirmPassword")}
                            </label>
                            <div className="relative">
                               <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-zinc-400">
@@ -318,11 +476,7 @@ export default function BookingSuccessPage() {
                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                         ) : (
                            <>
-                              <span>
-                                 {locale === "vi"
-                                    ? "Kích hoạt & Đăng nhập ngay"
-                                    : "Activate & Log In Now"}
-                              </span>
+                              <span>{t("activateBtn")}</span>
                               <ArrowRight className="h-3.5 w-3.5" />
                            </>
                         )}
@@ -335,27 +489,46 @@ export default function BookingSuccessPage() {
                <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 text-center space-y-3 animate-in fade-in duration-300">
                   <CheckCircle className="h-10 w-10 text-emerald-600 mx-auto" />
                   <h3 className="text-base font-bold text-emerald-950">
-                     {locale === "vi"
-                        ? "Kích hoạt tài khoản thành viên thành công!"
-                        : "Membership Activated Successfully!"}
+                     {t("activatedSuccessTitle")}
                   </h3>
                   <p className="text-xs text-emerald-800/80 leading-relaxed font-semibold">
-                     {locale === "vi"
-                        ? "Hệ thống đang tự động đăng nhập và đưa bạn tới trang hồ sơ cá nhân..."
-                        : "Logging you in and redirecting to your profile dashboard..."}
+                     {t("activatedSuccessDesc")}
                   </p>
                </div>
             )}
 
             {/* Actions */}
             <div className="text-center pt-4">
-               <button
-                  onClick={() => router.push(`/${locale}`)}
-                  className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-800 text-sm font-bold border border-zinc-200 bg-white rounded-xl px-6 py-3 cursor-pointer transition-colors shadow-2xs hover:shadow-xs"
-               >
-                  <Home className="h-4.5 w-4.5" />
-                  <span>{locale === "vi" ? "Về trang chủ" : "Return Home"}</span>
-               </button>
+               {isPaymentSuccess ? (
+                  <button
+                     onClick={() => router.push("/")}
+                     className="inline-flex items-center gap-2 text-zinc-500 hover:text-zinc-800 text-sm font-bold border border-zinc-200 bg-white rounded-xl px-6 py-3 cursor-pointer transition-colors shadow-2xs hover:shadow-xs"
+                  >
+                     <Home className="h-4.5 w-4.5" />
+                     <span>{t("returnHome")}</span>
+                  </button>
+               ) : (
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                     <button
+                        onClick={handleRetryPayment}
+                        disabled={retrying}
+                        className="inline-flex items-center justify-center gap-2 text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-sm font-bold rounded-xl px-6 py-3 cursor-pointer transition-all shadow-md hover:shadow-lg w-full sm:w-auto min-w-[160px]"
+                     >
+                        {retrying ? (
+                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                           <span>{t("retryPayment")}</span>
+                        )}
+                     </button>
+                     <button
+                        onClick={() => router.push("/")}
+                        className="inline-flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-800 text-sm font-bold border border-zinc-200 bg-white rounded-xl px-6 py-3 cursor-pointer transition-colors shadow-2xs hover:shadow-xs w-full sm:w-auto"
+                     >
+                        <Home className="h-4.5 w-4.5" />
+                        <span>{t("returnHome")}</span>
+                     </button>
+                  </div>
+               )}
             </div>
          </div>
       </div>

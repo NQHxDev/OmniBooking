@@ -191,4 +191,46 @@ export const authService = {
       )) as unknown as ApiResponse<User>;
       return response.data;
    },
+
+   /**
+    * Fetches a CSRF token from the server to bootstrap the session if needed.
+    */
+   getCsrfToken: async (): Promise<string> => {
+      const response = (await apiClient.get("/auth/csrf", {
+         withCredentials: true,
+         // @ts-expect-error - Custom axios config flag for interceptor
+         _skipToast: true,
+      })) as unknown as ApiResponse<{ csrfToken: string }>;
+      return response.data.csrfToken;
+   },
+
+   /**
+    * Gets the async registration status for a request ID.
+    */
+   getRegistrationStatus: async (
+      requestId: string,
+      timeout: boolean = false
+   ): Promise<
+      ApiResponse<{
+         requestId: string;
+         status: string;
+         message: string;
+         completedAt: string | null;
+      }>
+   > => {
+      const response = (await apiClient.get(
+         `/auth/registration-status/${requestId}?timeout=${timeout}`,
+         {
+            withCredentials: true,
+            // @ts-expect-error - Custom axios config flag for interceptor
+            _skipToast: true,
+         }
+      )) as unknown as ApiResponse<{
+         requestId: string;
+         status: string;
+         message: string;
+         completedAt: string | null;
+      }>;
+      return response;
+   },
 };

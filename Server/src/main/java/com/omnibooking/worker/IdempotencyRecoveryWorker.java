@@ -1,7 +1,7 @@
 package com.omnibooking.worker;
 
 import com.omnibooking.model.ProcessedEvent;
-import com.omnibooking.repository.ProcessedEventRepository;
+import com.omnibooking.repository.infra.ProcessedEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

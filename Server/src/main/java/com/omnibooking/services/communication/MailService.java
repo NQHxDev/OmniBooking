@@ -13,6 +13,7 @@ import java.util.Map;
 public class MailService {
 
    private final MailTemplateService mailTemplateService;
+
    private final AppProperties appProperties;
 
    public EmailEvent buildVerificationEmailEvent(String toEmail, String userName, String token) {
@@ -108,4 +109,5 @@ public class MailService {
             .content(htmlContent)
             .build();
    }
+
 }

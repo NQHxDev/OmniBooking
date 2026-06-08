@@ -1,13 +1,10 @@
 import { Toaster } from "sonner";
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages, getTranslations } from "next-intl/server";
+import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 
-export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
-   const { locale } = await params;
-   const t = await getTranslations({ locale, namespace: "Common" });
-
+export async function generateMetadata() {
    const baseTitle = "OmniBooking Partner Hub";
    const pageTitle = "Quản lý chỗ nghỉ";
 

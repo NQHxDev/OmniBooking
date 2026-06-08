@@ -8,8 +8,8 @@ import com.omnibooking.exception.AppException;
 import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserPasskey;
-import com.omnibooking.repository.UserRepository;
-import com.omnibooking.repository.UserPasskeyRepository;
+import com.omnibooking.repository.user.UserRepository;
+import com.omnibooking.repository.user.UserPasskeyRepository;
 import com.omnibooking.services.auth.PasskeyService;
 import com.webauthn4j.data.client.challenge.Challenge;
 import com.webauthn4j.data.client.challenge.DefaultChallenge;
@@ -31,8 +31,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class PasskeyServiceImpl implements PasskeyService {
 
    private final AppProperties appProperties;
+
    private final StringRedisTemplate redisTemplate;
+
    private final UserRepository userRepository;
+
    private final UserPasskeyRepository userPasskeyRepository;
 
    private static final String CHALLENGE_PREFIX = "passkey_challenge:";

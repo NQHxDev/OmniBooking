@@ -1,5 +1,7 @@
 package com.omnibooking.services.impl;
 
+import com.omnibooking.constant.EventConstants;
+import com.omnibooking.constant.SecurityConstants;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.dto.LoginRequest;
 import com.omnibooking.dto.RegisterRequest;
@@ -8,11 +10,13 @@ import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.Role;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
-import com.omnibooking.repository.RoleRepository;
-import com.omnibooking.repository.UserProfileRepository;
-import com.omnibooking.repository.UserRepository;
+import com.omnibooking.repository.security.RoleRepository;
+import com.omnibooking.repository.user.UserProfileRepository;
+import com.omnibooking.repository.user.UserRepository;
+import com.omnibooking.config.AppProperties;
 import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.services.auth.SessionService;
+import com.omnibooking.services.auth.CachedRoleService;
 import com.omnibooking.services.auth.impl.AuthServiceImpl;
 import com.omnibooking.services.communication.MailService;
 import com.omnibooking.services.core.BloomFilterService;
@@ -32,7 +36,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Collections;
 import java.util.Objects;
@@ -47,40 +50,70 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyInt;
+
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.anyLong;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuthServiceImpl Unit Tests")
 class AuthServiceImplTest {
 
    @Mock
+   private AppProperties appProperties;
+
+   @Mock
+   private AppProperties.Security securityProperties;
+
+   @Mock
    private UserRepository userRepository;
+
    @Mock
    private RoleRepository roleRepository;
+
+   @Mock
+   private CachedRoleService cachedRoleService;
+
    @Mock
    private UserProfileRepository userProfileRepository;
+
    @Mock
    private PasswordEncoder passwordEncoder;
+
    @Mock
    private JWTService jwtService;
+
    @Mock
    private SessionService sessionService;
+
    @Mock
    private ApplicationEventPublisher eventPublisher;
+
    @Mock
    private VerificationService verificationService;
+
    @Mock
    private StringRedisTemplate redisTemplate;
+
    @Mock
    private BloomFilterService bloomFilterService;
+
    @Mock
    private HttpServletResponse response;
+
    @Mock
    private UserMapper userMapper;
+
    @Mock
    private MailService mailService;
+
    @Mock
    private OutboxService outboxService;
+
    @Mock
    private com.omnibooking.services.auth.TwoFactorAuthService twoFactorAuthService;
 
@@ -92,7 +125,8 @@ class AuthServiceImplTest {
 
    @BeforeEach
    void setUp() {
-      ReflectionTestUtils.setField(Objects.requireNonNull(authService), "cookieSecure", false);
+      lenient().when(appProperties.getSecurity()).thenReturn(securityProperties);
+      lenient().when(securityProperties.isCookieSecure()).thenReturn(false);
       lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
    }
 
@@ -109,7 +143,7 @@ class AuthServiceImplTest {
                .password("password123")
                .fullName("Test User")
                .build();
-         Role userRole = Role.builder().name("ROLE_USER").build();
+         Role userRole = Role.builder().name(SecurityConstants.Roles.USER).build();
          User user = User.builder()
                .id(UUID.randomUUID())
                .email(request.getEmail())
@@ -118,12 +152,12 @@ class AuthServiceImplTest {
                .build();
 
          when(bloomFilterService.mightContain(request.getEmail())).thenReturn(false);
-         when(roleRepository.findByName("ROLE_USER")).thenReturn(Optional.of(userRole));
+         when(cachedRoleService.getRoleByName(SecurityConstants.Roles.USER)).thenReturn(userRole);
          when(passwordEncoder.encode(anyString())).thenReturn("hashed_password");
          when(userMapper.toUser(any())).thenReturn(user);
          when(userRepository.save(any(User.class))).thenReturn(user);
          when(userProfileRepository.save(any(UserProfile.class))).thenReturn(new UserProfile());
-         when(jwtService.generateAccessToken(any(), any(), any(), any(), any())).thenReturn("access_token");
+         when(jwtService.generateAccessToken(any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any())).thenReturn("access_token");
          when(sessionService.getSession(any())).thenReturn(RedisSessionInfo.builder().userId(user.getId()).build());
          when(userMapper.toAuthResponse(any(), any(), any())).thenReturn(AuthResponse.builder()
                .email(request.getEmail())
@@ -138,7 +172,7 @@ class AuthServiceImplTest {
          verify(userRepository, times(1)).save(any(User.class));
          verify(bloomFilterService, times(1)).add(request.getEmail());
          verify(sessionService, times(1)).saveSession(any(), any(), anyLong());
-         verify(outboxService, times(1)).saveEvent(any(), eq("USER"), eq("USER_REGISTERED"), any());
+         verify(outboxService, times(1)).saveEvent(any(), eq("USER"), eq(EventConstants.USER_REGISTERED), any());
       }
 
       @Test
@@ -173,7 +207,7 @@ class AuthServiceImplTest {
                .password("password123")
                .rememberMe(false)
                .build();
-         Role role = Role.builder().name("ROLE_USER").build();
+         Role role = Role.builder().name(SecurityConstants.Roles.USER).build();
          User user = User.builder()
                .id(UUID.randomUUID())
                .email(request.getEmail())
@@ -185,14 +219,14 @@ class AuthServiceImplTest {
          when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
          when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
          when(twoFactorAuthService.is2FAEnabledForUser(user.getId())).thenReturn(false);
-         when(jwtService.generateAccessToken(any(), any(), any(), any(), any())).thenReturn("access_token");
+         when(jwtService.generateAccessToken(any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any())).thenReturn("access_token");
          when(sessionService.getSession(any())).thenReturn(RedisSessionInfo.builder().userId(user.getId()).build());
          when(userMapper.toAuthResponse(any(), any(), any())).thenReturn(AuthResponse.builder()
                .email(request.getEmail())
                .build());
 
          // Act
-         AuthResponse result = authService.login(request, "ip", "ua", response);
+         AuthResponse result = authService.login(request, "ip", "ua", response, null);
 
          // Assert
          assertThat(result).isNotNull();
@@ -211,7 +245,7 @@ class AuthServiceImplTest {
          when(bloomFilterService.mightContain(request.getEmail())).thenReturn(false);
 
          // Act & Assert
-         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response))
+         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response, null))
                .isInstanceOf(AppException.class)
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.INVALID_CREDENTIALS);
 
@@ -233,7 +267,7 @@ class AuthServiceImplTest {
          when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
 
          // Act & Assert
-         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response))
+         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response, null))
                .isInstanceOf(AppException.class)
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.INVALID_CREDENTIALS);
       }
@@ -247,7 +281,7 @@ class AuthServiceImplTest {
                .password("password123")
                .rememberMe(false)
                .build();
-         Role role = Role.builder().name("ROLE_USER").build();
+         Role role = Role.builder().name(SecurityConstants.Roles.USER).build();
          User user = User.builder()
                .id(UUID.randomUUID())
                .email(request.getEmail())
@@ -261,7 +295,7 @@ class AuthServiceImplTest {
          when(twoFactorAuthService.is2FAEnabledForUser(user.getId())).thenReturn(true);
 
          // Act & Assert
-         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response))
+         assertThatThrownBy(() -> authService.login(request, "ip", "ua", response, null))
                .isInstanceOf(AppException.class)
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.TWO_FACTOR_REQUIRED);
       }
@@ -291,7 +325,7 @@ class AuthServiceImplTest {
          // Verify reset token set
          verify(valueOps, times(1)).set(startsWith("reset_token:"), eq(email), eq(15L), any(TimeUnit.class));
          // Verify outbox event recorded
-         verify(outboxService, times(1)).saveEvent(any(), eq("USER"), eq("FORGOT_PASSWORD"), any());
+         verify(outboxService, times(1)).saveEvent(any(), eq("USER"), eq(EventConstants.FORGOT_PASSWORD), any());
       }
 
       @Test
@@ -370,4 +404,5 @@ class AuthServiceImplTest {
                .hasFieldOrPropertyWithValue("errorEnum", ErrorCode.INVALID_RESET_TOKEN);
       }
    }
+
 }

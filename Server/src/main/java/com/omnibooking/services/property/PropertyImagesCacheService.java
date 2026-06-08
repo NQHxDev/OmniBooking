@@ -2,7 +2,7 @@ package com.omnibooking.services.property;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.omnibooking.repository.MediaRepository;
+import com.omnibooking.repository.infra.MediaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -18,7 +18,9 @@ import java.util.concurrent.TimeUnit;
 public class PropertyImagesCacheService {
 
    private final StringRedisTemplate redisTemplate;
+
    private final MediaRepository mediaRepository;
+
    private final ObjectMapper objectMapper;
 
    private static final String CACHE_PREFIX = "property:images:";
@@ -30,25 +32,28 @@ public class PropertyImagesCacheService {
       String cacheKey = CACHE_PREFIX + propertyId;
       String lockKey = LOCK_PREFIX + propertyId;
 
-      // 1. Try to read from Redis cache
+      // Try to read from Redis cache
       String cachedValue = redisTemplate.opsForValue().get(cacheKey);
       if (cachedValue != null) {
          try {
-            return objectMapper.readValue(cachedValue, new TypeReference<List<String>>() {});
+            return objectMapper.readValue(cachedValue, new TypeReference<List<String>>() {
+            });
          } catch (Exception e) {
             log.error("Failed to deserialize property image URLs from Redis cache for key: {}", cacheKey, e);
          }
       }
 
-      // 2. Cache stampede protection using a distributed lock
+      // Cache stampede protection using a distributed lock
       Boolean acquired = redisTemplate.opsForValue().setIfAbsent(lockKey, "locked", LOCK_TTL_SECONDS, TimeUnit.SECONDS);
       if (Boolean.TRUE.equals(acquired)) {
          try {
-            // Double check locking pattern: check if another thread populated the cache while we waited for lock
+            // Double check locking pattern: check if another thread populated the cache
+            // while we waited for lock
             cachedValue = redisTemplate.opsForValue().get(cacheKey);
             if (cachedValue != null) {
                try {
-                  return objectMapper.readValue(cachedValue, new TypeReference<List<String>>() {});
+                  return objectMapper.readValue(cachedValue, new TypeReference<List<String>>() {
+                  });
                } catch (Exception e) {
                   log.error("Failed to deserialize property image URLs on double check", e);
                }
@@ -59,7 +64,8 @@ public class PropertyImagesCacheService {
             List<String> urls = queryDatabase(propertyId);
 
             try {
-               redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(urls), CACHE_TTL_DAYS, TimeUnit.DAYS);
+               redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(urls), CACHE_TTL_DAYS,
+                     TimeUnit.DAYS);
             } catch (Exception e) {
                log.error("Failed to serialize property image URLs to Redis cache for key: {}", cacheKey, e);
             }
@@ -84,7 +90,8 @@ public class PropertyImagesCacheService {
             cachedValue = redisTemplate.opsForValue().get(cacheKey);
             if (cachedValue != null) {
                try {
-                  return objectMapper.readValue(cachedValue, new TypeReference<List<String>>() {});
+                  return objectMapper.readValue(cachedValue, new TypeReference<List<String>>() {
+                  });
                } catch (Exception e) {
                   log.error("Failed to deserialize property image URLs from polled cache value", e);
                }
@@ -109,4 +116,5 @@ public class PropertyImagesCacheService {
             .map(com.omnibooking.model.Media::getUrl)
             .toList();
    }
+
 }

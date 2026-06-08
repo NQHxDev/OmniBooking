@@ -22,6 +22,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service("zalo")
 @RequiredArgsConstructor
@@ -29,7 +31,9 @@ import java.util.Objects;
 public class ZaloOAuth2ServiceImpl implements OAuth2ProviderService {
 
    private final AppProperties appProperties;
+
    private final RestTemplate restTemplate;
+
    private final StringRedisTemplate redisTemplate;
 
    private static final String ZALO_AUTH_URL = "https://oauth.zaloapp.com/v4/permission";
@@ -39,8 +43,8 @@ public class ZaloOAuth2ServiceImpl implements OAuth2ProviderService {
 
    @Override
    public String generateAuthUrl() {
-      String state = java.util.UUID.randomUUID().toString();
-      redisTemplate.opsForValue().set(STATE_PREFIX + state, "valid", 15, java.util.concurrent.TimeUnit.MINUTES);
+      String state = UUID.randomUUID().toString();
+      redisTemplate.opsForValue().set(STATE_PREFIX + state, "valid", 15, TimeUnit.MINUTES);
 
       return UriComponentsBuilder.fromUriString(ZALO_AUTH_URL)
             .queryParam("app_id", appProperties.getOauth2().getZalo().getClientId())
@@ -51,8 +55,6 @@ public class ZaloOAuth2ServiceImpl implements OAuth2ProviderService {
 
    @Override
    public OAuth2UserInfo exchangeCodeForUserInfo(String code, String state) {
-      log.info("[OAuth2] Fetching Zalo user info for code: {} and state: {}", code, state);
-
       // Validate state
       String stateKey = STATE_PREFIX + state;
       if (Boolean.FALSE.equals(redisTemplate.hasKey(stateKey))) {
@@ -124,4 +126,5 @@ public class ZaloOAuth2ServiceImpl implements OAuth2ProviderService {
    public String getProviderName() {
       return "zalo";
    }
+
 }

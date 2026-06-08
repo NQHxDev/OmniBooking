@@ -31,9 +31,11 @@ public class DestinationController {
       String ipAddress = getClientIp(request);
       String countryCode = geoLocationService.getCountryCode(ipAddress);
 
-      log.info("Fetching trending destinations for IP: {} (Country: {}) with locale: {}", ipAddress, countryCode, locale);
+      // log.info("Fetching trending destinations for IP: {} (Country: {}) with
+      // locale: {}", ipAddress, countryCode, locale);
 
       List<DestinationSuggestionResponse> trending = destinationService.getTrending(countryCode, locale);
+
       return ApiResponse.success(trending);
    }
 
@@ -43,17 +45,20 @@ public class DestinationController {
          @RequestParam(required = false, defaultValue = "vi") String locale) {
 
       List<DestinationSuggestionResponse> suggestions = destinationService.searchSuggestions(query, locale);
+
       return ApiResponse.success(suggestions);
    }
 
    private String getClientIp(HttpServletRequest request) {
       String remoteAddr = "";
+
       if (request != null) {
          remoteAddr = request.getHeader("X-FORWARDED-FOR");
          if (remoteAddr == null || "".equals(remoteAddr)) {
             remoteAddr = request.getRemoteAddr();
          }
       }
+
       return remoteAddr;
    }
 

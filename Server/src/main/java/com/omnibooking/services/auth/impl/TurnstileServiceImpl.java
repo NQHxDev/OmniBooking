@@ -26,6 +26,7 @@ import java.util.Objects;
 public class TurnstileServiceImpl implements TurnstileService {
 
    private final RestTemplate restTemplate;
+
    private final AppProperties appProperties;
 
    @Override

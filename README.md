@@ -95,7 +95,7 @@ OmniBooking áp dụng mô hình **Micro-Monorepo (Modular Monolith)** — một
                                               │
               ┌───────────────────────────────┼────────────────────────────┐
               │                               │                            │
-    ┌─────────▼──────────┐      ┌─────────────▼──────────┐    ┌───────────▼────────┐
+    ┌─────────▼──────────┐      ┌─────────────▼──────────┐    ┌────────────▼───────┐
     │     Web Portal     │      │     Partner Portal     │    │     Owner Portal   │
     │     Next.js 16     │      │        Next.js 16      │    │     Next.js 16     │
     │     Port 3000      │      │        Port 3002       │    │     Port 3005      │
@@ -192,10 +192,10 @@ OmniBooking triển khai mô hình bảo mật **Defense in Depth** — nhiều 
 │  Client Request                                                         │
 │       │                                                                 │
 │       ▼                                                                 │
-│  ┌─────────────────────┐     ┌──────────────────────────────┐           │
-│  │ Extract JWT Cookie  │────▶│ Validate JWT Signature       │           │
-│  │ (HttpOnly, Lax)     │     │ (JJWT + HMAC-SHA256)         │           │
-│  └─────────────────────┘     └──────────────┬───────────────┘           │
+│  ┌─────────────────────┐      ┌──────────────────────────────┐          │
+│  │ Extract JWT Cookie  │────> │ Validate JWT Signature       │          │
+│  │ (HttpOnly, Lax)     │      │ (JJWT + HMAC-SHA256)         │          │
+│  └─────────────────────┘      └─────────────┬────────────────┘          │
 │                                             │                           │
 │                                             ▼                           │
 │                              ┌──────────────────────────────┐           │
@@ -217,16 +217,16 @@ OmniBooking triển khai mô hình bảo mật **Defense in Depth** — nhiều 
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Tính năng                       | Mô tả                                                                                                               |
-| :------------------------------ | :------------------------------------------------------------------------------------------------------------------ |
-| **JWT + HttpOnly Cookies**      | Access token, Refresh token, Session ID, Fingerprint — tất cả lưu trong HttpOnly, SameSite=Lax cookies              |
-| **Dual-Key Fingerprinting**     | JWT chứa hash của cookie `x_fgp`. Cả hai phải khớp mới xác thực — chống token theft & session hijacking             |
-| **Redis Session (Fail-Closed)** | Mỗi request validate session trong Redis. Nếu Redis lỗi → **HTTP 503** (không bao giờ fallback insecure)            |
-| **Token Version Revocation**    | Mỗi User có `token_version`. Đổi mật khẩu → tăng version → tất cả JWT cũ bị thu hồi ngay lập tức trên toàn hệ thống |
-| **Atomic Refresh Rotation**     | Lưu & verify session mới trong Redis TRƯỚC KHI thu hồi session cũ. Nếu fail → rollback giữ session cũ hoạt động     |
-| **Refresh DoS Prevention**      | Distributed lock (SET NX PX) + Lua script release — ngăn chặn tấn công DoS trên endpoint refresh                    |
-| **Double-Submit CSRF**          | Cookie `csrf_token` + Header `X-CSRF-Token` + Origin validation = chống CSRF toàn diện                              |
-| **Cookie Domain Safety**        | `CookieDomainInitializer` kiểm tra `COOKIE_DOMAIN` phải được cấu hình khi chạy production profile                   |
+| Tính năng                       | Mô tả                                                                                                                                                                                  |
+| :------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **JWT + HttpOnly Cookies**      | Access token, Refresh token, Session ID, Fingerprint — tất cả lưu trong HttpOnly, SameSite=Lax cookies                                                                                 |
+| **Dual-Key Fingerprinting**     | JWT chứa hash của cookie `x_fgp`. Cả hai phải khớp mới xác thực — chống token theft & session hijacking                                                                                |
+| **Redis Session (Fail-Closed)** | Mỗi request validate session trong Redis. Nếu Redis lỗi → **HTTP 503** (không bao giờ fallback insecure)                                                                               |
+| **Token Version Revocation**    | Mỗi User có `token_version`. Đổi mật khẩu → tăng version → tất cả JWT cũ bị thu hồi ngay lập tức trên toàn hệ thống                                                                    |
+| **Atomic Refresh Rotation**     | Lưu & verify session mới trong Redis TRƯỚC KHI thu hồi session cũ. Nếu fail → rollback giữ session cũ hoạt động                                                                        |
+| **Refresh DoS Prevention**      | Distributed lock (SET NX PX) + Lua script release — ngăn chặn tấn công DoS trên endpoint refresh                                                                                       |
+| **Double-Submit CSRF**          | Token sinh qua HMAC-SHA256 liên kết chặt chẽ với `session_id`, rotate tại Login/Logout/Refresh, Origin validation chuẩn hóa qua URI, và hỗ trợ bootstrap chủ động qua `GET /auth/csrf` |
+| **Cookie Domain Safety**        | `CookieDomainInitializer` kiểm tra `COOKIE_DOMAIN` phải được cấu hình khi chạy production profile                                                                                      |
 
 ### Phương thức Xác thực
 
@@ -342,8 +342,8 @@ OmniBooking triển khai **Transactional Outbox** ở mức production-grade v�
 │                                                                      │
 │  Business Transaction                                                │
 │       │                                                              │
-│       ├──▶ Save Entity (DB)         ── Same Transaction ──┐          │
-│       └──▶ Save OutboxEvent (DB)    ◀─────────────────────┘          │
+│       ├──> Save Entity (DB)         ── Same Transaction ──┐          │
+│       └──> Save OutboxEvent (DB)    <─────────────────────┘          │
 │                    │                                                 │
 │                    ▼                                                 │
 │            afterCommit() → Wake-Up Signal (AtomicBoolean)            │
@@ -356,10 +356,10 @@ OmniBooking triển khai **Transactional Outbox** ở mức production-grade v�
 │         └─────────┬──────────────┘                                   │
 │                   │                                                  │
 │                   ▼                                                  │
-│         ┌─────────────────────┐     ┌──────────────────────┐         │
-│         │   Publish to Kafka  │────▶│  Idempotent Consumer │         │
-│         └─────────────────────┘     │  (Claim-then-Process)│         │
-│                                     └──────────────────────┘         │
+│         ┌─────────────────────┐      ┌──────────────────────┐        │
+│         │   Publish to Kafka  │────> │  Idempotent Consumer │        │
+│         └─────────────────────┘      │  (Claim-then-Process)│        │
+│                                      └──────────────────────┘        │
 │                                                                      │
 │  On Failure: Exponential Backoff (1m → 5m → 15m → 1h → Dead Letter)  │
 └──────────────────────────────────────────────────────────────────────┘
@@ -406,12 +406,12 @@ OmniBooking triển khai **Transactional Outbox** ở mức production-grade v�
 Mỗi request được gắn `X-Request-ID` duy nhất, truyền xuyên suốt từ Client → Next.js → Spring Boot → Kafka → Database:
 
 ```
-Client                 Next.js               Spring Boot            Kafka Consumer
-  │                      │                      │                      │
-  │ X-Request-ID: abc123 │                      │                      │
-  ├─────────────────────▶├─────────────────────▶├─────────────────────▶│
-  │                      │                      │ MDC.put("requestId") │
-  │                      │                      │ SQL Comment: abc123  │
+Client                   Next.js               Spring Boot               Kafka Consumer
+  │                        │                        │                        │
+  │ X-Request-ID: abc123   │                        │                        │
+  ├──────────────────────> ├──────────────────────> ├──────────────────────> │
+  │                        │                        │ MDC.put("requestId")   │
+  │                        │                        │ SQL Comment: abc123    │
 ```
 
 ### Structured Logging (4 Streams)

@@ -1,6 +1,9 @@
 package com.omnibooking.security;
 
 import com.omnibooking.services.auth.JWTService;
+import com.omnibooking.services.auth.SessionService;
+
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,8 +16,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -22,11 +23,16 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
+import com.omnibooking.config.AppProperties;
 
 @Configuration
 @EnableWebSecurity
@@ -34,18 +40,21 @@ import jakarta.servlet.http.HttpServletResponse;
 public class SecurityConfig {
 
    private final JWTService jwtService;
+
    private final CustomUserDetailsService userDetailsService;
+
    private final StringRedisTemplate redisTemplate;
+
    private final ObjectMapper objectMapper;
-   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
 
-   @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:http://localhost:3000}")
+   private final MeterRegistry meterRegistry;
+
+   private final AppProperties appProperties;
+
+   private final SessionService sessionService;
+
+   @Value("${app.cors.allowed-origins:http://localhost:3000}")
    private String allowedOrigins;
-
-   @Bean
-   public PasswordEncoder passwordEncoder() {
-      return Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
-   }
 
    @Bean
    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
@@ -58,10 +67,10 @@ public class SecurityConfig {
       CorsConfiguration config = new CorsConfiguration();
       config.setAllowCredentials(true);
       if (allowedOrigins != null && !allowedOrigins.isBlank()) {
-         config.setAllowedOrigins(java.util.Arrays.stream(allowedOrigins.split(","))
+         config.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
                .map(String::trim)
                .filter(s -> !s.isEmpty())
-               .collect(java.util.stream.Collectors.toList()));
+               .collect(Collectors.toList()));
       }
       config.setAllowedHeaders(List.of(
             "Authorization",
@@ -82,15 +91,26 @@ public class SecurityConfig {
       config.setExposedHeaders(List.of("Set-Cookie", "X-Request-ID", "X-Correlation-ID"));
       config.setMaxAge(3600L);
       source.registerCorsConfiguration("/**", config);
+
       return source;
    }
 
    @Bean
    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
       JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtService, userDetailsService, redisTemplate,
-            meterRegistry);
-      CustomCsrfFilter csrfFilter = new CustomCsrfFilter(objectMapper, allowedOrigins,
-            meterRegistry);
+            meterRegistry, sessionService, appProperties);
+      CustomCsrfFilter csrfFilter = new CustomCsrfFilter(
+            objectMapper,
+            allowedOrigins,
+            meterRegistry,
+            appProperties.getSecurity().getCsrfBypassPatterns(),
+            appProperties.getSecurity().isCookieSecure(),
+            appProperties.getSecurity().getCsrfSecret() != null
+                  && !appProperties.getSecurity().getCsrfSecret().isBlank()
+                        ? appProperties.getSecurity().getCsrfSecret()
+                        : appProperties.getSecurity().getJwtSecret(),
+            sessionService,
+            appProperties.getSecurity().getTrustedHosts());
 
       http
             .csrf(AbstractHttpConfigurer::disable)
@@ -102,10 +122,12 @@ public class SecurityConfig {
                   .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh", "/auth/logout",
                         "/auth/2fa/login",
                         "/auth/forgot-password", "/auth/reset-password", "/auth/google/**", "/auth/subscribe/**",
-                        "/auth/finalize-registration",
-                        "/auth/check-email", "/auth/activate-guest")
+                        "/auth/finalize-registration", "/auth/registration-status/**",
+                        "/auth/check-email", "/auth/activate-guest", "/auth/csrf")
                   .permitAll()
                   .requestMatchers(HttpMethod.POST, "/bookings").permitAll()
+                  .requestMatchers(HttpMethod.GET, "/bookings/**").permitAll()
+                  .requestMatchers("/payments/**").permitAll()
                   .requestMatchers("/properties/search", "/properties/search/**").permitAll()
                   .requestMatchers("/destinations", "/destinations/**").permitAll()
                   .requestMatchers("/health/**").permitAll()
@@ -115,6 +137,7 @@ public class SecurityConfig {
                   .requestMatchers("/actuator/**").permitAll()
                   // Allow public property details view if needed
                   .requestMatchers(HttpMethod.GET, "/properties/**").permitAll()
+                  .requestMatchers("/admin/**").hasRole("ADMIN")
                   .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(csrfFilter, JwtAuthenticationFilter.class)

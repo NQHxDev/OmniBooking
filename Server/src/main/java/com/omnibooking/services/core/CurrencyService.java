@@ -2,8 +2,8 @@ package com.omnibooking.services.core;
 
 import com.omnibooking.config.AppProperties;
 import com.omnibooking.model.ExchangeRate;
-import com.omnibooking.repository.CurrencyRepository;
-import com.omnibooking.repository.ExchangeRateRepository;
+import com.omnibooking.repository.payment.CurrencyRepository;
+import com.omnibooking.repository.payment.ExchangeRateRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -29,9 +29,13 @@ public class CurrencyService {
    private static final String RATE_CACHE_PREFIX = "currency:rate:";
 
    private final CurrencyRepository currencyRepository;
+
    private final ExchangeRateRepository exchangeRateRepository;
+
    private final AppProperties appProperties;
+
    private final RestTemplate restTemplate;
+
    private final StringRedisTemplate redisTemplate;
 
    /**
@@ -81,8 +85,10 @@ public class CurrencyService {
       String url = String.format(appProperties.getCurrency().getProviderUrl(), apiKey, base);
 
       try {
-         ParameterizedTypeReference<Map<String, Object>> responseType = new ParameterizedTypeReference<>() {};
-         ResponseEntity<Map<String, Object>> responseEntity = restTemplate.exchange(url, HttpMethod.GET, null, responseType);
+         ParameterizedTypeReference<Map<String, Object>> responseType = new ParameterizedTypeReference<>() {
+         };
+         ResponseEntity<Map<String, Object>> responseEntity = restTemplate.exchange(url, HttpMethod.GET, null,
+               responseType);
          Map<String, Object> response = responseEntity.getBody();
 
          if (response != null && "success".equals(response.get("result"))
@@ -113,7 +119,8 @@ public class CurrencyService {
                   exchangeRateRepository.save(exchangeRate);
 
                   // Cache in Redis (TTL 4 hours)
-                  redisTemplate.opsForValue().set(RATE_CACHE_PREFIX + currencyCode, bigRate.toString(), 4, TimeUnit.HOURS);
+                  redisTemplate.opsForValue().set(RATE_CACHE_PREFIX + currencyCode, bigRate.toString(), 4,
+                        TimeUnit.HOURS);
                }
             });
             log.info("Successfully updated exchange rates from API for {} supported currencies.",

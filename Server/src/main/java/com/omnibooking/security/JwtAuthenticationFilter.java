@@ -1,14 +1,28 @@
 package com.omnibooking.security;
 
 import com.omnibooking.services.auth.JWTService;
+import com.omnibooking.services.auth.SessionService;
+import com.omnibooking.config.AppProperties;
 import com.omnibooking.util.CookieUtils;
 import com.omnibooking.util.SecurityUtils;
+import com.omnibooking.dto.ApiResponse;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+import java.util.concurrent.TimeUnit;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -18,6 +32,15 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Claims;
+import io.micrometer.common.lang.NonNull;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.data.redis.RedisConnectionFailureException;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.QueryTimeoutException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.MediaType;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -29,13 +52,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
    private final StringRedisTemplate redisTemplate;
 
-   private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+   private final MeterRegistry meterRegistry;
+
+   private final SessionService sessionService;
+
+   private final AppProperties appProperties;
 
    @Override
    protected void doFilterInternal(
-         @org.springframework.lang.NonNull HttpServletRequest request,
-         @org.springframework.lang.NonNull HttpServletResponse response,
-         @org.springframework.lang.NonNull FilterChain filterChain)
+         @NonNull HttpServletRequest request,
+         @NonNull HttpServletResponse response,
+         @NonNull FilterChain filterChain)
          throws ServletException, IOException {
 
       if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
@@ -48,33 +75,46 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
          String sessionIdFromCookie = CookieUtils.getCookieValue(request, CookieUtils.SESSION_ID);
 
          if (accessToken != null && sessionIdFromCookie != null) {
-            UUID userId = jwtService.extractUserId(accessToken);
-            UUID sessionIdFromJwt = jwtService.extractSessionId(accessToken);
-            String fgpHashFromJwt = jwtService.extractFingerprintHash(accessToken);
+            Claims claims = jwtService.extractAllClaims(accessToken);
+            String subject = claims.getSubject();
+            UUID userId = subject != null ? UUID.fromString(subject) : null;
+
+            String sessionIdFromJwtStr = claims.get("sessionId", String.class);
+            UUID sessionIdFromJwt = sessionIdFromJwtStr != null ? UUID.fromString(sessionIdFromJwtStr) : null;
+
+            String fgpHashFromJwt = claims.get("fgh", String.class);
             String fingerprintFromCookie = CookieUtils.getCookieValue(request, CookieUtils.FINGERPRINT);
             if (fingerprintFromCookie == null) {
                fingerprintFromCookie = request.getHeader("x-fgp");
             }
 
-            // 1. Verify SessionID consistency
-            if (sessionIdFromCookie == null || !sessionIdFromJwt.toString().equals(sessionIdFromCookie)) {
+            // Verify SessionID consistency
+            if (sessionIdFromCookie == null || sessionIdFromJwt == null
+                  || !sessionIdFromJwt.toString().equals(sessionIdFromCookie)) {
                log.warn("Session ID mismatch detected for user: {}", userId);
                filterChain.doFilter(request, response);
                return;
             }
 
-            // 2. Verify Fingerprint consistency
-            if (fingerprintFromCookie == null || fgpHashFromJwt == null ||
-                  !SecurityUtils.hashFingerprint(fingerprintFromCookie).equals(fgpHashFromJwt)) {
+            // Verify Fingerprint consistency with versioned pepper
+            String fgh_v = claims.get("fgh_v", String.class);
+            String pepper = null;
+            if (fgh_v != null && appProperties.getSecurity().getFingerprintPeppers() != null) {
+               pepper = appProperties.getSecurity().getFingerprintPeppers().get(fgh_v);
+            }
+            String expectedHash = SecurityUtils.hashFingerprint(fingerprintFromCookie, pepper);
+            if (fingerprintFromCookie == null || fgpHashFromJwt == null || !expectedHash.equals(fgpHashFromJwt)) {
                log.warn("Fingerprint mismatch or missing for user: {}. Possible token theft.", userId);
+               writeAuditLog(userId, sessionIdFromJwt, "FINGERPRINT_MISMATCH", request);
                filterChain.doFilter(request, response);
                return;
             }
 
-            // 3. Stateful Verification: Check Redis
-            String redisKey = "refresh:" + sessionIdFromJwt;
+            // Stateful Verification: Check Redis Hash
+            RedisSessionInfo sessionInfo = null;
             try {
-               if (Boolean.FALSE.equals(redisTemplate.hasKey(redisKey))) {
+               sessionInfo = sessionService.getSession(sessionIdFromJwt);
+               if (sessionInfo == null) {
                   log.warn("Session not found in Redis for sessionId: {}", sessionIdFromJwt);
                   filterChain.doFilter(request, response);
                   return;
@@ -85,21 +125,118 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                return;
             }
 
-            // 4. Set Authentication
-            if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-               UserDetails userDetails = userDetailsService.loadUserById(userId.toString());
+            // Verify Session Ownership
+            if (userId == null || !userId.equals(sessionInfo.getUserId())) {
+               log.warn("Session ownership mismatch: JWT userId = {}, Redis userId = {}", userId,
+                     sessionInfo.getUserId());
+               writeAuditLog(sessionInfo.getUserId(), sessionIdFromJwt, "SESSION_OWNERSHIP_MISMATCH", request);
+               sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Session ownership validation failed.",
+                     "SESSION_OWNERSHIP_MISMATCH", request);
+               return;
+            }
 
-               if (userDetails instanceof UserPrincipal userPrincipal) {
-                  Integer tokenVersionFromJwt = jwtService.extractTokenVersion(accessToken);
-                  if (tokenVersionFromJwt == null || !tokenVersionFromJwt.equals(userPrincipal.getTokenVersion())) {
-                     log.warn("Token version mismatch for user: {}. Expected {}, got {}", userId, userPrincipal.getTokenVersion(), tokenVersionFromJwt);
+            // Verify Session Version (P3)
+            Integer jwtSessionVersion = claims.get("sv", Integer.class);
+            if (jwtSessionVersion == null) {
+               jwtSessionVersion = 1;
+            }
+            if (!jwtSessionVersion.equals(sessionInfo.getSessionVersion())) {
+               log.warn("Session version mismatch: JWT version = {}, Redis version = {}", jwtSessionVersion,
+                     sessionInfo.getSessionVersion());
+               writeAuditLog(userId, sessionIdFromJwt, "SESSION_VERSION_MISMATCH", request);
+               sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Session version validation failed.",
+                     "SESSION_VERSION_MISMATCH", request);
+               return;
+            }
+
+            // Verify Session Active status
+            if (!sessionInfo.isActive()) {
+               log.warn("Attempt to authenticate using inactive pending session: {}", sessionIdFromJwt);
+               sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "Session is not active.",
+                     "SESSION_INACTIVE", request);
+               return;
+            }
+
+            // Cache sessionInfo in request attributes
+            request.setAttribute("sessionInfo", sessionInfo);
+
+            // Set Authentication
+            if (userId != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+               String versionKey = "user_token_version:" + userId;
+               Integer tokenVersionFromJwt = claims.get("tokenVersion", Integer.class);
+               String cachedVersionStr = null;
+               try {
+                  cachedVersionStr = redisTemplate.opsForValue().get(versionKey);
+               } catch (Exception ex) {
+                  log.error("Redis is unavailable during token version cache lookup: {}", ex.getMessage());
+                  handleRedisFailure(request, response, ex);
+                  return;
+               }
+
+               Integer tokenVersion;
+               if (cachedVersionStr != null) {
+                  meterRegistry.counter("omnibooking.auth.token_version.cache.hit").increment();
+                  tokenVersion = Integer.parseInt(cachedVersionStr);
+               } else {
+                  meterRegistry.counter("omnibooking.auth.token_version.cache.miss").increment();
+                  // Cache miss: Load from DB and populate cache
+                  UserDetails userDetails;
+                  try {
+                     userDetails = userDetailsService.loadUserById(userId.toString());
+                  } catch (Exception ex) {
+                     log.error("Failed to load user from DB on token version cache miss: {}", ex.getMessage());
+                     filterChain.doFilter(request, response);
+                     return;
+                  }
+
+                  if (userDetails instanceof UserPrincipal userPrincipal) {
+                     tokenVersion = userPrincipal.getTokenVersion();
+                     try {
+                        redisTemplate.opsForValue().set(versionKey, String.valueOf(tokenVersion), 30, TimeUnit.DAYS);
+                     } catch (Exception ex) {
+                        log.error("Failed to populate token version cache in Redis: {}", ex.getMessage());
+                     }
+                  } else {
                      filterChain.doFilter(request, response);
                      return;
                   }
                }
 
+               if (tokenVersionFromJwt == null || !tokenVersionFromJwt.equals(tokenVersion)) {
+                  log.warn("Token version mismatch for user: {}. Expected {}, got {}", userId, tokenVersion,
+                        tokenVersionFromJwt);
+                  filterChain.doFilter(request, response);
+                  return;
+               }
+
+               // Reconstruct UserPrincipal from JWT claims without DB hit! (Task 3)
+               Set<String> roles = java.util.Collections.emptySet();
+               Object rolesObj = claims.get("roles");
+               if (rolesObj instanceof List<?> rolesList) {
+                  roles = rolesList.stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .collect(Collectors.toSet());
+               }
+               List<SimpleGrantedAuthority> authorities = roles.stream()
+                     .map(SimpleGrantedAuthority::new)
+                     .collect(Collectors.toList());
+
+               String email = claims.get("email", String.class);
+               String username = claims.get("username", String.class);
+
+               UserPrincipal principal = UserPrincipal.builder()
+                     .id(userId)
+                     .username(username != null && !username.isBlank() ? username : userId.toString())
+                     .email(email != null ? email : "")
+                     .password("") // Password not needed for session auth
+                     .authorities(authorities)
+                     .active(true)
+                     .tokenVersion(tokenVersion)
+                     .build();
+
                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                     userDetails, null, userDetails.getAuthorities());
+                     principal, null, principal.getAuthorities());
                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                SecurityContextHolder.getContext().setAuthentication(authentication);
             }
@@ -114,31 +251,86 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       filterChain.doFilter(request, response);
    }
 
-   private void handleRedisFailure(HttpServletRequest request, HttpServletResponse response, Exception ex) throws IOException {
+   private void handleRedisFailure(HttpServletRequest request, HttpServletResponse response, Exception ex)
+         throws IOException {
       String requestId = (String) request.getAttribute("requestId");
-      
+
       // Classify Redis exception reason
       String reason = "lookup_failure";
-      if (ex instanceof org.springframework.dao.QueryTimeoutException || ex.getMessage().toLowerCase().contains("timeout")) {
+      if (ex instanceof QueryTimeoutException || ex.getMessage().toLowerCase().contains("timeout")) {
          reason = "timeout";
-      } else if (ex instanceof org.springframework.data.redis.RedisConnectionFailureException ||
-                 ex instanceof org.springframework.dao.DataAccessResourceFailureException) {
+      } else if (ex instanceof RedisConnectionFailureException || ex instanceof DataAccessResourceFailureException) {
          reason = "connection_failure";
       }
-      
+
       meterRegistry.counter("omnibooking.auth.redis.failures", "reason", reason).increment();
       meterRegistry.counter("omnibooking.auth.rejections", "reason", "redis_unavailable").increment();
-      
-      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE); // HTTP 503
-      response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
+
+      response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      response.setContentType(MediaType.APPLICATION_JSON_VALUE);
       response.setCharacterEncoding("UTF-8");
 
-      com.omnibooking.dto.ApiResponse<Object> apiResponse = com.omnibooking.dto.ApiResponse.error(
+      ApiResponse<Object> apiResponse = ApiResponse.error(
             "Authentication service is temporarily unavailable. Please try again later.",
             "SERVICE_UNAVAILABLE",
             ex.getMessage(),
             requestId);
-      response.getWriter().write(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(apiResponse));
+      response.getWriter().write(new ObjectMapper().writeValueAsString(apiResponse));
+   }
+
+   private void sendErrorResponse(HttpServletResponse response, int status, String message, String code,
+         HttpServletRequest request)
+         throws IOException {
+      String requestId = (String) request.getAttribute("requestId");
+      response.setStatus(status);
+      response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+      response.setCharacterEncoding("UTF-8");
+
+      ApiResponse<Object> apiResponse = ApiResponse.error(
+            message,
+            code,
+            null,
+            requestId);
+      response.getWriter().write(new ObjectMapper().writeValueAsString(apiResponse));
+   }
+
+   private void writeAuditLog(UUID userId, UUID sessionId, String classification, HttpServletRequest request) {
+      try {
+         long timestamp = System.currentTimeMillis();
+         String auditSecret = appProperties.getSecurity().getAuditSecret();
+         String payloadToSign = (userId != null ? userId.toString() : "null") + ":" +
+               (sessionId != null ? sessionId.toString() : "null") + ":" +
+               timestamp + ":" +
+               classification;
+
+         String auditHash = "";
+         try {
+            Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(
+                  auditSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            sha256_HMAC.init(secretKeySpec);
+            byte[] hash = sha256_HMAC.doFinal(payloadToSign.getBytes(StandardCharsets.UTF_8));
+            auditHash = HexFormat.of().formatHex(hash);
+         } catch (Exception ex) {
+            log.error("Failed to generate audit HMAC signature", ex);
+         }
+
+         String sourceIp = request.getRemoteAddr();
+         String userAgent = request.getHeader("User-Agent");
+
+         String logMessage = String.format(
+               "{\"userId\":\"%s\",\"sessionId\":\"%s\",\"classification\":\"%s\",\"sourceIp\":\"%s\",\"userAgent\":\"%s\",\"timestamp\":%d,\"auditHash\":\"%s\"}",
+               userId != null ? userId.toString() : "null",
+               sessionId != null ? sessionId.toString() : "null",
+               classification,
+               sourceIp,
+               userAgent != null ? userAgent.replace("\"", "\\\"") : "",
+               timestamp,
+               auditHash);
+         LoggerFactory.getLogger("AUDIT_LOGGER").info("SECURITY_AUDIT_EVENT: {}", logMessage);
+      } catch (Exception e) {
+         log.error("Failed to write structured security audit log", e);
+      }
    }
 
 }

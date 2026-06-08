@@ -30,4 +30,8 @@ public class PropertyResponse implements Serializable {
 
    private String imageUrl;
 
+   private java.math.BigDecimal averageRating;
+
+   private Integer reviewCount;
+
 }

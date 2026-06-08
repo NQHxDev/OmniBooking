@@ -8,7 +8,6 @@ import { partnerService } from "@/lib/api/services/partnerService";
 import PartnerNavbar from "@/components/PartnerNavbar";
 import { useAuthStore } from "@/store/useAuthStore";
 import { getPartnerUrl } from "@omnibooking/shared";
-import { env } from "@/env";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 
@@ -75,7 +74,7 @@ export default function PartnerRegisterPage() {
             setCountdown((prev) => prev - 1);
          }, 1000);
       } else if (step === "SUCCESS" && countdown === 0) {
-         window.location.href = `${getPartnerUrl(window.location.origin)}/dashboard`;
+         window.location.href = "/";
       }
       return () => clearInterval(timer);
    }, [step, countdown, router]);
@@ -92,7 +91,7 @@ export default function PartnerRegisterPage() {
 
    const handleVerify = async () => {
       try {
-         await partnerService.verifyOtp(code);
+         await partnerService.verifyOtp(code.trim());
          setStep("TERMS");
          toast.success(t("toasts.verifySuccess"));
       } catch {
@@ -165,7 +164,7 @@ export default function PartnerRegisterPage() {
                                  type="text"
                                  placeholder={t("otpPlaceholder")}
                                  value={code}
-                                 onChange={(e) => setCode(e.target.value)}
+                                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:ring-2 focus:ring-[#006ce4] focus:bg-white outline-none transition-all font-mono tracking-[0.5em] uppercase text-center text-xl pl-[0.5em]"
                               />
                            </div>
@@ -277,16 +276,16 @@ export default function PartnerRegisterPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                            <Link
                               href="/"
-                              className="px-6 py-4 bg-zinc-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-lg"
+                              className="px-6 py-4 bg-zinc-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-lg text-center"
                            >
                               {t("goHome")}
                            </Link>
-                           <Link
-                              href="/become-a-host"
-                              className="px-6 py-4 bg-white border border-zinc-200 text-zinc-900 rounded-xl font-bold hover:bg-zinc-50 transition-all"
+                           <a
+                              href={`${getPartnerUrl(window.location.origin)}/dashboard`}
+                              className="px-6 py-4 bg-white border border-zinc-200 text-zinc-900 rounded-xl font-bold hover:bg-zinc-50 transition-all text-center"
                            >
-                              {t("viewIntro")}
-                           </Link>
+                              {t("viewDashboard")}
+                           </a>
                         </div>
                      </div>
                   )}

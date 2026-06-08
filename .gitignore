@@ -10,9 +10,12 @@ node_modules/
 .antigravity/
 .codegraph/
 
-.env
-.env.local
-.env.*.local
+*.zip
+
+env/.env
+env/.env.local
+env/.env.prod
+env/.env.*.local
 
 Todo.md
 NOTE.md
@@ -32,6 +35,8 @@ Server/.classpath
 Server/.factorypath
 Server/.mvn/wrapper/*.jar
 !Server/.mvn/wrapper/maven-wrapper.jar
+Server/src/main/resources/mock-users.json
+Server/load-tests/summary.*
 
 # --- Frontend (Client - Next.js / Node) ---
 *.tsbuildinfo

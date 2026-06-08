@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 import java.util.Collections;
 import java.util.Objects;
@@ -24,7 +26,7 @@ public class BloomFilterService {
     */
    public void createFilter(String filterName, double errorRate, long capacity) {
       try {
-         org.springframework.data.redis.core.script.RedisScript<String> script = new org.springframework.data.redis.core.script.DefaultRedisScript<>(
+         RedisScript<String> script = new DefaultRedisScript<>(
                "return redis.call('BF.RESERVE', KEYS[1], ARGV[1], ARGV[2])", String.class);
 
          redisTemplate.execute(script,
@@ -42,7 +44,7 @@ public class BloomFilterService {
       if (value == null)
          return;
       try {
-         org.springframework.data.redis.core.script.RedisScript<Long> script = new org.springframework.data.redis.core.script.DefaultRedisScript<>(
+         RedisScript<Long> script = new DefaultRedisScript<>(
                "return redis.call('BF.ADD', KEYS[1], ARGV[1])", Long.class);
 
          redisTemplate.execute(script, Objects.requireNonNull(Collections.singletonList(EMAIL_FILTER)), value);
@@ -55,7 +57,7 @@ public class BloomFilterService {
       if (value == null)
          return false;
       try {
-         org.springframework.data.redis.core.script.RedisScript<Long> script = new org.springframework.data.redis.core.script.DefaultRedisScript<>(
+         RedisScript<Long> script = new DefaultRedisScript<>(
                "return redis.call('BF.EXISTS', KEYS[1], ARGV[1])", Long.class);
 
          Long result = redisTemplate.execute(script, Objects.requireNonNull(Collections.singletonList(EMAIL_FILTER)),

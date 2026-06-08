@@ -3,6 +3,8 @@ package com.omnibooking.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.dto.BookingResponse;
 import com.omnibooking.dto.CreateBookingRequest;
+import com.omnibooking.mapper.PropertyDocumentMapper;
+import com.omnibooking.mapper.UserMapper;
 import com.omnibooking.model.enums.BookingStatus;
 import com.omnibooking.services.booking.BookingService;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import jakarta.servlet.http.Cookie;
+import com.omnibooking.util.CookieUtils;
 
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
@@ -45,10 +49,10 @@ public class BookingControllerTest {
    private BookingService bookingService;
 
    @MockitoBean
-   private com.omnibooking.mapper.PropertyDocumentMapper propertyDocumentMapper;
+   private PropertyDocumentMapper propertyDocumentMapper;
 
    @MockitoBean
-   private com.omnibooking.mapper.UserMapper userMapper;
+   private UserMapper userMapper;
 
    // Mock external systems to avoid connection issues in tests
    @MockitoBean
@@ -103,6 +107,8 @@ public class BookingControllerTest {
       Mockito.when(bookingService.createBooking(any(CreateBookingRequest.class), any())).thenReturn(response);
 
       mockMvc.perform(post("/bookings")
+            .cookie(new Cookie(CookieUtils.CSRF_TOKEN, "test_csrf"))
+            .header("X-CSRF-Token", "test_csrf")
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
@@ -110,4 +116,5 @@ public class BookingControllerTest {
             .andExpect(jsonPath("$.data.bookingCode").value("ABC12345"))
             .andExpect(jsonPath("$.data.guestEmail").value("john@example.com"));
    }
+
 }

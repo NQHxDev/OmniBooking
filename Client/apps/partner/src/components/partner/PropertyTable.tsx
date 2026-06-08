@@ -54,7 +54,7 @@ export default function PropertyTable({ properties }: PropertyTableProps) {
       <div className="space-y-8">
          {/* Grid View - Smaller and more elegant cards */}
          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
-            {visibleProperties.map((property, index) => (
+            {visibleProperties.map((property) => (
                <div
                   key={property.id}
                   className="group relative flex flex-col overflow-hidden rounded-[2rem] bg-white shadow-sm border border-zinc-100 hover:shadow-xl hover:shadow-zinc-200 transition-all duration-500"

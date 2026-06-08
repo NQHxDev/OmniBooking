@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -31,21 +32,41 @@ public class JWTService {
    /**
     * Generate an Access Token with userId, roles, and sessionId.
     */
-   public String generateAccessToken(UUID userId, java.util.Collection<String> roles, UUID sessionId,
+   public String generateAccessToken(UUID userId, Collection<String> roles, UUID sessionId,
          String fingerprintHash) {
-      return generateAccessToken(userId, roles, sessionId, fingerprintHash, 0);
+      return generateAccessToken(userId, userId.toString(), "", roles, sessionId, fingerprintHash, 0);
    }
 
    /**
     * Generate an Access Token with userId, roles, sessionId, and tokenVersion.
     */
-   public String generateAccessToken(UUID userId, java.util.Collection<String> roles, UUID sessionId,
+   public String generateAccessToken(UUID userId, Collection<String> roles, UUID sessionId,
          String fingerprintHash, Integer tokenVersion) {
+      return generateAccessToken(userId, userId.toString(), "", roles, sessionId, fingerprintHash, tokenVersion);
+   }
+
+   /**
+    * Generate an Access Token with userId, username, email, roles, sessionId, and tokenVersion.
+    */
+   public String generateAccessToken(UUID userId, String username, String email, Collection<String> roles,
+         UUID sessionId, String fingerprintHash, Integer tokenVersion) {
+      return generateAccessToken(userId, username, email, roles, sessionId, fingerprintHash, tokenVersion, 1, null);
+   }
+
+   /**
+    * Generate an Access Token with userId, username, email, roles, sessionId, tokenVersion, sessionVersion, and fingerprintPepperVersion.
+    */
+   public String generateAccessToken(UUID userId, String username, String email, Collection<String> roles,
+         UUID sessionId, String fingerprintHash, Integer tokenVersion, Integer sessionVersion, String fingerprintPepperVersion) {
       return Jwts.builder()
             .subject(userId.toString())
+            .claim("username", username)
+            .claim("email", email)
             .claim("roles", roles)
             .claim("sessionId", sessionId.toString())
             .claim("fgh", fingerprintHash)
+            .claim("fgh_v", fingerprintPepperVersion)
+            .claim("sv", sessionVersion != null ? sessionVersion : 1)
             .claim("tokenVersion", tokenVersion != null ? tokenVersion : 0)
             .issuedAt(new Date())
             .expiration(new Date(System.currentTimeMillis() + expiration))
@@ -86,6 +107,14 @@ public class JWTService {
       return extractAllClaims(token).get("fgh", String.class);
    }
 
+   public String extractEmail(String token) {
+      return extractAllClaims(token).get("email", String.class);
+   }
+
+   public String extractUsername(String token) {
+      return extractAllClaims(token).get("username", String.class);
+   }
+
    public Integer extractTokenVersion(String token) {
       return extractAllClaims(token).get("tokenVersion", Integer.class);
    }
@@ -100,6 +129,14 @@ public class JWTService {
       }
 
       return Collections.emptySet();
+   }
+
+   public String extractFingerprintPepperVersion(String token) {
+      return extractAllClaims(token).get("fgh_v", String.class);
+   }
+
+   public Integer extractSessionVersion(String token) {
+      return extractAllClaims(token).get("sv", Integer.class);
    }
 
 }

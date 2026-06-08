@@ -49,27 +49,6 @@ services:
       JVM_OPTS: "-Xms32M -Xmx64M"
       SERVER_SERVLET_CONTEXTPATH: "/"
 
-  server:
-    build: ./Server
-    container_name: omnibooking-server
-    ports:
-      - "${SERVER_PORT}:8080"
-    environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - KAFKA_SERVERS=kafka:29092
-      - ELASTICSEARCH_URIS=http://elasticsearch:9200
-    depends_on:
-      - db
-      - redis
-      - kafka
-      - elasticsearch
-
   elasticsearch:
     build:
       context: .
@@ -103,16 +82,6 @@ services:
       - "5601:5601"
     depends_on:
       - elasticsearch
-
-  client:
-    build: ./Client
-    container_name: omnibooking-client
-    ports:
-      - "${CLIENT_PORT}:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-    depends_on:
-      - server
 
   prometheus:
     image: prom/prometheus:latest

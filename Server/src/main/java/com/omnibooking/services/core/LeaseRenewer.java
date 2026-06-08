@@ -9,13 +9,16 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Helper class that periodically renews the database idempotency claim lease for long-running processes.
- * Implements {@link AutoCloseable} to clean up its background worker thread upon exit in a try-with-resources.
+ * Helper class that periodically renews the database idempotency claim lease
+ * for long-running processes.
+ * Implements {@link AutoCloseable} to clean up its background worker thread
+ * upon exit in a try-with-resources.
  */
 @Slf4j
 public class LeaseRenewer implements AutoCloseable {
 
    private final ScheduledExecutorService scheduler;
+
    private final ScheduledFuture<?> future;
 
    public LeaseRenewer(IdempotencyService idempotencyService, UUID eventId, String consumerGroup) {
@@ -29,7 +32,8 @@ public class LeaseRenewer implements AutoCloseable {
          thread.setDaemon(true);
          return thread;
       });
-      // Periodically renew the lease every 2 minutes, extending the lease to 5 minutes from now
+      // Periodically renew the lease every 2 minutes, extending the lease to 5
+      // minutes from now
       this.future = this.scheduler.scheduleAtFixedRate(() -> {
          try {
             idempotencyService.renewLease(eventId, consumerGroup, java.time.Duration.ofMinutes(5));

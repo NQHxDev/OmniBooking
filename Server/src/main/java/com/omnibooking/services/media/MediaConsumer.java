@@ -1,11 +1,12 @@
 package com.omnibooking.services.media;
 
+import com.omnibooking.constant.EventConstants;
 import com.omnibooking.config.KafkaConfig;
 import com.omnibooking.dto.CloudinaryResponse;
 import com.omnibooking.dto.event.MediaUploadEvent;
 import com.omnibooking.model.Media;
-import com.omnibooking.repository.MediaRepository;
-import com.omnibooking.repository.PropertyRepository;
+import com.omnibooking.repository.infra.MediaRepository;
+import com.omnibooking.repository.property.PropertyRepository;
 import com.omnibooking.dto.event.PropertySyncEvent;
 import com.omnibooking.services.property.PropertyService;
 import com.omnibooking.services.property.PropertyImagesCacheService;
@@ -64,11 +65,11 @@ public class MediaConsumer {
 
       CloudinaryResponse response = null;
       try (LeaseRenewer ignored = new LeaseRenewer(idempotencyService, event.getEventId(), consumerGroup)) {
-         // 1. Upload to Cloudinary
+         // Upload to Cloudinary
          response = cloudinaryService.upload(event.getFileBytes(), event.getFolder());
          log.info("[Kafka Consumer] Uploaded to Cloudinary. URL: {}", response.url());
 
-         // 2. Persist to Database
+         // Persist to Database
          Media media = Media.builder()
                .url(response.secureUrl())
                .publicId(response.publicId())
@@ -122,7 +123,7 @@ public class MediaConsumer {
             outboxService.saveEvent(
                   propertyId,
                   "PROPERTY",
-                  "PROPERTY_SYNC",
+                  EventConstants.PROPERTY_SYNC,
                   PropertySyncEvent.builder()
                         .propertyId(propertyId)
                         .operation("CREATE")
@@ -166,4 +167,5 @@ public class MediaConsumer {
          throw new RuntimeException("Media processing failed, rolled back changes", e);
       }
    }
+
 }

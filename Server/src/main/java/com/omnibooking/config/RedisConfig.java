@@ -26,6 +26,7 @@ public class RedisConfig {
 
    public static final String FEATURED_PROPERTIES = "featured_properties";
    public static final String TRENDING_DESTINATIONS = "trending_destinations";
+   public static final String PROPERTY_PRICING = "property_pricing";
 
    @Bean(name = "cacheManager")
    @Primary
@@ -49,6 +50,9 @@ public class RedisConfig {
       // Trending destinations can stay even longer (e.g., 24 hours)
       cacheConfigurations.put(TRENDING_DESTINATIONS, defaultConfig.entryTtl(Duration.ofHours(24)));
 
+      // Dynamic pricing rules can stay for 30 minutes
+      cacheConfigurations.put(PROPERTY_PRICING, defaultConfig.entryTtl(Duration.ofMinutes(30)));
+
       return RedisCacheManager.builder(connectionFactory)
             .cacheDefaults(defaultConfig)
             .withInitialCacheConfigurations(cacheConfigurations)
@@ -64,4 +68,5 @@ public class RedisConfig {
 
       return mapper;
    }
+
 }

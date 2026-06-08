@@ -11,7 +11,10 @@ export interface CreateBookingRequest {
    guestPhone?: string;
    specialRequests?: string;
    couponId?: string;
+   reservationToken?: string;
    currency?: string;
+   paymentMethod?: string;
+   guestCount?: number;
 }
 
 export interface BookingResponse {
@@ -29,6 +32,29 @@ export interface BookingResponse {
    status: string;
    activationToken?: string;
    currency?: string;
+   depositAmount?: number;
+   requiresDeposit?: boolean;
+   paymentMethod?: string;
+}
+
+export interface StayPriceResult {
+   dailyPrices: {
+      date: string;
+      basePrice: number;
+      seasonalAdjustment: number;
+      weekendAdjustment: number;
+      occupancyAdjustment: number;
+      finalPrice: number;
+      appliedRuleIds: string[];
+   }[];
+   totalBasePrice: number;
+   totalSeasonalAdjustment: number;
+   totalWeekendAdjustment: number;
+   totalOccupancyAdjustment: number;
+   totalCouponDiscount: number;
+   totalFinalPrice: number;
+   appliedCouponId?: string;
+   appliedCouponCode?: string;
 }
 
 export const bookingService = {
@@ -37,6 +63,37 @@ export const bookingService = {
          "/bookings",
          request,
          { withCredentials: true }
+      );
+      return response.data;
+   },
+   getById: async (id: string): Promise<BookingResponse> => {
+      const response = await apiClient.get<unknown, ApiResponse<BookingResponse>>(
+         `/bookings/${id}`,
+         { withCredentials: true }
+      );
+      return response.data;
+   },
+   getMyBookings: async (): Promise<BookingResponse[]> => {
+      const response = await apiClient.get<unknown, ApiResponse<BookingResponse[]>>(
+         "/bookings/mine",
+         { withCredentials: true }
+      );
+      return response.data;
+   },
+   calculatePrice: async (params: {
+      propertyId: string;
+      roomTypeId: string;
+      checkIn: string;
+      checkOut: string;
+      guestCount: number;
+      couponCode?: string;
+   }): Promise<StayPriceResult> => {
+      const response = await apiClient.get<unknown, ApiResponse<StayPriceResult>>(
+         "/bookings/calculate-price",
+         {
+            params,
+            withCredentials: true,
+         }
       );
       return response.data;
    },

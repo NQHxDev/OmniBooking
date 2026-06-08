@@ -1,5 +1,6 @@
 package com.omnibooking.services.auth.impl;
 
+import com.omnibooking.constant.EventConstants;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.config.AppProperties;
@@ -10,8 +11,8 @@ import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
 import com.omnibooking.model.UserTwoFactor;
-import com.omnibooking.repository.UserRepository;
-import com.omnibooking.repository.UserTwoFactorRepository;
+import com.omnibooking.repository.user.UserRepository;
+import com.omnibooking.repository.user.UserTwoFactorRepository;
 import com.omnibooking.services.auth.TwoFactorAuthService;
 import com.omnibooking.services.communication.MailService;
 import com.omnibooking.services.core.EncryptionService;
@@ -26,6 +27,7 @@ import dev.samstevens.totp.time.SystemTimeProvider;
 import dev.samstevens.totp.time.TimeProvider;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -34,12 +36,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class TwoFactorAuthServiceImpl implements TwoFactorAuthService {
+
+   private static final String INCR_EXPIRE_SCRIPT =
+         "local val = redis.call('incr', KEYS[1]); " +
+         "if val == 1 then " +
+         "  redis.call('expire', KEYS[1], tonumber(ARGV[1])); " +
+         "end; " +
+         "return val;";
 
    private final UserRepository userRepository;
 
@@ -146,7 +156,7 @@ public class TwoFactorAuthServiceImpl implements TwoFactorAuthService {
          outboxService.saveEvent(
                user.getId(),
                "USER",
-               "TWO_FACTOR_ENABLED",
+               EventConstants.TWO_FACTOR_ENABLED,
                emailEvent);
 
       } catch (AppException e) {
@@ -318,14 +328,26 @@ public class TwoFactorAuthServiceImpl implements TwoFactorAuthService {
          return true;
       }
 
-      // Handle failed attempt rate limiting
+      // Handle failed attempt rate limiting atomically
       String failedAttemptsKey = "totp:failed:" + userId;
-      Long failedCount = redisTemplate.opsForValue().increment(failedAttemptsKey);
+      Long failedCount = 0L;
+      try {
+         failedCount = redisTemplate.execute(
+               new DefaultRedisScript<>(INCR_EXPIRE_SCRIPT, Long.class),
+               Collections.singletonList(failedAttemptsKey),
+               "300" // 5 minutes = 300 seconds
+         );
+      } catch (Exception e) {
+         log.error("Failed to execute atomic failure increment for TOTP: {}", userId, e);
+         try {
+            failedCount = redisTemplate.opsForValue().increment(failedAttemptsKey);
+            redisTemplate.expire(failedAttemptsKey, 5, TimeUnit.MINUTES);
+         } catch (Exception ex) {
+            log.error("Fallback TOTP increment also failed: {}", userId, ex);
+         }
+      }
       if (failedCount == null) {
          failedCount = 1L;
-      }
-      if (failedCount == 1) {
-         redisTemplate.expire(failedAttemptsKey, 5, TimeUnit.MINUTES);
       }
       if (failedCount >= 5) {
          redisTemplate.opsForValue().set(lockKey, "locked", 15, TimeUnit.MINUTES);
