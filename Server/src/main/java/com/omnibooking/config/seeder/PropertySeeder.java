@@ -16,7 +16,12 @@ import com.omnibooking.model.Role;
 import com.omnibooking.model.RoomAvailability;
 import com.omnibooking.model.RoomType;
 import com.omnibooking.model.User;
+import com.omnibooking.repository.infra.MediaRepository;
 import com.omnibooking.repository.property.AmenityRepository;
+import com.omnibooking.repository.property.CancellationPolicyRepository;
+import com.omnibooking.repository.property.PropertyRepository;
+import com.omnibooking.repository.property.RoomAvailabilityRepository;
+import com.omnibooking.repository.property.RoomTypeRepository;
 import com.omnibooking.services.auth.CachedRoleService;
 import com.omnibooking.repository.user.UserRepository;
 import com.omnibooking.services.media.CloudinaryService;
@@ -25,9 +30,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 
 import java.io.File;
 import java.io.InputStream;
@@ -38,8 +40,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Component
@@ -52,6 +54,16 @@ public class PropertySeeder {
 
    private final AmenityRepository amenityRepository;
 
+   private final PropertyRepository propertyRepository;
+
+   private final RoomTypeRepository roomTypeRepository;
+
+   private final RoomAvailabilityRepository roomAvailabilityRepository;
+
+   private final MediaRepository mediaRepository;
+
+   private final CancellationPolicyRepository cancellationPolicyRepository;
+
    private final AppProperties appProperties;
 
    private final ObjectMapper objectMapper;
@@ -59,9 +71,6 @@ public class PropertySeeder {
    private final CloudinaryService cloudinaryService;
 
    private final org.springframework.cache.CacheManager cacheManager;
-
-   @PersistenceContext
-   private EntityManager entityManager;
 
    private static final String[] BANNER_FILE_NAMES = {
          "BannerOne.jpg", "BannerTwo.jpg", "BannerThree.jpg", "BannerFour.jpg", "BannerFive.jpg",
@@ -87,14 +96,11 @@ public class PropertySeeder {
    @Transactional
    public void cleanUp() {
       log.info("Cleaning up existing properties, rooms, availabilities, media...");
-      entityManager.createQuery("DELETE FROM Media m WHERE m.entityType IN ('PROPERTY', 'ROOM_TYPE')")
-            .executeUpdate();
-      entityManager.createQuery("DELETE FROM RoomAvailability ra").executeUpdate();
-      entityManager.createQuery("DELETE FROM RoomType rt").executeUpdate();
-      entityManager.createQuery("DELETE FROM Property p").executeUpdate();
-      entityManager.createQuery("DELETE FROM CancellationPolicy cp").executeUpdate();
-      entityManager.flush();
-      entityManager.clear();
+      mediaRepository.deleteByEntityTypeIn(List.of("PROPERTY", "ROOM_TYPE"));
+      roomAvailabilityRepository.deleteAllInBatch();
+      roomTypeRepository.deleteAllInBatch();
+      propertyRepository.deleteAllInBatch();
+      cancellationPolicyRepository.deleteAllInBatch();
 
       // Clear Redis caches to prevent stale data
       if (cacheManager != null) {
@@ -112,7 +118,7 @@ public class PropertySeeder {
 
    @Transactional
    public void seed(boolean force) {
-      long propertyCount = entityManager.createQuery("SELECT COUNT(p) FROM Property p", Long.class).getSingleResult();
+      long propertyCount = propertyRepository.count();
       if (propertyCount > 0 && !force) {
          return;
       }
@@ -166,7 +172,7 @@ public class PropertySeeder {
             .freeCancellationDays(1)
             .penaltyPercentage(new BigDecimal("100.00"))
             .build();
-      entityManager.persist(policy);
+      policy = cancellationPolicyRepository.save(policy);
 
       String cloudName = appProperties.getCloudinary().getCloudName();
 
@@ -227,7 +233,7 @@ public class PropertySeeder {
          User owner = existingUsers.get(random.nextInt(existingUsers.size()));
          if (!owner.getRoles().contains(partnerRole)) {
             owner.getRoles().add(partnerRole);
-            entityManager.merge(owner); // Save the role promotion
+            userRepository.save(owner);
          }
 
          // Determine Property Type
@@ -264,7 +270,7 @@ public class PropertySeeder {
                .legalOwnerName("Owner of " + propertyName)
                .build();
 
-         entityManager.persist(property);
+         property = propertyRepository.save(property);
 
          // Seed Media for Property (Main banner)
          String bannerImageId = UuidCreator.getTimeOrderedEpoch().toString();
@@ -298,7 +304,7 @@ public class PropertySeeder {
                .entityType(MediaConstants.PROPERTY_TYPE)
                .isMain(true)
                .build();
-         entityManager.persist(mainMedia);
+         mediaRepository.save(mainMedia);
 
          // Seed Media for Property
          int numSubImages = 6 + random.nextInt(5);
@@ -318,7 +324,7 @@ public class PropertySeeder {
                   .entityType(MediaConstants.PROPERTY_TYPE)
                   .isMain(false)
                   .build();
-            entityManager.persist(subMedia);
+            mediaRepository.save(subMedia);
          }
 
          // Seed Room Types with different attributes and increasing prices
@@ -384,10 +390,11 @@ public class PropertySeeder {
                   .bedType(bedType)
                   .build();
 
-            entityManager.persist(roomType);
+            roomType = roomTypeRepository.save(roomType);
 
-            // 8. Seed Room Availability for the next 30 days
+            // Seed Room Availability for the next 30 days
             LocalDate today = LocalDate.now();
+            List<RoomAvailability> availabilities = new ArrayList<>();
             for (int day = 0; day < 30; day++) {
                LocalDate date = today.plusDays(day);
                RoomAvailability availability = RoomAvailability.builder()
@@ -397,19 +404,16 @@ public class PropertySeeder {
                      .priceOverride(null) // use base price
                      .isClosed(false)
                      .build();
-               entityManager.persist(availability);
+               availabilities.add(availability);
             }
+            roomAvailabilityRepository.saveAll(availabilities);
          }
 
          if ((i + 1) % 5 == 0) {
-            entityManager.flush();
-            entityManager.clear();
             log.info("Seeded {}/{} properties...", i + 1, properties.size());
          }
       }
 
-      entityManager.flush();
-      entityManager.clear();
       log.info("Successfully seeded all {} properties and room types into the database!", properties.size());
    }
 

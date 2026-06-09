@@ -1,4 +1,4 @@
--- V1: Initial Complete Schema Setup
+-- Initial Complete Schema Setup
 
 -- 1. Base Tables (No Foreign Keys)
 CREATE TABLE IF NOT EXISTS roles (
@@ -39,10 +39,10 @@ CREATE TABLE IF NOT EXISTS users (
    password VARCHAR(255), -- Nullable for social login users
    is_active BOOLEAN DEFAULT TRUE,
    version BIGINT DEFAULT 0,
+   token_version INT NOT NULL DEFAULT 0,
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-   deleted_at TIMESTAMP WITH TIME ZONE,
-   token_version INT NOT NULL DEFAULT 0
+   deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS amenities (
@@ -211,10 +211,11 @@ CREATE TABLE IF NOT EXISTS properties (
    tax_code VARCHAR(255),
    legal_owner_name VARCHAR(255),
 
-   -- Aggregated Rating Fields (from V4)
+   -- Aggregated Rating Fields
    average_rating NUMERIC(4,2) DEFAULT 0.00,
    review_count INTEGER DEFAULT 0,
-   rating_sum BIGINT DEFAULT 0
+   rating_sum BIGINT DEFAULT 0,
+   expected_image_count INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS room_types (
@@ -447,7 +448,7 @@ CREATE TABLE IF NOT EXISTS processed_events (
    PRIMARY KEY (event_id, consumer_group)
 );
 
--- Reviews Schema (from V4 + V5)
+-- Reviews
 CREATE TABLE IF NOT EXISTS reviews (
    id UUID PRIMARY KEY,
    booking_id UUID NOT NULL UNIQUE,
@@ -466,6 +467,7 @@ CREATE TABLE IF NOT EXISTS reviews (
    moderation_reason VARCHAR(255),
    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   version BIGINT NOT NULL DEFAULT 0,
 
    CONSTRAINT reviews_booking_id_fkey FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE RESTRICT,
    CONSTRAINT reviews_property_id_fkey FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE,
@@ -474,7 +476,7 @@ CREATE TABLE IF NOT EXISTS reviews (
    FOREIGN KEY (moderated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- Price Rules & Versioning (from V6)
+-- Price Rules & Versioning
 CREATE TABLE IF NOT EXISTS price_rules (
    id UUID PRIMARY KEY,
    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
@@ -489,6 +491,7 @@ CREATE TABLE IF NOT EXISTS price_rules (
    priority INT NOT NULL DEFAULT 0,
    is_active BOOLEAN NOT NULL DEFAULT true,
    version INT NOT NULL DEFAULT 0,
+   deleted_at TIMESTAMP WITH TIME ZONE,
    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
 
@@ -518,7 +521,7 @@ CREATE TABLE IF NOT EXISTS price_rule_versions (
    CONSTRAINT chk_version_occupancy_valid CHECK (rule_type <> 'OCCUPANCY' OR occupancy_threshold > 0)
 );
 
--- Coupon Reservations (from V6)
+-- Coupon Reservations
 CREATE TABLE IF NOT EXISTS coupon_reservations (
    id UUID PRIMARY KEY,
    coupon_id UUID NOT NULL REFERENCES coupons(id) ON DELETE CASCADE,
@@ -532,7 +535,7 @@ CREATE TABLE IF NOT EXISTS coupon_reservations (
    CONSTRAINT chk_reservation_status CHECK (status IN ('ACTIVE', 'CONSUMED', 'EXPIRED'))
 );
 
--- Booking Price Breakdowns (from V6)
+-- Booking Price Breakdowns
 CREATE TABLE IF NOT EXISTS booking_price_breakdowns (
    id UUID PRIMARY KEY,
    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -559,7 +562,7 @@ CREATE TABLE IF NOT EXISTS booking_applied_rule_versions (
    CONSTRAINT chk_applied_rule_adj_nonzero CHECK (adjustment_amount <> 0)
 );
 
--- Update coupons table with scope property_id and reserved_count (from V6)
+-- Coupon scoping & reservation tracking
 ALTER TABLE coupons ADD COLUMN property_id UUID REFERENCES properties(id) ON DELETE CASCADE;
 ALTER TABLE coupons ADD COLUMN reserved_count INT NOT NULL DEFAULT 0;
 
@@ -600,21 +603,45 @@ CREATE INDEX idx_user_two_factor_user_id ON user_two_factor(user_id);
 CREATE INDEX idx_partner_legal_profiles_partner_active ON partner_legal_profiles(partner_id, is_active);
 CREATE INDEX IF NOT EXISTS idx_processed_events_time ON processed_events(processed_at);
 
--- Registration inbox & DLT indexes (from V2 + V3)
+-- Registration inbox & DLT indexes
 CREATE INDEX IF NOT EXISTS idx_reg_inbox_status_retry ON registration_inbox(status, next_retry_at) WHERE status IN ('PENDING', 'PROCESSING');
 CREATE INDEX IF NOT EXISTS idx_reg_dlt_status ON registration_dlt(status);
 
--- Reviews indexes (from V4)
+-- Reviews indexes
 CREATE INDEX idx_reviews_property_created ON reviews(property_id, created_at DESC) WHERE deleted_at IS NULL AND status = 'PUBLISHED';
 CREATE INDEX idx_reviews_user ON reviews(user_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_reviews_booking ON reviews(booking_id);
 CREATE INDEX idx_reviews_moderation ON reviews(status, created_at) WHERE deleted_at IS NULL;
 
--- Pricing audit & reservation indexes (from V6)
+-- Pricing audit & reservation indexes
 CREATE INDEX idx_coupon_res_active_expiry ON coupon_reservations(expires_at) WHERE status = 'ACTIVE';
 CREATE INDEX idx_audit_old_values ON pricing_audit_logs USING gin (old_values);
 CREATE INDEX idx_audit_new_values ON pricing_audit_logs USING gin (new_values);
 CREATE INDEX idx_audit_correlation ON pricing_audit_logs(correlation_id);
+
+-- Foreign Key Indexes
+-- Every FK column should be indexed to avoid sequential scans during
+-- parent-table DELETE/UPDATE and referential integrity checks.
+CREATE INDEX idx_properties_cancellation_policy_id ON properties(cancellation_policy_id);
+CREATE INDEX idx_bookings_room_type_id ON bookings(room_type_id);
+CREATE INDEX idx_bookings_coupon_id ON bookings(coupon_id);
+CREATE INDEX idx_booking_status_logs_booking_id ON booking_status_logs(booking_id);
+CREATE INDEX idx_booking_status_logs_changed_by ON booking_status_logs(changed_by);
+CREATE INDEX idx_search_logs_user_id ON search_logs(user_id);
+CREATE INDEX idx_partner_legal_profiles_partner_id ON partner_legal_profiles(partner_id);
+CREATE INDEX idx_reviews_property_id ON reviews(property_id);
+CREATE INDEX idx_reviews_user_id ON reviews(user_id);
+CREATE INDEX idx_reviews_deleted_by ON reviews(deleted_by);
+CREATE INDEX idx_reviews_moderated_by ON reviews(moderated_by);
+CREATE INDEX idx_price_rules_property_id ON price_rules(property_id);
+CREATE INDEX idx_price_rules_room_type_id ON price_rules(room_type_id);
+CREATE INDEX idx_price_rule_versions_price_rule_id ON price_rule_versions(price_rule_id);
+CREATE INDEX idx_coupon_reservations_coupon_id ON coupon_reservations(coupon_id);
+CREATE INDEX idx_coupon_reservations_customer_id ON coupon_reservations(customer_id);
+CREATE INDEX idx_coupon_reservations_property_id ON coupon_reservations(property_id);
+CREATE INDEX idx_booking_price_breakdowns_booking_id ON booking_price_breakdowns(booking_id);
+CREATE INDEX idx_booking_applied_rule_versions_breakdown_id ON booking_applied_rule_versions(booking_breakdown_id);
+CREATE INDEX idx_booking_applied_rule_versions_rule_version_id ON booking_applied_rule_versions(rule_version_id);
 
 COMMENT ON COLUMN user_passkeys.deleted_at IS 'Timestamp of soft deletion';
 
@@ -675,19 +702,19 @@ SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'ROLE_ADMIN' ON CON
 
 -- ROLE_PARTNER
 INSERT INTO roles_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'ROLE_PARTNER' 
+SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'ROLE_PARTNER'
 AND p.name IN ('property:read', 'property:write', 'property:delete', 'room:read', 'room:write', 'room:delete', 'booking:read', 'booking:manage', 'booking:cancel', 'review:read', 'review:reply', 'earning:read', 'partner:profile:read', 'partner:profile:write')
 ON CONFLICT DO NOTHING;
 
 -- ROLE_DRIVER
 INSERT INTO roles_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'ROLE_DRIVER' 
+SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'ROLE_DRIVER'
 AND p.name IN ('ride:read', 'ride:manage', 'vehicle:read', 'vehicle:write', 'vehicle:delete', 'earning:read', 'partner:profile:read', 'partner:profile:write')
 ON CONFLICT DO NOTHING;
 
 -- ROLE_USER
 INSERT INTO roles_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'ROLE_USER' 
+SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'ROLE_USER'
 AND p.name IN ('property:read', 'room:read', 'booking:read', 'booking:write', 'booking:cancel', 'review:read', 'review:write', 'ride:read', 'ride:write', 'vehicle:read', 'user:read')
 ON CONFLICT DO NOTHING;
 
@@ -700,7 +727,7 @@ ON CONFLICT (code) DO NOTHING;
 
 -- Standard Amenities
 -- General Amenities
-INSERT INTO amenities (id, name, category, icon_url) VALUES 
+INSERT INTO amenities (id, name, category, icon_url) VALUES
 (gen_random_uuid(), 'Free Wi-Fi', 'GENERAL', 'wifi'),
 (gen_random_uuid(), 'Swimming Pool', 'GENERAL', 'pool'),
 (gen_random_uuid(), 'Parking', 'GENERAL', 'parking'),
@@ -714,7 +741,7 @@ INSERT INTO amenities (id, name, category, icon_url) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Room Amenities
-INSERT INTO amenities (id, name, category, icon_url) VALUES 
+INSERT INTO amenities (id, name, category, icon_url) VALUES
 (gen_random_uuid(), 'Air Conditioning', 'ROOM', 'ac'),
 (gen_random_uuid(), 'Flat-screen TV', 'ROOM', 'tv'),
 (gen_random_uuid(), 'Balcony', 'ROOM', 'balcony'),
@@ -725,7 +752,7 @@ INSERT INTO amenities (id, name, category, icon_url) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Bathroom Amenities
-INSERT INTO amenities (id, name, category, icon_url) VALUES 
+INSERT INTO amenities (id, name, category, icon_url) VALUES
 (gen_random_uuid(), 'Private Bathroom', 'BATHROOM', 'bathroom'),
 (gen_random_uuid(), 'Hairdryer', 'BATHROOM', 'hairdryer'),
 (gen_random_uuid(), 'Free Toiletries', 'BATHROOM', 'toiletries'),
@@ -735,7 +762,7 @@ INSERT INTO amenities (id, name, category, icon_url) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Kitchen Amenities
-INSERT INTO amenities (id, name, category, icon_url) VALUES 
+INSERT INTO amenities (id, name, category, icon_url) VALUES
 (gen_random_uuid(), 'Refrigerator', 'KITCHEN', 'refrigerator'),
 (gen_random_uuid(), 'Microwave', 'KITCHEN', 'microwave'),
 (gen_random_uuid(), 'Electric Kettle', 'KITCHEN', 'kettle'),

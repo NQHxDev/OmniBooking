@@ -40,11 +40,10 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 
 ### Business Modules
 
-...
-
-### API Standardization
-
-...
+- **Property & Inventory**: Separation of `properties` (the establishment) and `room_types` (specific offerings). `room_availability` manages daily inventory counts and `price_override` for seasonal/event-based pricing.
+- **Amenities**: Polymorphic junction tables for both property-level (`property_amenities`) and room-level (`room_amenities`) amenity assignment.
+- **Booking Engine**: State machine with full traceability via `booking_status_logs` (Pending → Confirmed → Stayed → Cancelled). Guest-specific data stored per booking, independent from account profile.
+- **Financials**: `cancellation_policies` define free cancellation windows and penalty tiers. `transactions` tracks PAYMENT/REFUND events with JSONB metadata for payment provider integration. `coupons` supports percentage/fixed discounts with usage limits and validity periods.
 
 ### Performance & Scalability
 
@@ -71,7 +70,7 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 - **Health Monitoring**: Integrated Spring Boot Actuator for real-time system monitoring.
 - **Request Context**: `RequestContextHolder` (ThreadLocal) provides global access to request-scoped data (Trace ID, User ID), similar to NestJS ExecutionContext.
 
-## 5. Frontend Core Patterns
+## 4. Frontend Core Patterns
 
 ### Edge-level Locale-Preserving Redirects
 
@@ -108,7 +107,7 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 
 - **Health Monitoring**: Integrated Spring Boot Actuator for real-time system monitoring.
 
-## 6. Security Architecture
+## 5. Security Architecture
 
 - **Security Foundation**: Robust `SecurityConfig` set up with CORS enabled, stateless session policy, and CSRF protection enabled for cookie-based authentication via `CustomCsrfFilter`. State-changing requests verify that the `csrf_token` cookie and `X-CSRF-Token` header match, using HMAC-SHA256 bound to the backend `session_id` to prevent token spoofing. It also performs normalized Origin comparison using parsed URIs.
 - **Public/Private Split**: Clear separation between public metadata/swagger endpoints and secured API routes.
@@ -116,7 +115,7 @@ Implemented `redis/redis-stack-server` to support high-performance operations an
 - **Security Standard**: All API security checks must use constants from `SecurityConstants` via SpEL (e.g., `T(com.omnibooking.constant.SecurityConstants.Roles).ADMIN`) to ensure consistency and avoid hardcoded strings.
 - **Layout Guards**: Role-based access control implemented at the Next.js layout level using derived state from Zustand to prevent unauthorized access and flickering.
 
-## 7. Authentication & Session Management
+## 6. Authentication & Session Management
 
 The system implements a robust, secure authentication mechanism designed for production environments:
 
@@ -139,7 +138,7 @@ The system implements a robust, secure authentication mechanism designed for pro
 - **OAuth2 CSRF Protection**: Both Google and Zalo OAuth2 providers implement secure `state` parameter validation. A unique UUID state is dynamically generated and stored in Redis with a 15-minute expiration before initiating the authorization flow. Upon callback execution, the state parameter returned by the provider is matched against Redis, mitigating OAuth CSRF and session hijacking attempts.
 - **Stateless Verification**: The backend validates JWTs without DB lookups for primary access, using Redis for session invalidation (Logout).
 
-## 8. Partner Onboarding Lifecycle
+## 7. Partner Onboarding Lifecycle
 
 To maintain platform quality, the partner registration is a multi-stage verified process:
 
@@ -147,7 +146,7 @@ To maintain platform quality, the partner registration is a multi-stage verified
 2. **Role Upgrade**: Upon verification, the user's role is upgraded to `ROLE_PARTNER` via a specialized backend endpoint.
 3. **Session Re-authentication**: After upgrade, a new JWT containing the updated roles is issued to ensure immediate access to partner-specific features.
 
-## 9. Messaging & Asynchronous Processing
+## 8. Messaging & Asynchronous Processing
 
 To ensure high performance and non-blocking operations, the system implements an asynchronous messaging pipeline:
 
@@ -158,7 +157,7 @@ To ensure high performance and non-blocking operations, the system implements an
    - **Delivery**: A consumer listens to the topic and invokes the **Resend SDK** to perform the actual email delivery.
 - **Template Engine**: Uses **Thymeleaf** to render premium HTML email templates with dynamic data injection.
 
-## 10. Configuration Management (NestJS Style)
+## 9. Configuration Management (NestJS Style)
 
 The system uses a centralized, type-safe configuration pattern similar to NestJS ConfigModule:
 
@@ -167,28 +166,7 @@ The system uses a centralized, type-safe configuration pattern similar to NestJS
 - **Validation & Fail-Fast**: Uses Bean Validation (`@NotBlank`, `@Validated`) to ensure all critical environment variables are present at startup.
 - **Environment Mapping**: Mapped from the root `.env` file into `application.properties` via `${VAR_NAME}` syntax.
 
-## 11. Database V2 Architecture (Booking & Property)
-
-The V2 schema expands the system to support a complete hospitality business lifecycle:
-
-### Property Management Module
-
-- **Granular Inventory**: Separation of `properties` (the establishment) and `room_types` (specific offerings).
-- **Dynamic Pricing & Availability**: `room_availability` table manages daily inventory counts and `price_override` for seasonal or event-based pricing.
-- **Flexible Amenities**: A polymorphic-style approach using junction tables for both property-level and room-level amenities.
-
-### Booking Engine
-
-- **State Machine Logging**: `bookings` status changes are tracked in `booking_status_logs` for full traceability (Pending -> Confirmed -> Stayed -> Cancelled).
-- **Guest-centric Data**: Stores specific guest information for each booking, allowing it to differ from the account holder's profile.
-
-### Financials & Cancellations
-
-- **Automated Refund Calculation**: `cancellation_policies` define free cancellation windows and penalty tiers.
-- **Transaction History**: `transactions` table tracks all `PAYMENT` and `REFUND` events, with a `JSONB` metadata column for deep integration with payment providers (Stripe, etc.).
-- **Promotion Ready**: `coupons` table supports various discount types (Percentage, Fixed) with usage limits and validity periods.
-
-## 12. Media Management & Image Optimization
+## 10. Media Management & Image Optimization
 
 OmniBooking uses a hybrid approach for media to ensure high performance:
 
@@ -205,7 +183,7 @@ To prevent bottlenecks during heavy media operations:
 - **Async Workflow**: For non-critical updates (e.g., bulk property image sync), the backend publishes a `MediaProcessedEvent` to Kafka.
 - **Decoupled Processing**: Worker services consume these events to perform secondary tasks like generating search indices or updating social metadata without blocking the user request.
 
-## 13. Security & Password Recovery Flow
+## 11. Security & Password Recovery Flow
 
 The system implements a multi-layered security approach for sensitive operations like password resets:
 
@@ -225,7 +203,7 @@ The system implements a multi-layered security approach for sensitive operations
 - **Vietnamese Typography**: Shared `AuthBranding` component uses optimized `leading-tight` and `font-weight` to prevent character clipping for accented Vietnamese text.
 - **Error Obfuscation**: Client-side mappings convert technical `errorCodes` into user-friendly localized messages without leaking backend implementation details.
 
-## 14. OAuth2 & Social Authentication Architecture
+## 12. OAuth2 & Social Authentication Architecture
 
 The system implements a flexible, highly extensible architecture allowing seamless integration of unlimited identity providers (Social Providers):
 
@@ -240,7 +218,7 @@ The system implements a flexible, highly extensible architecture allowing seamle
 - **Smart Name Splitting**: Implements a culturally aware name splitting algorithm (e.g., Last word = First Name, Rest = Last & Middle Name) to ensure that the `UserProfile` data is accurate and not duplicated when retrieved from social APIs.
 - **Avatar Protection Policy**: The system only automatically updates the user's avatar from their social profile if they don't have an avatar set or are using an older social-provided avatar. If the user has uploaded a custom personal avatar, the system respects and preserves their choice.
 
-## 15. Smart Search & Real-time Indexing Architecture
+## 13. Smart Search & Real-time Indexing Architecture
 
 OmniBooking's search architecture is engineered to query millions of records in milliseconds by leveraging Elasticsearch combined with real-time data streaming via Kafka:
 
@@ -261,7 +239,7 @@ OmniBooking's search architecture is engineered to query millions of records in 
 - **Client-side Rendering**: Uses Leaflet with **Dynamic Import** components to optimize SEO and page load performance (LCP).
 - **Price-tag Markers**: Custom Markers display rates directly on the map, providing users with an intuitive, interactive experience similar to top-tier global Online Travel Agencies (OTAs).
 
-## 16. Reliable Messaging (Transactional Outbox Pattern)
+## 14. Reliable Messaging (Transactional Outbox Pattern)
 
 To guarantee absolute consistency between the relational Database and the Message Broker (Kafka), the system implements a highly resilient, distributed-safe Transactional Outbox Pattern:
 
@@ -305,7 +283,7 @@ To guarantee absolute consistency between the relational Database and the Messag
    - **Throttled Transactional Commit Wake-Up**: To support extreme write throughput without thread pool exhaustion or CPU spikes, the transactional `afterCommit` hook utilizes a lock-free signaling flag (`AtomicBoolean wakeUpPending`). Wake-up notifications are throttled so that at most one asynchronous outbox processing worker (`processOutboxAsync` with `@Async`) is active at a time. The worker executes a batch drain loop to consume all pending outbox records cleanly, minimizing JVM context switches and eliminating redundant logger noise.
    - **At-Least-Once Delivery & Idempotency Tradeoff**: The Outbox pattern guarantees **At-Least-Once** delivery of events. If Kafka successfully publishes the message but database updates to mark the outbox status as `PROCESSED` fail, the event is re-delivered. Since all consumers implement idempotency checks via `processed_events` deduplication store, duplicate messages are safely skipped, maintaining strict system consistency without exactly-once overhead.
 
-## 17. Global Search & Discovery Engine
+## 15. Global Search & Discovery Engine
 
 OmniBooking's search system is designed to provide a fast, accurate, and discovery-driven experience matching global standards established by platforms like Airbnb and Booking.com.
 
@@ -333,7 +311,7 @@ OmniBooking's search system is designed to provide a fast, accurate, and discove
 - **Configurable Fallback**: If the IP is a local loopback address (`127.0.0.1`, `0:0:0:0:0:0:0:1`) or if the database is missing, it falls back to a default country configured via `app.geo.default-country` (defaults to `VN`).
 - **Next.js SSR Forwarding**: For Server-side Rendering (SSR) fetches where the request originates from the Next.js server itself, the client's original IP address is read from the incoming request's `x-forwarded-for` header and forwarded to the backend API inside the `X-Forwarded-For` HTTP header. This ensures correct location targeting.
 
-## 18. Global Currency & Real-time Pricing System
+## 16. Global Currency & Real-time Pricing System
 
 The OmniBooking system is designed to operate globally with flexible and highly precise multi-currency processing:
 
@@ -361,226 +339,92 @@ To ensure financial safety and foster a highly interactive user experience, the 
 
 ---
 
-## 19. Reviews & Ratings Architecture
+## 17. Reviews & Ratings Architecture
 
-To provide a robust, production-ready reviews and ratings system, OmniBooking implements a comprehensive reviews architecture with strict transactional guarantees, concurrency safety, and anti-abuse safeguards.
+### 17.1. Concurrency-Safe Rating Aggregation
 
-### 19.1. Concurrency-Safe Rating Aggregation & Lock Contention
+Rating statistics (`average_rating`, `review_count`, `rating_sum`) are stored directly on the `properties` table and updated atomically via native SQL:
 
-- **Rationale**: Simultaneous review submissions for the same property can lead to race conditions (dirty reads/writes) if aggregations are computed in memory.
-- **Data Model Changes**:
-   - Add a `rating_sum` column (**BIGINT/Long** to prevent integer overflow for high-volume hotels) and `review_count` column (INTEGER) to the `properties` table.
-   - Add `average_rating` (**NUMERIC(4,2)** to allow precise fractional scoring and future-proofing) column to the `properties` table.
-- **Transactional Guarantees & Lock Timeout**:
-   - The system utilizes **Pessimistic Write Locking** (`SELECT ... FOR UPDATE`) at the database layer. When a review is created, modified, or deleted, the parent `Property` entity is locked immediately.
-   - **Lock Timeout Strategy**: To prevent system-wide gridlocks, the query uses a strict **3-second lock timeout** (`javax.persistence.lock.timeout = 3000`). If lock acquisition fails, the transaction is rolled back, the counter `review_property_lock_contention_total` is incremented, and the request fails with a `409 Conflict` (`REVIEW_LOCK_TIMEOUT`).
-   - Rating recalculation is performed inside this write lock transaction:
-     `rating_sum = rating_sum + new_rating`
-     `review_count = review_count + 1`
-     `average_rating = rating_sum / review_count`
-   - **Trade-offs**: Pessimistic write locking blocks concurrent writes for the same property, preventing dirty writes but introducing latency spikes (hotspots) for ultra-popular hotels receiving dozens of reviews simultaneously.
-   - **Future Scaling Strategy (Roadmap)**:
-      1. **Atomic SQL Updates**: Transition to lock-free statements (e.g., `UPDATE properties SET rating_sum = rating_sum + :rating, review_count = review_count + 1 WHERE id = :id`), which lock only during the execution statement rather than the whole transaction.
-      2. **Event-Driven Batch Aggregation**: Offload review aggregation to an asynchronous worker queue that aggregates review ratings in memory (or using Redis atomic operations) and writes to PostgreSQL in batches every 5 minutes.
-- **Hot Property Observability & Troubleshooting**:
-   - Under heavy traffic, lock contention hotspots can develop on popular hotels (e.g. during promotional campaigns).
-   - High contention will trigger Prometheus alerts when the rate of `review_property_lock_contention_total` exceeds 5/minute.
-   - **Operational Troubleshooting Procedures**:
-     If lock starvation is reported, operators query active database backend locks:
-      ```sql
-      SELECT pid, query, state, age(clock_timestamp(), query_start)
-      FROM pg_stat_activity
-      WHERE query LIKE '%FOR UPDATE%' AND state = 'active'
-      ORDER BY age DESC;
-      ```
-      If stuck backends or connection leaks are identified, operators terminate the blocking PID using `SELECT pg_terminate_backend(pid);`.
+```sql
+UPDATE properties SET
+    rating_sum = COALESCE(rating_sum, 0) + :rating,
+    review_count = COALESCE(review_count, 0) + 1,
+    average_rating = ROUND((COALESCE(rating_sum, 0) + :rating)::numeric / (COALESCE(review_count, 0) + 1), 2)
+WHERE id = :id
+```
 
-### 19.2. Soft Delete & Auditability
+- Uses **atomic SQL** (lock-free at the transaction level) instead of pessimistic write locking to avoid contention hotspots on popular properties.
+- A repair job (`/admin/properties/rebuild-ratings`) recalculates aggregates from `reviews` data, guarded by **PostgreSQL Advisory Lock** to prevent concurrent execution.
+- Prometheus metrics: `review_property_lock_contention_total`, `review_creation_total`, `review_repair_job_duration_seconds`.
 
-- **Rationale**: Deleting a review permanently destroys valuable platform audit trails and historical records.
-- **Data Model Changes**:
-   - `reviews` table includes audit columns: `deleted_at` (TIMESTAMP), `deleted_by` (UUID), and `deletion_reason` (VARCHAR).
-- **Operational Behavior**:
-   - The default deletion behavior is converted to a **Soft Delete**.
-   - Soft-deleted reviews are automatically filtered out from all public queries and excluded from rating calculations (average rating and review count are recalculated and decremented upon soft deletion).
-   - Deletion audits record who performed the action (User, Partner, or Admin) and the justification.
+### 17.2. Review Lifecycle & Soft Delete
 
-### 19.3. Review Moderation & Immutable Audit Trail
+| Status      | Description                                  |
+| ----------- | -------------------------------------------- |
+| `PUBLISHED` | Visible publicly, counted in ratings         |
+| `PENDING`   | Awaiting moderation (flagged by spam filter) |
+| `HIDDEN`    | Hidden by moderator, excluded from ratings   |
+| `REMOVED`   | Removed by moderator, excluded from ratings  |
 
-- **Rationale**: Prevent spam and offensive reviews from displaying publicly while maintaining an immutable history of moderation actions for auditing.
-- **Data Model Changes**:
-   - Add a `status` column (VARCHAR) mapped to the `ReviewStatus` enum: `PENDING`, `PUBLISHED`, `HIDDEN`, `REMOVED`.
-   - Add audit columns: `moderated_by` (UUID), `moderated_at` (TIMESTAMP), and `moderation_reason` (VARCHAR) to the `reviews` table.
-- **Moderation Query Performance**:
-   - Moderation-heavy workflows scan for reviews in states other than `PUBLISHED`. To prevent full-table scans, the system implements a composite index:
-     `CREATE INDEX idx_reviews_moderation ON reviews(status, created_at) WHERE deleted_at IS NULL;`
-   - This optimizes loading the administrator moderation queues.
-- **Roadmap for Immutable Moderation History**:
-   - Initially, moderation actions overwrite the audit columns directly on the `Review` entity.
-   - **Roadmap**: As moderation frequency grows, we will introduce a `review_moderation_history` table to log every moderation state transition sequentially, preserving previous statuses and reasons:
-      - Columns: `id` (UUID PRIMARY KEY), `review_id` (UUID), `old_status` (VARCHAR), `new_status` (VARCHAR), `action_by` (UUID), `reason` (VARCHAR), `action_at` (TIMESTAMP).
+- **Soft delete**: Sets `deleted_at`, `deleted_by`, `deletion_reason`. Rating aggregates are decremented atomically on soft deletion.
+- **Moderation audit**: `moderated_by`, `moderated_at`, `moderation_reason` columns on the `reviews` table track moderation actions.
 
-### 19.4. Stronger Business Validation & Content Policy
+### 17.3. Business Validation Rules
 
-- **Rationale**: Enforce data integrity and trust by restricting reviews to actual customers, while maintaining a minimum quality threshold for comments.
-- **Validation Rules**:
-   - **Ownership**: The `booking.getUser().getId()` must match the authenticated `currentUserId`.
-   - **Booking Status**: The booking must be in the `STAYED` state.
-   - **Chronological Check**: Stays can only be reviewed after the checkout date (`booking.getCheckOutDate()`) has passed.
-   - **Invalid Bookings**: Cancelled (`CANCELLED`), refunded (`REFUNDED`), or active bookings are blocked from writing reviews.
-   - **Uniqueness**: A booking can have at most one associated review.
-- **Content Policy & Comment Length**:
-   - Submissions containing text must meet a **minimum length of 10 characters** (e.g. to filter out low-effort or automated words like "ok", "good").
-   - Rating-only reviews (no text) are allowed if the comment is completely null or empty.
-- **Database Defense-in-Depth**:
-   - Enforce comment length limits directly at the database level by specifying the column type as `VARCHAR(1000)` (or adding a check constraint `CHECK (char_length(comment) <= 1000)`). This prevents oversized payloads from persisting even if application-layer validation fails.
+| Rule           | Constraint                                                                    |
+| -------------- | ----------------------------------------------------------------------------- |
+| Ownership      | `booking.user_id` must match authenticated user                               |
+| Booking status | Must be `STAYED`                                                              |
+| Chronological  | Only after `check_out_date` has passed                                        |
+| Uniqueness     | One review per booking (`UNIQUE(booking_id)`)                                 |
+| Comment length | Minimum 10 characters if provided; rating-only reviews (null comment) allowed |
+| Comment max    | `VARCHAR(1000)` enforced at DB level                                          |
 
-### 19.5. Partner Reply Governance
+### 17.4. Partner Reply & Anti-Abuse
 
-- **Rationale**: Standardize communication between guests and partners while preserving reply history.
-- **Data Model Changes**:
-   - `reviews` table includes reply fields: `reply` (TEXT) and `reply_updated_at` (TIMESTAMP).
-- **Operational Behavior**:
-   - Property partners with the `review:reply` authority can reply to reviews for properties they own.
-   - **Edit Behavior**: Replies are editable. When a partner overwrites their previous reply, the system updates `reply_updated_at` and registers an audit log.
-   - **Roadmap for Reply History**: Introduce a `review_replies_history` table to store all versions of a partner's reply, preventing malicious partners from changing replies to gaslight guests.
+- **Partner replies**: Partners with `review:reply` permission can reply to reviews on their own properties. Replies are editable; `reply_updated_at` tracks the last modification.
+- **Rate limiting**: Redis sliding window — max 5 review creations per hour per user.
+- **Spam filtering**: Basic blocklist check on comments; matches are set to `PENDING` status.
+- **Redis failure policy**: **Fail Open** — rate limiting is bypassed if Redis is unavailable. Failures tracked via `redis_rate_limit_failure_total` counter.
 
-### 19.6. Anti-Abuse Protection & Redis Failure Policy
+### 17.5. Elasticsearch Sync & Eventual Consistency
 
-- **Rationale**: Prevent malicious users or bots from spamming reviews or running brute-force rating campaigns.
-- **Operational Behavior**:
-   - **Rate Limiting**: Integrated Redis-based sliding window rate limiter (max 5 review creations per hour per user).
-   - **Spam Filtering**: Basic blocklist filtering on comments prior to publishing (flagging matches to `PENDING` status).
-- **Redis Failure Policy (Fail Open)**:
-   - If the Redis cluster is down, the system defaults to **Fail Open**. Rate limit checks are bypassed, and review creation is allowed to proceed to avoid breaking user experience.
-   - **Monitoring & Alerting**: A Prometheus counter `redis_rate_limit_failure_total` tracks rate-limiting lookup failures, triggering immediate operational alerts when failure rates exceed thresholds.
+- PostgreSQL is the source of truth; Elasticsearch is a read-only index.
+- The `PROPERTY_SYNC` Kafka consumer is **fully idempotent** — it queries latest stats from PostgreSQL and overwrites the Elasticsearch document.
+- Administrative reindex job (`/admin/search/reindex`) rebuilds Elasticsearch in batches of 100 with checkpoint/resume support.
+- **Outbox retention**: `PROCESSED` events retained 30 days, `DEAD` events retained 90 days. Daily purge job at 3:00 AM.
 
-### 19.7. Elasticsearch Failure Handling & Eventual Consistency (PROPERTY_SYNC Idempotency)
+### 17.6. Partner Dashboard Rating
 
-- **Rationale**: Network partitions or Elasticsearch downtime must not lead to data loss, while duplicate sync messages must resolve safely.
-- **Eventual Consistency SLA**:
-   - The database remains the source of truth; Elasticsearch acts as a read-only index.
-   - Target sync synchronization lag is **<= 2 seconds** under normal load.
-   - **Monitoring**: Alerts trigger if outbox backlog (`omnibooking.outbox.pending.count`) > 500 for > 5 minutes, or if Kafka consumer lag exceeds 1000 messages.
-- **PROPERTY_SYNC Idempotency**:
-   - The `consumePropertySync` Kafka listener is designed to be **fully idempotent**. It queries the latest property statistics directly from PostgreSQL and overrides the Elasticsearch document. Duplicate message delivery cannot result in inconsistent states.
-- **Elasticsearch Disaster Recovery & Reindex Hardening**:
-   - An administrative background job `/admin/search/reindex` is introduced to perform a batch rebuild of Elasticsearch documents directly from PostgreSQL.
-   - **Batching & Rate Limiting**: The job processes properties in batches of 100 with a configurable sleep delay between batches to control throughput and prevent overloading Elasticsearch or Kafka.
-   - **Checkpoint & Resume**: The job logs and caches the last successfully indexed property ID (cursor) in Redis or a DB metadata table, allowing the job to resume from the checkpoint if interrupted.
+- `ratingScore` = average rating across all reviews on active properties owned by the partner.
+- **Soft-deleted properties excluded** (`property.deletedAt IS NOT NULL`), **inactive properties included** (`isActive = false`).
+- API contract: `ratingScore: number | null`. Returns `null` when no published reviews exist.
 
-### 19.8. Outbox Retention & Maintenance
+### 17.7. Database Indexes
 
-- **Rationale**: Avoid transactional outbox table bloat, which degrades database performance over time.
-- **Retention Policy**:
-   - `PROCESSED` (Success) events are retained for **30 days** for troubleshooting.
-   - `DEAD` (Failed) events are retained for **90 days** to allow manual auditing and re-processing before pruning.
-- **Operational Procedures**:
-   - The `purgeOldOutboxEvents` scheduled job runs daily at 3:00 AM, executing bounded deletes to prune expired events without causing transaction log overflow.
+```sql
+CREATE INDEX idx_reviews_property_created ON reviews(property_id, created_at DESC)
+    WHERE deleted_at IS NULL AND status = 'PUBLISHED';
+CREATE INDEX idx_reviews_user ON reviews(user_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_reviews_booking ON reviews(booking_id);
+CREATE INDEX idx_reviews_moderation ON reviews(status, created_at) WHERE deleted_at IS NULL;
+```
 
-### 19.9. Query, Pagination Standards & Cursor-based Roadmap
+### 17.8. Scalability Roadmap
 
-- **Operational Behavior**:
-   - **Default Sort**: Reviews are fetched ordered by `created_at DESC`.
-   - **Sort Options**: Future pagination queries will support sorting by `rating DESC` (highest first) and `rating ASC` (lowest first).
-   - **Page Size Limits**: Page sizes are strictly capped between 10 (default) and 50 records to protect server memory.
-- **Pagination Scalability Roadmap**:
-   - Currently, offset-based pagination (`LIMIT/OFFSET`) is used.
-   - **Roadmap**: For popular properties with massive review datasets, offset pagination scales poorly due to $O(N)$ row-scan overhead. The system defines a migration path to **Cursor-based pagination** using the review's time-ordered UUID v7 as a cursor (`WHERE (created_at, id) < (:cursor_created_at, :cursor_id)`), guaranteeing $O(1)$ query times at any depth.
+| Item               | Current                           | Target                                            |
+| ------------------ | --------------------------------- | ------------------------------------------------- |
+| Pagination         | Offset-based (`LIMIT/OFFSET`)     | Cursor-based using UUID v7                        |
+| Dashboard stats    | Dynamic `AVG()` query             | Redis cache with 10-min TTL                       |
+| Moderation history | Overwrite columns                 | Separate `review_moderation_history` table        |
+| Reply history      | Overwrite `reply` column          | Separate `review_replies_history` table           |
+| Table partitioning | Single table                      | HASH by `property_id` at 10M+ rows                |
+| Data archival      | Retain all                        | 7-year active retention → S3 Glacier cold storage |
+| GDPR               | `ON DELETE SET NULL` on `user_id` | Anonymize reviews instead of deleting             |
 
-### 19.10. Database Performance
+## 18. Background Property Registration & Media Processing Architecture
 
-- **Rationale**: High-traffic properties will query reviews frequently, requiring optimal index layouts.
-- **Index Optimization**:
-   - Index on `(property_id, created_at)`: Optimizes fetching paginated reviews for a property sorted by time.
-   - Index on `(user_id)`: Speed up retrieving a user's review history.
-   - Index on `(booking_id)`: Accelerate checking duplicate review constraints.
-
-### 19.11. Aggregate Repair Job Hardening & Distributed Execution Safety
-
-- **Rationale**: Data anomalies, schema updates, or manual DB changes can cause rating statistics to drift. Long-running calculations must not block web request threads.
-- **Operational Job**:
-   - An administrative task `/admin/properties/rebuild-ratings` is introduced to rebuild `review_count`, `rating_sum`, and `average_rating` for a specific property or all properties by running an aggregate scan over the `reviews` table.
-   - **Asynchronous Execution**: The job is triggered asynchronously as a background task to prevent HTTP request timeout issues.
-   - **Distributed Execution Safety**: To prevent lock thrashing and multiple instances from executing the rebuild concurrently, the job requires acquiring a **PostgreSQL Advisory Lock** (`pg_try_advisory_xact_lock(1911)`) or a Redis distributed lock (`lock:rebuild-ratings`) with a lease time of 1 hour.
-   - **Verification Procedure**: The job prints pre-update and post-update statistics to logs and publishes a bulk `PROPERTY_SYNC` event to sync corrected ratings to Elasticsearch.
-   - **Roadmap for Durable Jobs**: Replace Spring in-memory `@Async` processing with **Quartz Scheduler** or database-backed job runner tables to ensure that long-running operations can recover from server crashes/restarts.
-
-### 19.12. Operational Metrics & Observability
-
-- **Prometheus Custom Metrics**:
-   - `review_property_lock_wait_seconds` (Summary/Timer): Tracks the latency of locking property rows.
-   - `review_property_lock_contention_total` (Counter): Measures lock timeouts and acquisition failures.
-   - `review_creation_total` (Counter): Counts total review submissions (labelled by status).
-   - `review_moderation_total` (Counter): Counts moderation transitions (labelled by transition type).
-   - `review_repair_job_duration_seconds` (Summary/Timer): Measures the duration of the rebuild ratings job.
-- **Alerting Recommendations**:
-   - **Lock Contention Alert**: Trigger P1 alert if `review_property_lock_contention_total` rate > 5 per minute, indicating potential database connection starvation or deadlocks.
-   - **Rate Limit Failures Alert**: Trigger alert if `redis_rate_limit_failure_total` rate > 10 per minute, suggesting Redis cluster unavailability.
-
-### 19.13. Expanded Test Coverage
-
-- **Testing Requirements**:
-   - **Concurrency Tests**: Simulated multi-threaded review submissions targeting a single property to verify that `review_count`, `rating_sum`, and `average_rating` update correctly without deadlocks.
-   - **Soft Deletion & Restoration Tests**: Confirm rating metrics decrement/increment correctly upon soft deletion/restoration.
-   - **Authorization Boundary Tests**: Verify that users cannot edit partner replies, and partners cannot delete reviews.
-   - **Outbox Retry Verification**: Validate that simulated Kafka broker failures trigger correct backoff and DLQ routing.
-
-### 19.14. Review Table Growth & Partitioning Roadmap
-
-- **Rationale**: When tables exceed millions of records, read/write latencies degrade due to index tree depth.
-- **Growth Thresholds**: Table partitioning will be triggered once the `reviews` table exceeds **10 million records**.
-- **Partitioning Strategy**:
-   - **HASH Partitioning by `property_id`**: Optimal for routing read and write queries, co-locating all reviews of a hotel in a single partition.
-   - **RANGE Partitioning by `created_at` (Quarterly)**: Secondary option to align with monthly retention workflows.
-   - **Migration strategy**: Execute online partitioning utilizing PgBouncer and `pg_partman` to partition active tables with zero application downtime.
-
-### 19.15. Data Lifecycle & Archival Roadmap
-
-- **Rationale**: Storing historical reviews in primary databases indefinitely increases backup times and costs.
-- **Archival Policy**:
-   - Reviews are retained active for **7 years** to support analytics.
-   - Older reviews are exported to compressed cold storage (AWS S3 Glacier / CSV format) and purged from PostgreSQL.
-- **GDPR / Compliance Anonymization**:
-   - Under privacy regulations (Right to be Forgotten), when a user profile is deleted, their reviews are **anonymized** (setting `user_id` to a generic system-null user and clearing name/email from the guest metadata) instead of deleted, preserving the historical ratings of properties while ensuring full compliance.
-
-### 19.16. Partner Average Rating Score Calculation (Issue #28 Updates)
-
-- **Business Logic Rules**:
-   - The rating score shown on the Partner Dashboard (`ratingScore` in `PartnerStatsResponse`) is calculated dynamically as the average rating of active reviews across all properties owned by that partner.
-   - **Soft-Deleted Properties Excluded**: Reviews belonging to properties that have been soft-deleted (`property.deletedAt IS NOT NULL`) are **excluded** from the calculation, matching the logic: `r.property.deletedAt IS NULL`.
-   - **Inactive Properties Included**: Reviews belonging to properties that are temporarily inactive (`isActive = false` but not soft-deleted) **are included** in the average rating calculation. This ensures historical reputation is preserved and not temporarily hidden if a property goes offline.
-- **Contract & Empty State**:
-   - The `ratingScore` API field uses the contract type `number | null` (not string / "N/A" / "0.0").
-   - If a partner has no properties, or there are no published reviews for their properties, the API returns `"ratingScore": null`. The partner portal UI handles this case by displaying "No reviews yet" (or "Chưa có đánh giá" in Vietnamese) and hiding the percentage change indicator.
-- **Database Optimistic Locking & Schema Integrity**:
-   - The `reviews` table utilizes Hibernate `@Version` for optimistic locking (`version` column).
-   - An audit of all 24 entities inheriting from `BaseEntity` confirmed only `reviews` was missing this version column, which has been resolved via Flyway migration `V2__Add_Review_Version.sql`.
-- **Flyway Migration Verification Procedure**:
-   - Post-migration, DevOps / QA can verify the schema structure in PostgreSQL using the following query:
-      ```sql
-      SELECT column_name, is_nullable, column_default, data_type
-      FROM information_schema.columns
-      WHERE table_name = 'reviews' AND column_name = 'version';
-      ```
-   - Expected results:
-      - `column_name`: `version`
-      - `is_nullable`: `NO`
-      - `column_default`: `0`
-      - `data_type`: `bigint`
-- **Jackson & Validation Path Sanitization**:
-   - To prevent internal DTO structure exposure (e.g., paths like `roomTypes[0].bedType`), nested validation path errors and deserialization mapping exception field names are sanitized. Both `MethodArgumentNotValidException` and `HttpMessageNotReadableException` extract and return only the leaf property field name (e.g. `'bedType'`).
-   - In `GlobalExceptionHandler`, helper methods `getLeafFieldName` parse property paths and Jackson path references, extracting the last element only. This ensures error responses remain user-friendly and internal structure details are never leaked.
-- **Future Dashboard Rating Optimization (Backlog)**:
-   - Calculating average ratings dynamically at runtime via `AVG(r.rating)` can become expensive as the review volume grows.
-   - **Roadmap / Backlog**: A future ticket should optimize this by caching dashboard statistics in Redis (e.g. 10-minute TTL) or pre-computing and storing rating aggregates asynchronously via Kafka event consumers.
-- **Public Web Client Regression Test Coverage**:
-   - Real-world validation is extended to the Public Web Client via Test Group F (Public Property Detail Page verification).
-   - **Verification Scenarios**: Ensure all 8 `BedType` enums (e.g. `BUNK`, `SOFA_BED`, `TRIPLE`) are correctly localized across supported locales (en, vi) on the property detail page, and that raw uppercase enum strings are never displayed to end users.
-
-## 20. Background Property Registration & Media Processing Architecture
-
-### 20.1. Architectural Overview & Fire-and-Forget Flow
+### 18.1. Architectural Overview & Fire-and-Forget Flow
 
 - **UX Goal**: Transition the partner property registration from a blocking, synchronous multi-step form to a fast, non-blocking asynchronous registration experience.
 - **Asynchronous Design**:
@@ -588,7 +432,7 @@ To provide a robust, production-ready reviews and ratings system, OmniBooking im
    - The frontend immediately initializes the tracking state in the backend progress API and triggers parallel, fire-and-forget HTTP multipart upload requests to the `/api/v1/media/upload` endpoint (without waiting for all of them to resolve).
    - Once all upload requests are fired, the partner is redirected to the dashboard, where a floating progress widget displays real-time updates.
 
-### 20.2. Redis-Based Atomic & Idempotent Progress Tracking
+### 18.2. Redis-Based Atomic & Idempotent Progress Tracking
 
 - **State Store**: The upload progress state is stored in a Redis Hash at key `media:progress:{propertyId}` with the following fields:
    - `total`: Total number of expected images.
@@ -607,7 +451,7 @@ To provide a robust, production-ready reviews and ratings system, OmniBooking im
    - `processingWeight` (default `75%`): Progress contributed by successfully optimizing images and persisting them (processed).
    - Formula: `percentage = (queued / total * uploadWeight) + (processed / total * processingWeight)`.
 
-### 20.3. ZSET-Based Stall Detection
+### 18.3. ZSET-Based Stall Detection
 
 - **Index**: Active property registrations are tracked in a Redis Sorted Set (ZSET) at key `media:progress:active`, where the member is `propertyId` and the score is the `lastUpdatedAt` timestamp.
 - **Detection**: A scheduler (`MediaStallDetector`) runs every 30 seconds to fetch properties from the ZSET that haven't received progress updates within the `stallTimeout` threshold (default 120s):
@@ -615,7 +459,7 @@ To provide a robust, production-ready reviews and ratings system, OmniBooking im
    - Any matching property is transitioned to the `STALLED` state, alerting the user via the UI widget.
    - Using a ZSET index avoids scanning keys matching `media:progress:*`, scaling efficiently to tens of thousands of concurrent uploads.
 
-### 20.4. Event-Driven Server-Sent Events (SSE) Dispatcher
+### 18.4. Event-Driven Server-Sent Events (SSE) Dispatcher
 
 - **Decoupled Delivery**: Real-time progress notifications are pushed to the client using Server-Sent Events.
 - **Pipeline**:
@@ -627,7 +471,7 @@ To provide a robust, production-ready reviews and ratings system, OmniBooking im
    - Periodic keep-alive heartbeats are sent to prevent browser timeouts.
    - Max concurrent emitters per property are capped (default 5) to prevent resource depletion attacks.
 
-### 20.5. Recovery Flow for Incomplete Uploads
+### 18.5. Recovery Flow for Incomplete Uploads
 
 - **Problem**: If a partner closes their tab or browser mid-upload, some image uploads are lost, leaving the property in an incomplete state.
 - **Backend Recovery**:

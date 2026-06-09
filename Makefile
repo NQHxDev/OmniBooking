@@ -132,6 +132,11 @@ docker-restart-prod:
 		echo "Aborted..."; \
 	fi
 
+.PHONY: docker-start-prod
+docker-start-prod:
+	@echo "Starting all Production Docker services..."
+	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml start
+
 .PHONY: docker-stop-prod
 docker-stop-prod:
 	@read -p "Are you sure you want to stop all Production Docker services? (y/n): " ans; \
@@ -244,6 +249,7 @@ help:
 	@echo "    make docker-build  - Build and start all services in Production Docker"
 	@echo "    make docker-rebuild - Stop, rebuild, and restart Production Docker services (optimal)"
 	@echo "    make docker-restart-prod - Rebuild and restart Production Docker services"
+	@echo "    make docker-start-prod - Start Production Docker services"
 	@echo "    make docker-stop-prod - Stop Production Docker services"
 	@echo "    make docker-down-prod - Stop and clean Production stack"
 	@echo "    make docker-logs   - Tail production Docker logs"
