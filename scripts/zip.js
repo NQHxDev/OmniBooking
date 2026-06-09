@@ -54,16 +54,17 @@ const num2 = parseInt(p2, 16);
 const shortUuid = ((num0 ^ num1 ^ num2) >>> 0).toString(16).padStart(8, "0");
 const outFilename = `${baseName}_${shortUuid}.zip`;
 const outputFile = path.join(outDir, outFilename);
+const relativeOutPath = path.relative(process.cwd(), outputFile).replace(/\\/g, "/");
 
 try {
    console.log(`Creating ${outFilename}...`);
-   const quotedInputs = inputPaths.map((p) => `"${p}"`).join(" ");
-   const excludeFlags = excludes.map((e) => `"${e}"`).join(" ");
-   const cmd = `tar ${excludeFlags} -caf "${outputFile}" ${quotedInputs}`;
+   const quotedInputs = inputPaths.map((p) => `"${p.replace(/\\/g, "/")}"`).join(" ");
+   const excludeFlags = excludes.map((e) => `"${e.replace(/\\/g, "/")}"`).join(" ");
+   const cmd = `tar ${excludeFlags} -caf "${relativeOutPath}" ${quotedInputs}`;
    execSync(cmd, { stdio: "inherit" });
    console.log(`Successfully created ${outFilename}`);
 } catch (err) {
    console.error(`Error creating zip archive: ${err.message}`);
-   console.error('Make sure you have "tar" installed (pre-installed on Windows 10+ and macOS).');
+   console.error('Make sure you have "tar" installed (pre-installed on Windows 10+ and macOS)!');
    process.exit(1);
 }
