@@ -3,6 +3,7 @@ package com.omnibooking.controller;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.event.MediaUploadEvent;
 import com.omnibooking.services.media.MediaProducer;
+import com.omnibooking.services.media.MediaProgressService;
 import com.omnibooking.constant.MediaConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +29,8 @@ public class MediaController {
 
    private final MediaProducer mediaProducer;
 
+   private final MediaProgressService mediaProgressService;
+
    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
    @PreAuthorize("hasAuthority(T(com.omnibooking.constant.SecurityConstants.Roles).PARTNER) and !hasAuthority(T(com.omnibooking.constant.SecurityConstants.Roles).ADMIN)")
    @Operation(summary = "Upload media for property (Partner Only)")
@@ -51,6 +54,16 @@ public class MediaController {
             .build();
 
       mediaProducer.sendUploadEvent(event);
+
+      // Track queued progress (idempotent via Lua script)
+      try {
+         mediaProgressService.markQueued(
+               java.util.UUID.fromString(event.getEntityId()),
+               event.getCorrelationId());
+      } catch (Exception e) {
+         log.warn("[Media Controller] Failed to track queued progress for entity: {}",
+               event.getEntityId(), e);
+      }
 
       return ApiResponse.success("Media upload started! Processing in background with ID: " + correlationId);
    }

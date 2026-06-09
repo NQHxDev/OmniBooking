@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -40,8 +41,10 @@ public class PropertyRequest {
 
    private String legalOwnerName;
 
-   private java.util.List<String> amenities;
+   private List<String> amenities;
 
-   private java.util.List<RoomTypeRequest> roomTypes;
+   private List<RoomTypeRequest> roomTypes;
+
+   private Integer expectedImageCount;
 
 }

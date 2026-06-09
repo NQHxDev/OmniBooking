@@ -1,6 +1,7 @@
 import apiClient from "./apiClient";
 import { getBaseURL } from "./config";
 import { ApiResponse } from "./services/authService";
+import { IncompleteUploadResponse, MediaProgressSSE } from "@/types/media";
 
 export interface RoomTypeRequest {
    name: string;
@@ -187,4 +188,18 @@ export const propertyService = {
          return null;
       }
    },
+
+   getMediaProgress: (propertyId: string) =>
+      apiClient.get<unknown, ApiResponse<MediaProgressSSE>>(`/media/progress/${propertyId}`),
+
+   initMediaProgress: (propertyId: string, total: number) =>
+      apiClient.post(`/media/progress/${propertyId}/init`, null, { params: { total } }),
+
+   getIncompleteUploads: () =>
+      apiClient.get<unknown, ApiResponse<IncompleteUploadResponse[]>>(
+         "/partner/properties/incomplete-uploads"
+      ),
+
+   dismissIncompleteUpload: (propertyId: string) =>
+      apiClient.patch(`/partner/properties/${propertyId}/dismiss-incomplete`),
 };

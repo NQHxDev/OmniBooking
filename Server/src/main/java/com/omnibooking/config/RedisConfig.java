@@ -13,8 +13,10 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import com.omnibooking.services.pricing.PriceCalculationService.StayPriceResult;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -26,7 +28,7 @@ public class RedisConfig {
 
    public static final String FEATURED_PROPERTIES = "featured_properties";
    public static final String TRENDING_DESTINATIONS = "trending_destinations";
-   public static final String PROPERTY_PRICING = "property_pricing";
+   public static final String PROPERTY_PRICING = "property_pricing_v2";
 
    @Bean(name = "cacheManager")
    @Primary
@@ -50,8 +52,18 @@ public class RedisConfig {
       // Trending destinations can stay even longer (e.g., 24 hours)
       cacheConfigurations.put(TRENDING_DESTINATIONS, defaultConfig.entryTtl(Duration.ofHours(24)));
 
+      // Dedicated serializer for pricing cache (StayPriceResult)
+      Jackson2JsonRedisSerializer<StayPriceResult> pricingSerializer = new Jackson2JsonRedisSerializer<>(mapper,
+            StayPriceResult.class);
+
+      RedisCacheConfiguration pricingConfig = RedisCacheConfiguration.defaultCacheConfig()
+            .entryTtl(Duration.ofMinutes(30))
+            .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
+            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(pricingSerializer))
+            .disableCachingNullValues();
+
       // Dynamic pricing rules can stay for 30 minutes
-      cacheConfigurations.put(PROPERTY_PRICING, defaultConfig.entryTtl(Duration.ofMinutes(30)));
+      cacheConfigurations.put(PROPERTY_PRICING, pricingConfig);
 
       return RedisCacheManager.builder(connectionFactory)
             .cacheDefaults(defaultConfig)

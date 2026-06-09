@@ -117,7 +117,8 @@
             "roomsRequired": "Vui lòng thêm ít nhất một loại phòng.",
             "legalRequired": "Vui lòng điền đầy đủ thông tin pháp lý.",
             "termsRequired": "Bạn phải đồng ý với các điều khoản để tiếp tục.",
-            "uploading": "Đang đăng tải thông tin chỗ nghỉ..."
+            "uploading": "Đang đăng tải thông tin chỗ nghỉ...",
+            "submitted": "Đã đăng ký chỗ nghỉ! Ảnh đang được xử lý..."
          },
          "propertyTypes": {
             "HOTEL": {
@@ -432,6 +433,25 @@
          "errorSave": "Không thể lưu thông tin quy tắc giá.",
          "errorDelete": "Không thể xóa quy tắc giá.",
          "errorUpdate": "Không thể cập nhật trạng thái."
+      },
+      "uploadProgress": {
+         "processing": "Đang xử lý chỗ nghỉ mới",
+         "stalled": "Đang xử lý lâu hơn dự kiến...",
+         "completed": "Chỗ nghỉ đã sẵn sàng!",
+         "partialSuccess": "Chỗ nghỉ đã tạo thành công",
+         "failed": "Xử lý ảnh thất bại",
+         "imagesProcessed": "{processed}/{total} ảnh đã xử lý xong",
+         "imagesFailed": "{success} thành công · {failed} thất bại",
+         "completedIn": "Hoàn tất trong {time} giây",
+         "systemProcessing": "Hệ thống đang xử lý, vui lòng chờ",
+         "reuploadFailed": "Tải lại ảnh lỗi",
+         "retry": "Thử lại",
+         "viewDetails": "Xem chi tiết",
+         "submitted": "Đã đăng ký chỗ nghỉ! Ảnh đang được xử lý...",
+         "recoveryTitle": "Chưa tải lên đủ số lượng ảnh",
+         "recoveryMessage": "Chỗ nghỉ \"{name}\" chỉ mới có {actual} trên {expected} hình ảnh được tải lên thành công. Vui lòng tiếp tục tải lên hoặc bỏ qua cảnh báo này.",
+         "dismiss": "Bỏ qua",
+         "resume": "Tiếp tục tải"
       }
    },
    "Map": {

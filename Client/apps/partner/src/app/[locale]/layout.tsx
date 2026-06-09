@@ -17,6 +17,7 @@ export async function generateMetadata() {
 import QueryProvider from "@/providers/QueryProvider";
 import AppInitializer from "@/providers/AppInitializer";
 import PartnerAuthGuard from "@/components/partner/PartnerAuthGuard";
+import UploadProgressManager from "@/components/partner/UploadProgressManager";
 
 export default async function LocaleLayout({
    children,
@@ -42,6 +43,7 @@ export default async function LocaleLayout({
                <PartnerAuthGuard>{children}</PartnerAuthGuard>
             </AppInitializer>
             <Toaster position="bottom-right" richColors closeButton />
+            <UploadProgressManager />
          </QueryProvider>
       </NextIntlClientProvider>
    );

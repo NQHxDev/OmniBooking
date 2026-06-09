@@ -2,6 +2,7 @@ package com.omnibooking.services.property.impl;
 
 import com.omnibooking.dto.PropertyRequest;
 import com.omnibooking.dto.PropertyResponse;
+import com.omnibooking.dto.IncompleteUploadResponse;
 import com.omnibooking.dto.RoomTypeRequest;
 import com.omnibooking.dto.PropertyDetailResponse;
 import com.omnibooking.dto.RoomTypeResponse;
@@ -115,6 +116,7 @@ public class PropertyServiceImpl implements PropertyService {
             .businessRegistrationNumber(encryptedRegNum)
             .taxCode(encryptedTaxCode)
             .legalOwnerName(encryptedOwnerName)
+            .expectedImageCount(request.getExpectedImageCount())
             .isActive(true)
             .build();
 
@@ -553,6 +555,43 @@ public class PropertyServiceImpl implements PropertyService {
       }
 
       return trimmed.replaceAll("^(?i)(Thành\\s+phố|Tỉnh|TP\\.?)\\s+", "").trim();
+   }
+
+   @Override
+   public List<IncompleteUploadResponse> getIncompleteUploads(UUID ownerId) {
+      List<Property> properties = propertyRepository.findIncompletePropertiesByOwnerId(ownerId);
+      return properties.stream()
+            .map(p -> {
+               long actualCount = mediaRepository.countByEntityIdAndEntityType(p.getId(), "PROPERTY");
+               return IncompleteUploadResponse.builder()
+                     .propertyId(p.getId())
+                     .propertyName(p.getName())
+                     .expectedCount(p.getExpectedImageCount())
+                     .actualCount((int) actualCount)
+                     .build();
+            })
+            .collect(Collectors.toList());
+   }
+
+   @Override
+   @Transactional
+   @Caching(evict = {
+         @CacheEvict(value = "properties", allEntries = true),
+         @CacheEvict(value = "partner_properties", key = "#ownerId")
+   })
+   public void dismissIncompleteUpload(UUID propertyId, UUID ownerId) {
+      Property property = propertyRepository.findById(propertyId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+      if (!property.getOwner().getId().equals(ownerId)) {
+         throw new AppException(ErrorCode.UNAUTHORIZED);
+      }
+
+      long actualCount = mediaRepository.countByEntityIdAndEntityType(propertyId, "PROPERTY");
+      property.setExpectedImageCount((int) actualCount);
+      propertyRepository.save(property);
+      log.info("[Recovery] Incomplete upload warning dismissed for property: {} (expected_image_count set to actual: {})",
+            propertyId, actualCount);
    }
 
 }

@@ -139,3 +139,29 @@ If a user is blocked by CSRF (HTTP 403 `SEC_002` or `SEC_001` in the response):
 2. **Review Environment Settings**:
    - Verify that `CLIENT_URL` is set to the correct client domain.
    - Verify that `TRUSTED_HOSTS` contains the hostnames of all production web clients accessing the backend.
+
+### Step 4: Troubleshooting SSE & Asynchronous Security Exceptions
+
+#### Symptoms:
+
+- Errors logged in `logs/error.log` with stack trace containing:
+  `org.springframework.security.authorization.AuthorizationDeniedException: Access Denied`
+- Accompanied by Tomcat root exceptions saying:
+  `Unable to handle the Spring Security Exception because the response is already committed.`
+- Connections to Server-Sent Event (SSE) progress streams or registration streams terminate unexpectedly with protocol level errors.
+- Nested security exceptions thrown during SSE stream timeouts or client disconnects.
+
+#### Root Cause:
+
+- Under Spring Security 6, the filter chain intercepts all dispatch types (`REQUEST`, `ASYNC`, `ERROR`).
+- During secondary dispatches (`ASYNC` for streaming and `ERROR` for timeouts/disconnects), the JWT filter (`OncePerRequestFilter`) does not execute again. The `SecurityContext` on the async/error handling threads is empty.
+- Spring Security's `AuthorizationFilter` intercepts the secondary dispatch, detects no authentication, and throws `AuthorizationDeniedException`.
+
+#### Resolution:
+
+- Verify that `SecurityConfig.java` has the matching rule:
+   ```java
+   .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
+   ```
+- This allows internal container dispatches to complete without triggering security filter authorization.
+- Note: This does not weaken request security. The initial client entry point is always a `REQUEST` dispatch type, which undergoes full JWT authentication, role check, and CSRF check.

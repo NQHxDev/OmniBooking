@@ -46,6 +46,25 @@ public class AppProperties {
 
    private final Sentry sentry = new Sentry();
 
+   private final Media media = new Media();
+
+   @Data
+   public static class Media {
+      private final Progress progress = new Progress();
+
+      @Data
+      public static class Progress {
+         private int uploadWeight = 25;
+         private int processingWeight = 75;
+         private long retentionTtl = 86400;
+         private long stallTimeout = 120;
+         private long stallCheckInterval = 30;
+         private long sseTimeout = 300000;
+         private int sseHeartbeatInterval = 15;
+         private int maxEmittersPerProperty = 5;
+      }
+   }
+
    @Data
    public static class Sentry {
       private String dsn;

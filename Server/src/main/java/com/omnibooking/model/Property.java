@@ -108,4 +108,7 @@ public class Property extends BaseEntity {
    @Column(name = "rating_sum")
    private Long ratingSum = 0L;
 
+   @Column(name = "expected_image_count")
+   private Integer expectedImageCount;
+
 }

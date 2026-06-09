@@ -80,4 +80,9 @@ public interface PropertyRepository extends JpaRepository<Property, UUID>, JpaSp
          "WHERE id = :id", nativeQuery = true)
    int decrementRating(@Param("id") UUID id, @Param("rating") int rating);
 
+   @Query("SELECT p FROM Property p WHERE p.owner.id = :ownerId " +
+         "AND p.expectedImageCount IS NOT NULL " +
+         "AND p.expectedImageCount > (SELECT COUNT(m) FROM com.omnibooking.model.Media m WHERE m.entityId = p.id AND m.entityType = 'PROPERTY')")
+   List<Property> findIncompletePropertiesByOwnerId(@Param("ownerId") UUID ownerId);
+
 }

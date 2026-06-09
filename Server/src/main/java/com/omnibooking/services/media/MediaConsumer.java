@@ -45,6 +45,8 @@ public class MediaConsumer {
 
    private final MeterRegistry meterRegistry;
 
+   private final MediaProgressService mediaProgressService;
+
    @Transactional
    @KafkaListener(topics = KafkaConfig.MEDIA_TOPIC, groupId = "omnibooking-media-group")
    public void consumeUploadEvent(MediaUploadEvent event) {
@@ -133,12 +135,34 @@ public class MediaConsumer {
                   propertyId);
          }
 
+         if ("PROPERTY".equals(event.getEntityType())) {
+            try {
+               mediaProgressService.markProcessed(
+                     UUID.fromString(event.getEntityId()),
+                     event.getCorrelationId());
+            } catch (Exception progressEx) {
+               log.error("[Kafka Consumer] Failed to update media progress to processed for property: {}",
+                     event.getEntityId(), progressEx);
+            }
+         }
+
          if (event.getEventId() != null) {
             idempotencyService.completeEvent(event.getEventId(), consumerGroup);
          }
       } catch (Exception e) {
          log.error("[Kafka Consumer] Error processing media for correlationId: {}. Error: {}",
                event.getCorrelationId(), e.getMessage());
+
+         if ("PROPERTY".equals(event.getEntityType())) {
+            try {
+               mediaProgressService.markFailed(
+                     UUID.fromString(event.getEntityId()),
+                     event.getCorrelationId());
+            } catch (Exception progressEx) {
+               log.error("[Kafka Consumer] Failed to update media progress to failed for property: {}",
+                     event.getEntityId(), progressEx);
+            }
+         }
 
          // Rollback compensation for Cloudinary resource leakage prevention
          if (response != null && response.publicId() != null) {

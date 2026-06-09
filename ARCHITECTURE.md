@@ -578,6 +578,66 @@ To provide a robust, production-ready reviews and ratings system, OmniBooking im
    - Real-world validation is extended to the Public Web Client via Test Group F (Public Property Detail Page verification).
    - **Verification Scenarios**: Ensure all 8 `BedType` enums (e.g. `BUNK`, `SOFA_BED`, `TRIPLE`) are correctly localized across supported locales (en, vi) on the property detail page, and that raw uppercase enum strings are never displayed to end users.
 
+## 20. Background Property Registration & Media Processing Architecture
+
+### 20.1. Architectural Overview & Fire-and-Forget Flow
+
+- **UX Goal**: Transition the partner property registration from a blocking, synchronous multi-step form to a fast, non-blocking asynchronous registration experience.
+- **Asynchronous Design**:
+   - When the partner submits the registration form, the property entity is immediately created in the database, initialized with the `expectedImageCount` field representing the total number of images chosen.
+   - The frontend immediately initializes the tracking state in the backend progress API and triggers parallel, fire-and-forget HTTP multipart upload requests to the `/api/v1/media/upload` endpoint (without waiting for all of them to resolve).
+   - Once all upload requests are fired, the partner is redirected to the dashboard, where a floating progress widget displays real-time updates.
+
+### 20.2. Redis-Based Atomic & Idempotent Progress Tracking
+
+- **State Store**: The upload progress state is stored in a Redis Hash at key `media:progress:{propertyId}` with the following fields:
+   - `total`: Total number of expected images.
+   - `queued`: Number of images successfully received by the HTTP controller and dispatched to Kafka.
+   - `processed`: Number of images successfully uploaded to Cloudinary and persisted in PostgreSQL.
+   - `failed`: Number of images that failed to be processed.
+   - `status`: Current state (`PROCESSING`, `STALLED`, `COMPLETED`, `PARTIAL_SUCCESS`, or `FAILED`).
+   - `percentage`: Dynamically calculated completion percentage.
+   - `lastUpdatedAt`: Epoch millis timestamp of the last update.
+   - `ownerId`: UUID of the partner who created the property (for authorization checks).
+- **Lua Scripts**: All progress updates and transitions are implemented via atomic Redis Lua scripts to prevent race conditions from concurrent parallel image processing.
+   - `media_progress_queued.lua`: Idempotently marks a correlationId as queued.
+   - `media_progress_update.lua`: Idempotently marks a correlationId as completed or failed, checks if the image was previously in the opposite set (to handle Kafka retry transitions accurately), recomputes the completion percentage using configurable weights, transitions the status, and cleans up the active set index if in a terminal state.
+- **Weights Calculation**: Progress percentage is calculated using weights configured in `application.properties`:
+   - `uploadWeight` (default `25%`): Progress contributed by successfully uploading images to the backend (queued).
+   - `processingWeight` (default `75%`): Progress contributed by successfully optimizing images and persisting them (processed).
+   - Formula: `percentage = (queued / total * uploadWeight) + (processed / total * processingWeight)`.
+
+### 20.3. ZSET-Based Stall Detection
+
+- **Index**: Active property registrations are tracked in a Redis Sorted Set (ZSET) at key `media:progress:active`, where the member is `propertyId` and the score is the `lastUpdatedAt` timestamp.
+- **Detection**: A scheduler (`MediaStallDetector`) runs every 30 seconds to fetch properties from the ZSET that haven't received progress updates within the `stallTimeout` threshold (default 120s):
+   - Command: `ZRANGEBYSCORE media:progress:active 0 (now - stallTimeout)`.
+   - Any matching property is transitioned to the `STALLED` state, alerting the user via the UI widget.
+   - Using a ZSET index avoids scanning keys matching `media:progress:*`, scaling efficiently to tens of thousands of concurrent uploads.
+
+### 20.4. Event-Driven Server-Sent Events (SSE) Dispatcher
+
+- **Decoupled Delivery**: Real-time progress notifications are pushed to the client using Server-Sent Events.
+- **Pipeline**:
+   - The Redis progress service publishes a local Spring `MediaProgressUpdatedEvent` on state changes.
+   - `SseProgressDispatcher` listens to these events and dispatches the progress data to active `SseEmitter` instances corresponding to that `propertyId`.
+- **Hardening Features**:
+   - Emitters are managed in a thread-safe map with concurrent collections.
+   - A cleanup mechanism runs automatically when emitters timeout, complete, or throw errors.
+   - Periodic keep-alive heartbeats are sent to prevent browser timeouts.
+   - Max concurrent emitters per property are capped (default 5) to prevent resource depletion attacks.
+
+### 20.5. Recovery Flow for Incomplete Uploads
+
+- **Problem**: If a partner closes their tab or browser mid-upload, some image uploads are lost, leaving the property in an incomplete state.
+- **Backend Recovery**:
+   - The `properties` table tracks `expected_image_count`.
+   - The endpoint `/partner/properties/incomplete-uploads` (GET) returns properties owned by the current partner where the actual count of media records in the DB is less than `expected_image_count`.
+   - The endpoint `/partner/properties/{propertyId}/dismiss-incomplete` (PATCH) allows the partner to dismiss the alert by setting `expected_image_count = actual_image_count`.
+- **Frontend Integration**:
+   - An amber warning banner is displayed on the partner dashboard when incomplete properties are found.
+   - Partners can click "Resume" to redirect to the property detail page to upload more images, or "Dismiss" to silence the warning.
+
 ---
 
-_Last Updated: 2026-06-08_
+_Last Updated: 2026-06-09_

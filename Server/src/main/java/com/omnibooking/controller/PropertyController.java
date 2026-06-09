@@ -4,6 +4,7 @@ import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.PartnerLegalProfileResponse;
 import com.omnibooking.dto.PropertyRequest;
 import com.omnibooking.dto.PropertyResponse;
+import com.omnibooking.dto.IncompleteUploadResponse;
 import com.omnibooking.services.property.PropertyService;
 import com.omnibooking.util.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -75,6 +77,28 @@ public class PropertyController {
       PropertyDetailResponse response = propertyService.getPropertyDetailForPartner(id, userId);
 
       return ApiResponse.success(response);
+   }
+
+   @GetMapping("/incomplete-uploads")
+   @PreAuthorize("hasAuthority(T(com.omnibooking.constant.SecurityConstants.Roles).PARTNER)")
+   @Operation(summary = "Get properties with incomplete image uploads for current partner")
+   public ApiResponse<List<IncompleteUploadResponse>> getIncompleteUploads() {
+      UUID userId = SecurityUtils.getCurrentUserId();
+      log.info("Controller: Fetching incomplete uploads for partner: {}", userId);
+      List<IncompleteUploadResponse> response = propertyService.getIncompleteUploads(userId);
+
+      return ApiResponse.success(response);
+   }
+
+   @PatchMapping("/{propertyId}/dismiss-incomplete")
+   @PreAuthorize("hasAuthority(T(com.omnibooking.constant.SecurityConstants.Roles).PARTNER)")
+   @Operation(summary = "Dismiss incomplete image upload warning for a property")
+   public ApiResponse<Void> dismissIncompleteUpload(@PathVariable UUID propertyId) {
+      UUID userId = SecurityUtils.getCurrentUserId();
+      log.info("Controller: Dismissing incomplete uploads warning for property: {} by partner: {}", propertyId, userId);
+      propertyService.dismissIncompleteUpload(propertyId, userId);
+
+      return ApiResponse.success(null);
    }
 
 }

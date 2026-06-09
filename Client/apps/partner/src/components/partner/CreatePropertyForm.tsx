@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 import { useSettingStore } from "@/store/useSettingStore";
+import { useUploadProgressStore } from "@/store/useUploadProgressStore";
 import { useQuery } from "@tanstack/react-query";
 import apiClient from "@/lib/api/apiClient";
 
@@ -56,25 +57,6 @@ const getPropertySchema = (tv: (key: string) => string) =>
       }),
    });
 
-const waitImagesSync = async (propertyId: string): Promise<number> => {
-   const startTime = Date.now();
-   const maxPollTime = 30000; // 30s timeout
-
-   while (Date.now() - startTime < maxPollTime) {
-      try {
-         const myProperties = await propertyService.getMyProperties();
-         const createdProperty = myProperties.find((p) => p.id === propertyId);
-         if (createdProperty && createdProperty.imageUrl) {
-            break;
-         }
-      } catch (error) {
-         console.error("Failed to check image status", error);
-      }
-      await new Promise((resolve) => setTimeout(resolve, 500));
-   }
-   return Date.now() - startTime;
-};
-
 export default function CreatePropertyForm() {
    const t = useTranslations("Partner.createPropertyForm");
    const tHeader = useTranslations("Partner.createProperty");
@@ -88,6 +70,7 @@ export default function CreatePropertyForm() {
    const router = useRouter();
 
    const { currency } = useSettingStore();
+   const addJob = useUploadProgressStore((s) => s.addJob);
    const { data: rates } = useQuery({
       queryKey: ["currency-rates"],
       queryFn: async () => {
@@ -152,37 +135,24 @@ export default function CreatePropertyForm() {
          const submissionData = {
             ...data,
             roomTypes: convertedRoomTypes,
+            expectedImageCount: images.length,
          };
 
          // 1. Create Property
          const property = await propertyService.createProperty(submissionData);
 
-         // 2. Upload Images
-         setImages((prev) => prev.map((img) => ({ ...img, isUploading: true })));
+         // 2. Init media progress tracking + add job to store
+         await propertyService.initMediaProgress(property.id, images.length);
+         addJob(property.id, data.name);
 
-         const uploadPromises = images.map((img, index) =>
-            propertyService.uploadMedia(img.file, property.id, "PROPERTY", index === 0)
-         );
+         // 3. Fire-and-forget image uploads (tracked via SSE)
+         images.forEach((img, index) => {
+            propertyService
+               .uploadMedia(img.file, property.id, "PROPERTY", index === 0)
+               .catch((err) => console.error("[MediaUpload] HTTP upload failed:", err));
+         });
 
-         await Promise.all(uploadPromises);
-
-         // Cập nhật toast thành đang xử lý tối ưu ảnh
-         toast.loading(
-            t("messages.imageProcessing") || "Hình ảnh đang được tối ưu hóa trên hệ thống CDN...",
-            {
-               id: loadingToastId,
-            }
-         );
-
-         // 3. Chờ ảnh được Kafka/CDN xử lý xong bất đồng bộ
-         const elapsedTime = await waitImagesSync(property.id);
-
-         // Nếu xử lý quá nhanh (dưới 3 giây), cố tình delay thêm cho đủ 3 giây để trải nghiệm mượt mà hơn
-         if (elapsedTime < 3000) {
-            await new Promise((resolve) => setTimeout(resolve, 3000 - elapsedTime));
-         }
-
-         toast.success(t("messages.success") || "Tạo chỗ nghỉ và đồng bộ hình ảnh thành công!", {
+         toast.success(t("messages.submitted"), {
             id: loadingToastId,
          });
 

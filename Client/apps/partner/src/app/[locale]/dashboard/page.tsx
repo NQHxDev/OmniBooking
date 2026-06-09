@@ -6,6 +6,7 @@ import DashboardSidebar from "@/components/partner/DashboardSidebar";
 import DashboardStats from "@/components/partner/DashboardStats";
 import PropertyTable from "@/components/partner/PropertyTable";
 import DashboardHeader from "@/components/partner/DashboardHeader";
+import UploadRecoveryBanner from "@/components/partner/UploadRecoveryBanner";
 import { propertyService } from "@/lib/api/propertyService";
 import { partnerService } from "@/lib/api/services/partnerService";
 import { getTranslations } from "next-intl/server";
@@ -48,6 +49,9 @@ export default async function PartnerDashboard() {
             <DashboardHeader />
 
             <div className="p-8">
+               {/* Recovery Banner */}
+               <UploadRecoveryBanner />
+
                {/* Welcome & Action */}
                <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
                   <div>

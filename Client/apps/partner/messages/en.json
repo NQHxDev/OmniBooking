@@ -117,7 +117,8 @@
             "roomsRequired": "Please add at least one room type.",
             "legalRequired": "Please fill in all legal information fields.",
             "termsRequired": "You must agree to the terms to proceed.",
-            "uploading": "Uploading property information..."
+            "uploading": "Uploading property information...",
+            "submitted": "Property registered! Images are being processed..."
          },
          "propertyTypes": {
             "HOTEL": {
@@ -432,6 +433,25 @@
          "errorSave": "Unable to save pricing rule.",
          "errorDelete": "Unable to delete pricing rule.",
          "errorUpdate": "Unable to update status."
+      },
+      "uploadProgress": {
+         "processing": "Processing new property",
+         "stalled": "Processing is taking longer than expected...",
+         "completed": "Property is ready!",
+         "partialSuccess": "Property created successfully",
+         "failed": "Image processing failed",
+         "imagesProcessed": "{processed}/{total} images processed",
+         "imagesFailed": "{success} succeeded · {failed} failed",
+         "completedIn": "Completed in {time}s",
+         "systemProcessing": "System is processing, please wait",
+         "reuploadFailed": "Re-upload failed images",
+         "retry": "Retry",
+         "viewDetails": "View details",
+         "submitted": "Property registered! Images are being processed...",
+         "recoveryTitle": "Incomplete Image Upload",
+         "recoveryMessage": "The property \"{name}\" has only {actual} of {expected} images uploaded. Please resume or dismiss this warning.",
+         "dismiss": "Dismiss",
+         "resume": "Resume"
       }
    },
    "Map": {

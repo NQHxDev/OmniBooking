@@ -15,6 +15,8 @@ public interface MediaRepository extends JpaRepository<Media, UUID> {
 
    List<Media> findByEntityIdAndEntityType(UUID entityId, String entityType);
 
+   long countByEntityIdAndEntityType(UUID entityId, String entityType);
+
    Optional<Media> findFirstByEntityIdAndEntityTypeAndIsMainTrue(UUID entityId, String entityType);
 
    @Query("SELECT m FROM Media m WHERE m.entityType = 'PROPERTY' AND m.isMain = true AND m.entityId IN :entityIds")

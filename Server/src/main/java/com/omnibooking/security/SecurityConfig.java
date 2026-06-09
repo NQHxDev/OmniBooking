@@ -33,6 +33,7 @@ import com.omnibooking.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import com.omnibooking.config.AppProperties;
+import jakarta.servlet.DispatcherType;
 
 @Configuration
 @EnableWebSecurity
@@ -117,6 +118,10 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                  // Permit ASYNC and ERROR dispatcher types to prevent Spring Security from running authorization checks
+                  // during secondary async/SSE dispatches (e.g. /media/progress/{propertyId}/stream) or container-driven error pages,
+                  // where OncePerRequestFilter (JWT) does not run again and would otherwise cause AccessDeniedException.
+                  .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                   .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                   .requestMatchers("/auth/passkey/**").authenticated()
                   .requestMatchers("/auth/login", "/auth/register", "/auth/verify", "/auth/refresh", "/auth/logout",
