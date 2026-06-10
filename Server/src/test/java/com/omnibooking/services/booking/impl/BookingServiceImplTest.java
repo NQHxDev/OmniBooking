@@ -230,6 +230,14 @@ class BookingServiceImplTest {
          return b;
       });
 
+      lenient().when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> {
+         Booking b = invocation.getArgument(0);
+         if (b.getId() == null) {
+            b.setId(UUID.randomUUID());
+         }
+         return b;
+      });
+
       lenient().when(currencyService.convertFromBase(any(BigDecimal.class), anyString()))
             .thenAnswer(invocation -> invocation.getArgument(0));
 

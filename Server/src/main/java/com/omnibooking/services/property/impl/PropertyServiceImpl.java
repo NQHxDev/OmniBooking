@@ -214,9 +214,11 @@ public class PropertyServiceImpl implements PropertyService {
    }
 
    private List<PropertyResponse> getCachedList(Cache cache, String key) {
-      if (cache == null) return null;
+      if (cache == null)
+         return null;
       List<?> rawList = cache.get(key, List.class);
-      if (rawList == null || rawList.isEmpty()) return null;
+      if (rawList == null || rawList.isEmpty())
+         return null;
 
       List<PropertyResponse> cachedList = new java.util.ArrayList<>();
       for (Object obj : rawList) {
@@ -445,7 +447,8 @@ public class PropertyServiceImpl implements PropertyService {
             .map(r -> {
                BigDecimal currentPrice;
                try {
-                  var result = priceCalculationService.calculateStayPrice(r.getProperty().getId(), r.getId(), LocalDate.now(), LocalDate.now().plusDays(1), 2);
+                  var result = priceCalculationService.calculateStayPrice(r.getProperty().getId(), r.getId(),
+                        LocalDate.now(), LocalDate.now().plusDays(1), 2);
                   currentPrice = result.totalFinalPrice();
                } catch (Exception e) {
                   currentPrice = r.getBasePrice();
@@ -502,7 +505,8 @@ public class PropertyServiceImpl implements PropertyService {
             .map(r -> {
                BigDecimal currentPrice;
                try {
-                  var result = priceCalculationService.calculateStayPrice(r.getProperty().getId(), r.getId(), LocalDate.now(), LocalDate.now().plusDays(1), 2);
+                  var result = priceCalculationService.calculateStayPrice(r.getProperty().getId(), r.getId(),
+                        LocalDate.now(), LocalDate.now().plusDays(1), 2);
                   currentPrice = result.totalFinalPrice();
                } catch (Exception e) {
                   currentPrice = r.getBasePrice();
@@ -590,7 +594,8 @@ public class PropertyServiceImpl implements PropertyService {
       long actualCount = mediaRepository.countByEntityIdAndEntityType(propertyId, "PROPERTY");
       property.setExpectedImageCount((int) actualCount);
       propertyRepository.save(property);
-      log.info("[Recovery] Incomplete upload warning dismissed for property: {} (expected_image_count set to actual: {})",
+      log.info(
+            "[Recovery] Incomplete upload warning dismissed for property: {} (expected_image_count set to actual: {})",
             propertyId, actualCount);
    }
 

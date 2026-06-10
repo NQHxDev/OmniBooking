@@ -170,17 +170,18 @@ public class CouponReservationServiceImpl implements CouponReservationService {
       List<CouponReservation> reservations = couponReservationRepository
             .findByCustomerIdAndCouponIdAndStatusOrderByReservedAtDesc(customerId, couponId, ReservationStatus.CONSUMED);
 
-      if (!reservations.isEmpty()) {
-         CouponReservation reservation = reservations.get(0);
-         int rowsAffected = couponReservationRepository.transitionStatus(reservation.getId(), ReservationStatus.CONSUMED,
-               ReservationStatus.EXPIRED);
-         if (rowsAffected > 0) {
-            couponRepository.refundCouponUsageAtomically(couponId);
-            return;
-         }
+      if (reservations.isEmpty()) {
+         log.info("No CONSUMED coupon reservation found for customer {} and coupon {}. Release may have already processed. Skipping.", customerId, couponId);
+         return;
       }
 
-      couponRepository.refundCouponUsageAtomically(couponId);
+      CouponReservation reservation = reservations.get(0);
+      int rowsAffected = couponReservationRepository.transitionStatus(reservation.getId(), ReservationStatus.CONSUMED,
+            ReservationStatus.EXPIRED);
+      if (rowsAffected > 0) {
+         couponRepository.refundCouponUsageAtomically(couponId);
+         log.info("Successfully refunded coupon reservation {} for coupon {}", reservation.getId(), couponId);
+      }
    }
 
 }

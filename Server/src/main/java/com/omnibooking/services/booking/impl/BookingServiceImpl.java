@@ -29,6 +29,10 @@ import com.omnibooking.repository.property.RoomTypeRepository;
 import com.omnibooking.repository.user.UserRepository;
 import com.omnibooking.repository.user.UserProfileRepository;
 import com.omnibooking.repository.payment.TransactionRepository;
+import com.omnibooking.repository.pricing.BookingAppliedRuleVersionRepository;
+import com.omnibooking.repository.pricing.BookingPriceBreakdownRepository;
+import com.omnibooking.repository.pricing.CouponReservationRepository;
+import com.omnibooking.repository.pricing.PriceRuleVersionRepository;
 import com.omnibooking.model.Transaction;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.services.booking.BookingService;
@@ -37,6 +41,10 @@ import com.omnibooking.services.core.BloomFilterService;
 import com.omnibooking.services.core.CurrencyService;
 import com.omnibooking.services.core.EncryptionService;
 import com.omnibooking.services.core.OutboxService;
+import com.omnibooking.services.pricing.CouponReleaseRetryService;
+import com.omnibooking.services.pricing.CouponReservationService;
+import com.omnibooking.services.pricing.PriceCalculationService;
+import com.omnibooking.services.pricing.PricingEngine;
 import com.omnibooking.services.pricing.PricingRuleHandler;
 import com.omnibooking.services.user.VerificationService;
 import com.omnibooking.services.auth.CachedRoleService;
@@ -107,21 +115,36 @@ public class BookingServiceImpl implements BookingService {
 
    private final org.springframework.cache.CacheManager cacheManager;
 
-   private final com.omnibooking.services.pricing.PriceCalculationService priceCalculationService;
-   private final com.omnibooking.services.pricing.CouponReservationService couponReservationService;
-   private final com.omnibooking.repository.pricing.CouponReservationRepository couponReservationRepository;
-   private final com.omnibooking.repository.pricing.BookingPriceBreakdownRepository bookingPriceBreakdownRepository;
-   private final com.omnibooking.repository.pricing.BookingAppliedRuleVersionRepository bookingAppliedRuleVersionRepository;
-   private final com.omnibooking.repository.pricing.PriceRuleVersionRepository priceRuleVersionRepository;
-   private final com.omnibooking.services.pricing.PricingEngine pricingEngine;
+   private final PriceCalculationService priceCalculationService;
+
+   private final CouponReservationService couponReservationService;
+
+   private final CouponReservationRepository couponReservationRepository;
+
+   private final BookingPriceBreakdownRepository bookingPriceBreakdownRepository;
+
+   private final BookingAppliedRuleVersionRepository bookingAppliedRuleVersionRepository;
+
+   private final PriceRuleVersionRepository priceRuleVersionRepository;
+
+   private final PricingEngine pricingEngine;
 
    private final BookingStateMachine bookingStateMachine;
+
    private final InventoryService inventoryService;
+
    private final BookingConfigProperties bookingConfig;
+
+   private final CouponReleaseRetryService couponReleaseRetryService;
+
    private final Counter bookingCreatedCounter;
+
    private final Counter bookingConfirmedCounter;
+
    private final Counter bookingCancelledCounter;
+
    private final Counter paymentCallbackCounter;
+
    private final Counter paymentDuplicateCallbackCounter;
 
    @Override
@@ -256,7 +279,7 @@ public class BookingServiceImpl implements BookingService {
          BigDecimal fifteenPercent = finalPrice.multiply(new BigDecimal("0.15"));
          BigDecimal firstNightRoomPrice = roomType.getBasePrice();
          Optional<RoomAvailability> firstDayOpt = roomAvailabilityRepository
-               .findByRoomTypeIdAndAvailabilityDateWithLock(roomType.getId(), request.getCheckInDate());
+               .findByRoomTypeIdAndAvailabilityDate(roomType.getId(), request.getCheckInDate());
          if (firstDayOpt.isPresent() && firstDayOpt.get().getPriceOverride() != null) {
             firstNightRoomPrice = firstDayOpt.get().getPriceOverride();
          }
@@ -296,10 +319,12 @@ public class BookingServiceImpl implements BookingService {
          booking.setExpiresAt(Instant.now().plus(bookingConfig.getHoldDurationMinutes(), ChronoUnit.MINUTES));
       }
 
-      booking = bookingRepository.save(booking);
+      booking = bookingRepository.saveAndFlush(booking);
 
-      // Room Availability Check & Locks (delegated to InventoryService after booking is saved)
-      inventoryService.reserveInventory(booking, roomType, request.getCheckInDate(), request.getCheckOutDate(), request.getNumRooms());
+      // Room Availability Check & Locks (delegated to InventoryService after booking
+      // is saved)
+      inventoryService.reserveInventory(booking, roomType, request.getCheckInDate(), request.getCheckOutDate(),
+            request.getNumRooms());
 
       // Collect all rule IDs for batch load
       Set<UUID> allRuleIds = stayPrice.dailyPrices().stream()
@@ -422,7 +447,8 @@ public class BookingServiceImpl implements BookingService {
                EventConstants.BOOKING_CONFIRMED_MAIL,
                emailEvent);
 
-         // Evict partner bookings list cache to show the new booking on their management page
+         // Evict partner bookings list cache to show the new booking on their management
+         // page
          try {
             Cache cache = cacheManager.getCache("partner_bookings");
             if (cache != null) {
@@ -463,8 +489,10 @@ public class BookingServiceImpl implements BookingService {
       paymentCallbackCounter.increment();
 
       // STEP 1: Atomic status transition (THE concurrency guard)
-      // If another callback already confirmed → rowsUpdated == 0 → skip ALL side-effects
-      int rowsUpdated = bookingRepository.atomicConfirmBooking(bookingId, Instant.now(), BookingStatus.PENDING_PAYMENT, BookingStatus.CONFIRMED);
+      // If another callback already confirmed → rowsUpdated == 0 → skip ALL
+      // side-effects
+      int rowsUpdated = bookingRepository.atomicConfirmBooking(bookingId, Instant.now(), BookingStatus.PENDING_PAYMENT,
+            BookingStatus.CONFIRMED);
 
       if (rowsUpdated == 0) {
          // Booking already confirmed, expired, or cancelled
@@ -548,7 +576,8 @@ public class BookingServiceImpl implements BookingService {
       // STEP 6: Metrics (only once)
       bookingConfirmedCounter.increment();
 
-      // Evict partner bookings list cache to show the new booking on their management page
+      // Evict partner bookings list cache to show the new booking on their management
+      // page
       try {
          Cache cache = cacheManager.getCache("partner_bookings");
          if (cache != null) {
@@ -576,10 +605,14 @@ public class BookingServiceImpl implements BookingService {
 
       // Release coupon in same transaction
       if (booking.getCoupon() != null && booking.getUser() != null) {
+         UUID couponId = booking.getCoupon().getId();
+         UUID userId = booking.getUser().getId();
          try {
-            couponReservationService.refundReservation(booking.getCoupon().getId(), booking.getUser().getId());
+            couponReservationService.refundReservation(couponId, userId);
          } catch (Exception e) {
-            log.warn("Failed to release coupon for cancelled booking {}", booking.getId(), e);
+            log.warn("Immediate coupon release failed for cancelled booking {}, persisting retry record.",
+                  booking.getId(), e);
+            couponReleaseRetryService.createRetry(booking.getId(), couponId, userId);
          }
       }
 

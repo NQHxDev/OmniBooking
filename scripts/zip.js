@@ -56,7 +56,50 @@ const outFilename = `${baseName}_${shortUuid}.zip`;
 const outputFile = path.join(outDir, outFilename);
 const relativeOutPath = path.relative(process.cwd(), outputFile).replace(/\\/g, "/");
 
+function copyMdFiles(srcDir, destDir) {
+   const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+   let hasMd = false;
+
+   for (const entry of entries) {
+      const srcPath = path.join(srcDir, entry.name);
+      const destPath = path.join(destDir, entry.name);
+
+      if (entry.isDirectory()) {
+         const subHasMd = copyMdFiles(srcPath, destPath);
+         if (subHasMd) {
+            hasMd = true;
+         }
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+         if (!fs.existsSync(destDir)) {
+            fs.mkdirSync(destDir, { recursive: true });
+         }
+         fs.copyFileSync(srcPath, destPath);
+         hasMd = true;
+      }
+   }
+   return hasMd;
+}
+
+const isServer = baseName.toLowerCase() === "server";
+if (isServer && !inputPaths.includes("Docs")) {
+   inputPaths.push("Docs");
+}
+
+let docsSwapped = false;
+const docsDir = path.resolve("Docs");
+const docsBackupDir = path.resolve("Docs_backup");
+
 try {
+   if (isServer && fs.existsSync(docsDir)) {
+      if (fs.existsSync(docsBackupDir)) {
+         fs.rmSync(docsBackupDir, { recursive: true, force: true });
+      }
+      fs.renameSync(docsDir, docsBackupDir);
+      docsSwapped = true;
+
+      copyMdFiles(docsBackupDir, docsDir);
+   }
+
    console.log(`Creating ${outFilename}...`);
    const quotedInputs = inputPaths.map((p) => `"${p.replace(/\\/g, "/")}"`).join(" ");
    const excludeFlags = excludes.map((e) => `"${e.replace(/\\/g, "/")}"`).join(" ");
@@ -67,4 +110,13 @@ try {
    console.error(`Error creating zip archive: ${err.message}`);
    console.error('Make sure you have "tar" installed (pre-installed on Windows 10+ and macOS)!');
    process.exit(1);
+} finally {
+   if (docsSwapped) {
+      if (fs.existsSync(docsDir)) {
+         fs.rmSync(docsDir, { recursive: true, force: true });
+      }
+      if (fs.existsSync(docsBackupDir)) {
+         fs.renameSync(docsBackupDir, docsDir);
+      }
+   }
 }

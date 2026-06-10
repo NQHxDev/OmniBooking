@@ -4,30 +4,32 @@
 
 Hệ thống OmniBooking quản lý trạng thái của Booking thông qua các bước nghiêm ngặt nhằm tránh race condition và đảm bảo tính nhất quán dữ liệu. Các trạng thái bao gồm:
 
-- **PENDING**: Booking vừa được khởi tạo, đang chờ xử lý.
-- **PENDING_PAYMENT**: Booking yêu cầu thanh toán đặt cọc trực tuyến (Momo/Visa). Có thời gian hết hạn (`expiresAt`).
+- **PENDING_PAYMENT**: Booking yêu cầu thanh toán đặt cọc trực tuyến (Momo/Visa). Có thời gian hết hạn (`expiresAt`). Trạng thái này hoạt động như một trạng thái **HOLD** tạm thời, giữ chỗ trống trong thời gian quy định trước khi thanh toán thành công.
 - **CONFIRMED**: Booking đã được xác nhận (hoặc thanh toán thành công, hoặc không cần cọc và được tạo bởi tài khoản hợp lệ).
 - **CANCELLED**: Khách hàng hoặc hệ thống hủy booking.
 - **EXPIRED**: Booking không hoàn tất thanh toán trước khi hết hạn và bị worker tự động quét hủy.
 - **CHECKED_IN**: Khách đã nhận phòng thành công.
 - **CHECKED_OUT**: Khách đã trả phòng thành công.
 - **NO_SHOW**: Khách không đến nhận phòng sau thời gian quy định (No-Show Grace Period).
+- **REFUNDED**: Booking đã được hoàn trả lại tiền thanh toán/đặt cọc (chuyển tiếp từ CANCELLED hoặc CONFIRMED).
 
 ### State Diagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING : createBooking()
-    PENDING --> PENDING_PAYMENT : Requires Deposit (Online)
-    PENDING --> CONFIRMED : Auto-confirm (Cash/No Deposit)
+    [*] --> PENDING_PAYMENT : createBooking() (Requires Deposit)
+    [*] --> CONFIRMED : createBooking() (Auto-confirm / Cash)
 
     PENDING_PAYMENT --> CONFIRMED : confirmBooking() (Success Callback)
     PENDING_PAYMENT --> EXPIRED : BookingExpirationWorker (Timeout)
-    PENDING_PAYMENT --> CANCELLED : cancelBooking() (User action)
+    PENDING_PAYMENT --> CANCELLED : cancelBooking() (User/System cancellation)
 
     CONFIRMED --> CHECKED_IN : checkIn()
     CONFIRMED --> CANCELLED : cancelBooking() (Within cancellation policy)
     CONFIRMED --> NO_SHOW : BookingExpirationWorker (No-show grace expired)
+    CONFIRMED --> REFUNDED : refundBooking() (Refund completed)
+
+    CANCELLED --> REFUNDED : refundBooking() (Deposit returned)
 
     CHECKED_IN --> CHECKED_OUT : checkOut()
 ```
@@ -50,7 +52,7 @@ stateDiagram-v2
    ```sql
    UPDATE booking SET status = 'EXPIRED', updated_at = :now
    WHERE id = :bookingId
-   AND status IN ('PENDING', 'PENDING_PAYMENT')
+   AND status = 'PENDING_PAYMENT'
    AND expires_at < :now
    ```
 - **`atomicConfirmBooking()`**: Tương tự:

@@ -207,4 +207,41 @@ public class MetricsConfig {
             .description("Total stuck booking anomalies detected").register(r);
    }
 
+   @Bean
+   public Counter reconciliationCouponLeakCounter(MeterRegistry r) {
+      return Counter.builder("omnibooking.reconciliation.coupon_leak.total")
+            .description("Total coupon leak anomalies detected").register(r);
+   }
+
+   @Bean
+   public Counter couponReleaseRetryCounter(MeterRegistry r) {
+      return Counter.builder("omnibooking.coupon.release.retry.total")
+            .description("Total coupon release retry attempts").register(r);
+   }
+
+   @Bean
+   public Counter couponReleaseRetrySuccessCounter(MeterRegistry r) {
+      return Counter.builder("omnibooking.coupon.release.retry.success.total")
+            .description("Total successful coupon release retries").register(r);
+   }
+
+   @Bean
+   public Counter couponReleaseRetryFailureCounter(MeterRegistry r) {
+      return Counter.builder("omnibooking.coupon.release.retry.failure.total")
+            .description("Total failed coupon release retries").register(r);
+   }
+
+   @Bean
+   public MeterBinder couponReleasePendingBinder(com.omnibooking.repository.pricing.CouponReleaseRetryRepository couponReleaseRetryRepository) {
+      return registry -> Gauge.builder("omnibooking.coupon.release.pending.total", () -> {
+         try {
+            return couponReleaseRetryRepository.countByStatus("PENDING");
+         } catch (Exception e) {
+            return 0;
+         }
+      })
+            .description("Number of pending coupon release retries")
+            .register(registry);
+   }
+
 }

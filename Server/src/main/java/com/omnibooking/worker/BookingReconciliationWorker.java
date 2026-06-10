@@ -19,6 +19,10 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import com.omnibooking.model.CouponReservation;
+import com.omnibooking.model.enums.ReservationStatus;
+import com.omnibooking.repository.booking.CouponRepository;
+import com.omnibooking.repository.pricing.CouponReservationRepository;
 
 @Component
 @RequiredArgsConstructor
@@ -39,12 +43,17 @@ public class BookingReconciliationWorker {
 
    private final Counter reconciliationStuckBookingCounter;
 
+   private final CouponReservationRepository couponReservationRepository;
+
+   private final CouponRepository couponRepository;
+
+   private final Counter reconciliationCouponLeakCounter;
+
    /**
-    * Runs daily at 4 AM. Detects and reports discrepancies.
-    * Initially report-only — does NOT auto-repair.
+    * Runs every 30 minutes. Detects and reports/repairs discrepancies.
     */
-   @Scheduled(cron = "0 0 4 * * *")
-   @SchedulerLock(name = "bookingReconciliation", lockAtMostFor = "PT30M", lockAtLeastFor = "PT5M")
+   @Scheduled(cron = "0 */30 * * * *")
+   @SchedulerLock(name = "bookingReconciliation", lockAtMostFor = "PT25M", lockAtLeastFor = "PT5M")
    public void reconcile() {
       SentryId checkInId = Sentry.captureCheckIn(
             new CheckIn("booking-reconciliation-worker", CheckInStatus.IN_PROGRESS));
@@ -60,6 +69,9 @@ public class BookingReconciliationWorker {
 
          // 3. Payment Reconciliation
          reconcilePayments();
+
+         // 4. Coupon Reconciliation
+         reconcileCoupons();
 
          log.info("=== Booking Reconciliation Completed ===");
          Sentry.captureCheckIn(
@@ -123,6 +135,31 @@ public class BookingReconciliationWorker {
          }
          reconciliationPaymentMismatchCounter.increment(orphans.size());
          reconciliationAnomalyCounter.increment(orphans.size());
+      }
+   }
+
+   private void reconcileCoupons() {
+      List<CouponReservation> leaked = couponReservationRepository.findLeakedCouponReservations();
+
+      if (!leaked.isEmpty()) {
+         log.error("[RECONCILIATION] Found {} leaked coupon reservations:", leaked.size());
+         for (CouponReservation cr : leaked) {
+            log.error("  Reservation: {}, Coupon: {}, Customer: {}",
+                  cr.getId(), cr.getCoupon().getCode(), cr.getCustomer().getEmail());
+
+            try {
+               int rowsAffected = couponReservationRepository.transitionStatus(
+                     cr.getId(), ReservationStatus.CONSUMED, ReservationStatus.EXPIRED);
+               if (rowsAffected > 0) {
+                  couponRepository.refundCouponUsageAtomically(cr.getCoupon().getId());
+                  log.info("[RECONCILIATION] Successfully auto-repaired leaked coupon reservation: {}", cr.getId());
+               }
+            } catch (Exception e) {
+               log.error("[RECONCILIATION] Failed to auto-repair leaked coupon reservation: {}", cr.getId(), e);
+            }
+         }
+         reconciliationCouponLeakCounter.increment(leaked.size());
+         reconciliationAnomalyCounter.increment(leaked.size());
       }
    }
 

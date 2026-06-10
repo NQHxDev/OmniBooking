@@ -23,8 +23,10 @@ public class BookingStateMachine {
 
    private static final Map<BookingStatus, Set<BookingStatus>> TRANSITIONS = Map.of(
          BookingStatus.PENDING_PAYMENT, Set.of(BookingStatus.CONFIRMED, BookingStatus.CANCELLED, BookingStatus.EXPIRED),
-         BookingStatus.CONFIRMED, Set.of(BookingStatus.CHECKED_IN, BookingStatus.CANCELLED, BookingStatus.NO_SHOW),
-         BookingStatus.CHECKED_IN, Set.of(BookingStatus.CHECKED_OUT));
+         BookingStatus.CONFIRMED,
+         Set.of(BookingStatus.CHECKED_IN, BookingStatus.CANCELLED, BookingStatus.NO_SHOW, BookingStatus.REFUNDED),
+         BookingStatus.CHECKED_IN, Set.of(BookingStatus.CHECKED_OUT),
+         BookingStatus.CANCELLED, Set.of(BookingStatus.REFUNDED));
 
    private final BookingConfigProperties config;
    private final BookingStatusLogRepository statusLogRepository;

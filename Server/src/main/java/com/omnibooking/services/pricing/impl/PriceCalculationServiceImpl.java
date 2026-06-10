@@ -79,6 +79,15 @@ public class PriceCalculationServiceImpl implements PriceCalculationService {
             .collect(Collectors.toList());
 
       List<LocalDate> stayDates = checkIn.datesUntil(checkOut).collect(Collectors.toList());
+
+      // Batch load availability records for the entire stay range
+      List<RoomAvailability> availabilities = roomAvailabilityRepository
+            .findByRoomTypeIdAndAvailabilityDateRange(roomTypeId, checkIn, checkOut);
+
+      java.util.Map<LocalDate, BigDecimal> priceOverrides = availabilities.stream()
+            .filter(a -> a.getPriceOverride() != null)
+            .collect(Collectors.toMap(RoomAvailability::getAvailabilityDate, RoomAvailability::getPriceOverride));
+
       List<DailyPrice> dailyPrices = new ArrayList<>();
 
       BigDecimal totalBasePrice = BigDecimal.ZERO;
@@ -88,11 +97,7 @@ public class PriceCalculationServiceImpl implements PriceCalculationService {
       BigDecimal totalFinal = BigDecimal.ZERO;
 
       for (LocalDate date : stayDates) {
-         BigDecimal basePrice = roomAvailabilityRepository
-               .findByRoomTypeIdAndAvailabilityDate(roomTypeId, date)
-               .map(RoomAvailability::getPriceOverride)
-               .filter(p -> p != null)
-               .orElse(roomType.getBasePrice());
+         BigDecimal basePrice = priceOverrides.getOrDefault(date, roomType.getBasePrice());
 
          PricingEngine.PricingResult result = pricingEngine.calculatePrice(
                applicableRulesForRoom,

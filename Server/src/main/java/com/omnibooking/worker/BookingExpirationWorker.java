@@ -8,6 +8,7 @@ import com.omnibooking.repository.booking.BookingRepository;
 import com.omnibooking.repository.booking.BookingStatusLogRepository;
 import com.omnibooking.services.booking.InventoryService;
 import com.omnibooking.services.pricing.CouponReservationService;
+import com.omnibooking.services.pricing.CouponReleaseRetryService;
 import io.micrometer.core.instrument.Counter;
 import io.sentry.CheckIn;
 import io.sentry.CheckInStatus;
@@ -37,6 +38,7 @@ public class BookingExpirationWorker {
    private final BookingStatusLogRepository statusLogRepository;
    private final InventoryService inventoryService;
    private final CouponReservationService couponReservationService;
+   private final CouponReleaseRetryService couponReleaseRetryService;
    private final BookingConfigProperties config;
    private final Counter bookingExpiredCounter;
    private final Counter bookingExpirationFailureCounter;
@@ -46,11 +48,10 @@ public class BookingExpirationWorker {
    private BookingExpirationWorker self;
 
    @Scheduled(fixedDelayString = "${omnibooking.booking.expiration-check-interval-ms:60000}")
-   @SchedulerLock(name = "bookingExpiration",
-      lockAtMostFor = "PT10M", lockAtLeastFor = "PT30S")
+   @SchedulerLock(name = "bookingExpiration", lockAtMostFor = "PT10M", lockAtLeastFor = "PT30S")
    public void expireBookings() {
       SentryId checkInId = Sentry.captureCheckIn(
-         new CheckIn("booking-expiration-worker", CheckInStatus.IN_PROGRESS));
+            new CheckIn("booking-expiration-worker", CheckInStatus.IN_PROGRESS));
 
       try {
          int totalProcessed = 0;
@@ -61,8 +62,8 @@ public class BookingExpirationWorker {
          // Loop until no more expired bookings remain
          while (true) {
             List<Booking> batch = bookingRepository.findExpiredBookings(
-               List.of(BookingStatus.PENDING_PAYMENT),
-               now, page);
+                  List.of(BookingStatus.PENDING_PAYMENT),
+                  now, page);
 
             if (batch.isEmpty()) {
                break;
@@ -89,11 +90,11 @@ public class BookingExpirationWorker {
          }
 
          Sentry.captureCheckIn(
-            new CheckIn(checkInId, "booking-expiration-worker", CheckInStatus.OK));
+               new CheckIn(checkInId, "booking-expiration-worker", CheckInStatus.OK));
       } catch (Exception e) {
          log.error("Error in BookingExpirationWorker", e);
          Sentry.captureCheckIn(
-            new CheckIn(checkInId, "booking-expiration-worker", CheckInStatus.ERROR));
+               new CheckIn(checkInId, "booking-expiration-worker", CheckInStatus.ERROR));
       }
    }
 
@@ -101,7 +102,8 @@ public class BookingExpirationWorker {
    public void processExpiration(UUID bookingId, Instant now) {
       // STEP 1: Atomic status transition (THE idempotency mechanism)
       // If payment callback already confirmed this booking → rowsUpdated == 0 → skip
-      int rowsUpdated = bookingRepository.atomicExpireBooking(bookingId, now, BookingStatus.PENDING_PAYMENT, BookingStatus.EXPIRED);
+      int rowsUpdated = bookingRepository.atomicExpireBooking(bookingId, now, BookingStatus.PENDING_PAYMENT,
+            BookingStatus.EXPIRED);
 
       if (rowsUpdated == 0) {
          log.info("Booking {} already confirmed/expired, skipping", bookingId);
@@ -119,27 +121,27 @@ public class BookingExpirationWorker {
 
       // STEP 5: Audit log
       statusLogRepository.save(BookingStatusLog.builder()
-         .booking(booking)
-         .oldStatus(BookingStatus.PENDING_PAYMENT)
-         .newStatus(BookingStatus.EXPIRED)
-         .reason("Booking expired: payment not received within time limit")
-         .build());
+            .booking(booking)
+            .oldStatus(BookingStatus.PENDING_PAYMENT)
+            .newStatus(BookingStatus.EXPIRED)
+            .reason("Booking expired: payment not received within time limit")
+            .build());
 
       // STEP 6: Metrics
       bookingExpiredCounter.increment();
    }
 
    private void releaseCouponIfPresent(Booking booking) {
-      if (booking.getCoupon() != null) {
+      if (booking.getCoupon() != null && booking.getUser() != null) {
+         UUID couponId = booking.getCoupon().getId();
+         UUID userId = booking.getUser().getId();
          try {
-            // Coupon release in same TX boundary as status transition
-            // → prevents coupon race condition
-            if (booking.getUser() != null) {
-               couponReservationService.refundReservation(booking.getCoupon().getId(), booking.getUser().getId());
-            }
+            couponReservationService.refundReservation(couponId, userId);
          } catch (Exception e) {
-            log.warn("Failed to release coupon for booking {}", booking.getId(), e);
+            log.warn("Immediate coupon release failed for booking {}, persisting retry record.", booking.getId(), e);
+            couponReleaseRetryService.createRetry(booking.getId(), couponId, userId);
          }
       }
    }
+
 }

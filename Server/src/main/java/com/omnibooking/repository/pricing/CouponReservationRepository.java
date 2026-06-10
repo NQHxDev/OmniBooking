@@ -27,6 +27,14 @@ public interface CouponReservationRepository extends JpaRepository<CouponReserva
          @Param("couponId") UUID couponId,
          @Param("status") ReservationStatus status);
 
+   @Query("SELECT cr FROM CouponReservation cr " +
+         "WHERE cr.status = com.omnibooking.model.enums.ReservationStatus.CONSUMED " +
+         "AND EXISTS (SELECT b FROM Booking b " +
+         "            WHERE b.coupon = cr.coupon " +
+         "            AND b.user = cr.customer " +
+         "            AND b.status IN (com.omnibooking.model.enums.BookingStatus.CANCELLED, com.omnibooking.model.enums.BookingStatus.EXPIRED))")
+   List<CouponReservation> findLeakedCouponReservations();
+
    @Modifying(clearAutomatically = true)
    @Query("UPDATE CouponReservation cr SET cr.status = :newStatus WHERE cr.id = :id AND cr.status = :oldStatus")
    int transitionStatus(@Param("id") UUID id, @Param("oldStatus") ReservationStatus oldStatus,

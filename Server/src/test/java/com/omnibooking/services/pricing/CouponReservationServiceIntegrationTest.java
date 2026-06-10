@@ -1,7 +1,12 @@
 package com.omnibooking.services.pricing;
 
-import com.omnibooking.model.*;
-import com.omnibooking.model.enums.*;
+import com.omnibooking.model.Coupon;
+import com.omnibooking.model.CouponReservation;
+import com.omnibooking.model.Property;
+import com.omnibooking.model.User;
+import com.omnibooking.model.enums.DiscountType;
+import com.omnibooking.model.enums.PropertyType;
+import com.omnibooking.model.enums.ReservationStatus;
 import com.omnibooking.repository.booking.CouponRepository;
 import com.omnibooking.repository.pricing.CouponReservationRepository;
 import com.omnibooking.repository.property.PropertyRepository;
@@ -23,7 +28,9 @@ import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
 @Transactional
