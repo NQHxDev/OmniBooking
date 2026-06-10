@@ -12,8 +12,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
+import java.util.Optional;
+
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, UUID> {
+
+   @Lock(LockModeType.PESSIMISTIC_WRITE)
+   @Query("SELECT b FROM Booking b WHERE b.id = :id")
+   Optional<Booking> findByIdForUpdate(@Param("id") UUID id);
 
    List<Booking> findByUserId(UUID userId);
 

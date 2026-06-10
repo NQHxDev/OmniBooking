@@ -30,6 +30,8 @@ import com.omnibooking.services.pricing.CouponReservationService;
 import com.omnibooking.services.pricing.PriceCalculationService;
 import com.omnibooking.services.pricing.PricingEngine;
 import com.omnibooking.services.user.VerificationService;
+import com.omnibooking.services.payment.PaymentStateMachine;
+import com.omnibooking.repository.payment.PaymentEventRepository;
 
 import io.micrometer.core.instrument.Counter;
 
@@ -57,7 +59,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Optional;
@@ -179,6 +180,12 @@ class BookingServiceImplTest {
    @Mock
    private Counter paymentDuplicateCallbackCounter;
 
+   @Mock
+   private PaymentStateMachine paymentStateMachine;
+
+   @Mock
+   private PaymentEventRepository paymentEventRepository;
+
    @InjectMocks
    private BookingServiceImpl bookingService;
 
@@ -228,6 +235,14 @@ class BookingServiceImplTest {
             b.setId(UUID.randomUUID());
          }
          return b;
+      });
+
+      lenient().when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
+         Transaction t = invocation.getArgument(0);
+         if (t.getId() == null) {
+            t.setId(UUID.randomUUID());
+         }
+         return t;
       });
 
       lenient().when(bookingRepository.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> {
@@ -512,10 +527,7 @@ class BookingServiceImplTest {
             .checkOutDate(LocalDate.now().plusDays(5))
             .build();
 
-      when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(mockBooking));
-      when(bookingRepository.atomicConfirmBooking(eq(bookingId), any(Instant.class), eq(BookingStatus.PENDING_PAYMENT),
-            eq(BookingStatus.CONFIRMED))).thenReturn(1);
-
+      when(bookingRepository.findByIdForUpdate(bookingId)).thenReturn(Optional.of(mockBooking));
       // Act
       bookingService.confirmBooking(bookingId, "MOMO", "momo_trans_123", "{}");
 

@@ -4,6 +4,8 @@ import com.omnibooking.config.BookingConfigProperties;
 import com.omnibooking.model.Booking;
 import com.omnibooking.model.BookingStatusLog;
 import com.omnibooking.model.enums.BookingStatus;
+import com.omnibooking.exception.AppException;
+import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.repository.booking.BookingRepository;
 import com.omnibooking.repository.booking.BookingStatusLogRepository;
 import com.omnibooking.services.booking.InventoryService;
@@ -100,26 +102,32 @@ public class BookingExpirationWorker {
 
    @Transactional(propagation = Propagation.REQUIRES_NEW)
    public void processExpiration(UUID bookingId, Instant now) {
-      // STEP 1: Atomic status transition (THE idempotency mechanism)
-      // If payment callback already confirmed this booking → rowsUpdated == 0 → skip
-      int rowsUpdated = bookingRepository.atomicExpireBooking(bookingId, now, BookingStatus.PENDING_PAYMENT,
-            BookingStatus.EXPIRED);
+      log.info("Acquiring pessimistic write lock for booking expiration {}", bookingId);
+      Booking booking = bookingRepository.findByIdForUpdate(bookingId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Booking not found"));
 
-      if (rowsUpdated == 0) {
-         log.info("Booking {} already confirmed/expired, skipping", bookingId);
+      if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
+         log.info("Booking {} already confirmed/expired, skipping expiration", bookingId);
          return;
       }
 
-      // STEP 2: Status transition succeeded → proceed with side-effects
-      Booking booking = bookingRepository.findById(bookingId).orElseThrow();
+      if (booking.getExpiresAt() == null || booking.getExpiresAt().isAfter(now)) {
+         log.info("Booking {} has not expired yet, skipping", bookingId);
+         return;
+      }
 
-      // STEP 3: Release inventory (called ONLY because status transition succeeded)
+      // Transition booking status to EXPIRED
+      booking.setStatus(BookingStatus.EXPIRED);
+      booking.setUpdatedAt(now);
+      bookingRepository.save(booking);
+
+      // Release inventory
       inventoryService.releaseInventory(booking);
 
-      // STEP 4: Release coupon (in same transaction)
+      // Release coupon
       releaseCouponIfPresent(booking);
 
-      // STEP 5: Audit log
+      // Audit log
       statusLogRepository.save(BookingStatusLog.builder()
             .booking(booking)
             .oldStatus(BookingStatus.PENDING_PAYMENT)
@@ -127,7 +135,7 @@ public class BookingExpirationWorker {
             .reason("Booking expired: payment not received within time limit")
             .build());
 
-      // STEP 6: Metrics
+      // Metrics
       bookingExpiredCounter.increment();
    }
 

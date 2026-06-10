@@ -152,6 +152,18 @@ CREATE TABLE IF NOT EXISTS shedlock (
    locked_by VARCHAR(255) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS coupon_release_retries (
+   id UUID PRIMARY KEY,
+   booking_id UUID NOT NULL,
+   coupon_id UUID NOT NULL,
+   user_id UUID NOT NULL,
+   attempt_count INT NOT NULL,
+   last_attempt_at TIMESTAMP,
+   next_attempt_at TIMESTAMP NOT NULL,
+   status VARCHAR(20) NOT NULL,
+   created_at TIMESTAMP NOT NULL
+);
+
 -- 2. Dependent Tables (With Foreign Keys)
 CREATE TABLE IF NOT EXISTS user_profiles (
    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -271,7 +283,8 @@ CREATE TABLE IF NOT EXISTS bookings (
    total_price DECIMAL(19, 4) NOT NULL, -- Original price before discount
    final_price DECIMAL(19, 4) NOT NULL, -- Price after coupons
    coupon_id UUID REFERENCES coupons(id) ON DELETE SET NULL,
-   status VARCHAR(20) NOT NULL DEFAULT 'PENDING_PAYMENT', -- PENDING_PAYMENT, CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED, EXPIRED, NO_SHOW, REFUNDED
+   status VARCHAR(30) NOT NULL DEFAULT 'PENDING_PAYMENT', -- PENDING_PAYMENT, CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED, EXPIRED, NO_SHOW, REFUNDED
+   expires_at TIMESTAMP WITH TIME ZONE,
 
    -- Guest Info (can be different from user, using searchable encryption)
    guest_name VARCHAR(100) NOT NULL,
@@ -290,18 +303,34 @@ CREATE TABLE IF NOT EXISTS bookings (
    requires_deposit BOOLEAN NOT NULL DEFAULT FALSE,
    payment_method VARCHAR(50),
 
-   CONSTRAINT check_booking_dates CHECK (check_out_date > check_in_date)
+   CONSTRAINT check_booking_dates CHECK (check_out_date > check_in_date),
+   CONSTRAINT chk_pending_payment_has_expiry CHECK (status <> 'PENDING_PAYMENT' OR expires_at IS NOT NULL),
+   CONSTRAINT chk_confirmed_no_expiry CHECK (status <> 'CONFIRMED' OR expires_at IS NULL),
+   CONSTRAINT chk_expired_has_expiry CHECK (status <> 'EXPIRED' OR expires_at IS NOT NULL)
 );
 
 CREATE TABLE IF NOT EXISTS booking_status_logs (
    id UUID PRIMARY KEY,
    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-   old_status VARCHAR(20),
-   new_status VARCHAR(20) NOT NULL,
+   old_status VARCHAR(30),
+   new_status VARCHAR(30) NOT NULL,
    reason TEXT,
    changed_by UUID REFERENCES users(id),
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   deleted_at TIMESTAMP WITH TIME ZONE,
+   version BIGINT DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS inventory_operations (
+   id UUID PRIMARY KEY,
+   booking_id UUID NOT NULL REFERENCES bookings(id),
+   room_type_id UUID NOT NULL REFERENCES room_types(id),
+   availability_date DATE NOT NULL,
+   operation_type VARCHAR(10) NOT NULL,
+   num_rooms INTEGER NOT NULL,
+   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
    deleted_at TIMESTAMP WITH TIME ZONE,
    version BIGINT DEFAULT 0
 );
@@ -318,7 +347,9 @@ CREATE TABLE IF NOT EXISTS transactions (
    version BIGINT DEFAULT 0,
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-   deleted_at TIMESTAMP WITH TIME ZONE
+   deleted_at TIMESTAMP WITH TIME ZONE,
+
+   CONSTRAINT uq_transactions_provider_tx_id UNIQUE (provider_transaction_id)
 );
 
 CREATE TABLE IF NOT EXISTS media (
@@ -642,6 +673,21 @@ CREATE INDEX idx_coupon_reservations_property_id ON coupon_reservations(property
 CREATE INDEX idx_booking_price_breakdowns_booking_id ON booking_price_breakdowns(booking_id);
 CREATE INDEX idx_booking_applied_rule_versions_breakdown_id ON booking_applied_rule_versions(booking_breakdown_id);
 CREATE INDEX idx_booking_applied_rule_versions_rule_version_id ON booking_applied_rule_versions(rule_version_id);
+
+-- Booking lifecycle / expiration worker indexes
+CREATE INDEX idx_bookings_status_expires
+   ON bookings(status, expires_at)
+   WHERE expires_at IS NOT NULL AND deleted_at IS NULL;
+CREATE INDEX idx_inv_ops_booking ON inventory_operations(booking_id);
+CREATE INDEX idx_inv_ops_type ON inventory_operations(operation_type, booking_id);
+
+-- Coupon release retry scheduler indexes
+CREATE UNIQUE INDEX ux_coupon_retry_pending
+ON coupon_release_retries (booking_id, coupon_id)
+WHERE status = 'PENDING';
+
+CREATE INDEX idx_coupon_retry_pending_sched
+ON coupon_release_retries (status, next_attempt_at);
 
 COMMENT ON COLUMN user_passkeys.deleted_at IS 'Timestamp of soft deletion';
 

@@ -19,8 +19,13 @@ import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import jakarta.persistence.UniqueConstraint;
+
 @Entity
-@Table(name = "transactions")
+@Table(name = "transactions", uniqueConstraints = {
+   @UniqueConstraint(name = "uq_transactions_provider_order_id", columnNames = {"payment_method", "provider_order_id"}),
+   @UniqueConstraint(name = "uq_transactions_provider_tx_id", columnNames = {"payment_method", "provider_transaction_id"})
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -47,8 +52,17 @@ public class Transaction extends BaseEntity {
    @Column(nullable = false, length = 20)
    private TransactionStatus status = TransactionStatus.PENDING;
 
-   @Column(name = "provider_transaction_id", unique = true)
+   @Column(name = "provider_order_id")
+   private String providerOrderId;
+
+   @Column(name = "provider_transaction_id")
    private String providerTransactionId;
+
+   @Column(name = "local_amount", precision = 19, scale = 4)
+   private BigDecimal localAmount;
+
+   @Column(name = "local_currency", length = 3)
+   private String localCurrency;
 
    @JdbcTypeCode(SqlTypes.JSON)
    @Column(columnDefinition = "jsonb")

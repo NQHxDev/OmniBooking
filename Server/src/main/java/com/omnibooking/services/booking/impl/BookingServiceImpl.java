@@ -34,6 +34,9 @@ import com.omnibooking.repository.pricing.BookingPriceBreakdownRepository;
 import com.omnibooking.repository.pricing.CouponReservationRepository;
 import com.omnibooking.repository.pricing.PriceRuleVersionRepository;
 import com.omnibooking.model.Transaction;
+import com.omnibooking.model.PaymentEvent;
+import com.omnibooking.repository.payment.PaymentEventRepository;
+import com.omnibooking.services.payment.PaymentStateMachine;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.services.booking.BookingService;
 import com.omnibooking.services.communication.MailService;
@@ -50,6 +53,8 @@ import com.omnibooking.services.user.VerificationService;
 import com.omnibooking.services.auth.CachedRoleService;
 import com.omnibooking.services.booking.BookingStateMachine;
 import com.omnibooking.services.booking.InventoryService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.config.BookingConfigProperties;
 import com.omnibooking.model.PriceRuleVersion;
 import io.micrometer.core.instrument.Counter;
@@ -146,6 +151,10 @@ public class BookingServiceImpl implements BookingService {
    private final Counter paymentCallbackCounter;
 
    private final Counter paymentDuplicateCallbackCounter;
+
+   private final PaymentStateMachine paymentStateMachine;
+
+   private final PaymentEventRepository paymentEventRepository;
 
    @Override
    @Transactional
@@ -488,44 +497,90 @@ public class BookingServiceImpl implements BookingService {
    public void confirmBooking(UUID bookingId, String paymentMethod, String providerTransactionId, String metadata) {
       paymentCallbackCounter.increment();
 
-      // STEP 1: Atomic status transition (THE concurrency guard)
-      // If another callback already confirmed → rowsUpdated == 0 → skip ALL
-      // side-effects
-      int rowsUpdated = bookingRepository.atomicConfirmBooking(bookingId, Instant.now(), BookingStatus.PENDING_PAYMENT,
-            BookingStatus.CONFIRMED);
+      log.info("Acquiring pessimistic write lock for booking {}", bookingId);
+      Booking booking = bookingRepository.findByIdForUpdate(bookingId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Booking not found"));
 
-      if (rowsUpdated == 0) {
-         // Booking already confirmed, expired, or cancelled
-         log.info("Booking {} not in PENDING_PAYMENT state, skipping confirmation", bookingId);
+      if (booking.getStatus() != BookingStatus.PENDING_PAYMENT) {
+         log.info("Booking {} not in PENDING_PAYMENT state (current: {}), skipping confirmation", bookingId,
+               booking.getStatus());
          return;
       }
 
-      // STEP 2: Atomic transition succeeded → this callback owns the confirmation
-      Booking booking = bookingRepository.findById(bookingId).orElseThrow();
+      // Transition booking status to CONFIRMED
+      BookingStatus oldStatus = booking.getStatus();
       booking.setStatus(BookingStatus.CONFIRMED);
+      booking.setExpiresAt(null);
+      bookingRepository.save(booking);
 
-      // STEP 3: Audit log (only once — guaranteed by atomic transition)
+      // Save booking status log
       bookingStatusLogRepository.save(BookingStatusLog.builder()
             .booking(booking)
-            .oldStatus(BookingStatus.PENDING_PAYMENT)
+            .oldStatus(oldStatus)
             .newStatus(BookingStatus.CONFIRMED)
             .reason("Deposit paid via " + paymentMethod)
             .changedBy(booking.getUser())
             .build());
 
-      // STEP 4: Save transaction — dedup via DB unique constraint
-      Transaction transaction = Transaction.builder()
-            .booking(booking)
-            .amount(booking.getDepositAmount())
-            .transactionType(TransactionType.PAYMENT)
-            .paymentMethod(paymentMethod)
-            .status(TransactionStatus.SUCCESS)
-            .providerTransactionId(providerTransactionId)
-            .metadata(metadata)
-            .build();
+      // Parse orderId from metadata to update the pending transaction
+      String orderId = null;
+      if (metadata != null) {
+         try {
+            JsonNode rootNode = new ObjectMapper().readTree(metadata);
+            if (rootNode.has("orderId")) {
+               orderId = rootNode.get("orderId").asText();
+            }
+         } catch (Exception e) {
+            log.warn("Failed to parse orderId from metadata JSON: {}", e.getMessage());
+         }
+      }
+
+      Transaction transaction;
+      if (orderId != null) {
+         Optional<Transaction> pendingTxOpt = transactionRepository.findByProviderOrderId(orderId);
+         if (pendingTxOpt.isPresent()) {
+            transaction = pendingTxOpt.get();
+            paymentStateMachine.transition(transaction, TransactionStatus.SUCCESS);
+            transaction.setProviderTransactionId(providerTransactionId);
+            transaction.setMetadata(metadata);
+         } else {
+            transaction = Transaction.builder()
+                  .booking(booking)
+                  .amount(booking.getDepositAmount())
+                  .localAmount(booking.getDepositAmount()) // fallback
+                  .localCurrency(booking.getCurrency())
+                  .transactionType(TransactionType.PAYMENT)
+                  .paymentMethod(paymentMethod)
+                  .status(TransactionStatus.SUCCESS)
+                  .providerTransactionId(providerTransactionId)
+                  .metadata(metadata)
+                  .build();
+         }
+      } else {
+         transaction = Transaction.builder()
+               .booking(booking)
+               .amount(booking.getDepositAmount())
+               .localAmount(booking.getDepositAmount()) // fallback
+               .localCurrency(booking.getCurrency())
+               .transactionType(TransactionType.PAYMENT)
+               .paymentMethod(paymentMethod)
+               .status(TransactionStatus.SUCCESS)
+               .providerTransactionId(providerTransactionId)
+               .metadata(metadata)
+               .build();
+      }
 
       try {
-         transactionRepository.save(transaction);
+         transaction = transactionRepository.save(transaction);
+
+         // Record PAYMENT_CONFIRMED event
+         PaymentEvent confEvent = PaymentEvent.builder()
+               .transactionId(transaction.getId())
+               .bookingId(bookingId)
+               .eventType("PAYMENT_CONFIRMED")
+               .metadata(metadata)
+               .build();
+         paymentEventRepository.save(confEvent);
       } catch (DataIntegrityViolationException ex) {
          log.info("Duplicate provider transaction ignored: providerTxId={}", providerTransactionId);
          paymentDuplicateCallbackCounter.increment();

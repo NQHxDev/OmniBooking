@@ -1,0 +1,24 @@
+# Exclude build artifacts
+target/
+*.jar
+*.war
+
+# Exclude Maven wrappers (we use global Maven in image)
+.mvn/
+mvnw
+mvnw.cmd
+
+# Exclude IDEs and local configurations
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Exclude source repository info
+.git/
+.gitignore
+
+# Exclude application logs
+logs/
+*.log

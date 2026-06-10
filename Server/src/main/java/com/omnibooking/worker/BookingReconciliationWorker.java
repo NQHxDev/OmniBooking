@@ -23,6 +23,18 @@ import com.omnibooking.model.CouponReservation;
 import com.omnibooking.model.enums.ReservationStatus;
 import com.omnibooking.repository.booking.CouponRepository;
 import com.omnibooking.repository.pricing.CouponReservationRepository;
+import com.omnibooking.services.booking.BookingService;
+import com.omnibooking.services.payment.PaymentProviderFactory;
+import com.omnibooking.services.payment.PaymentProvider;
+import com.omnibooking.services.payment.PaymentStateMachine;
+import com.omnibooking.repository.payment.PaymentEventRepository;
+import com.omnibooking.model.PaymentEvent;
+import com.omnibooking.model.Transaction;
+import com.omnibooking.model.enums.TransactionStatus;
+import com.omnibooking.model.enums.PaymentGatewayStatus;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -48,6 +60,14 @@ public class BookingReconciliationWorker {
    private final CouponRepository couponRepository;
 
    private final Counter reconciliationCouponLeakCounter;
+
+   private final BookingService bookingService;
+
+   private final PaymentProviderFactory paymentProviderFactory;
+
+   private final PaymentStateMachine paymentStateMachine;
+
+   private final PaymentEventRepository paymentEventRepository;
 
    /**
     * Runs every 30 minutes. Detects and reports/repairs discrepancies.
@@ -122,7 +142,8 @@ public class BookingReconciliationWorker {
    }
 
    private void reconcilePayments() {
-      // Transactions with SUCCESS status but booking still PENDING_PAYMENT
+      // 1. Auto-confirm legacy orphans (Transaction SUCCESS but Booking
+      // PENDING_PAYMENT)
       List<Object[]> orphans = transactionRepository
             .findSuccessTransactionsWithNonConfirmedBookings();
 
@@ -130,11 +151,80 @@ public class BookingReconciliationWorker {
          log.error("[RECONCILIATION] Found {} paid but unconfirmed bookings:",
                orphans.size());
          for (Object[] row : orphans) {
+            UUID bookingId = (UUID) row[0];
+            UUID transactionId = (UUID) row[1];
+            String providerTxId = (String) row[2];
             log.error("  Booking: {}, Transaction: {}, ProviderTxId: {}",
-                  row[0], row[1], row[2]);
+                  bookingId, transactionId, providerTxId);
+
+            try {
+               log.info("[RECONCILIATION] Auto-confirming orphan booking: {}", bookingId);
+               bookingService.confirmBooking(bookingId, "MOMO", providerTxId, "{\"reconciled\":true}");
+            } catch (Exception e) {
+               log.error("[RECONCILIATION] Failed to auto-confirm orphan booking: {}", bookingId, e);
+            }
          }
          reconciliationPaymentMismatchCounter.increment(orphans.size());
          reconciliationAnomalyCounter.increment(orphans.size());
+      }
+
+      // 2. Query Gateway for Stale PENDING Transactions
+      // stuckThreshold = created at least 10 minutes ago
+      Instant stuckThreshold = Instant.now().minus(10, ChronoUnit.MINUTES);
+      // maxAgeThreshold = created within 24 hours ago
+      Instant maxAgeThreshold = Instant.now().minus(24, ChronoUnit.HOURS);
+
+      PageRequest pageRequest = PageRequest.of(0, 50, Sort.by("updatedAt").ascending());
+
+      List<Transaction> pendingTxs = transactionRepository.findPendingTransactionsForReconciliation(
+            TransactionStatus.PENDING, stuckThreshold, maxAgeThreshold, pageRequest);
+
+      if (!pendingTxs.isEmpty()) {
+         log.info("[RECONCILIATION] Found {} stale pending transactions to reconcile.", pendingTxs.size());
+         for (Transaction tx : pendingTxs) {
+            try {
+               PaymentProvider provider = paymentProviderFactory.getProvider(tx.getPaymentMethod());
+               log.info("[RECONCILIATION] Querying status for transaction: {}, orderId: {}", tx.getId(),
+                     tx.getProviderOrderId());
+               PaymentGatewayStatus gatewayStatus = provider.queryPaymentStatus(tx);
+
+               if (gatewayStatus == PaymentGatewayStatus.SUCCESS) {
+                  log.info("[RECONCILIATION] Transaction {} confirmed SUCCESS by gateway.", tx.getId());
+
+                  // Record RECONCILIATION_FIXED event
+                  PaymentEvent fixEvent = PaymentEvent.builder()
+                        .transactionId(tx.getId())
+                        .bookingId(tx.getBooking().getId())
+                        .eventType("RECONCILIATION_FIXED")
+                        .metadata(String.format("{\"orderId\":\"%s\",\"status\":\"SUCCESS\"}", tx.getProviderOrderId()))
+                        .build();
+                  paymentEventRepository.save(fixEvent);
+               } else if (gatewayStatus == PaymentGatewayStatus.FAILED) {
+                  log.info("[RECONCILIATION] Transaction {} confirmed FAILED by gateway. Transitioning state.",
+                        tx.getId());
+                  paymentStateMachine.transition(tx, TransactionStatus.FAILED);
+                  transactionRepository.save(tx);
+
+                  PaymentEvent failEvent = PaymentEvent.builder()
+                        .transactionId(tx.getId())
+                        .bookingId(tx.getBooking().getId())
+                        .eventType("PAYMENT_FAILED")
+                        .metadata(String.format(
+                              "{\"orderId\":\"%s\",\"status\":\"FAILED\",\"reason\":\"Gateway reported failed\"}",
+                              tx.getProviderOrderId()))
+                        .build();
+                  paymentEventRepository.save(failEvent);
+               } else if (gatewayStatus == PaymentGatewayStatus.PENDING) {
+                  // Save transaction to update its updatedAt and send it to the back of the queue
+                  tx.setUpdatedAt(Instant.now());
+                  transactionRepository.save(tx);
+                  log.info("[RECONCILIATION] Transaction {} is still PENDING at gateway. Updated timestamp to defer.",
+                        tx.getId());
+               }
+            } catch (Exception e) {
+               log.error("[RECONCILIATION] Failed to reconcile transaction: {}", tx.getId(), e);
+            }
+         }
       }
    }
 
