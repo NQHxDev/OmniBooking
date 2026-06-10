@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.slf4j.MDC;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -27,9 +28,36 @@ public class SseNotificationService {
 
    private final ObjectMapper objectMapper;
 
+   private final StringRedisTemplate redisTemplate;
+
    public SseEmitter subscribe(String requestId) {
       MDC.put("requestId", requestId);
       try {
+         // Check if we already have a cached registration result (race condition fallback)
+         String resultKey = "registration_result:" + requestId;
+         String cachedResult = redisTemplate.opsForValue().get(resultKey);
+         if (cachedResult != null && cachedResult.contains("SUCCESS")) {
+            String tokenKey = "registration_token:" + requestId;
+            String accessToken = redisTemplate.opsForValue().get(tokenKey);
+            if (accessToken != null) {
+               SseEmitter emitter = new SseEmitter(120_000L);
+               try {
+                  Map<String, String> responseMap = new HashMap<>();
+                  responseMap.put("accessToken", accessToken);
+                  String responseJson = objectMapper.writeValueAsString(responseMap);
+
+                  emitter.send(SseEmitter.event()
+                        .name("REGISTRATION_COMPLETE")
+                        .data(responseJson));
+                  emitter.complete();
+                  logJson("registration_sse_sent_cached", requestId, null, "Cached registration notification sent via SSE successfully");
+                  return emitter;
+               } catch (IOException e) {
+                  logJson("registration_sse_failed_cached", requestId, null, "Failed to send cached SSE: " + e.getMessage());
+               }
+            }
+         }
+
          // Timeout after 2 minutes of waiting
          SseEmitter emitter = new SseEmitter(120_000L);
 

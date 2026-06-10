@@ -185,6 +185,7 @@ export default function AuthPage() {
 
                const eventSource = new EventSource(fullSseUrl);
                let sseCompleted = false;
+               let pollingStarted = false;
 
                const startPollingFallback = () => {
                   let attempt = 0;
@@ -233,9 +234,22 @@ export default function AuthPage() {
                   setTimeout(poll, backoffIntervals[0]);
                };
 
+               const triggerPollingOnce = () => {
+                  if (!pollingStarted && !sseCompleted) {
+                     pollingStarted = true;
+                     startPollingFallback();
+                  }
+               };
+
+               // Early fallback: start polling after 3 seconds in parallel with SSE
+               const pollingTimer = setTimeout(() => {
+                  triggerPollingOnce();
+               }, 3000);
+
                eventSource.addEventListener("REGISTRATION_COMPLETE", async (e) => {
                   try {
                      sseCompleted = true;
+                     clearTimeout(pollingTimer);
                      const userData = JSON.parse(e.data);
                      const accessToken = userData.accessToken;
 
@@ -278,7 +292,7 @@ export default function AuthPage() {
                   if (!sseCompleted) {
                      console.error("SSE Error, falling back to polling:", err);
                      eventSource.close();
-                     startPollingFallback();
+                     triggerPollingOnce();
                   } else {
                      eventSource.close();
                   }

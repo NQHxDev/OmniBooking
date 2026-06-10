@@ -171,10 +171,6 @@ public class RegistrationService {
                            // Mark inbox status to SUCCESS
                            updateInboxStatus(UUID.fromString(finalRequestId), RegistrationInboxStatus.SUCCESS);
 
-                           // Cache result in Redis for 7 days (Durable Result)
-                           String resultKey = "registration_result:" + finalRequestId;
-                           redisTemplate.opsForValue().set(resultKey, "SUCCESS", 7, TimeUnit.DAYS);
-
                            // Increment success metric
                            meterRegistry.counter("registration_success_total").increment();
 
@@ -209,8 +205,18 @@ public class RegistrationService {
          if (userRepository.existsByEmail(user.getEmail())) {
             log.warn("Email {} already exists during individual fallback insert. Rejecting.", user.getEmail());
             updateInboxStatus(reqId, RegistrationInboxStatus.FAILED);
-            redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "FAILED_DUPLICATE_EMAIL", 10,
-                  TimeUnit.MINUTES);
+             try {
+                Map<String, Object> resultPayload = new HashMap<>();
+                resultPayload.put("requestId", msg.getRequestId());
+                resultPayload.put("status", "FAILED");
+                resultPayload.put("message", "FAILED_DUPLICATE_EMAIL");
+                resultPayload.put("completedAt", Instant.now().toString());
+                String payloadJson = objectMapper.writeValueAsString(resultPayload);
+                redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), payloadJson, 10,
+                      TimeUnit.MINUTES);
+             } catch (Exception e) {
+                log.error("Failed to serialize duplicate registration result", e);
+             }
             meterRegistry.counter("registration_failed_total").increment();
             logJson("registration_db_failed_duplicate", msg.getRequestId(), user.getEmail(),
                   "Registration failed: Email already exists during individual insert fallback");
@@ -236,8 +242,7 @@ public class RegistrationService {
                      MDC.put("requestId", msg.getRequestId());
                      try {
                         updateInboxStatus(reqId, RegistrationInboxStatus.SUCCESS);
-                        redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "SUCCESS", 7,
-                              TimeUnit.DAYS);
+
                         meterRegistry.counter("registration_success_total").increment();
                         logJson("registration_db_committed", msg.getRequestId(), user.getEmail(),
                               "Registration request successfully saved to database (individual fallback)");
@@ -267,8 +272,18 @@ public class RegistrationService {
             if (nextRetryCount > 10) {
                inbox.setStatus(RegistrationInboxStatus.FAILED_PERMANENT);
                inbox.setProcessedAt(Instant.now());
-               redisTemplate.opsForValue().set("registration_result:" + reqId, "FAILED_PERMANENT", 7,
-                     TimeUnit.DAYS);
+                try {
+                   Map<String, Object> resultPayload = new HashMap<>();
+                   resultPayload.put("requestId", reqId.toString());
+                   resultPayload.put("status", "FAILED");
+                   resultPayload.put("message", "FAILED_PERMANENT");
+                   resultPayload.put("completedAt", Instant.now().toString());
+                   String payloadJson = objectMapper.writeValueAsString(resultPayload);
+                   redisTemplate.opsForValue().set("registration_result:" + reqId, payloadJson, 10,
+                         TimeUnit.MINUTES);
+                } catch (Exception e) {
+                   log.error("Failed to serialize failed permanent registration result", e);
+                }
                meterRegistry.counter("omnibooking.registration.failed_permanent.count").increment();
                meterRegistry.counter("registration_failed_total").increment();
                logJson("registration_failed_permanent", reqId.toString(), null,
@@ -377,13 +392,23 @@ public class RegistrationService {
          AuthResponse authResponse = userMapper.toAuthResponse(user, profile, roleNames);
 
          // Generate a temporary access token for session finalization
-         String accessToken = jwtService.generateAccessToken(user.getId(), roleNames, UUID.randomUUID(),
+         String accessToken = jwtService.generateAccessToken(user.getId(), roleNames, UUID.fromString(requestId),
                "async-registration");
          authResponse.setAccessToken(accessToken);
 
          // Store the temporary token in Redis with a 10-minute TTL
          String tokenKey = "registration_token:" + requestId;
          redisTemplate.opsForValue().set(tokenKey, accessToken, 10, TimeUnit.MINUTES);
+
+         // Save the registration_result with a 10-minute TTL (JSON format)
+         Map<String, Object> resultPayload = new HashMap<>();
+         resultPayload.put("requestId", requestId);
+         resultPayload.put("userId", user.getId().toString());
+         resultPayload.put("status", "SUCCESS");
+         resultPayload.put("completedAt", Instant.now().toString());
+         String payloadJson = objectMapper.writeValueAsString(resultPayload);
+         String resultKey = "registration_result:" + requestId;
+         redisTemplate.opsForValue().set(resultKey, payloadJson, 10, TimeUnit.MINUTES);
 
          String dataJson = objectMapper.writeValueAsString(authResponse);
 

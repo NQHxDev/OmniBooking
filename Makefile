@@ -51,12 +51,12 @@ monitoring:
 .PHONY: test-server
 test-server:
 	@echo "Starting isolated Redis container for integration tests..."
-	@docker-compose -f docker-compose.test.yml up -d
+	@docker-compose -p omnibooking-test -f "$(CURDIR)/docker-compose.test.yml" up -d
 	@echo "Running Server unit tests..."
 	@cd Server && ./mvnw clean test; \
 	status=$$?; \
 	echo "Stopping and removing isolated Redis container..."; \
-	docker-compose -f docker-compose.test.yml down -v; \
+	docker-compose -p omnibooking-test -f "$(CURDIR)/docker-compose.test.yml" down -v; \
 	exit $$status
 
 # Performance & Load Testing with k6
@@ -111,29 +111,23 @@ docker-restart:
 # Docker Production Stack
 .PHONY: docker-build
 docker-build:
-	@cp env/.env.prod Client/.env
 	@echo "Building and starting all services in Production Docker..."
 	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml up --build -d
-	@rm -f Client/.env
 
 .PHONY: docker-rebuild
 docker-rebuild:
 	@echo "Stopping running production containers to free up RAM & CPU..."
 	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml stop
-	@cp env/.env.prod Client/.env
 	@echo "Building and starting all services in Production Docker..."
 	@docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml up --build -d
-	@rm -f Client/.env
 	@echo "Rebuild and restart completed successfully!"
 
 .PHONY: docker-restart-prod
 docker-restart-prod:
 	@read -p "Are you sure you want to rebuild and restart all Production Docker services? (y/n): " ans; \
 	if [ "$$ans" = "y" ] || [ "$$ans" = "Y" ]; then \
-		cp env/.env.prod Client/.env; \
 		echo "Rebuilding and restarting all Production Docker services..."; \
 		docker-compose -p omnibooking-prod --env-file env/.env.prod -f docker-compose.prod.yml up -d --build; \
-		rm -f Client/.env; \
 	else \
 		echo "Aborted..."; \
 	fi

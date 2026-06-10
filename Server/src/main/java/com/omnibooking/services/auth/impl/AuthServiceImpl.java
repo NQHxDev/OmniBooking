@@ -56,6 +56,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.stream.Collectors;
 
@@ -1134,6 +1135,18 @@ public class AuthServiceImpl implements AuthService {
                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
          UserProfile profile = userProfileRepository.findById(userId).orElse(null);
 
+         // Clean up registration cache keys in Redis
+         try {
+            UUID originalRequestId = jwtService.extractSessionId(accessToken);
+            if (originalRequestId != null) {
+               String reqIdStr = originalRequestId.toString();
+               redisTemplate.delete("registration_result:" + reqIdStr);
+               redisTemplate.delete("registration_token:" + reqIdStr);
+            }
+         } catch (Exception ex) {
+            log.warn("Failed to clean up registration Redis cache: {}", ex.getMessage());
+         }
+
          long now = System.currentTimeMillis();
          // For finalize registration, we don't have 'rememberMe' info from the original
          // request yet,
@@ -1291,15 +1304,33 @@ public class AuthServiceImpl implements AuthService {
       if (redisVal != null) {
          String status = redisVal;
          String message = "Status retrieved from cache";
-         if (redisVal.startsWith("FAILED")) {
-            status = "FAILED";
-            message = redisVal;
+         Instant completedAt = null;
+
+         if (redisVal.startsWith("{")) {
+            try {
+               Map<?, ?> map = objectMapper.readValue(redisVal, Map.class);
+               status = (String) map.get("status");
+               if (map.containsKey("message")) {
+                  message = (String) map.get("message");
+               }
+               if (map.containsKey("completedAt")) {
+                  completedAt = Instant.parse((String) map.get("completedAt"));
+               }
+            } catch (Exception e) {
+               log.error("Failed to parse registration result JSON from Redis", e);
+            }
+         } else {
+            if (redisVal.startsWith("FAILED")) {
+               status = "FAILED";
+               message = redisVal;
+            }
          }
+
          response = RegistrationStatusResponse.builder()
                .requestId(requestId)
                .status(status)
                .message(message)
-               .completedAt(null)
+               .completedAt(completedAt)
                .build();
       } else {
          // 4. Fallback to DB
@@ -1323,7 +1354,8 @@ public class AuthServiceImpl implements AuthService {
       // 5. Track Polling Success (first successful status check completion)
       if ("SUCCESS".equalsIgnoreCase(response.getStatus())) {
          String successPolledKey = "registration_polling_success_tracked:" + requestId;
-         Boolean isFirstSuccess = redisTemplate.opsForValue().setIfAbsent(successPolledKey, "true", 10, TimeUnit.MINUTES);
+         Boolean isFirstSuccess = redisTemplate.opsForValue().setIfAbsent(successPolledKey, "true", 10,
+               TimeUnit.MINUTES);
          if (Boolean.TRUE.equals(isFirstSuccess)) {
             meterRegistry.counter("registration_polling_success_total").increment();
          }
