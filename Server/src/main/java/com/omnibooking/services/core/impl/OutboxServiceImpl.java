@@ -195,6 +195,7 @@ public class OutboxServiceImpl implements OutboxService {
    @Transactional(propagation = Propagation.REQUIRES_NEW)
    public void processSingleEvent(OutboxEvent event) {
       try {
+         log.info("OutboxServiceImpl using kafkaTemplate: {}", System.identityHashCode(kafkaTemplate));
          String topic = getTopicForEvent(event.getEventType());
 
          // Deserialize and dynamically upcast JSON payload before mapping

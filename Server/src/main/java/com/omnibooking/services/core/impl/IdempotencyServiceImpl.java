@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.omnibooking.exception.AppException;
 import com.omnibooking.exception.ErrorCode;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -25,6 +26,7 @@ import java.util.UUID;
 public class IdempotencyServiceImpl implements IdempotencyService {
 
    private final ProcessedEventRepository processedEventRepository;
+   private final MeterRegistry meterRegistry;
 
    @Override
    @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -53,6 +55,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
          } catch (DataIntegrityViolationException e) {
             log.warn("Race condition: Duplicate event claim detected: eventId={}, consumerGroup={}",
                   eventId, consumerGroup);
+            meterRegistry.counter("omnibooking.event.duplicate").increment();
             return false;
          }
       }
@@ -61,6 +64,9 @@ public class IdempotencyServiceImpl implements IdempotencyService {
       boolean isLeaseExpired = existing.getLeaseUntil() != null && existing.getLeaseUntil().isBefore(now);
 
       if ("FAILED".equals(existing.getStatus()) || ("PROCESSING".equals(existing.getStatus()) && isLeaseExpired)) {
+         if ("PROCESSING".equals(existing.getStatus()) && isLeaseExpired) {
+            meterRegistry.counter("omnibooking.lease.takeover").increment();
+         }
          existing.setStatus("PROCESSING");
          existing.setUpdatedAt(now);
          existing.setLeaseUntil(now.plus(Duration.ofMinutes(5)));
@@ -78,6 +84,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
       }
 
       log.info("Duplicate event detected (already COMPLETED): eventId={}, consumerGroup={}", eventId, consumerGroup);
+      meterRegistry.counter("omnibooking.event.duplicate").increment();
       return false;
    }
 
@@ -124,16 +131,16 @@ public class IdempotencyServiceImpl implements IdempotencyService {
       if (eventId == null) {
          return;
       }
-      ProcessedEvent.ProcessedEventId id = new ProcessedEvent.ProcessedEventId(eventId, consumerGroup);
-      processedEventRepository.findById(id).ifPresent(processedEvent -> {
-         if ("PROCESSING".equals(processedEvent.getStatus())) {
-            processedEvent.setLeaseUntil(Instant.now().plus(extension));
-            processedEvent.setUpdatedAt(Instant.now());
-            processedEventRepository.saveAndFlush(processedEvent);
-            log.info("Successfully renewed lease for event: eventId={}, consumerGroup={}, leaseUntil={}",
-                  eventId, consumerGroup, processedEvent.getLeaseUntil());
-         }
-      });
+      Instant now = Instant.now();
+      Instant newLeaseUntil = now.plus(extension);
+      int updated = processedEventRepository.renewLeaseOpt(eventId, consumerGroup, newLeaseUntil, now);
+      if (updated > 0) {
+         log.info("Successfully renewed lease for event: eventId={}, consumerGroup={}, leaseUntil={}",
+               eventId, consumerGroup, newLeaseUntil);
+      } else {
+         log.warn("Failed to renew lease for event (not in PROCESSING or lease already expired): eventId={}, consumerGroup={}",
+               eventId, consumerGroup);
+      }
    }
 
 }

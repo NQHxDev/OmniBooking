@@ -25,12 +25,23 @@ public class ResendEmailService {
    @CircuitBreaker(name = "externalService", fallbackMethod = "sendEmailFallback")
    @Retry(name = "externalService")
    public void sendHtmlEmail(String to, String subject, String htmlContent) {
-      CreateEmailOptions params = CreateEmailOptions.builder()
+      sendHtmlEmail(to, subject, htmlContent, null);
+   }
+
+   @CircuitBreaker(name = "externalService", fallbackMethod = "sendEmailFallback")
+   @Retry(name = "externalService")
+   public void sendHtmlEmail(String to, String subject, String htmlContent, String idempotencyKey) {
+      CreateEmailOptions.Builder paramsBuilder = CreateEmailOptions.builder()
             .from(fromEmail)
             .to(to)
             .subject(subject)
-            .html(htmlContent)
-            .build();
+            .html(htmlContent);
+
+      if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+         paramsBuilder.headers(java.util.Map.of("Idempotency-Key", idempotencyKey));
+      }
+
+      CreateEmailOptions params = paramsBuilder.build();
 
       try {
          CreateEmailResponse data = resend.emails().send(params);
@@ -43,8 +54,11 @@ public class ResendEmailService {
 
    public void sendEmailFallback(String to, String subject, String htmlContent, Throwable t) {
       log.error("[Fallback] Resilience4j triggered for email to {}. Reason: {}", to, t.getMessage());
-      // Here you could save the email to a 'failed_emails' table for later manual
-      // retry
+   }
+
+   public void sendEmailFallback(String to, String subject, String htmlContent, String idempotencyKey, Throwable t) {
+      log.error("[Fallback] Resilience4j triggered for email to {} with idempotencyKey {}. Reason: {}", to,
+            idempotencyKey, t.getMessage());
    }
 
 }

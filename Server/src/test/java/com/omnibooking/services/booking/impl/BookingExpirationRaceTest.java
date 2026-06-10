@@ -26,6 +26,8 @@ import com.omnibooking.services.booking.BookingService;
 import com.omnibooking.worker.BookingExpirationWorker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -42,11 +44,15 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.slf4j.LoggerFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -151,13 +157,26 @@ public class BookingExpirationRaceTest {
    public void setUp() {
       cleanDatabase();
 
+      Mockito.doReturn(CompletableFuture.completedFuture(null))
+            .when(kafkaTemplate).send(
+                  ArgumentMatchers.anyString(),
+                  ArgumentMatchers.any(),
+                  ArgumentMatchers.any());
+
+      Mockito.doReturn(CompletableFuture.completedFuture(null))
+            .when(kafkaTemplate).send(
+                  ArgumentMatchers.anyString(),
+                  ArgumentMatchers.any());
+
       testUser = User.builder()
             .username("race_usr_" + UUID.randomUUID().toString().substring(0, 8))
             .email("race_" + UUID.randomUUID() + "@example.com")
             .password("password")
             .isActive(true)
-            .roles(java.util.Collections.emptySet())
+            .roles(Collections.emptySet())
             .build();
+      LoggerFactory.getLogger(BookingExpirationRaceTest.class)
+            .info("BookingExpirationRaceTest using kafkaTemplate: {}", System.identityHashCode(kafkaTemplate));
       testUser = userRepository.save(testUser);
 
       testProperty = Property.builder()
@@ -238,7 +257,8 @@ public class BookingExpirationRaceTest {
             bookingService.confirmBooking(bookingId, "momo", "provider_tx_race_123", "{}");
             confirmSucceeded.set(true);
          } catch (Exception e) {
-            // Confirmation failed or ignored
+            LoggerFactory.getLogger(BookingExpirationRaceTest.class)
+                  .error("Confirm Booking thread failed", e);
          } finally {
             doneLatch.countDown();
          }
@@ -252,7 +272,8 @@ public class BookingExpirationRaceTest {
             bookingExpirationWorker.processExpiration(bookingId, Instant.now().plus(2, ChronoUnit.DAYS));
             expireSucceeded.set(true);
          } catch (Exception e) {
-            // Expiration failed
+            LoggerFactory.getLogger(BookingExpirationRaceTest.class)
+                  .error("Expire Booking thread failed", e);
          } finally {
             doneLatch.countDown();
          }

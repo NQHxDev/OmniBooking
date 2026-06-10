@@ -29,4 +29,12 @@ public interface ProcessedEventRepository extends JpaRepository<ProcessedEvent, 
    @Query("DELETE FROM ProcessedEvent p WHERE p.status IN :statuses AND p.updatedAt < :threshold")
    int deleteOldEvents(@Param("statuses") List<String> statuses, @Param("threshold") Instant threshold);
 
+   @Modifying
+   @Query("UPDATE ProcessedEvent p SET p.leaseUntil = :newLeaseUntil, p.updatedAt = :now WHERE p.eventId = :eventId AND p.consumerGroup = :consumerGroup AND p.status = 'PROCESSING' AND p.leaseUntil > :now")
+   int renewLeaseOpt(@Param("eventId") UUID eventId, @Param("consumerGroup") String consumerGroup, @Param("newLeaseUntil") Instant newLeaseUntil, @Param("now") Instant now);
+
+   @Modifying
+   @Query("UPDATE ProcessedEvent p SET p.status = 'FAILED', p.leaseUntil = :now, p.updatedAt = :now WHERE p.eventId = :eventId AND p.consumerGroup = :consumerGroup AND p.status = 'PROCESSING' AND p.leaseUntil < :now")
+   int recoverStaleEvent(@Param("eventId") UUID eventId, @Param("consumerGroup") String consumerGroup, @Param("now") Instant now);
+
 }

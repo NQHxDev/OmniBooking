@@ -51,12 +51,21 @@ OmniBooking uses Kafka as its core event broker, backed by the Transactional Out
 
 ### 2.1 Kafka Topics
 
-| Kafka Topic Name            | Producer Component    | Consumer Component     | Partition Key                     | Description                                                                               |
-| :-------------------------- | :-------------------- | :--------------------- | :-------------------------------- | :---------------------------------------------------------------------------------------- |
-| `omnibooking-mail-topic`    | `OutboxWorker`        | `EmailConsumer`        | `aggregateId` (User/Booking UUID) | Outbox-published communication events (verifications, OTPs, booking confirmations).       |
-| `omnibooking-media-topic`   | `MediaProducer`       | `MediaConsumer`        | `correlationId` / `aggregateId`   | Asset upload events to Cloudinary.                                                        |
-| `omnibooking-property-sync` | `OutboxWorker`        | `PropertySyncConsumer` | `propertyId`                      | Elasticsearch index update events for properties.                                         |
-| `omnibooking-user-cdc`      | `RegistrationService` | `UserCDCConsumer`      | `userId`                          | User registration CDC events triggered asynchronously for post-registration side-effects. |
+| Kafka Topic Name            | Producer Component               | Consumer Component     | Partition Key                     | Description                                                                               |
+| :-------------------------- | :------------------------------- | :--------------------- | :-------------------------------- | :---------------------------------------------------------------------------------------- |
+| `omnibooking-mail-topic`    | `EmailProducer` / `OutboxWorker` | `EmailConsumer`        | `recipient email` (event.getTo()) | Outbox-published communication events (verifications, OTPs, booking confirmations).       |
+| `omnibooking-media-topic`   | `MediaProducer`                  | `MediaConsumer`        | `correlationId` / `aggregateId`   | Asset upload events to Cloudinary.                                                        |
+| `omnibooking-property-sync` | `OutboxWorker`                   | `PropertySyncConsumer` | `propertyId`                      | Elasticsearch index update events for properties.                                         |
+| `omnibooking-user-cdc`      | `RegistrationService`            | `UserCDCConsumer`      | `userId`                          | User registration CDC events triggered asynchronously for post-registration side-effects. |
+
+#### Partition Key Trade-offs: `omnibooking-mail-topic` using `recipient email`
+
+- **Ưu điểm**:
+   - **Đảm bảo thứ tự tuyệt đối**: Mọi email gửi đến cùng một địa chỉ người nhận (ví dụ: OTP đăng ký, mã reset mật khẩu, thông báo xác nhận) sẽ được đẩy vào cùng một partition và xử lý tuần tự theo đúng thứ tự gửi từ backend. Điều này ngăn ngừa race condition như gửi mã OTP mới nhưng mã cũ lại đến sau và ghi đè do chạy bất đồng bộ song song.
+   - **Bảo vệ tính toàn vẹn thông điệp**: Tránh việc người dùng nhận được chuỗi email không đúng trình tự thời gian thực tế.
+- **Nhược điểm & Trade-offs**:
+   - **Lệch tải partition (Skewed/Hotspot Partitioning)**: Nếu có một địa chỉ email nhận một lượng lớn email hệ thống liên tục (ví dụ: email admin hoặc hệ thống monitor), partition chứa email đó sẽ phải chịu tải lớn hơn các partition khác. Tuy nhiên, đối với nghiệp vụ email giao dịch (transactional email) của người dùng, lượng email cho mỗi địa chỉ thường rất thấp nên rủi ro hotspot thực tế gần như không đáng kể.
+   - **Hạn chế xử lý song song trên một email**: Chỉ có thể có tối đa 1 consumer thread xử lý email cho một địa chỉ tại một thời điểm (do hạn chế partition-level locking của Kafka), nhưng đây cũng chính là mục tiêu thiết kế để đảm bảo tuần tự.
 
 ### 2.2 Outbox Event Types & Registrations
 

@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+   - name: 'OmniBooking Dashboards'
+     orgId: 1
+     folder: 'Operations'
+     type: file
+     disableDeletion: false
+     editable: true
+     options:
+        path: /etc/grafana/provisioning/dashboards

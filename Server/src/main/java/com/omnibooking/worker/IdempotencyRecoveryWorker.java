@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -18,6 +19,7 @@ import java.util.List;
 public class IdempotencyRecoveryWorker {
 
    private final ProcessedEventRepository processedEventRepository;
+   private final MeterRegistry meterRegistry;
 
    /**
     * Recovers stale claims stuck in 'PROCESSING' state for longer than 5 minutes.
@@ -34,12 +36,11 @@ public class IdempotencyRecoveryWorker {
          for (ProcessedEvent event : staleEvents) {
             log.warn("Recovering stale claim: eventId={}, consumerGroup={}, leaseUntil={}", 
                   event.getEventId(), event.getConsumerGroup(), event.getLeaseUntil());
-            event.setStatus("FAILED");
-            event.setUpdatedAt(Instant.now());
-            event.setLeaseUntil(Instant.now());
-            processedEventRepository.save(event);
+            int updated = processedEventRepository.recoverStaleEvent(event.getEventId(), event.getConsumerGroup(), now);
+            if (updated > 0) {
+               meterRegistry.counter("omnibooking.lease.expired").increment();
+            }
          }
-         processedEventRepository.flush();
       }
    }
 

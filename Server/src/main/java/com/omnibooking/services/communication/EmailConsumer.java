@@ -30,6 +30,7 @@ public class EmailConsumer {
          if (!claimed) {
             log.warn("[Kafka Consumer] Duplicate email event detected and skipped: eventId={}, to={}",
                   event.getEventId(), event.getTo());
+            meterRegistry.counter("omnibooking.event.duplicate").increment();
             meterRegistry.counter("omnibooking.kafka.consumer.duplicate").increment();
             meterRegistry.counter("omnibooking.kafka.consumer.skipped").increment();
             return;
@@ -39,7 +40,8 @@ public class EmailConsumer {
       log.info("[Kafka Consumer] Processing email event for {} (eventId: {})", event.getTo(), event.getEventId());
 
       try (LeaseRenewer ignored = new LeaseRenewer(idempotencyService, event.getEventId(), consumerGroup)) {
-         resendEmailService.sendHtmlEmail(event.getTo(), event.getSubject(), event.getContent());
+         resendEmailService.sendHtmlEmail(event.getTo(), event.getSubject(), event.getContent(),
+               event.getEventId() != null ? event.getEventId().toString() : null);
          if (event.getEventId() != null) {
             idempotencyService.completeEvent(event.getEventId(), consumerGroup);
          }

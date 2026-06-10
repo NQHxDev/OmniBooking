@@ -29,6 +29,9 @@ The following Micrometer metrics are exposed under `/actuator/prometheus`:
 | `registration_polling_success_total`     | Counter | Number of times status polling successfully resolves a registration.                      |
 | `registration_polling_timeout_total`     | Counter | Number of status polling requests that timed out (reached max backoff retries).           |
 | `registration_status_rate_limited_total` | Counter | Number of times a status check polling API request was rate-limited (429).                |
+| `omnibooking_event_duplicate_total`      | Counter | Total duplicate messages/events identified at the consumer/inbox layer.                   |
+| `omnibooking_lease_takeover_total`       | Counter | Number of times a consumer claims an expired lease of another node.                       |
+| `omnibooking_lease_expired_total`        | Counter | Number of stale database leases marked as FAILED by the recovery worker.                  |
 
 ### Security (CSRF) Metrics
 
@@ -72,6 +75,27 @@ Configure the following alert thresholds in Prometheus:
 - **Severity**: `warning`
 - **Description**: More than 50 status checks are rate-limited. Indicates a rogue polling client or a potential denial-of-service attempt on the registration status check API.
 
+### Alert: High Kafka Consumer Lag
+
+- **Expression**: `sum(kafka_consumergroup_lag) by (consumergroup, topic) > 1000`
+- **Duration**: `5m`
+- **Severity**: `warning`
+- **Description**: Kafka consumer lag exceeds 1000 messages. Indicates that the consumer is falling behind in processing events.
+
+### Alert: Dead Letter Queue (DLT) Entry Spike
+
+- **Expression**: `increase(registration_dlt_total[5m]) > 5`
+- **Duration**: `2m`
+- **Severity**: `page` (Critical)
+- **Description**: Spike in Dead Letter Queue (DLT) registrations. Indicates processing errors or unrecoverable database/message format issues.
+
+### Alert: High Lease Takeover Rate
+
+- **Expression**: `rate(omnibooking_lease_takeover_total[5m]) > 0.1`
+- **Duration**: `5m`
+- **Severity**: `warning`
+- **Description**: Rate of lease takeovers is high. This could indicate JVM garbage collection pauses, network partitions, or consumer instances crashing.
+
 ---
 
 ## 4. Grafana Dashboards
@@ -90,6 +114,12 @@ Two main dashboards should be built to visualize these operational metrics:
 1. **Total CSRF Rejections**: Time-series graph of `csrf_rejected_total`.
 2. **Rejection Breakdown**: Stacked bar chart showing `csrf_origin_invalid_total` (Origin/Referer failures) vs `csrf_token_invalid_total` (Token discrepancies).
 3. **Invalid Origin Source Domains**: Table displaying request referrer domains that triggered `csrf_origin_invalid_total` (extracted from access logs).
+
+### C. Kafka Reliability & Idempotency Hardening Dashboard
+
+1. **Kafka Consumer Lag & Throughput**: Real-time tracking of consumer group lag and topic throughput.
+2. **Duplicate Event Rate**: Visualization of blocked duplicate events by the fast-fail shield.
+3. **Lease Lifecycle Rates**: Monitored rate of lease takeovers (`omnibooking_lease_takeover_total`) and stale lease expirations (`omnibooking_lease_expired_total`).
 
 ---
 

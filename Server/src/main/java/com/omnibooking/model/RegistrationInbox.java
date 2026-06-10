@@ -58,4 +58,11 @@ public class RegistrationInbox {
    @Column(name = "processed_at")
    private Instant processedAt;
 
+   @Column(name = "updated_at", nullable = false)
+   @Builder.Default
+   private Instant updatedAt = Instant.now();
+
+   @Column(name = "processing_started_at")
+   private Instant processingStartedAt;
+
 }

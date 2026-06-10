@@ -9,6 +9,7 @@ import com.omnibooking.dto.RegisterRequest;
 import com.omnibooking.dto.RegistrationMessage;
 import com.omnibooking.dto.event.UserCreatedEvent;
 import com.omnibooking.mapper.UserMapper;
+import com.omnibooking.model.RegistrationInbox;
 import com.omnibooking.model.Role;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
@@ -24,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.slf4j.MDC;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -90,6 +92,45 @@ public class RegistrationService {
       });
    }
 
+   @Transactional(propagation = Propagation.REQUIRES_NEW)
+   public boolean claimInboxForProcessing(UUID requestId) {
+      Instant now = Instant.now();
+      int updated = registrationInboxRepository.claimRequestForProcessing(requestId, now);
+      if (updated > 0) {
+         return true;
+      }
+
+      return registrationInboxRepository.findById(requestId)
+            .map(inbox -> {
+               if (inbox.getStatus() == RegistrationInboxStatus.SUCCESS
+                     || inbox.getStatus() == RegistrationInboxStatus.FAILED_PERMANENT) {
+                  log.info("Request {} already completed/failed permanently, skipping", requestId);
+                  meterRegistry.counter("omnibooking.event.duplicate").increment();
+               } else {
+                  log.info("Request {} is currently in status {}, skipping concurrent execution", requestId,
+                        inbox.getStatus());
+               }
+               return false;
+            })
+            .orElseGet(() -> {
+               try {
+                  RegistrationInbox inbox = RegistrationInbox.builder()
+                        .requestId(requestId)
+                        .payload("{}")
+                        .status(RegistrationInboxStatus.PROCESSING)
+                        .processingStartedAt(now)
+                        .updatedAt(now)
+                        .build();
+                  registrationInboxRepository.save(inbox);
+                  return true;
+               } catch (DataIntegrityViolationException e) {
+                  log.warn("Concurrent creation of inbox record failed for request {}", requestId);
+                  meterRegistry.counter("omnibooking.event.duplicate").increment();
+                  return false;
+               }
+            });
+   }
+
    @Transactional
    public void saveBatchProcessed(List<User> users, List<UserProfile> profiles, List<RegistrationMessage> messages) {
       try {
@@ -130,9 +171,9 @@ public class RegistrationService {
                            // Mark inbox status to SUCCESS
                            updateInboxStatus(UUID.fromString(finalRequestId), RegistrationInboxStatus.SUCCESS);
 
-                           // Cache result in Redis for 10 minutes (Durable Result)
+                           // Cache result in Redis for 7 days (Durable Result)
                            String resultKey = "registration_result:" + finalRequestId;
-                           redisTemplate.opsForValue().set(resultKey, "SUCCESS", 10, TimeUnit.MINUTES);
+                           redisTemplate.opsForValue().set(resultKey, "SUCCESS", 7, TimeUnit.DAYS);
 
                            // Increment success metric
                            meterRegistry.counter("registration_success_total").increment();
@@ -195,8 +236,8 @@ public class RegistrationService {
                      MDC.put("requestId", msg.getRequestId());
                      try {
                         updateInboxStatus(reqId, RegistrationInboxStatus.SUCCESS);
-                        redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "SUCCESS", 10,
-                              TimeUnit.MINUTES);
+                        redisTemplate.opsForValue().set("registration_result:" + msg.getRequestId(), "SUCCESS", 7,
+                              TimeUnit.DAYS);
                         meterRegistry.counter("registration_success_total").increment();
                         logJson("registration_db_committed", msg.getRequestId(), user.getEmail(),
                               "Registration request successfully saved to database (individual fallback)");
@@ -226,8 +267,8 @@ public class RegistrationService {
             if (nextRetryCount > 10) {
                inbox.setStatus(RegistrationInboxStatus.FAILED_PERMANENT);
                inbox.setProcessedAt(Instant.now());
-               redisTemplate.opsForValue().set("registration_result:" + reqId, "FAILED_PERMANENT", 10,
-                     TimeUnit.MINUTES);
+               redisTemplate.opsForValue().set("registration_result:" + reqId, "FAILED_PERMANENT", 7,
+                     TimeUnit.DAYS);
                meterRegistry.counter("omnibooking.registration.failed_permanent.count").increment();
                meterRegistry.counter("registration_failed_total").increment();
                logJson("registration_failed_permanent", reqId.toString(), null,

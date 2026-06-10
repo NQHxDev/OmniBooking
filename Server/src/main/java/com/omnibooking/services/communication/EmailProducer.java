@@ -16,7 +16,7 @@ public class EmailProducer {
 
    public void sendEmailEvent(EmailEvent event) {
       log.info("[Kafka Producer] Sending email event to {} for subject: {}", event.getTo(), event.getSubject());
-      kafkaTemplate.send(KafkaConfig.MAIL_TOPIC, event);
+      kafkaTemplate.send(KafkaConfig.MAIL_TOPIC, event.getTo(), event);
    }
 
 }

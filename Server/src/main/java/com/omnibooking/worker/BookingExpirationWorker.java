@@ -116,10 +116,18 @@ public class BookingExpirationWorker {
          return;
       }
 
-      // Transition booking status to EXPIRED
-      booking.setStatus(BookingStatus.EXPIRED);
-      booking.setUpdatedAt(now);
-      bookingRepository.save(booking);
+      // Transition booking status to EXPIRED atomically
+      int rowsUpdated = bookingRepository.atomicExpireBooking(
+            bookingId, now, BookingStatus.PENDING_PAYMENT, BookingStatus.EXPIRED);
+
+      if (rowsUpdated == 0) {
+         log.info("Booking {} already confirmed/expired or not expired, skipping expiration", bookingId);
+         return;
+      }
+
+      // Refresh booking state for inventory/coupon release and logging
+      booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Booking not found"));
 
       // Release inventory
       inventoryService.releaseInventory(booking);

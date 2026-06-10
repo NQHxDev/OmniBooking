@@ -26,4 +26,8 @@ public interface RegistrationInboxRepository extends JpaRepository<RegistrationI
    @Query("DELETE FROM RegistrationInbox r WHERE r.status = :status AND r.createdAt < :threshold")
    int deleteByStatusAndCreatedAtBefore(@Param("status") RegistrationInboxStatus status, @Param("threshold") Instant threshold);
 
+   @Modifying
+   @Query("UPDATE RegistrationInbox r SET r.status = 'PROCESSING', r.processingStartedAt = :now, r.updatedAt = :now WHERE r.requestId = :requestId AND r.status NOT IN ('PROCESSING', 'SUCCESS', 'FAILED_PERMANENT')")
+   int claimRequestForProcessing(@Param("requestId") UUID requestId, @Param("now") Instant now);
+
 }
