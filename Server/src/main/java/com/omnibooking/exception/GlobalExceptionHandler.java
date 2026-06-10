@@ -108,6 +108,22 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.error(message, ErrorCode.INVALID_KEY.getCode(), null, requestId));
    }
 
+   @ExceptionHandler(org.springframework.web.context.request.async.AsyncRequestTimeoutException.class)
+   public ResponseEntity<Void> handleAsyncRequestTimeoutException() {
+      // Async request timeout is a normal lifecycle completion event (e.g. for SSE streams), not an error.
+      // Returning 200 OK completes the request cleanly from Spring's perspective.
+      return ResponseEntity.ok().build();
+   }
+
+   @ExceptionHandler(java.io.IOException.class)
+   public ResponseEntity<Void> handleIOException(java.io.IOException ex) {
+      if (ex.getMessage() != null && (ex.getMessage().contains("Client disconnect") || ex.getMessage().contains("Broken pipe"))) {
+         log.debug("Client disconnected during async request: {}", ex.getMessage());
+         return ResponseEntity.ok().build();
+      }
+      throw new RuntimeException(ex);
+   }
+
    @ExceptionHandler(Exception.class)
    public ResponseEntity<ApiResponse<Object>> handleAllExceptions(Exception ex, HttpServletRequest request) {
 

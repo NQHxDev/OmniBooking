@@ -10,6 +10,7 @@ import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.model.Booking;
 import com.omnibooking.model.Property;
 import com.omnibooking.model.Review;
+import com.omnibooking.model.RoomType;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
 import com.omnibooking.model.enums.BookingStatus;
@@ -134,8 +135,8 @@ class ReviewServiceImplTest {
       booking = Booking.builder()
             .id(bookingId)
             .user(user)
-            .roomType(com.omnibooking.model.RoomType.builder().property(property).build())
-            .status(BookingStatus.STAYED)
+            .roomType(RoomType.builder().property(property).build())
+            .status(BookingStatus.CHECKED_OUT)
             .checkInDate(LocalDate.now().minusDays(5))
             .checkOutDate(LocalDate.now().minusDays(1))
             .build();
@@ -489,4 +490,5 @@ class ReviewServiceImplTest {
                eq(ReviewStatus.PUBLISHED), eq(PageRequest.of(0, 10)));
       }
    }
+
 }

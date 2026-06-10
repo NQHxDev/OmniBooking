@@ -28,6 +28,7 @@ import com.omnibooking.repository.elasticsearch.DestinationElasticsearchReposito
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.KafkaAdmin;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -76,8 +77,14 @@ public class BookingControllerTest {
    @MockitoBean
    private RedisMessageListenerContainer redisMessageListenerContainer;
 
+   @MockitoBean
+   private ValueOperations<String, String> valueOps;
+
    @Test
    public void shouldCreateBookingSuccessfully() throws Exception {
+      Mockito.when(stringRedisTemplate.opsForValue()).thenReturn(valueOps);
+      Mockito.when(valueOps.setIfAbsent(any(), any(), Mockito.anyLong(), any())).thenReturn(true);
+
       UUID roomTypeId = UUID.randomUUID();
       CreateBookingRequest request = CreateBookingRequest.builder()
             .roomTypeId(roomTypeId)
@@ -108,6 +115,7 @@ public class BookingControllerTest {
 
       mockMvc.perform(post("/bookings")
             .header("Origin", "http://localhost:3000")
+            .header("X-Idempotency-Key", UUID.randomUUID().toString())
             .cookie(new Cookie(CookieUtils.CSRF_TOKEN, "test_csrf"))
             .header("X-CSRF-Token", "test_csrf")
             .contentType(MediaType.APPLICATION_JSON)

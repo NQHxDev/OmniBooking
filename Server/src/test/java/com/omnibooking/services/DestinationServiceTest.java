@@ -84,4 +84,5 @@ public class DestinationServiceTest {
       assertEquals(10.5, saved.getLocation().getLat());
       assertEquals(105.5, saved.getLocation().getLon());
    }
+
 }

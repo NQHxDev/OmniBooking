@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS bookings (
    total_price DECIMAL(19, 4) NOT NULL, -- Original price before discount
    final_price DECIMAL(19, 4) NOT NULL, -- Price after coupons
    coupon_id UUID REFERENCES coupons(id) ON DELETE SET NULL,
-   status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING, CONFIRMED, STAYED, CANCELLED, REFUNDED
+   status VARCHAR(20) NOT NULL DEFAULT 'PENDING_PAYMENT', -- PENDING_PAYMENT, CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED, EXPIRED, NO_SHOW, REFUNDED
 
    -- Guest Info (can be different from user, using searchable encryption)
    guest_name VARCHAR(100) NOT NULL,

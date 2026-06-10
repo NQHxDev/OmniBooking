@@ -76,3 +76,14 @@ These event types are defined in [EventConstants.java](../Server/src/main/java/c
 | `TWO_FACTOR_ENABLED`                 | `TWO_FACTOR_ENABLED`            | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent to users when 2FA is successfully enabled.                                 |
 | `PROPERTY_SYNC`                      | `PROPERTY_SYNC`                 | `PropertySyncEvent.class` | `omnibooking-property-sync` | Sent to update property search indexes in Elasticsearch.                        |
 | `BOOKING_CONFIRMED_MAIL`             | `BOOKING_CONFIRMED_MAIL`        | `EmailEvent.class`        | `omnibooking-mail-topic`    | Sent to guests upon successful booking confirmation.                            |
+
+### 2.3 Booking Domain Events (Future Event-Driven Architecture)
+
+Các sự kiện domain phục vụ cho kiến trúc Event-Driven trong tương lai (khi tích hợp Kafka CDC hoặc phát sự kiện trực tiếp từ `BookingStateMachine`):
+
+| Event Name         | Topic Name                   | Payload / Description                                                                            |
+| :----------------- | :--------------------------- | :----------------------------------------------------------------------------------------------- |
+| `BookingCreated`   | `omnibooking-booking-events` | Phát ra khi booking được tạo thành công ở trạng thái `PENDING` hoặc `PENDING_PAYMENT`.           |
+| `BookingConfirmed` | `omnibooking-booking-events` | Phát ra khi booking chuyển sang trạng thái `CONFIRMED` sau khi thanh toán hoặc tự động xác nhận. |
+| `BookingCancelled` | `omnibooking-booking-events` | Phát ra khi booking bị hủy bởi khách hàng hoặc admin.                                            |
+| `BookingExpired`   | `omnibooking-booking-events` | Phát ra khi booking bị chuyển sang trạng thái `EXPIRED` do hết hạn thanh toán.                   |

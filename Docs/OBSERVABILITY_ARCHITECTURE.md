@@ -191,3 +191,85 @@ Khi xảy ra sự cố luồng Đăng ký hoặc Bảo mật, kỹ sư vận hà
 
 - Tích hợp Sentry check-in cho `OutboxWorker` (slug: `outbox-worker`) và `CurrencyWorker` (slug: `currency-worker`).
 - Mỗi khi job chạy, hệ thống bắn tín hiệu `IN_PROGRESS` lên Sentry Crons. Khi kết thúc thành công bắn tín hiệu `OK`, nếu lỗi bắn tín hiệu `ERROR`. Cho phép phát hiện tức thời nếu worker bị treo hoặc chết luồng.
+
+### C. Booking Lifecycle & Reconciliation Monitoring
+
+Hệ thống OmniBooking tích hợp giám sát nâng cao cho vòng đời đặt phòng và các tác vụ đối soát.
+
+#### 1. Các Metrics mới (Prometheus Counters)
+
+Hệ thống tự động ghi nhận các chỉ số vận hành sau:
+
+| Tên Metric (Prometheus Counter)                     | Mô tả / Ý nghĩa                                                              |
+| :-------------------------------------------------- | :--------------------------------------------------------------------------- |
+| `omnibooking.booking.created.total`                 | Tổng số booking được tạo.                                                    |
+| `omnibooking.booking.confirmed.total`               | Tổng số booking được xác nhận thành công.                                    |
+| `omnibooking.booking.expired.total`                 | Tổng số booking bị hủy tự động do hết hạn thanh toán.                        |
+| `omnibooking.payment.callback.duplicate.total`      | Số lần nhận callback thanh toán Momo/Visa bị trùng lặp.                      |
+| `omnibooking.booking.expiration.failure.total`      | Số lỗi xảy ra trong quá trình xử lý hết hạn booking.                         |
+| `omnibooking.booking.idempotency.hit.total`         | Số lần trúng cache Idempotency ngăn chặn trùng lặp tạo booking.              |
+| `omnibooking.reconciliation.anomaly.total`          | Tổng số bất thường đối soát được phát hiện bởi Reconciliation Worker.        |
+| `omnibooking.reconciliation.inventory_leak.total`   | Số vụ rò rỉ inventory (booking hết hạn/hủy vẫn giữ phòng).                   |
+| `omnibooking.reconciliation.payment_mismatch.total` | Số vụ bất nhất thanh toán (đã thanh toán nhưng booking không được xác nhận). |
+| `omnibooking.reconciliation.stuck_booking.total`    | Số lượng booking bị kẹt ở trạng thái chờ thanh toán quá hạn.                 |
+
+#### 2. Quy tắc cảnh báo Prometheus (Booking Alerting Rules)
+
+Các luật cảnh báo quan trọng cấu hình trong Prometheus:
+
+```yaml
+- alert: BookingExpirationFailureSpike
+  expr: increase(omnibooking_booking_expiration_failure_total[5m]) > 5
+  for: 2m
+  labels: { severity: critical }
+  annotations: { summary: "Booking expiration failures spiking" }
+
+- alert: DuplicatePaymentSpike
+  expr: increase(omnibooking_payment_callback_duplicate_total[5m]) > 10
+  for: 2m
+  labels: { severity: warning }
+
+- alert: ReconciliationAnomalies
+  expr: increase(omnibooking_reconciliation_anomaly_total[1h]) > 0
+  for: 5m
+  labels: { severity: critical }
+  annotations: { summary: "Booking reconciliation found discrepancies" }
+
+- alert: InventoryLeakDetected
+  expr: increase(omnibooking_reconciliation_inventory_leak_total[1h]) > 0
+  for: 5m
+  labels: { severity: critical }
+  annotations:
+     { summary: "Inventory leak detected — EXPIRED/CANCELLED bookings still holding inventory" }
+
+- alert: PaymentMismatchDetected
+  expr: increase(omnibooking_reconciliation_payment_mismatch_total[1h]) > 0
+  for: 5m
+  labels: { severity: critical }
+  annotations: { summary: "Paid booking not confirmed — possible payment-to-booking inconsistency" }
+
+- alert: StuckBookingsDetected
+  expr: increase(omnibooking_reconciliation_stuck_booking_total[1h]) > 0
+  for: 5m
+  labels: { severity: warning }
+  annotations:
+     {
+        summary: "Bookings stuck in PENDING_PAYMENT past expiry — expiration worker may have failed",
+     }
+```
+
+#### 3. Dashboard Grafana đề xuất - "Booking Operations"
+
+| Panel                        | Metric                                                   | Type          |
+| :--------------------------- | :------------------------------------------------------- | :------------ |
+| Booking Creation Rate        | `rate(omnibooking_booking_created_total[5m])`            | Graph         |
+| Confirmation Rate            | `rate(omnibooking_booking_confirmed_total[5m])`          | Graph         |
+| Expiration Rate              | `rate(omnibooking_booking_expired_total[5m])`            | Graph         |
+| Expiration vs Confirmation   | expired / confirmed ratio                                | Stat          |
+| Inventory Reserve vs Release | `reservation_total` vs `release_total`                   | Graph         |
+| Payment Duplicate Rate       | `rate(omnibooking_payment_callback_duplicate_total[5m])` | Graph         |
+| Expiration Failures          | `expiration_failure_total`                               | Stat (Red)    |
+| Reconciliation Anomalies     | `reconciliation_anomaly_total`                           | Stat (Red)    |
+| Inventory Leaks              | `reconciliation_inventory_leak_total`                    | Stat (Red)    |
+| Payment Mismatches           | `reconciliation_payment_mismatch_total`                  | Stat (Red)    |
+| Stuck Bookings               | `reconciliation_stuck_booking_total`                     | Stat (Yellow) |

@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,5 +17,10 @@ public interface PriceRuleVersionRepository extends JpaRepository<PriceRuleVersi
 
    @Query("SELECT COALESCE(MAX(prv.version), 0) FROM PriceRuleVersion prv WHERE prv.priceRule.id = :priceRuleId")
    Integer findMaxVersionByPriceRuleId(@Param("priceRuleId") UUID priceRuleId);
+
+   @Query("SELECT v FROM PriceRuleVersion v WHERE v.priceRule.id IN :ruleIds " +
+          "AND v.version = (SELECT MAX(v2.version) FROM PriceRuleVersion v2 " +
+          "WHERE v2.priceRule.id = v.priceRule.id)")
+   List<PriceRuleVersion> findLatestVersionsByPriceRuleIds(@Param("ruleIds") Set<UUID> ruleIds);
 
 }

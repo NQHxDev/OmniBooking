@@ -164,4 +164,23 @@ public class CouponReservationServiceImpl implements CouponReservationService {
       }
    }
 
+   @Override
+   @Transactional
+   public void refundReservation(UUID couponId, UUID customerId) {
+      List<CouponReservation> reservations = couponReservationRepository
+            .findByCustomerIdAndCouponIdAndStatusOrderByReservedAtDesc(customerId, couponId, ReservationStatus.CONSUMED);
+
+      if (!reservations.isEmpty()) {
+         CouponReservation reservation = reservations.get(0);
+         int rowsAffected = couponReservationRepository.transitionStatus(reservation.getId(), ReservationStatus.CONSUMED,
+               ReservationStatus.EXPIRED);
+         if (rowsAffected > 0) {
+            couponRepository.refundCouponUsageAtomically(couponId);
+            return;
+         }
+      }
+
+      couponRepository.refundCouponUsageAtomically(couponId);
+   }
+
 }

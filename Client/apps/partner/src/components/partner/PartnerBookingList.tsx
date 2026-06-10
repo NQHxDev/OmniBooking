@@ -46,36 +46,46 @@ export default function PartnerBookingList({ initialBookings }: PartnerBookingLi
 
    const getStatusBadge = (status: PartnerBookingResponse["status"]) => {
       const styles = {
-         PENDING: "bg-amber-50 text-amber-700 border-amber-200/60",
+         PENDING_PAYMENT: "bg-amber-50 text-amber-700 border-amber-200/60",
          CONFIRMED: "bg-emerald-50 text-emerald-700 border-emerald-200/60",
-         STAYED: "bg-blue-50 text-blue-700 border-blue-200/60",
+         CHECKED_IN: "bg-indigo-50 text-indigo-700 border-indigo-200/60",
+         CHECKED_OUT: "bg-blue-50 text-blue-700 border-blue-200/60",
          CANCELLED: "bg-rose-50 text-rose-700 border-rose-200/60",
+         EXPIRED: "bg-zinc-50 text-zinc-500 border-zinc-200",
+         NO_SHOW: "bg-purple-50 text-purple-700 border-purple-200/60",
          REFUNDED: "bg-zinc-50 text-zinc-500 border-zinc-200",
       };
 
       const labels = {
-         PENDING: "Đang chờ",
+         PENDING_PAYMENT: "Chờ thanh toán",
          CONFIRMED: "Đã xác nhận",
-         STAYED: "Đã ở",
+         CHECKED_IN: "Đã nhận phòng",
+         CHECKED_OUT: "Đã trả phòng",
          CANCELLED: "Đã hủy",
+         EXPIRED: "Hết hạn",
+         NO_SHOW: "Vắng mặt",
          REFUNDED: "Đã hoàn tiền",
       };
 
       return (
          <span
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${styles[status] || styles.PENDING}`}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${styles[status] || styles.PENDING_PAYMENT}`}
          >
             <span
                className={`h-1.5 w-1.5 rounded-full ${
                   status === "CONFIRMED"
                      ? "bg-emerald-500"
-                     : status === "PENDING"
+                     : status === "PENDING_PAYMENT"
                        ? "bg-amber-500"
-                       : status === "STAYED"
-                         ? "bg-blue-500"
-                         : status === "CANCELLED"
-                           ? "bg-rose-500"
-                           : "bg-zinc-400"
+                       : status === "CHECKED_IN"
+                         ? "bg-indigo-500"
+                         : status === "CHECKED_OUT"
+                           ? "bg-blue-500"
+                           : status === "CANCELLED"
+                             ? "bg-rose-500"
+                             : status === "NO_SHOW"
+                               ? "bg-purple-500"
+                               : "bg-zinc-400"
                }`}
             />
             {labels[status] || status}

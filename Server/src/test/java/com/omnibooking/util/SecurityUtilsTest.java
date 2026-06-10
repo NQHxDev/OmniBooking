@@ -26,7 +26,8 @@ class SecurityUtilsTest {
             .authorities(Collections.emptyList())
             .active(true)
             .build();
-      UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
+      UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(principal, null,
+            Collections.emptyList());
       SecurityContextHolder.getContext().setAuthentication(auth);
 
       try {
@@ -45,7 +46,8 @@ class SecurityUtilsTest {
    void shouldGetCurrentUserId_FromName() {
       // Arrange
       UUID userId = UUID.randomUUID();
-      UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(userId.toString(), null, Collections.emptyList());
+      UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(userId.toString(), null,
+            Collections.emptyList());
       SecurityContextHolder.getContext().setAuthentication(auth);
 
       try {
@@ -83,4 +85,5 @@ class SecurityUtilsTest {
    void shouldReturnNull_WhenHashInputNull() {
       assertThat(SecurityUtils.hashFingerprint(null)).isNull();
    }
+
 }

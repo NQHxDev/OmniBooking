@@ -38,7 +38,7 @@ public interface PropertyRepository extends JpaRepository<Property, UUID>, JpaSp
          "AND EXISTS (SELECT m FROM com.omnibooking.model.Media m WHERE m.entityId = p.id AND m.entityType = 'PROPERTY' AND m.isMain = true) "
          +
          "ORDER BY (SELECT COUNT(b) FROM Booking b WHERE b.roomType.property = p " +
-         "AND b.status IN (com.omnibooking.model.enums.BookingStatus.CONFIRMED, com.omnibooking.model.enums.BookingStatus.STAYED) "
+         "AND b.status IN (com.omnibooking.model.enums.BookingStatus.CONFIRMED, com.omnibooking.model.enums.BookingStatus.CHECKED_IN, com.omnibooking.model.enums.BookingStatus.CHECKED_OUT) "
          +
          "AND b.createdAt >= :startDate) DESC, random()")
    List<Property> findFeaturedProperties(@Param("startDate") Instant startDate, Pageable pageable);

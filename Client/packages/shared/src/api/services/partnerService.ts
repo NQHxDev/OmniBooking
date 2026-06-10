@@ -27,7 +27,15 @@ export interface PartnerBookingResponse {
    numRooms: number;
    totalPrice: number;
    finalPrice: number;
-   status: "PENDING" | "CONFIRMED" | "STAYED" | "CANCELLED" | "REFUNDED";
+   status:
+      | "PENDING_PAYMENT"
+      | "CONFIRMED"
+      | "CHECKED_IN"
+      | "CHECKED_OUT"
+      | "CANCELLED"
+      | "EXPIRED"
+      | "NO_SHOW"
+      | "REFUNDED";
    guestName: string;
    guestEmail: string;
    guestPhone: string | null;

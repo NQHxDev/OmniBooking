@@ -11,6 +11,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.omnibooking.model.enums.OutboxStatus;
+
 @Repository
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> {
 
@@ -18,7 +20,7 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> 
    List<OutboxEvent> findEventsToProcess(@Param("now") Instant now, Pageable pageable);
 
    @Modifying
-   @Query("DELETE FROM OutboxEvent o WHERE o.status = com.omnibooking.model.enums.OutboxStatus.PROCESSED AND o.createdAt < :threshold")
-   int deleteProcessedEventsBefore(@Param("threshold") Instant threshold);
+   @Query("DELETE FROM OutboxEvent o WHERE o.status = :status AND o.createdAt < :threshold")
+   int deleteProcessedEventsBefore(@Param("threshold") Instant threshold, @Param("status") OutboxStatus status);
 
 }

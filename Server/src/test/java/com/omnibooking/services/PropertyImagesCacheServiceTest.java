@@ -8,6 +8,7 @@ import com.omnibooking.services.property.PropertyImagesCacheService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -64,7 +65,7 @@ public class PropertyImagesCacheServiceTest {
 
       when(redisTemplate.opsForValue()).thenReturn(valueOperations);
       when(valueOperations.get(cacheKey)).thenReturn(jsonUrls);
-      when(objectMapper.readValue(eq(jsonUrls), org.mockito.ArgumentMatchers.<TypeReference<List<String>>>any()))
+      when(objectMapper.readValue(eq(jsonUrls), ArgumentMatchers.<TypeReference<List<String>>>any()))
             .thenReturn(expectedUrls);
 
       List<String> actualUrls = propertyImagesCacheService.getPropertyImageUrls(propertyId);
@@ -98,4 +99,5 @@ public class PropertyImagesCacheServiceTest {
       propertyImagesCacheService.evict(propertyId);
       verify(redisTemplate).delete(cacheKey);
    }
+
 }

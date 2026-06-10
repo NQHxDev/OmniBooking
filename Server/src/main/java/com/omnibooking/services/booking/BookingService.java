@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import com.omnibooking.dto.BookingResponse;
 import com.omnibooking.security.UserPrincipal;
+import com.omnibooking.model.User;
 
 public interface BookingService {
 
@@ -17,5 +18,7 @@ public interface BookingService {
    BookingResponse getBookingById(UUID bookingId);
 
    List<BookingResponse> getMyBookings(UUID userId);
+
+   void cancelBooking(UUID bookingId, String reason, User changedBy);
 
 }

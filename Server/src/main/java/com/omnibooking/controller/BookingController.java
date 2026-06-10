@@ -5,6 +5,7 @@ import com.omnibooking.dto.BookingResponse;
 import com.omnibooking.dto.CreateBookingRequest;
 import com.omnibooking.security.Anonymous;
 import com.omnibooking.security.UserPrincipal;
+import com.omnibooking.annotation.Idempotent;
 import com.omnibooking.services.booking.BookingService;
 import com.omnibooking.services.pricing.PriceCalculationService;
 
@@ -68,6 +69,7 @@ public class BookingController {
    }
 
    @Anonymous
+   @Idempotent
    @PostMapping
    public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
          @Valid @RequestBody CreateBookingRequest request,

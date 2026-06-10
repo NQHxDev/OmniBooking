@@ -11,6 +11,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -63,7 +64,10 @@ public class Booking extends BaseEntity {
    @Builder.Default
    @Enumerated(EnumType.STRING)
    @Column(nullable = false, length = 20)
-   private BookingStatus status = BookingStatus.PENDING;
+   private BookingStatus status = BookingStatus.PENDING_PAYMENT;
+
+   @Column(name = "expires_at")
+   private Instant expiresAt;
 
    @Column(name = "guest_name", nullable = false, length = 100)
    private String guestName;

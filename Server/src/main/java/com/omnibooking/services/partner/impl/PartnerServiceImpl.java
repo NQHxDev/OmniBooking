@@ -3,6 +3,7 @@ package com.omnibooking.services.partner.impl;
 import com.omnibooking.dto.PartnerStatsResponse;
 import com.omnibooking.model.Booking;
 import com.omnibooking.model.enums.BookingStatus;
+import com.omnibooking.model.enums.ReviewStatus;
 import com.omnibooking.repository.booking.BookingRepository;
 import com.omnibooking.services.partner.PartnerService;
 import lombok.RequiredArgsConstructor;
@@ -107,7 +108,7 @@ public class PartnerServiceImpl implements PartnerService {
       boolean customersUp = currentCustomers >= previousCustomers;
 
       // Rating Score
-      Double avgRating = reviewRepository.getAverageRatingByOwnerId(partnerId);
+      Double avgRating = reviewRepository.getAverageRatingByOwnerId(partnerId, ReviewStatus.PUBLISHED);
       Double ratingScoreVal = null;
       if (avgRating != null) {
          ratingScoreVal = BigDecimal.valueOf(avgRating)

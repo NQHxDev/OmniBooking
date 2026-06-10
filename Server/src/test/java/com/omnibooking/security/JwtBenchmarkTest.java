@@ -87,4 +87,5 @@ public class JwtBenchmarkTest {
       // Suppress compiler unused variable warning
       assert userId != null && sessionId != null && fgpHash != null && version != null;
    }
+
 }

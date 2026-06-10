@@ -1,0 +1,6 @@
+services:
+  redis-test:
+    image: redis/redis-stack-server:latest
+    container_name: omnibooking-redis-test
+    ports:
+      - "6380:6379"

@@ -26,11 +26,11 @@ public interface ReviewRepository extends JpaRepository<Review, UUID>, JpaSpecif
 
    Page<Review> findByStatusAndDeletedAtIsNull(ReviewStatus status, Pageable pageable);
 
-   @Query("SELECT COUNT(r) FROM Review r WHERE r.property.id = :propertyId AND r.deletedAt IS NULL AND r.status = com.omnibooking.model.enums.ReviewStatus.PUBLISHED")
-   long countActiveReviewsByPropertyId(@Param("propertyId") UUID propertyId);
+   @Query("SELECT COUNT(r) FROM Review r WHERE r.property.id = :propertyId AND r.deletedAt IS NULL AND r.status = :status")
+   long countActiveReviewsByPropertyId(@Param("propertyId") UUID propertyId, @Param("status") ReviewStatus status);
 
-   @Query("SELECT SUM(r.rating) FROM Review r WHERE r.property.id = :propertyId AND r.deletedAt IS NULL AND r.status = com.omnibooking.model.enums.ReviewStatus.PUBLISHED")
-   Long sumActiveRatingsByPropertyId(@Param("propertyId") UUID propertyId);
+   @Query("SELECT SUM(r.rating) FROM Review r WHERE r.property.id = :propertyId AND r.deletedAt IS NULL AND r.status = :status")
+   Long sumActiveRatingsByPropertyId(@Param("propertyId") UUID propertyId, @Param("status") ReviewStatus status);
 
    /**
     * Calculates the average rating score for a partner.
@@ -42,7 +42,7 @@ public interface ReviewRepository extends JpaRepository<Review, UUID>, JpaSpecif
     * - Includes reviews belonging to disabled/inactive properties
     * (r.property.isActive is ignored) to reflect historical reputation.
     */
-   @Query("SELECT AVG(r.rating) FROM Review r WHERE r.property.owner.id = :ownerId AND r.deletedAt IS NULL AND r.property.deletedAt IS NULL AND r.status = com.omnibooking.model.enums.ReviewStatus.PUBLISHED")
-   Double getAverageRatingByOwnerId(@Param("ownerId") UUID ownerId);
+   @Query("SELECT AVG(r.rating) FROM Review r WHERE r.property.owner.id = :ownerId AND r.deletedAt IS NULL AND r.property.deletedAt IS NULL AND r.status = :status")
+   Double getAverageRatingByOwnerId(@Param("ownerId") UUID ownerId, @Param("status") ReviewStatus status);
 
 }

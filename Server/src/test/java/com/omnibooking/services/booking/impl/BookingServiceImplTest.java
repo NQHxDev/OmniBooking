@@ -26,11 +26,24 @@ import com.omnibooking.services.core.BloomFilterService;
 import com.omnibooking.services.core.CurrencyService;
 import com.omnibooking.services.core.EncryptionService;
 import com.omnibooking.services.core.OutboxService;
+import com.omnibooking.services.pricing.CouponReservationService;
+import com.omnibooking.services.pricing.PriceCalculationService;
+import com.omnibooking.services.pricing.PricingEngine;
 import com.omnibooking.services.user.VerificationService;
+
+import io.micrometer.core.instrument.Counter;
+
 import com.omnibooking.repository.payment.TransactionRepository;
+import com.omnibooking.repository.pricing.BookingAppliedRuleVersionRepository;
+import com.omnibooking.repository.pricing.BookingPriceBreakdownRepository;
+import com.omnibooking.repository.pricing.CouponReservationRepository;
+import com.omnibooking.repository.pricing.PriceRuleVersionRepository;
 import com.omnibooking.model.Transaction;
 import com.omnibooking.model.enums.BookingStatus;
 import com.omnibooking.services.auth.CachedRoleService;
+import com.omnibooking.services.booking.BookingStateMachine;
+import com.omnibooking.services.booking.InventoryService;
+import com.omnibooking.config.BookingConfigProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,6 +57,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Optional;
@@ -65,65 +79,115 @@ class BookingServiceImplTest {
 
    @Mock
    private BookingRepository bookingRepository;
+
    @Mock
    private RoomTypeRepository roomTypeRepository;
+
    @Mock
    private RoomAvailabilityRepository roomAvailabilityRepository;
+
    @Mock
    private UserRepository userRepository;
+
    @Mock
    private UserProfileRepository userProfileRepository;
+
    @Mock
    private RoleRepository roleRepository;
+
    @Mock
    private CachedRoleService cachedRoleService;
+
    @Mock
    private CouponRepository couponRepository;
+
    @Mock
    private BookingStatusLogRepository bookingStatusLogRepository;
+
    @Mock
    private TransactionRepository transactionRepository;
 
    @Mock
    private EncryptionService encryptionService;
+
    @Mock
    private BloomFilterService bloomFilterService;
+
    @Mock
    private VerificationService verificationService;
+
    @Mock
    private MailService mailService;
+
    @Mock
    private OutboxService outboxService;
+
    @Mock
    private CurrencyService currencyService;
+
    @Mock
    private PasswordEncoder passwordEncoder;
+
    @Mock
    private CacheManager cacheManager;
+
    @Mock
    private Cache cache;
 
    @Mock
-   private com.omnibooking.services.pricing.PriceCalculationService priceCalculationService;
+   private PriceCalculationService priceCalculationService;
+
    @Mock
-   private com.omnibooking.services.pricing.CouponReservationService couponReservationService;
+   private CouponReservationService couponReservationService;
+
    @Mock
-   private com.omnibooking.repository.pricing.CouponReservationRepository couponReservationRepository;
+   private CouponReservationRepository couponReservationRepository;
+
    @Mock
-   private com.omnibooking.repository.pricing.BookingPriceBreakdownRepository bookingPriceBreakdownRepository;
+   private BookingPriceBreakdownRepository bookingPriceBreakdownRepository;
+
    @Mock
-   private com.omnibooking.repository.pricing.BookingAppliedRuleVersionRepository bookingAppliedRuleVersionRepository;
+   private BookingAppliedRuleVersionRepository bookingAppliedRuleVersionRepository;
+
    @Mock
-   private com.omnibooking.repository.pricing.PriceRuleVersionRepository priceRuleVersionRepository;
+   private PriceRuleVersionRepository priceRuleVersionRepository;
+
    @Mock
-   private com.omnibooking.services.pricing.PricingEngine pricingEngine;
+   private PricingEngine pricingEngine;
+
+   @Mock
+   private BookingStateMachine bookingStateMachine;
+
+   @Mock
+   private InventoryService inventoryService;
+
+   @Mock
+   private BookingConfigProperties bookingConfig;
+
+   @Mock
+   private Counter bookingCreatedCounter;
+
+   @Mock
+   private Counter bookingConfirmedCounter;
+
+   @Mock
+   private Counter bookingCancelledCounter;
+
+   @Mock
+   private Counter paymentCallbackCounter;
+
+   @Mock
+   private Counter paymentDuplicateCallbackCounter;
 
    @InjectMocks
    private BookingServiceImpl bookingService;
 
    private RoomType mockRoomType;
+
    private User mockOwner;
+
    private Property mockProperty;
+
    private Role mockRole;
 
    @BeforeEach
@@ -177,39 +241,37 @@ class BookingServiceImplTest {
       lenient().when(cacheManager.getCache("partner_bookings")).thenReturn(cache);
 
       lenient().when(priceCalculationService.calculateStayPriceWithCoupon(
-            any(UUID.class), any(UUID.class), any(LocalDate.class), any(LocalDate.class), org.mockito.ArgumentMatchers.anyInt(), any()
-      )).thenAnswer(invocation -> {
-         LocalDate checkIn = invocation.getArgument(2);
-         LocalDate checkOut = invocation.getArgument(3);
-         long nights = java.time.temporal.ChronoUnit.DAYS.between(checkIn, checkOut);
-         
-         java.util.List<com.omnibooking.services.pricing.PriceCalculationService.DailyPrice> dailyPrices = new java.util.ArrayList<>();
-         BigDecimal totalBase = BigDecimal.ZERO;
-         for (int i = 0; i < nights; i++) {
-            com.omnibooking.services.pricing.PriceCalculationService.DailyPrice dp = new com.omnibooking.services.pricing.PriceCalculationService.DailyPrice(
-                  checkIn.plusDays(i),
-                  new BigDecimal("100.00"),
-                  BigDecimal.ZERO,
-                  BigDecimal.ZERO,
-                  BigDecimal.ZERO,
-                  new BigDecimal("100.00"),
-                  Collections.emptyList()
-            );
-            dailyPrices.add(dp);
-            totalBase = totalBase.add(new BigDecimal("100.00"));
-         }
-         return new com.omnibooking.services.pricing.PriceCalculationService.StayPriceResult(
-               dailyPrices,
-               totalBase,
-               BigDecimal.ZERO,
-               BigDecimal.ZERO,
-               BigDecimal.ZERO,
-               BigDecimal.ZERO,
-               totalBase,
-               null,
-               null
-         );
-      });
+            any(UUID.class), any(UUID.class), any(LocalDate.class), any(LocalDate.class),
+            org.mockito.ArgumentMatchers.anyInt(), any())).thenAnswer(invocation -> {
+               LocalDate checkIn = invocation.getArgument(2);
+               LocalDate checkOut = invocation.getArgument(3);
+               long nights = java.time.temporal.ChronoUnit.DAYS.between(checkIn, checkOut);
+
+               java.util.List<PriceCalculationService.DailyPrice> dailyPrices = new java.util.ArrayList<>();
+               BigDecimal totalBase = BigDecimal.ZERO;
+               for (int i = 0; i < nights; i++) {
+                  PriceCalculationService.DailyPrice dp = new PriceCalculationService.DailyPrice(
+                        checkIn.plusDays(i),
+                        new BigDecimal("100.00"),
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        new BigDecimal("100.00"),
+                        Collections.emptyList());
+                  dailyPrices.add(dp);
+                  totalBase = totalBase.add(new BigDecimal("100.00"));
+               }
+               return new PriceCalculationService.StayPriceResult(
+                     dailyPrices,
+                     totalBase,
+                     BigDecimal.ZERO,
+                     BigDecimal.ZERO,
+                     BigDecimal.ZERO,
+                     BigDecimal.ZERO,
+                     totalBase,
+                     null,
+                     null);
+            });
 
       lenient().when(bookingPriceBreakdownRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
    }
@@ -389,7 +451,7 @@ class BookingServiceImplTest {
    }
 
    @Test
-   @DisplayName("Guest Booking with VISA: Should require deposit and start with PENDING status")
+   @DisplayName("Guest Booking with VISA: Should require deposit and start with PENDING_PAYMENT status")
    void testGuestBooking_RequiresDeposit_VisaPaymentMethod_ShouldBePending() {
       LocalDate checkIn = LocalDate.now().plusDays(2);
       LocalDate checkOut = checkIn.plusDays(3);
@@ -420,7 +482,7 @@ class BookingServiceImplTest {
 
       // Assert
       assertThat(response.getRequiresDeposit()).isTrue();
-      assertThat(response.getStatus()).isEqualTo(BookingStatus.PENDING);
+      assertThat(response.getStatus()).isEqualTo(BookingStatus.PENDING_PAYMENT);
    }
 
    @Test
@@ -430,7 +492,7 @@ class BookingServiceImplTest {
       UUID bookingId = UUID.randomUUID();
       Booking mockBooking = Booking.builder()
             .id(bookingId)
-            .status(BookingStatus.PENDING)
+            .status(BookingStatus.PENDING_PAYMENT)
             .depositAmount(new BigDecimal("45.00"))
             .guestEmail("john@example.com")
             .guestName("John Doe")
@@ -443,17 +505,18 @@ class BookingServiceImplTest {
             .build();
 
       when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(mockBooking));
-      when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+      when(bookingRepository.atomicConfirmBooking(eq(bookingId), any(Instant.class), eq(BookingStatus.PENDING_PAYMENT),
+            eq(BookingStatus.CONFIRMED))).thenReturn(1);
 
       // Act
       bookingService.confirmBooking(bookingId, "MOMO", "momo_trans_123", "{}");
 
       // Assert
       assertThat(mockBooking.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
-      verify(bookingRepository, times(1)).save(mockBooking);
       verify(bookingStatusLogRepository, times(1)).save(any());
       verify(transactionRepository, times(1)).save(any(Transaction.class));
-      verify(outboxService, times(1)).saveEvent(eq(bookingId), eq("BOOKING"), eq(EventConstants.BOOKING_CONFIRMED_MAIL), any());
+      verify(outboxService, times(1)).saveEvent(eq(bookingId), eq("BOOKING"), eq(EventConstants.BOOKING_CONFIRMED_MAIL),
+            any());
    }
 
    @Test
@@ -492,4 +555,5 @@ class BookingServiceImplTest {
       assertThat(response.getRoomTypeName()).isEqualTo("Deluxe Room");
       assertThat(response.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
    }
+
 }

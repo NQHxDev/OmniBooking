@@ -22,6 +22,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import org.springframework.web.bind.annotation.RequestBody;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Objects;
@@ -49,13 +53,19 @@ public class IdempotencyAspect {
       HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes())
             .getRequest();
       String key = request.getHeader(IDEMPOTENCY_KEY_HEADER);
+      if (key == null || key.isBlank()) {
+         key = request.getHeader("Idempotency-Key");
+      }
 
       if (key == null || key.isBlank()) {
-         log.warn("Missing X-Idempotency-Key for idempotent endpoint: {}", request.getRequestURI());
+         log.warn("Missing Idempotency-Key or X-Idempotency-Key for idempotent endpoint: {}", request.getRequestURI());
          throw new AppException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED);
       }
 
       String redisKey = getRedisKey(request, key);
+
+      // Compute deterministic hash of request body
+      String requestBodyHash = computeRequestHash(joinPoint);
 
       // Đánh dấu đang xử lý (Lock)
       Boolean isNewKey = redisTemplate.opsForValue().setIfAbsent(redisKey, PROCESSING_VALUE, 5, TimeUnit.MINUTES);
@@ -74,6 +84,12 @@ public class IdempotencyAspect {
             log.info("Returning cached response for idempotency key: {}", key);
             MethodSignature signature = (MethodSignature) joinPoint.getSignature();
             CacheValue cacheValue = objectMapper.readValue(cachedResponse, CacheValue.class);
+
+            // Same key + different payload → 409 Conflict
+            if (cacheValue.getRequestHash() != null
+                  && !cacheValue.getRequestHash().equals(requestBodyHash)) {
+               throw new AppException(ErrorCode.IDEMPOTENCY_CONFLICT);
+            }
 
             if (cacheValue.isResponseEntity()) {
                Type genericReturnType = signature.getMethod().getGenericReturnType();
@@ -115,10 +131,10 @@ public class IdempotencyAspect {
             String bodyJson = responseEntity.getBody() != null
                   ? objectMapper.writeValueAsString(responseEntity.getBody())
                   : null;
-            cacheValue = new CacheValue(responseEntity.getStatusCode().value(), bodyJson, true);
+            cacheValue = new CacheValue(responseEntity.getStatusCode().value(), bodyJson, true, requestBodyHash);
          } else {
             String bodyJson = result != null ? objectMapper.writeValueAsString(result) : null;
-            cacheValue = new CacheValue(200, bodyJson, false);
+            cacheValue = new CacheValue(200, bodyJson, false, requestBodyHash);
          }
 
          String jsonResponse = objectMapper.writeValueAsString(cacheValue);
@@ -132,6 +148,42 @@ public class IdempotencyAspect {
          redisTemplate.delete(redisKey);
          throw e;
       }
+   }
+
+   private String computeRequestHash(ProceedingJoinPoint joinPoint) {
+      try {
+         Object[] args = joinPoint.getArgs();
+         StringBuilder sb = new StringBuilder();
+         for (Object arg : args) {
+            if (arg != null && (arg.getClass().isAnnotationPresent(RequestBody.class)
+                  || hasRequestBodyAnnotation(joinPoint, arg))) {
+               sb.append(objectMapper.writeValueAsString(arg));
+            }
+         }
+         MessageDigest digest = MessageDigest.getInstance("SHA-256");
+         byte[] hash = digest.digest(sb.toString().getBytes(StandardCharsets.UTF_8));
+         return HexFormat.of().formatHex(hash);
+      } catch (Exception e) {
+         log.warn("Failed to compute request hash, skipping validation", e);
+         return null;  // Graceful degradation — skip hash validation
+      }
+   }
+
+   private boolean hasRequestBodyAnnotation(ProceedingJoinPoint joinPoint, Object arg) {
+      MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+      var method = signature.getMethod();
+      var annotations = method.getParameterAnnotations();
+      Object[] args = joinPoint.getArgs();
+      for (int i = 0; i < args.length; i++) {
+         if (args[i] == arg) {
+            for (var ann : annotations[i]) {
+               if (ann.annotationType().equals(RequestBody.class)) {
+                  return true;
+               }
+            }
+         }
+      }
+      return false;
    }
 
    private String getRedisKey(HttpServletRequest request, String key) {
@@ -150,6 +202,7 @@ public class IdempotencyAspect {
       private int statusCode;
       private String body;
       private boolean isResponseEntity;
+      private String requestHash;  // SHA-256 of request body
    }
 
 }

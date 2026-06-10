@@ -36,10 +36,14 @@ public class MediaStallDetector {
     */
    @Scheduled(fixedRateString = "${app.media.progress.stall-check-interval:30}000")
    public void detectStalledJobs() {
+      var zsetOps = redisTemplate.opsForZSet();
+      if (zsetOps == null) {
+         return;
+      }
       long stallTimeout = appProperties.getMedia().getProgress().getStallTimeout() * 1000L;
       double staleThreshold = Instant.now().toEpochMilli() - stallTimeout;
 
-      Set<String> stalePropertyIds = redisTemplate.opsForZSet()
+      Set<String> stalePropertyIds = zsetOps
             .rangeByScore(ACTIVE_ZSET_KEY, 0, staleThreshold);
 
       if (stalePropertyIds == null || stalePropertyIds.isEmpty()) return;

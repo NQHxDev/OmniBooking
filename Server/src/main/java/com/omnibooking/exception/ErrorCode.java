@@ -48,6 +48,7 @@ public enum ErrorCode {
    // Idempotency Errors
    IDEMPOTENCY_KEY_REQUIRED("IDEM_001", "X-Idempotency-Key header is required", HttpStatus.BAD_REQUEST),
    IDEMPOTENCY_KEY_PROCESSING("IDEM_002", "Request is already being processed", HttpStatus.CONFLICT),
+   IDEMPOTENCY_CONFLICT("IDEM_003", "Idempotency key reused with different request payload", HttpStatus.CONFLICT),
    SERVICE_UNAVAILABLE("GEN_503", "Service temporarily unavailable, please try again later",
          HttpStatus.SERVICE_UNAVAILABLE);
 

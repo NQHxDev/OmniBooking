@@ -40,6 +40,16 @@ import com.omnibooking.services.core.OutboxService;
 import com.omnibooking.services.pricing.PricingRuleHandler;
 import com.omnibooking.services.user.VerificationService;
 import com.omnibooking.services.auth.CachedRoleService;
+import com.omnibooking.services.booking.BookingStateMachine;
+import com.omnibooking.services.booking.InventoryService;
+import com.omnibooking.config.BookingConfigProperties;
+import com.omnibooking.model.PriceRuleVersion;
+import io.micrometer.core.instrument.Counter;
+import org.springframework.dao.DataIntegrityViolationException;
+import java.time.Instant;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
@@ -105,12 +115,18 @@ public class BookingServiceImpl implements BookingService {
    private final com.omnibooking.repository.pricing.PriceRuleVersionRepository priceRuleVersionRepository;
    private final com.omnibooking.services.pricing.PricingEngine pricingEngine;
 
+   private final BookingStateMachine bookingStateMachine;
+   private final InventoryService inventoryService;
+   private final BookingConfigProperties bookingConfig;
+   private final Counter bookingCreatedCounter;
+   private final Counter bookingConfirmedCounter;
+   private final Counter bookingCancelledCounter;
+   private final Counter paymentCallbackCounter;
+   private final Counter paymentDuplicateCallbackCounter;
+
    @Override
    @Transactional
    public BookingResponse createBooking(CreateBookingRequest request, UserPrincipal principal) {
-      // log.info("Creating booking for email: {}, RoomType: {}",
-      // request.getGuestEmail(), request.getRoomTypeId());
-
       if (request.getCheckInDate().isAfter(request.getCheckOutDate())
             || request.getCheckInDate().isEqual(request.getCheckOutDate())) {
          throw new AppException("BOOKING_002", "Check-in date must be before check-out date", HttpStatus.BAD_REQUEST);
@@ -165,35 +181,6 @@ public class BookingServiceImpl implements BookingService {
                   .build();
             userProfileRepository.save(profile);
          }
-      }
-
-      // Room Availability Check & Locks (Pessimistic write locks for each day)
-      LocalDate date = request.getCheckInDate();
-      while (date.isBefore(request.getCheckOutDate())) {
-         final LocalDate finalDate = date;
-         RoomAvailability availability = roomAvailabilityRepository
-               .findByRoomTypeIdAndAvailabilityDateWithLock(roomType.getId(), date)
-               .orElseGet(() -> {
-                  // Auto-initialize if not pre-populated
-                  RoomAvailability init = RoomAvailability.builder()
-                        .roomType(roomType)
-                        .availabilityDate(finalDate)
-                        .availableCount(roomType.getTotalRooms())
-                        .isClosed(false)
-                        .build();
-                  return roomAvailabilityRepository.save(init);
-               });
-
-         if (Boolean.TRUE.equals(availability.getIsClosed())
-               || availability.getAvailableCount() < request.getNumRooms()) {
-            throw new AppException("BOOKING_001", "Room not available for date: " + date, HttpStatus.BAD_REQUEST);
-         }
-
-         // Deduct availability
-         availability.setAvailableCount(availability.getAvailableCount() - request.getNumRooms());
-         roomAvailabilityRepository.save(availability);
-
-         date = date.plusDays(1);
       }
 
       // Get guest count (defaults to room type capacities)
@@ -280,7 +267,7 @@ public class BookingServiceImpl implements BookingService {
       // Save Booking
       boolean isPendingOnlinePayment = requiresDeposit && ("momo".equalsIgnoreCase(request.getPaymentMethod())
             || "visa".equalsIgnoreCase(request.getPaymentMethod()));
-      BookingStatus initialStatus = isPendingOnlinePayment ? BookingStatus.PENDING : BookingStatus.CONFIRMED;
+      BookingStatus initialStatus = isPendingOnlinePayment ? BookingStatus.PENDING_PAYMENT : BookingStatus.CONFIRMED;
 
       Booking booking = Booking.builder()
             .user(user)
@@ -305,7 +292,25 @@ public class BookingServiceImpl implements BookingService {
             .depositAmount(depositAmount)
             .build();
 
+      if (initialStatus == BookingStatus.PENDING_PAYMENT) {
+         booking.setExpiresAt(Instant.now().plus(bookingConfig.getHoldDurationMinutes(), ChronoUnit.MINUTES));
+      }
+
       booking = bookingRepository.save(booking);
+
+      // Room Availability Check & Locks (delegated to InventoryService after booking is saved)
+      inventoryService.reserveInventory(booking, roomType, request.getCheckInDate(), request.getCheckOutDate(), request.getNumRooms());
+
+      // Collect all rule IDs for batch load
+      Set<UUID> allRuleIds = stayPrice.dailyPrices().stream()
+            .flatMap(dp -> dp.appliedRuleIds().stream())
+            .collect(Collectors.toSet());
+
+      // 1 batch query replaces 2N individual queries
+      Map<UUID, PriceRuleVersion> latestVersions = priceRuleVersionRepository
+            .findLatestVersionsByPriceRuleIds(allRuleIds)
+            .stream()
+            .collect(Collectors.toMap(v -> v.getPriceRule().getId(), v -> v));
 
       // Save Booking Price Breakdown and Applied Rule Versions
       for (var dp : stayPrice.dailyPrices()) {
@@ -333,12 +338,8 @@ public class BookingServiceImpl implements BookingService {
          breakdown = bookingPriceBreakdownRepository.save(breakdown);
 
          for (UUID ruleId : dp.appliedRuleIds()) {
-            Integer maxVer = priceRuleVersionRepository.findMaxVersionByPriceRuleId(ruleId);
-            if (maxVer != null && maxVer > 0) {
-               var ruleVer = priceRuleVersionRepository.findByPriceRuleIdAndVersion(ruleId, maxVer)
-                     .orElseThrow(() -> new IllegalStateException(
-                           "Price rule version not found for rule: " + ruleId + ", version: " + maxVer));
-
+            PriceRuleVersion ruleVer = latestVersions.get(ruleId);
+            if (ruleVer != null) {
                BigDecimal ruleAdjustment = BigDecimal.ZERO;
                if (ruleVer.getRuleType() == RuleType.SEASONAL) {
                   ruleAdjustment = daySeasonal;
@@ -349,16 +350,14 @@ public class BookingServiceImpl implements BookingService {
                }
 
                if (ruleAdjustment.compareTo(BigDecimal.ZERO) == 0) {
-                  PricingRuleHandler handler = pricingEngine
-                        .getHandler(ruleVer.getRuleType());
+                  PricingRuleHandler handler = pricingEngine.getHandler(ruleVer.getRuleType());
                   ruleAdjustment = handler
                         .calculateAdjustment(ruleVer.getAdjustmentType(), ruleVer.getAdjustmentValue(), dp.basePrice())
                         .multiply(numRoomsDec);
                }
 
                if (ruleAdjustment.compareTo(BigDecimal.ZERO) != 0) {
-                  BookingAppliedRuleVersion appliedRuleVer = BookingAppliedRuleVersion
-                        .builder()
+                  BookingAppliedRuleVersion appliedRuleVer = BookingAppliedRuleVersion.builder()
                         .bookingPriceBreakdown(breakdown)
                         .priceRuleVersion(ruleVer)
                         .adjustmentAmount(ruleAdjustment)
@@ -423,8 +422,7 @@ public class BookingServiceImpl implements BookingService {
                EventConstants.BOOKING_CONFIRMED_MAIL,
                emailEvent);
 
-         // Evict partner bookings list cache to show the new booking on their management
-         // page
+         // Evict partner bookings list cache to show the new booking on their management page
          try {
             Cache cache = cacheManager.getCache("partner_bookings");
             if (cache != null) {
@@ -435,6 +433,8 @@ public class BookingServiceImpl implements BookingService {
             log.error("Failed to evict partner_bookings cache", e);
          }
       }
+
+      bookingCreatedCounter.increment();
 
       return BookingResponse.builder()
             .id(booking.getId())
@@ -460,31 +460,32 @@ public class BookingServiceImpl implements BookingService {
    @Override
    @Transactional
    public void confirmBooking(UUID bookingId, String paymentMethod, String providerTransactionId, String metadata) {
-      log.info("Confirming booking: {} via paymentMethod: {}, providerTransactionId: {}", bookingId, paymentMethod,
-            providerTransactionId);
-      Booking booking = bookingRepository.findById(bookingId)
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Booking not found"));
+      paymentCallbackCounter.increment();
 
-      if (booking.getStatus() == BookingStatus.CONFIRMED) {
-         log.info("Booking {} is already CONFIRMED, skipping status update.", bookingId);
+      // STEP 1: Atomic status transition (THE concurrency guard)
+      // If another callback already confirmed → rowsUpdated == 0 → skip ALL side-effects
+      int rowsUpdated = bookingRepository.atomicConfirmBooking(bookingId, Instant.now(), BookingStatus.PENDING_PAYMENT, BookingStatus.CONFIRMED);
+
+      if (rowsUpdated == 0) {
+         // Booking already confirmed, expired, or cancelled
+         log.info("Booking {} not in PENDING_PAYMENT state, skipping confirmation", bookingId);
          return;
       }
 
-      BookingStatus oldStatus = booking.getStatus();
+      // STEP 2: Atomic transition succeeded → this callback owns the confirmation
+      Booking booking = bookingRepository.findById(bookingId).orElseThrow();
       booking.setStatus(BookingStatus.CONFIRMED);
-      booking = bookingRepository.save(booking);
 
-      // Create Booking Status Log
-      BookingStatusLog logEntry = BookingStatusLog.builder()
+      // STEP 3: Audit log (only once — guaranteed by atomic transition)
+      bookingStatusLogRepository.save(BookingStatusLog.builder()
             .booking(booking)
-            .oldStatus(oldStatus)
+            .oldStatus(BookingStatus.PENDING_PAYMENT)
             .newStatus(BookingStatus.CONFIRMED)
             .reason("Deposit paid via " + paymentMethod)
             .changedBy(booking.getUser())
-            .build();
-      bookingStatusLogRepository.save(logEntry);
+            .build());
 
-      // Save Transaction record
+      // STEP 4: Save transaction — dedup via DB unique constraint
       Transaction transaction = Transaction.builder()
             .booking(booking)
             .amount(booking.getDepositAmount())
@@ -494,9 +495,16 @@ public class BookingServiceImpl implements BookingService {
             .providerTransactionId(providerTransactionId)
             .metadata(metadata)
             .build();
-      transactionRepository.save(transaction);
 
-      // Send confirmation email
+      try {
+         transactionRepository.save(transaction);
+      } catch (DataIntegrityViolationException ex) {
+         log.info("Duplicate provider transaction ignored: providerTxId={}", providerTransactionId);
+         paymentDuplicateCallbackCounter.increment();
+         return;
+      }
+
+      // STEP 5: Outbox event (in same TX) — guaranteed email delivery (only once)
       String token = null;
       if (booking.getUser() != null && Boolean.FALSE.equals(booking.getUser().getIsActive())) {
          token = verificationService.createVerificationToken(booking.getUser().getId());
@@ -537,8 +545,10 @@ public class BookingServiceImpl implements BookingService {
             EventConstants.BOOKING_CONFIRMED_MAIL,
             emailEvent);
 
-      // Evict partner bookings list cache to show the new booking on their management
-      // page
+      // STEP 6: Metrics (only once)
+      bookingConfirmedCounter.increment();
+
+      // Evict partner bookings list cache to show the new booking on their management page
       try {
          Cache cache = cacheManager.getCache("partner_bookings");
          if (cache != null) {
@@ -549,6 +559,31 @@ public class BookingServiceImpl implements BookingService {
       } catch (Exception e) {
          log.error("Failed to evict partner_bookings cache", e);
       }
+   }
+
+   @Override
+   @Transactional
+   public void cancelBooking(UUID bookingId, String reason, User changedBy) {
+      Booking booking = bookingRepository.findById(bookingId)
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Booking not found"));
+
+      // State machine validates: only PENDING_PAYMENT or CONFIRMED can be cancelled
+      bookingStateMachine.transition(booking, BookingStatus.CANCELLED, reason, changedBy);
+      booking = bookingRepository.save(booking);
+
+      // Release inventory (only after successful transition)
+      inventoryService.releaseInventory(booking);
+
+      // Release coupon in same transaction
+      if (booking.getCoupon() != null && booking.getUser() != null) {
+         try {
+            couponReservationService.refundReservation(booking.getCoupon().getId(), booking.getUser().getId());
+         } catch (Exception e) {
+            log.warn("Failed to release coupon for cancelled booking {}", booking.getId(), e);
+         }
+      }
+
+      bookingCancelledCounter.increment();
    }
 
    @Override

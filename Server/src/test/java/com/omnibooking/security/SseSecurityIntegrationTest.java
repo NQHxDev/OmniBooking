@@ -1,6 +1,7 @@
 package com.omnibooking.security;
 
 import com.omnibooking.services.media.MediaProgressService;
+import com.omnibooking.services.media.SseProgressDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -47,7 +48,9 @@ public class SseSecurityIntegrationTest {
    @MockitoBean
    private MediaProgressService progressService;
 
-   // Mock external systems to avoid connection issues in tests
+   @MockitoBean
+   private SseProgressDispatcher sseDispatcher;
+
    @MockitoBean
    private ElasticsearchOperations elasticsearchOperations;
 
@@ -69,6 +72,8 @@ public class SseSecurityIntegrationTest {
    @MockitoBean
    private RedisMessageListenerContainer redisMessageListenerContainer;
 
+   private org.springframework.web.servlet.mvc.method.annotation.SseEmitter capturedEmitter;
+
    @BeforeEach
    public void setup() {
       this.mockMvc = MockMvcBuilders
@@ -76,6 +81,12 @@ public class SseSecurityIntegrationTest {
             .addFilter(new ForwardedHeaderFilter())
             .apply(springSecurity())
             .build();
+
+      this.capturedEmitter = null;
+      Mockito.doAnswer(invocation -> {
+         this.capturedEmitter = invocation.getArgument(1);
+         return null;
+      }).when(sseDispatcher).register(any(), any());
    }
 
    @Test
@@ -90,6 +101,11 @@ public class SseSecurityIntegrationTest {
             .with(user("partnerUser").authorities(() -> "ROLE_PARTNER")))
             .andExpect(request().asyncStarted())
             .andReturn();
+
+      // Complete the emitter to avoid blocking indefinitely
+      if (capturedEmitter != null) {
+         capturedEmitter.complete();
+      }
 
       // Dispatch async context - should succeed with status 200 (since
       // DispatcherType.ASYNC is permitted)
@@ -118,6 +134,7 @@ public class SseSecurityIntegrationTest {
       mockMvc.perform(get("/error")
             .with(request -> {
                request.setDispatcherType(DispatcherType.ERROR);
+               request.setAttribute("jakarta.servlet.error.status_code", 404);
                return request;
             }))
             .andExpect(status().isNotFound());
@@ -137,9 +154,15 @@ public class SseSecurityIntegrationTest {
       // Retrieve the MockAsyncContext
       MockAsyncContext asyncContext = (MockAsyncContext) mvcResult.getRequest().getAsyncContext();
 
+      jakarta.servlet.AsyncEvent event = new jakarta.servlet.AsyncEvent(asyncContext);
       // Trigger timeout listeners
       for (AsyncListener listener : asyncContext.getListeners()) {
-         listener.onTimeout(null);
+         listener.onTimeout(event);
+      }
+
+      // Complete the emitter to avoid blocking indefinitely
+      if (capturedEmitter != null) {
+         capturedEmitter.complete();
       }
 
       // Perform the async dispatch which completes the request under timeout
@@ -163,9 +186,15 @@ public class SseSecurityIntegrationTest {
       // Retrieve the MockAsyncContext
       MockAsyncContext asyncContext = (MockAsyncContext) mvcResult.getRequest().getAsyncContext();
 
+      jakarta.servlet.AsyncEvent event = new jakarta.servlet.AsyncEvent(asyncContext, new java.io.IOException("Client disconnect"));
       // Simulate async error path (client disconnect or emitter failure)
       for (AsyncListener listener : asyncContext.getListeners()) {
-         listener.onError(null);
+         listener.onError(event);
+      }
+
+      // Complete the emitter to avoid blocking indefinitely
+      if (capturedEmitter != null) {
+         capturedEmitter.complete();
       }
 
       // Perform async dispatch under error conditions

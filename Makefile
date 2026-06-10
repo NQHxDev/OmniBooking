@@ -50,8 +50,14 @@ monitoring:
 
 .PHONY: test-server
 test-server:
+	@echo "Starting isolated Redis container for integration tests..."
+	@docker-compose -f docker-compose.test.yml up -d
 	@echo "Running Server unit tests..."
-	@cd Server && ./mvnw clean test
+	@cd Server && ./mvnw clean test; \
+	status=$$?; \
+	echo "Stopping and removing isolated Redis container..."; \
+	docker-compose -f docker-compose.test.yml down -v; \
+	exit $$status
 
 # Performance & Load Testing with k6
 .PHONY: test-load

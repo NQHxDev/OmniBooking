@@ -16,6 +16,7 @@ import com.omnibooking.repository.user.UserRepository;
 import com.omnibooking.config.AppProperties;
 import com.omnibooking.services.auth.JWTService;
 import com.omnibooking.services.auth.SessionService;
+import com.omnibooking.services.auth.TwoFactorAuthService;
 import com.omnibooking.services.auth.CachedRoleService;
 import com.omnibooking.services.auth.impl.AuthServiceImpl;
 import com.omnibooking.services.communication.MailService;
@@ -35,6 +36,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Collections;
@@ -115,10 +117,10 @@ class AuthServiceImplTest {
    private OutboxService outboxService;
 
    @Mock
-   private com.omnibooking.services.auth.TwoFactorAuthService twoFactorAuthService;
+   private TwoFactorAuthService twoFactorAuthService;
 
    @Mock
-   private org.springframework.data.redis.core.ValueOperations<String, String> valueOps;
+   private ValueOperations<String, String> valueOps;
 
    @InjectMocks
    private AuthServiceImpl authService;
@@ -157,7 +159,8 @@ class AuthServiceImplTest {
          when(userMapper.toUser(any())).thenReturn(user);
          when(userRepository.save(any(User.class))).thenReturn(user);
          when(userProfileRepository.save(any(UserProfile.class))).thenReturn(new UserProfile());
-         when(jwtService.generateAccessToken(any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any())).thenReturn("access_token");
+         when(jwtService.generateAccessToken(any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any()))
+               .thenReturn("access_token");
          when(sessionService.getSession(any())).thenReturn(RedisSessionInfo.builder().userId(user.getId()).build());
          when(userMapper.toAuthResponse(any(), any(), any())).thenReturn(AuthResponse.builder()
                .email(request.getEmail())
@@ -219,7 +222,8 @@ class AuthServiceImplTest {
          when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
          when(passwordEncoder.matches(request.getPassword(), user.getPassword())).thenReturn(true);
          when(twoFactorAuthService.is2FAEnabledForUser(user.getId())).thenReturn(false);
-         when(jwtService.generateAccessToken(any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any())).thenReturn("access_token");
+         when(jwtService.generateAccessToken(any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any()))
+               .thenReturn("access_token");
          when(sessionService.getSession(any())).thenReturn(RedisSessionInfo.builder().userId(user.getId()).build());
          when(userMapper.toAuthResponse(any(), any(), any())).thenReturn(AuthResponse.builder()
                .email(request.getEmail())

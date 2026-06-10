@@ -152,12 +152,17 @@ export default function BookingsPage() {
                label: tBookings("statusConfirmed"),
                class: "bg-green-100 text-green-800 border-green-200",
             };
-         case "PENDING":
+         case "PENDING_PAYMENT":
             return {
                label: tBookings("statusPending"),
                class: "bg-yellow-100 text-yellow-800 border-yellow-200",
             };
-         case "STAYED":
+         case "CHECKED_IN":
+            return {
+               label: "Đã nhận phòng",
+               class: "bg-indigo-100 text-indigo-800 border-indigo-200",
+            };
+         case "CHECKED_OUT":
             return {
                label: tBookings("statusCompleted"),
                class: "bg-blue-100 text-blue-800 border-blue-200",
@@ -209,7 +214,7 @@ export default function BookingsPage() {
                <div className="space-y-6">
                   {bookings.map((booking) => {
                      const statusInfo = formatStatus(booking.status);
-                     const isStayed = booking.status === "STAYED";
+                     const isStayed = booking.status === "CHECKED_OUT";
                      const isCheckoutPassed = new Date(booking.checkOutDate) <= new Date();
                      const hasReviewed = reviewedBookingIds.has(booking.id);
                      const canReview = isStayed && isCheckoutPassed && !hasReviewed;

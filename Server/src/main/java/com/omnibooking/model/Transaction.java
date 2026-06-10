@@ -47,7 +47,7 @@ public class Transaction extends BaseEntity {
    @Column(nullable = false, length = 20)
    private TransactionStatus status = TransactionStatus.PENDING;
 
-   @Column(name = "provider_transaction_id")
+   @Column(name = "provider_transaction_id", unique = true)
    private String providerTransactionId;
 
    @JdbcTypeCode(SqlTypes.JSON)

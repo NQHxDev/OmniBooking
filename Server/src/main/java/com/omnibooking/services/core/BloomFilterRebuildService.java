@@ -32,7 +32,12 @@ public class BloomFilterRebuildService {
       log.info("Starting Bloom Filter rebuild process...");
 
       // Check if checkpoint exists indicating resumption
-      String checkpointVal = redisTemplate.opsForValue().get(CHECKPOINT_KEY);
+      var ops = redisTemplate.opsForValue();
+      if (ops == null) {
+         log.warn("StringRedisTemplate.opsForValue() returned null. Skipping Bloom Filter rebuild (expected if Redis is mocked in tests).");
+         return;
+      }
+      String checkpointVal = ops.get(CHECKPOINT_KEY);
       UUID lastId = null;
       if (checkpointVal != null && !checkpointVal.isEmpty()) {
          lastId = UUID.fromString(checkpointVal);

@@ -24,6 +24,7 @@ import java.util.Map;
 
 @Configuration
 @EnableCaching
+@org.springframework.context.annotation.Profile("!test")
 public class RedisConfig {
 
    public static final String FEATURED_PROPERTIES = "featured_properties";

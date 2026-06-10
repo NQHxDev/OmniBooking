@@ -66,7 +66,9 @@ public class CouponReservationServiceIntegrationTest {
    private RedisMessageListenerContainer redisMessageListenerContainer;
 
    private Property testProperty;
+
    private User testUser;
+
    private Coupon testCoupon;
 
    @BeforeEach

@@ -35,6 +35,11 @@ public interface CouponRepository extends JpaRepository<Coupon, UUID> {
          "WHERE c.id = :id AND c.reservedCount > 0")
    int consumeReservedCouponAtomically(@Param("id") UUID id);
 
+   @Modifying(clearAutomatically = true)
+   @Query("UPDATE Coupon c SET c.usedCount = c.usedCount - 1 " +
+         "WHERE c.id = :id AND c.usedCount > 0")
+   int refundCouponUsageAtomically(@Param("id") UUID id);
+
    List<Coupon> findByPropertyId(UUID propertyId);
 
 }

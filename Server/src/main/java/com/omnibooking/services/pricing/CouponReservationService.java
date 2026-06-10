@@ -11,6 +11,8 @@ public interface CouponReservationService {
 
    void releaseReservation(String reservationToken);
 
+   void refundReservation(UUID couponId, UUID customerId);
+
    void cleanExpiredReservations();
 
 }

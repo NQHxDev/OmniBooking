@@ -321,7 +321,7 @@ public class OutboxServiceImpl implements OutboxService {
    @Transactional
    public void purgeOldOutboxEvents() {
       Instant threshold = Instant.now().minus(30, ChronoUnit.DAYS);
-      int deleted = outboxEventRepository.deleteProcessedEventsBefore(threshold);
+      int deleted = outboxEventRepository.deleteProcessedEventsBefore(threshold, OutboxStatus.PROCESSED);
       if (deleted > 0) {
          log.info("Purged {} processed outbox events older than 30 days", deleted);
       }

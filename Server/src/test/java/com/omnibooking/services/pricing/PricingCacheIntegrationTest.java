@@ -32,7 +32,7 @@ import static org.mockito.Mockito.*;
 @SpringBootTest(properties = {
       "spring.cache.type=redis",
       "spring.data.redis.host=localhost",
-      "spring.data.redis.port=6379"
+      "spring.data.redis.port=6380"
 })
 public class PricingCacheIntegrationTest {
 

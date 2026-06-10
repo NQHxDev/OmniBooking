@@ -133,7 +133,7 @@ public class ReviewServiceImpl implements ReviewService {
          throw new AppException(ErrorCode.NOT_BOOKING_OWNER);
       }
 
-      if (booking.getStatus() != BookingStatus.STAYED) {
+      if (booking.getStatus() != BookingStatus.CHECKED_OUT) {
          throw new AppException(ErrorCode.INVALID_BOOKING_STATUS);
       }
 
@@ -374,8 +374,8 @@ public class ReviewServiceImpl implements ReviewService {
          Property property = propertyRepository.findByIdWithWriteLock(propertyId)
                .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
-         long count = reviewRepository.countActiveReviewsByPropertyId(propertyId);
-         Long sum = reviewRepository.sumActiveRatingsByPropertyId(propertyId);
+         long count = reviewRepository.countActiveReviewsByPropertyId(propertyId, ReviewStatus.PUBLISHED);
+         Long sum = reviewRepository.sumActiveRatingsByPropertyId(propertyId, ReviewStatus.PUBLISHED);
          if (sum == null) {
             sum = 0L;
          }
@@ -424,8 +424,8 @@ public class ReviewServiceImpl implements ReviewService {
          log.info("Starting background full rebuild ratings job...");
          List<Property> properties = propertyRepository.findAll();
          for (Property property : properties) {
-            long count = reviewRepository.countActiveReviewsByPropertyId(property.getId());
-            Long sum = reviewRepository.sumActiveRatingsByPropertyId(property.getId());
+            long count = reviewRepository.countActiveReviewsByPropertyId(property.getId(), ReviewStatus.PUBLISHED);
+            Long sum = reviewRepository.sumActiveRatingsByPropertyId(property.getId(), ReviewStatus.PUBLISHED);
             if (sum == null) {
                sum = 0L;
             }

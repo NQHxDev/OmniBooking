@@ -21,6 +21,12 @@ public interface CouponReservationRepository extends JpaRepository<CouponReserva
 
    List<CouponReservation> findByStatusAndExpiresAtBefore(ReservationStatus status, Instant now);
 
+   @Query("SELECT cr FROM CouponReservation cr WHERE cr.customer.id = :customerId AND cr.coupon.id = :couponId AND cr.status = :status ORDER BY cr.reservedAt DESC")
+   List<CouponReservation> findByCustomerIdAndCouponIdAndStatusOrderByReservedAtDesc(
+         @Param("customerId") UUID customerId,
+         @Param("couponId") UUID couponId,
+         @Param("status") ReservationStatus status);
+
    @Modifying(clearAutomatically = true)
    @Query("UPDATE CouponReservation cr SET cr.status = :newStatus WHERE cr.id = :id AND cr.status = :oldStatus")
    int transitionStatus(@Param("id") UUID id, @Param("oldStatus") ReservationStatus oldStatus,

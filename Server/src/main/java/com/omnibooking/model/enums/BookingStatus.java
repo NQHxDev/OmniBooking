@@ -1,9 +1,12 @@
 package com.omnibooking.model.enums;
 
 public enum BookingStatus {
-   PENDING,
+   PENDING_PAYMENT,
    CONFIRMED,
-   STAYED,
+   CHECKED_IN,
+   CHECKED_OUT,
    CANCELLED,
+   EXPIRED,
+   NO_SHOW,
    REFUNDED
 }
