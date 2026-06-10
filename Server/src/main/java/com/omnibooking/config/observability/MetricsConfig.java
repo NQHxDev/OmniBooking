@@ -182,6 +182,36 @@ public class MetricsConfig {
             .description("Idempotency cache hits for booking creation").register(r);
    }
 
+   @Bean
+   public Counter idempotencyHitCounter(MeterRegistry r) {
+      return Counter.builder("idempotency.hit")
+            .description("Total idempotency cache hits").register(r);
+   }
+
+   @Bean
+   public Counter idempotencyMissCounter(MeterRegistry r) {
+      return Counter.builder("idempotency.miss")
+            .description("Total idempotency cache misses").register(r);
+   }
+
+   @Bean
+   public Counter idempotencyConflictCounter(MeterRegistry r) {
+      return Counter.builder("idempotency.conflict")
+            .description("Total idempotency conflicts detected").register(r);
+   }
+
+   @Bean
+   public Counter idempotencyProcessingCounter(MeterRegistry r) {
+      return Counter.builder("idempotency.processing")
+            .description("Total idempotency keys currently processing").register(r);
+   }
+
+   @Bean
+   public Counter idempotencyReclaimedCounter(MeterRegistry r) {
+      return Counter.builder("idempotency.reclaimed")
+            .description("Total idempotency keys reclaimed from stale or failed status").register(r);
+   }
+
    // --- Reconciliation ---
    @Bean
    public Counter reconciliationAnomalyCounter(MeterRegistry r) {

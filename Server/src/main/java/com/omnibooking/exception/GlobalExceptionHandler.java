@@ -6,9 +6,11 @@ import com.omnibooking.dto.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
@@ -32,7 +34,22 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.error(ex.getMessage(), ex.getErrorCode(), null, requestId));
    }
 
-   private String getLeafFieldName(java.util.List<JsonMappingException.Reference> path) {
+   @ExceptionHandler(IdempotencyConflictException.class)
+   public ResponseEntity<Map<String, String>> handleIdempotencyConflictException(IdempotencyConflictException ex) {
+      Map<String, String> response = new HashMap<>();
+      response.put("error", "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST");
+      return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+   }
+
+   @ExceptionHandler(IdempotencyResponseNotReplayableException.class)
+   public ResponseEntity<Map<String, String>> handleIdempotencyResponseNotReplayableException(
+         IdempotencyResponseNotReplayableException ex) {
+      Map<String, String> response = new HashMap<>();
+      response.put("error", "IDEMPOTENCY_RESPONSE_NOT_REPLAYABLE");
+      return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(response);
+   }
+
+   private String getLeafFieldName(List<JsonMappingException.Reference> path) {
       if (path == null || path.isEmpty()) {
          return "parameter";
       }
@@ -110,14 +127,16 @@ public class GlobalExceptionHandler {
 
    @ExceptionHandler(org.springframework.web.context.request.async.AsyncRequestTimeoutException.class)
    public ResponseEntity<Void> handleAsyncRequestTimeoutException() {
-      // Async request timeout is a normal lifecycle completion event (e.g. for SSE streams), not an error.
+      // Async request timeout is a normal lifecycle completion event (e.g. for SSE
+      // streams), not an error.
       // Returning 200 OK completes the request cleanly from Spring's perspective.
       return ResponseEntity.ok().build();
    }
 
    @ExceptionHandler(java.io.IOException.class)
    public ResponseEntity<Void> handleIOException(java.io.IOException ex) {
-      if (ex.getMessage() != null && (ex.getMessage().contains("Client disconnect") || ex.getMessage().contains("Broken pipe"))) {
+      if (ex.getMessage() != null
+            && (ex.getMessage().contains("Client disconnect") || ex.getMessage().contains("Broken pipe"))) {
          log.debug("Client disconnected during async request: {}", ex.getMessage());
          return ResponseEntity.ok().build();
       }

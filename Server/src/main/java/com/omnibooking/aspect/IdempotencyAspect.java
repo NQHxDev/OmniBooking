@@ -2,35 +2,39 @@ package com.omnibooking.aspect;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.f4b6a3.uuid.UuidCreator;
 import com.omnibooking.annotation.Idempotent;
 import com.omnibooking.exception.AppException;
 import com.omnibooking.exception.ErrorCode;
-import com.omnibooking.util.SecurityUtils;
+import com.omnibooking.exception.IdempotencyConflictException;
+import com.omnibooking.exception.IdempotencyResponseNotReplayableException;
+import com.omnibooking.model.IdempotencyKey;
+import com.omnibooking.repository.infra.IdempotencyKeyRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-
 import org.springframework.web.bind.annotation.RequestBody;
-import java.security.MessageDigest;
-import java.nio.charset.StandardCharsets;
-import java.util.HexFormat;
+
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 @Aspect
 @Component
@@ -38,15 +42,17 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class IdempotencyAspect {
 
-   private static final String IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key";
+   private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 
-   private static final String REDIS_PREFIX = "idempotency:";
+   private static final String ALT_IDEMPOTENCY_KEY_HEADER = "X-Idempotency-Key";
 
-   private static final String PROCESSING_VALUE = "PROCESSING";
+   private static final int MAX_RESPONSE_SIZE = 2 * 1024 * 1024; // 2 MB
 
-   private final StringRedisTemplate redisTemplate;
+   private final IdempotencyKeyRepository idempotencyKeyRepository;
 
    private final ObjectMapper objectMapper;
+
+   private final MeterRegistry meterRegistry;
 
    @Around("@annotation(idempotent)")
    public Object handleIdempotency(ProceedingJoinPoint joinPoint, Idempotent idempotent) throws Throwable {
@@ -54,105 +60,173 @@ public class IdempotencyAspect {
             .getRequest();
       String key = request.getHeader(IDEMPOTENCY_KEY_HEADER);
       if (key == null || key.isBlank()) {
-         key = request.getHeader("Idempotency-Key");
+         key = request.getHeader(ALT_IDEMPOTENCY_KEY_HEADER);
       }
 
       if (key == null || key.isBlank()) {
-         log.warn("Missing Idempotency-Key or X-Idempotency-Key for idempotent endpoint: {}", request.getRequestURI());
+         log.warn("Missing Idempotency-Key header for idempotent endpoint: {}", request.getRequestURI());
          throw new AppException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED);
       }
 
-      String redisKey = getRedisKey(request, key);
-
-      // Compute deterministic hash of request body
+      String endpoint = request.getMethod() + " " + request.getRequestURI();
       String requestBodyHash = computeRequestHash(joinPoint);
+      Instant now = Instant.now();
+      long expiresMs = idempotent.timeUnit().toMillis(idempotent.expiration());
+      Instant expiresAt = now.plusMillis(expiresMs);
 
-      // Đánh dấu đang xử lý (Lock)
-      Boolean isNewKey = redisTemplate.opsForValue().setIfAbsent(redisKey, PROCESSING_VALUE, 5, TimeUnit.MINUTES);
+      // Try inserting the key with database native INSERT
+      UUID id = UuidCreator.getTimeOrderedEpoch();
+      int inserted = 0;
+      try {
+         inserted = idempotencyKeyRepository.insertIdempotencyKey(id, key, endpoint, requestBodyHash, now, expiresAt);
+      } catch (DataIntegrityViolationException e) {
+         inserted = 0;
+      }
 
-      if (Boolean.FALSE.equals(isNewKey)) {
-         // Key đã tồn tại, kiểm tra xem đang xử lý hay đã có cache
-         String cachedResponse = redisTemplate.opsForValue().get(redisKey);
+      if (inserted == 1) {
+         log.info("Successfully acquired new idempotency lock for key: {}, endpoint: {}", key, endpoint);
+         return proceedAndSave(joinPoint, id, key, endpoint, requestBodyHash, expiresMs);
+      }
 
-         if (cachedResponse != null) {
-            if (PROCESSING_VALUE.equals(cachedResponse)) {
-               log.warn("Request with key {} is already being processed", key);
-               throw new AppException(ErrorCode.IDEMPOTENCY_KEY_PROCESSING);
-            }
-
-            // Trả về kết quả từ cache
-            log.info("Returning cached response for idempotency key: {}", key);
-            MethodSignature signature = (MethodSignature) joinPoint.getSignature();
-            CacheValue cacheValue = objectMapper.readValue(cachedResponse, CacheValue.class);
-
-            // Same key + different payload → 409 Conflict
-            if (cacheValue.getRequestHash() != null
-                  && !cacheValue.getRequestHash().equals(requestBodyHash)) {
-               throw new AppException(ErrorCode.IDEMPOTENCY_CONFLICT);
-            }
-
-            if (cacheValue.isResponseEntity()) {
-               Type genericReturnType = signature.getMethod().getGenericReturnType();
-               Type bodyType = Object.class;
-               if (genericReturnType instanceof ParameterizedType) {
-                  ParameterizedType paramType = (ParameterizedType) genericReturnType;
-                  Type rawType = paramType.getRawType();
-                  if (rawType instanceof Class && ResponseEntity.class.isAssignableFrom((Class<?>) rawType)) {
-                     bodyType = paramType.getActualTypeArguments()[0];
-                  }
-               }
-               Object body = null;
-               if (cacheValue.getBody() != null) {
-                  JavaType type = objectMapper.getTypeFactory().constructType(bodyType);
-                  body = objectMapper.readValue(cacheValue.getBody(), type);
-               }
-               return ResponseEntity.status(cacheValue.getStatusCode()).body(body);
-            } else {
-               if (cacheValue.getBody() == null) {
-                  return null;
-               }
-               JavaType type = objectMapper.getTypeFactory().constructType(signature.getReturnType());
-               return objectMapper.readValue(cacheValue.getBody(), type);
-            }
-         }
-
-         // Dự phòng trong trường hợp key vừa hết hạn giữa setIfAbsent và get
+      // Key already exists, fetch it and decide what to do
+      Optional<IdempotencyKey> existingKeyOpt = idempotencyKeyRepository.findByIdempotencyKeyAndEndpoint(key, endpoint);
+      if (existingKeyOpt.isEmpty()) {
+         // Concurrency race fallback
+         meterRegistry.counter("idempotency.processing").increment();
          throw new AppException(ErrorCode.IDEMPOTENCY_KEY_PROCESSING);
       }
 
-      try {
-         // Thực thi nghiệp vụ
-         Object result = joinPoint.proceed();
+      IdempotencyKey existingKey = existingKeyOpt.get();
 
-         // Lưu kết quả vào Redis
-         CacheValue cacheValue;
-         if (result instanceof ResponseEntity) {
-            ResponseEntity<?> responseEntity = (ResponseEntity<?>) result;
-            String bodyJson = responseEntity.getBody() != null
-                  ? objectMapper.writeValueAsString(responseEntity.getBody())
-                  : null;
-            cacheValue = new CacheValue(responseEntity.getStatusCode().value(), bodyJson, true, requestBodyHash);
-         } else {
-            String bodyJson = result != null ? objectMapper.writeValueAsString(result) : null;
-            cacheValue = new CacheValue(200, bodyJson, false, requestBodyHash);
+      // Check hash immutability first for all states
+      if (!Objects.equals(existingKey.getRequestHash(), requestBodyHash)) {
+         log.warn("Idempotency key reused with different request payload. Key: {}, Endpoint: {}", key, endpoint);
+         meterRegistry.counter("idempotency.conflict").increment();
+         throw new IdempotencyConflictException("Idempotency key reused with different request payload");
+      }
+
+      String status = existingKey.getProcessingStatus();
+      if ("PROCESSING".equals(status)) {
+         Instant staleTime = Instant.now().minus(10, ChronoUnit.MINUTES);
+         if (existingKey.getProcessingStartedAt().isBefore(staleTime)) {
+            log.info("Detected stale PROCESSING record for key: {}, endpoint: {}. Reclaiming...", key, endpoint);
+            int reclaimed = idempotencyKeyRepository.reclaimStaleKey(key, endpoint, requestBodyHash, Instant.now(),
+                  staleTime);
+            if (reclaimed == 1) {
+               meterRegistry.counter("idempotency.reclaimed").increment();
+               return proceedAndSave(joinPoint, existingKey.getId(), key, endpoint, requestBodyHash, expiresMs);
+            }
+         }
+         meterRegistry.counter("idempotency.processing").increment();
+         throw new AppException(ErrorCode.IDEMPOTENCY_KEY_PROCESSING);
+      } else if ("FAILED".equals(status)) {
+         log.info("Reclaiming failed idempotency record for key: {}, endpoint: {}", key, endpoint);
+         int reclaimed = idempotencyKeyRepository.reclaimFailedKey(key, endpoint, requestBodyHash, Instant.now());
+         if (reclaimed == 1) {
+            meterRegistry.counter("idempotency.reclaimed").increment();
+            return proceedAndSave(joinPoint, existingKey.getId(), key, endpoint, requestBodyHash, expiresMs);
+         }
+         meterRegistry.counter("idempotency.processing").increment();
+         throw new AppException(ErrorCode.IDEMPOTENCY_KEY_PROCESSING);
+      } else if ("COMPLETED".equals(status)) {
+         if (!existingKey.isResponseCached()) {
+            log.warn("Idempotency response payload was not cached due to size restrictions. Key: {}, Endpoint: {}", key,
+                  endpoint);
+            throw new IdempotencyResponseNotReplayableException("Idempotency response not replayable");
          }
 
-         String jsonResponse = objectMapper.writeValueAsString(cacheValue);
-         redisTemplate.opsForValue().set(redisKey, jsonResponse, idempotent.expiration(),
-               Objects.requireNonNull(idempotent.timeUnit()));
+         log.info("Returning cached response for idempotency key: {}, endpoint: {}", key, endpoint);
+         meterRegistry.counter("idempotency.hit").increment();
+         return buildReplayedResponse(joinPoint, existingKey);
+      }
 
-         return result;
-      } catch (Throwable e) {
-         // Bắt Throwable thay vì Exception để tránh rò rỉ khóa khi có Error nghiêm trọng
-         log.error("Error occurred while processing idempotent request, releasing lock key: {}", key, e);
-         redisTemplate.delete(redisKey);
-         throw e;
+      meterRegistry.counter("idempotency.processing").increment();
+      throw new AppException(ErrorCode.IDEMPOTENCY_KEY_PROCESSING);
+   }
+
+   private Object proceedAndSave(ProceedingJoinPoint joinPoint, UUID id, String key, String endpoint,
+         String requestBodyHash, long expiresMs) throws Throwable {
+      Object result;
+      try {
+         result = joinPoint.proceed();
+      } catch (Throwable t) {
+         log.error("Error processing business logic for idempotency key: {}, updating to FAILED state.", key, t);
+         updateStatus(id, "FAILED", 500, null, false);
+         throw t;
+      }
+
+      String bodyJson = null;
+      boolean responseCached = true;
+      int statusCode = 200;
+
+      if (result instanceof ResponseEntity) {
+         ResponseEntity<?> responseEntity = (ResponseEntity<?>) result;
+         statusCode = responseEntity.getStatusCode().value();
+         bodyJson = responseEntity.getBody() != null ? objectMapper.writeValueAsString(responseEntity.getBody()) : null;
+      } else {
+         bodyJson = result != null ? objectMapper.writeValueAsString(result) : null;
+      }
+
+      if (bodyJson != null && bodyJson.length() > MAX_RESPONSE_SIZE) {
+         log.warn("Response payload size for idempotency key {} exceeded 2MB threshold. Skipping payload cache.", key);
+         bodyJson = null;
+         responseCached = false;
+      }
+
+      updateStatus(id, "COMPLETED", statusCode, bodyJson, responseCached);
+      meterRegistry.counter("idempotency.miss").increment();
+      return result;
+   }
+
+   private void updateStatus(UUID id, String status, Integer responseStatus, String responsePayload,
+         boolean responseCached) {
+      try {
+         idempotencyKeyRepository.findById(id).ifPresent(idempKey -> {
+            idempKey.setProcessingStatus(status);
+            idempKey.setResponseStatus(responseStatus);
+            idempKey.setResponsePayload(responsePayload);
+            idempKey.setResponseCached(responseCached);
+            idempotencyKeyRepository.saveAndFlush(idempKey);
+         });
+      } catch (Exception e) {
+         log.error("Failed to update idempotency status in database for ID: {}", id, e);
+      }
+   }
+
+   private Object buildReplayedResponse(ProceedingJoinPoint joinPoint, IdempotencyKey keyRecord) throws Exception {
+      MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+      Class<?> returnType = signature.getMethod().getReturnType();
+      if (ResponseEntity.class.isAssignableFrom(returnType)) {
+         Type genericReturnType = signature.getMethod().getGenericReturnType();
+         Type bodyType = Object.class;
+         if (genericReturnType instanceof ParameterizedType) {
+            ParameterizedType paramType = (ParameterizedType) genericReturnType;
+            Type rawType = paramType.getRawType();
+            if (rawType instanceof Class && ResponseEntity.class.isAssignableFrom((Class<?>) rawType)) {
+               bodyType = paramType.getActualTypeArguments()[0];
+            }
+         }
+         Object body = null;
+         if (keyRecord.getResponsePayload() != null) {
+            JavaType type = objectMapper.getTypeFactory().constructType(bodyType);
+            body = objectMapper.readValue(keyRecord.getResponsePayload(), type);
+         }
+         return ResponseEntity.status(keyRecord.getResponseStatus()).body(body);
+      } else {
+         if (keyRecord.getResponsePayload() == null) {
+            return null;
+         }
+         JavaType type = objectMapper.getTypeFactory().constructType(returnType);
+         return objectMapper.readValue(keyRecord.getResponsePayload(), type);
       }
    }
 
    private String computeRequestHash(ProceedingJoinPoint joinPoint) {
       try {
          Object[] args = joinPoint.getArgs();
+         if (args == null) {
+            return "hash-failed";
+         }
          StringBuilder sb = new StringBuilder();
          for (Object arg : args) {
             if (arg != null && (arg.getClass().isAnnotationPresent(RequestBody.class)
@@ -165,7 +239,7 @@ public class IdempotencyAspect {
          return HexFormat.of().formatHex(hash);
       } catch (Exception e) {
          log.warn("Failed to compute request hash, skipping validation", e);
-         return null;  // Graceful degradation — skip hash validation
+         return "hash-failed";
       }
    }
 
@@ -184,25 +258,6 @@ public class IdempotencyAspect {
          }
       }
       return false;
-   }
-
-   private String getRedisKey(HttpServletRequest request, String key) {
-      UUID userId = SecurityUtils.getCurrentUserId();
-      String userIdStr = (userId != null) ? userId.toString() : "anonymous";
-      return REDIS_PREFIX + request.getMethod() + ":" + request.getRequestURI() + ":" + userIdStr + ":" + key;
-   }
-
-   /**
-    * Wrapper class to store cached response metadata and serialized body.
-    */
-   @Data
-   @NoArgsConstructor
-   @AllArgsConstructor
-   private static class CacheValue {
-      private int statusCode;
-      private String body;
-      private boolean isResponseEntity;
-      private String requestHash;  // SHA-256 of request body
    }
 
 }

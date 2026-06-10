@@ -4,7 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.annotation.Idempotent;
 import com.omnibooking.exception.AppException;
 import com.omnibooking.exception.ErrorCode;
+import com.omnibooking.exception.IdempotencyConflictException;
+import com.omnibooking.exception.IdempotencyResponseNotReplayableException;
+import com.omnibooking.model.IdempotencyKey;
+import com.omnibooking.repository.infra.IdempotencyKeyRepository;
 import com.omnibooking.util.SecurityUtils;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
@@ -15,14 +21,14 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -33,9 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.contains;
-
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
@@ -43,10 +47,13 @@ import static org.mockito.Mockito.never;
 public class IdempotencyAspectTest {
 
    @Mock
-   private StringRedisTemplate redisTemplate;
+   private IdempotencyKeyRepository idempotencyKeyRepository;
 
    @Mock
-   private ValueOperations<String, String> valueOperations;
+   private MeterRegistry meterRegistry;
+
+   @Mock
+   private Counter counter;
 
    private ObjectMapper objectMapper;
 
@@ -75,13 +82,12 @@ public class IdempotencyAspectTest {
    @BeforeEach
    void setUp() {
       closeable = MockitoAnnotations.openMocks(this);
-      when(redisTemplate.opsForValue()).thenReturn(valueOperations);
       objectMapper = new ObjectMapper();
 
-      idempotencyAspect = new IdempotencyAspect(redisTemplate, objectMapper);
+      when(meterRegistry.counter(anyString())).thenReturn(counter);
 
-      // Instantiate annotation as an anonymous class to avoid Mockito proxying issues
-      // with annotations
+      idempotencyAspect = new IdempotencyAspect(idempotencyKeyRepository, objectMapper, meterRegistry);
+
       idempotentAnnotation = new Idempotent() {
          @Override
          public Class<? extends Annotation> annotationType() {
@@ -119,6 +125,7 @@ public class IdempotencyAspectTest {
 
    @Test
    void shouldThrowExceptionWhenIdempotencyKeyIsMissing() {
+      when(request.getHeader("Idempotency-Key")).thenReturn(null);
       when(request.getHeader("X-Idempotency-Key")).thenReturn(null);
 
       AppException exception = assertThrows(AppException.class,
@@ -130,17 +137,14 @@ public class IdempotencyAspectTest {
    @Test
    void shouldProceedAndCacheResponseForNewRequestWithResponseEntity() throws Throwable {
       String key = "test-key-1";
-      UUID userId = UUID.randomUUID();
-      when(request.getHeader("X-Idempotency-Key")).thenReturn(key);
+      when(request.getHeader("Idempotency-Key")).thenReturn(key);
       when(request.getMethod()).thenReturn("POST");
       when(request.getRequestURI()).thenReturn("/api/test");
-      mockedSecurityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(userId);
 
-      String expectedRedisKey = "idempotency:POST:/api/test:" + userId + ":" + key;
-
-      // Lock succeeds (is new key)
-      when(valueOperations.setIfAbsent(eq(expectedRedisKey), eq("PROCESSING"), anyLong(), any(TimeUnit.class)))
-            .thenReturn(true);
+      // Mock insert succeeds (inserted = 1)
+      when(idempotencyKeyRepository.insertIdempotencyKey(any(UUID.class), eq(key), eq("POST /api/test"), anyString(),
+            any(Instant.class), any(Instant.class)))
+            .thenReturn(1);
 
       // Business logic returns ResponseEntity
       ResponseEntity<String> businessResult = ResponseEntity.ok("Success Body");
@@ -154,28 +158,40 @@ public class IdempotencyAspectTest {
       assertTrue(result instanceof ResponseEntity);
       assertEquals(businessResult, result);
 
-      // Verify stored in Redis with CacheValue format
-      verify(valueOperations).set(eq(expectedRedisKey), contains("\"statusCode\":200"), eq(24L), eq(TimeUnit.HOURS));
+      // Verify stored in DB
+      verify(idempotencyKeyRepository).findById(any(UUID.class));
    }
 
    @Test
    void shouldReturnCachedResponseEntityForDuplicateRequest() throws Throwable {
       String key = "test-key-2";
-      UUID userId = UUID.randomUUID();
-      when(request.getHeader("X-Idempotency-Key")).thenReturn(key);
+      when(request.getHeader("Idempotency-Key")).thenReturn(key);
       when(request.getMethod()).thenReturn("POST");
       when(request.getRequestURI()).thenReturn("/api/test");
-      mockedSecurityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(userId);
 
-      String expectedRedisKey = "idempotency:POST:/api/test:" + userId + ":" + key;
+      // Mock insert fails (inserted = 0)
+      when(idempotencyKeyRepository.insertIdempotencyKey(any(UUID.class), eq(key), eq("POST /api/test"), anyString(),
+            any(Instant.class), any(Instant.class)))
+            .thenReturn(0);
 
-      // Lock fails (key already exists)
-      when(valueOperations.setIfAbsent(eq(expectedRedisKey), eq("PROCESSING"), anyLong(), any(TimeUnit.class)))
-            .thenReturn(false);
+      // Hash is match (computeRequestHash will return empty string or "hash-failed"
+      // on mock exceptions, let's say "hash-failed")
+      IdempotencyKey existingKey = IdempotencyKey.builder()
+            .id(UUID.randomUUID())
+            .idempotencyKey(key)
+            .endpoint("POST /api/test")
+            .requestHash("hash-failed")
+            .processingStatus("COMPLETED")
+            .responseStatus(202)
+            .responsePayload("\"Cached Data\"")
+            .responseCached(true)
+            .createdAt(Instant.now())
+            .expiresAt(Instant.now().plusSeconds(3600))
+            .processingStartedAt(Instant.now())
+            .build();
 
-      // Cached response exists
-      String cachedJson = "{\"statusCode\":202,\"body\":\"\\\"Cached Data\\\"\",\"responseEntity\":true}";
-      when(valueOperations.get(expectedRedisKey)).thenReturn(cachedJson);
+      when(idempotencyKeyRepository.findByIdempotencyKeyAndEndpoint(key, "POST /api/test"))
+            .thenReturn(Optional.of(existingKey));
 
       // Setup reflection signature
       Method dummyMethod = this.getClass().getMethod("dummyResponseEntityMethod");
@@ -197,17 +213,27 @@ public class IdempotencyAspectTest {
    @Test
    void shouldThrowProcessingExceptionWhenRequestIsAlreadyProcessing() throws Throwable {
       String key = "test-key-3";
-      UUID userId = UUID.randomUUID();
-      when(request.getHeader("X-Idempotency-Key")).thenReturn(key);
+      when(request.getHeader("Idempotency-Key")).thenReturn(key);
       when(request.getMethod()).thenReturn("POST");
       when(request.getRequestURI()).thenReturn("/api/test");
-      mockedSecurityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(userId);
 
-      String expectedRedisKey = "idempotency:POST:/api/test:" + userId + ":" + key;
+      when(idempotencyKeyRepository.insertIdempotencyKey(any(UUID.class), eq(key), eq("POST /api/test"), anyString(),
+            any(Instant.class), any(Instant.class)))
+            .thenReturn(0);
 
-      when(valueOperations.setIfAbsent(eq(expectedRedisKey), eq("PROCESSING"), anyLong(), any(TimeUnit.class)))
-            .thenReturn(false);
-      when(valueOperations.get(expectedRedisKey)).thenReturn("PROCESSING");
+      IdempotencyKey existingKey = IdempotencyKey.builder()
+            .id(UUID.randomUUID())
+            .idempotencyKey(key)
+            .endpoint("POST /api/test")
+            .requestHash("hash-failed")
+            .processingStatus("PROCESSING")
+            .createdAt(Instant.now())
+            .expiresAt(Instant.now().plusSeconds(3600))
+            .processingStartedAt(Instant.now()) // Not stale yet
+            .build();
+
+      when(idempotencyKeyRepository.findByIdempotencyKeyAndEndpoint(key, "POST /api/test"))
+            .thenReturn(Optional.of(existingKey));
 
       AppException exception = assertThrows(AppException.class,
             () -> idempotencyAspect.handleIdempotency(joinPoint, idempotentAnnotation));
@@ -217,31 +243,62 @@ public class IdempotencyAspectTest {
    }
 
    @Test
-   void shouldDeleteKeyAndThrowWhenBusinessLogicFails() throws Throwable {
+   void shouldThrowConflictExceptionWhenRequestHashDiffers() throws Throwable {
       String key = "test-key-4";
-      UUID userId = UUID.randomUUID();
-      when(request.getHeader("X-Idempotency-Key")).thenReturn(key);
+      when(request.getHeader("Idempotency-Key")).thenReturn(key);
       when(request.getMethod()).thenReturn("POST");
       when(request.getRequestURI()).thenReturn("/api/test");
-      mockedSecurityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(userId);
 
-      String expectedRedisKey = "idempotency:POST:/api/test:" + userId + ":" + key;
+      when(idempotencyKeyRepository.insertIdempotencyKey(any(UUID.class), eq(key), eq("POST /api/test"), anyString(),
+            any(Instant.class), any(Instant.class)))
+            .thenReturn(0);
 
-      when(valueOperations.setIfAbsent(eq(expectedRedisKey), eq("PROCESSING"), anyLong(), any(TimeUnit.class)))
-            .thenReturn(true);
+      IdempotencyKey existingKey = IdempotencyKey.builder()
+            .id(UUID.randomUUID())
+            .idempotencyKey(key)
+            .endpoint("POST /api/test")
+            .requestHash("different-hash") // Does not match "hash-failed"
+            .processingStatus("COMPLETED")
+            .build();
 
-      RuntimeException exception = new RuntimeException("DB Connection Failed");
-      when(joinPoint.proceed()).thenThrow(exception);
+      when(idempotencyKeyRepository.findByIdempotencyKeyAndEndpoint(key, "POST /api/test"))
+            .thenReturn(Optional.of(existingKey));
 
-      // Execute
-      RuntimeException thrown = assertThrows(RuntimeException.class,
+      assertThrows(IdempotencyConflictException.class,
             () -> idempotencyAspect.handleIdempotency(joinPoint, idempotentAnnotation));
 
-      assertEquals("DB Connection Failed", thrown.getMessage());
-      verify(redisTemplate).delete(expectedRedisKey);
+      verify(joinPoint, never()).proceed();
    }
 
-   // Helper methods for reflection tests
+   @Test
+   void shouldThrowResponseNotReplayableWhenResponseCachedIsFalse() throws Throwable {
+      String key = "test-key-5";
+      when(request.getHeader("Idempotency-Key")).thenReturn(key);
+      when(request.getMethod()).thenReturn("POST");
+      when(request.getRequestURI()).thenReturn("/api/test");
+
+      when(idempotencyKeyRepository.insertIdempotencyKey(any(UUID.class), eq(key), eq("POST /api/test"), anyString(),
+            any(Instant.class), any(Instant.class)))
+            .thenReturn(0);
+
+      IdempotencyKey existingKey = IdempotencyKey.builder()
+            .id(UUID.randomUUID())
+            .idempotencyKey(key)
+            .endpoint("POST /api/test")
+            .requestHash("hash-failed")
+            .processingStatus("COMPLETED")
+            .responseCached(false) // Not replayable
+            .build();
+
+      when(idempotencyKeyRepository.findByIdempotencyKeyAndEndpoint(key, "POST /api/test"))
+            .thenReturn(Optional.of(existingKey));
+
+      assertThrows(IdempotencyResponseNotReplayableException.class,
+            () -> idempotencyAspect.handleIdempotency(joinPoint, idempotentAnnotation));
+
+      verify(joinPoint, never()).proceed();
+   }
+
    public ResponseEntity<String> dummyResponseEntityMethod() {
       return null;
    }
