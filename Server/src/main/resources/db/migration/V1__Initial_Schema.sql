@@ -108,7 +108,9 @@ CREATE TABLE IF NOT EXISTS registration_inbox (
    retry_count INTEGER NOT NULL DEFAULT 0,
    last_error TEXT,
    next_retry_at TIMESTAMP WITH TIME ZONE,
-   processed_at TIMESTAMP WITH TIME ZONE
+   processed_at TIMESTAMP WITH TIME ZONE,
+   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+   processing_started_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS registration_dlt (
@@ -120,7 +122,8 @@ CREATE TABLE IF NOT EXISTS registration_dlt (
    original_error TEXT,
    status VARCHAR(20) NOT NULL, -- PENDING, REPLAYED, FAILED
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-   last_replayed_at TIMESTAMP WITH TIME ZONE
+   last_replayed_at TIMESTAMP WITH TIME ZONE,
+   CONSTRAINT uq_reg_dlt_partition_offset UNIQUE (partition_id, offset_val)
 );
 
 CREATE TABLE IF NOT EXISTS registration_dlt_audit (
@@ -162,6 +165,31 @@ CREATE TABLE IF NOT EXISTS coupon_release_retries (
    next_attempt_at TIMESTAMP NOT NULL,
    status VARCHAR(20) NOT NULL,
    created_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+   id UUID PRIMARY KEY,
+   idempotency_key VARCHAR(255) NOT NULL,
+   endpoint VARCHAR(255) NOT NULL,
+   request_hash VARCHAR(255) NOT NULL,
+   response_payload JSONB,
+   response_status INTEGER,
+   processing_status VARCHAR(50) NOT NULL,
+   response_cached BOOLEAN NOT NULL DEFAULT TRUE,
+   created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   processing_started_at TIMESTAMP WITH TIME ZONE NOT NULL,
+   CONSTRAINT uq_endpoint_idempotency_key UNIQUE (endpoint, idempotency_key)
+);
+
+CREATE TABLE IF NOT EXISTS payment_events (
+   id UUID PRIMARY KEY,
+   transaction_id UUID,
+   booking_id UUID,
+   event_type VARCHAR(50) NOT NULL,
+   event_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+   metadata JSONB,
+   version BIGINT DEFAULT 0
 );
 
 -- 2. Dependent Tables (With Foreign Keys)
@@ -270,7 +298,8 @@ CREATE TABLE IF NOT EXISTS room_availability (
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    deleted_at TIMESTAMP WITH TIME ZONE,
-   UNIQUE (room_type_id, availability_date)
+   UNIQUE (room_type_id, availability_date),
+   CONSTRAINT chk_room_availability_count CHECK (available_count >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS bookings (
@@ -332,7 +361,8 @@ CREATE TABLE IF NOT EXISTS inventory_operations (
    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
    deleted_at TIMESTAMP WITH TIME ZONE,
-   version BIGINT DEFAULT 0
+   version BIGINT DEFAULT 0,
+   CONSTRAINT uq_inventory_ops_booking_date_type UNIQUE (booking_id, availability_date, operation_type)
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
@@ -343,13 +373,17 @@ CREATE TABLE IF NOT EXISTS transactions (
    payment_method VARCHAR(50), -- STRIPE, PAYPAL, MOMO, VNPAY, BANK_TRANSFER
    status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING, SUCCESS, FAILED, VOIDED
    provider_transaction_id VARCHAR(255),
+   provider_order_id VARCHAR(255),
+   local_amount DECIMAL(19, 4),
+   local_currency VARCHAR(3),
    metadata JSONB,
    version BIGINT DEFAULT 0,
    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
    deleted_at TIMESTAMP WITH TIME ZONE,
 
-   CONSTRAINT uq_transactions_provider_tx_id UNIQUE (provider_transaction_id)
+   CONSTRAINT uq_transactions_provider_order_id UNIQUE (payment_method, provider_order_id),
+   CONSTRAINT uq_transactions_provider_tx_id UNIQUE (payment_method, provider_transaction_id)
 );
 
 CREATE TABLE IF NOT EXISTS media (
@@ -462,6 +496,7 @@ CREATE TABLE IF NOT EXISTS partner_legal_profiles (
    business_registration_number VARCHAR(255) NOT NULL,
    tax_code VARCHAR(255) NOT NULL,
    legal_owner_name VARCHAR(255) NOT NULL,
+   profile_search_hash VARCHAR(255),
    is_active BOOLEAN NOT NULL DEFAULT TRUE,
    version BIGINT NOT NULL DEFAULT 0,
    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -616,12 +651,20 @@ CREATE INDEX idx_room_availability_date ON room_availability(availability_date);
 CREATE INDEX idx_bookings_user_id ON bookings(user_id);
 CREATE INDEX idx_bookings_status ON bookings(status);
 CREATE INDEX idx_bookings_check_in ON bookings(check_in_date);
+CREATE INDEX IF NOT EXISTS idx_bookings_check_out_date ON bookings(check_out_date);
+CREATE INDEX IF NOT EXISTS idx_bookings_status_expires_at ON bookings(status, expires_at);
 CREATE INDEX idx_bookings_guest_phone_search_hash ON bookings(guest_phone_search_hash);
 CREATE INDEX idx_transactions_booking_id ON transactions(booking_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_provider_order_id ON transactions(provider_order_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_provider_transaction_id ON transactions(provider_transaction_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_booking_id_status ON transactions(booking_id, status);
+CREATE INDEX IF NOT EXISTS idx_payment_events_transaction_id ON payment_events(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_payment_events_booking_id ON payment_events(booking_id);
 CREATE INDEX idx_coupons_code ON coupons(code);
 CREATE INDEX idx_media_entity ON media(entity_id, entity_type);
 
 CREATE INDEX idx_outbox_processing ON outbox_events(status, next_retry_at) WHERE status IN ('PENDING', 'PROCESSING');
+CREATE INDEX idx_idempotency_keys_expires_at ON idempotency_keys (expires_at);
 CREATE INDEX idx_social_accounts_user_id ON social_accounts(user_id);
 CREATE INDEX idx_social_accounts_provider_id ON social_accounts(provider, provider_id);
 CREATE INDEX idx_search_logs_query ON search_logs(query_text);
@@ -632,6 +675,7 @@ CREATE UNIQUE INDEX idx_user_passkeys_credential_id_active ON user_passkeys(cred
 
 CREATE INDEX idx_user_two_factor_user_id ON user_two_factor(user_id);
 CREATE INDEX idx_partner_legal_profiles_partner_active ON partner_legal_profiles(partner_id, is_active);
+CREATE UNIQUE INDEX uq_partner_profile_hash ON partner_legal_profiles (partner_id, profile_search_hash);
 CREATE INDEX IF NOT EXISTS idx_processed_events_time ON processed_events(processed_at);
 
 -- Registration inbox & DLT indexes

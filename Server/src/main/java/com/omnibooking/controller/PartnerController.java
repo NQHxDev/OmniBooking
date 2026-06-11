@@ -1,17 +1,12 @@
 package com.omnibooking.controller;
 
-import com.omnibooking.constant.EventConstants;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.security.UserPrincipal;
-import com.omnibooking.services.communication.MailService;
-import com.omnibooking.services.core.OutboxService;
-import com.omnibooking.repository.user.UserProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,7 +20,6 @@ import com.omnibooking.dto.PartnerStatsResponse;
 import com.omnibooking.dto.PartnerBookingResponse;
 import com.omnibooking.dto.AuthResponse;
 import com.omnibooking.util.CookieUtils;
-import com.omnibooking.util.OtpUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -33,7 +27,6 @@ import java.util.List;
 
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/partner")
@@ -41,15 +34,9 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class PartnerController {
 
-   private final MailService mailService;
-
    private final StringRedisTemplate redisTemplate;
 
-   private final UserProfileRepository userProfileRepository;
-
    private final AuthService authService;
-
-   private final OutboxService outboxService;
 
    private final PartnerService partnerService;
 
@@ -67,7 +54,6 @@ public class PartnerController {
       return ResponseEntity.ok(ApiResponse.success(stats, "Lấy thống kê đối tác thành công", requestId));
    }
 
-   @Transactional
    @PostMapping("/send-otp")
    public ResponseEntity<ApiResponse<Void>> sendOtp(
          @AuthenticationPrincipal UserPrincipal principal,
@@ -79,46 +65,13 @@ public class PartnerController {
       String email = principal.getEmail();
       UUID userId = Objects.requireNonNull(principal.getId(), "User ID cannot be null");
 
-      // Fetch full name from profile
-      String fullName = userProfileRepository.findById(userId)
-            .map(profile -> profile.getDisplayName())
-            .orElse(principal.getUsername());
+      boolean sent = partnerService.sendPartnerOtp(userId, email, principal.getUsername());
 
-      // Cooldown check (prevent sending multiple emails within 30 seconds)
-      String lockKey = "otp:lock:" + userId;
-      Boolean isLocked = redisTemplate.hasKey(lockKey);
-      if (Boolean.TRUE.equals(isLocked)) {
-         log.warn("Partner OTP request ignored due to cooldown for user: {}", userId);
-         return ResponseEntity
-               .ok(ApiResponse.success(null, "Mã xác thực đã được gửi, vui lòng kiểm tra email", requestId));
-      }
+      String message = sent
+            ? "Mã xác thực đã được gửi đến email của bạn"
+            : "Mã xác thực đã được gửi, vui lòng kiểm tra email";
 
-      // Generate Alphanumeric OTP (A0A000 pattern)
-      String otpCode = OtpUtils.generateAlphanumericOtp();
-
-      // Store in Redis (valid for 10 minutes)
-      String redisKey = "otp:partner:" + userId;
-
-      // Use requireNonNull to satisfy strict null safety checks
-      Objects.requireNonNull(redisKey, "Redis key cannot be null");
-      Objects.requireNonNull(otpCode, "OTP code cannot be null");
-
-      redisTemplate.opsForValue().set(redisKey, otpCode, 10, TimeUnit.MINUTES);
-
-      // Set cooldown lock (30 seconds)
-      redisTemplate.opsForValue().set(lockKey, "locked", 30, TimeUnit.SECONDS);
-
-      // Record in Outbox instead of sending directly
-      com.omnibooking.dto.event.EmailEvent emailEvent = mailService.buildPartnerOtpEmailEvent(email, fullName, otpCode);
-      outboxService.saveEvent(
-            userId,
-            "PARTNER",
-            EventConstants.PARTNER_OTP_SEND,
-            emailEvent);
-
-      log.info("Partner OTP recorded in outbox for email: {} (RequestId: {})", email, requestId);
-
-      return ResponseEntity.ok(ApiResponse.success(null, "Mã xác thực đã được gửi đến email của bạn", requestId));
+      return ResponseEntity.ok(ApiResponse.success(null, message, requestId));
    }
 
    @PostMapping("/verify-otp")
@@ -173,7 +126,8 @@ public class PartnerController {
          }
       }
 
-      AuthResponse authResponse = authService.upgradeToPartner(principal.getId(), ip, userAgent, response, rememberMe, sessionId);
+      AuthResponse authResponse = authService.upgradeToPartner(principal.getId(), ip, userAgent, response, rememberMe,
+            sessionId);
 
       log.info("User {} upgraded to partner (RequestId: {})", principal.getId(), requestId);
 

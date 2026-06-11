@@ -20,6 +20,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +30,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,13 +40,22 @@ import java.util.UUID;
 public class BookingExpirationWorker {
 
    private final BookingRepository bookingRepository;
+
    private final BookingStatusLogRepository statusLogRepository;
+
    private final InventoryService inventoryService;
+
    private final CouponReservationService couponReservationService;
+
    private final CouponReleaseRetryService couponReleaseRetryService;
+
    private final BookingConfigProperties config;
+
    private final Counter bookingExpiredCounter;
+
    private final Counter bookingExpirationFailureCounter;
+
+   private final CacheManager cacheManager;
 
    @Autowired
    @Lazy
@@ -145,6 +157,26 @@ public class BookingExpirationWorker {
 
       // Metrics
       bookingExpiredCounter.increment();
+
+      // Evict partner caches
+      try {
+         var owner = booking.getRoomType().getProperty().getOwner();
+         if (owner != null && owner.getId() != null) {
+            Cache bookingsCache = cacheManager.getCache("partner_bookings");
+            if (bookingsCache != null) {
+               bookingsCache.evict(owner.getId());
+               log.info("Evicted partner_bookings cache for partner: {}", owner.getId());
+            }
+            Cache statsCache = cacheManager.getCache("partner_stats");
+            if (statsCache != null) {
+               String currentMonthKey = owner.getId().toString() + ":" + YearMonth.now().toString();
+               statsCache.evict(currentMonthKey);
+               log.info("Evicted partner_stats cache key: {} for partner: {}", currentMonthKey, owner.getId());
+            }
+         }
+      } catch (Exception e) {
+         log.error("Failed to evict partner caches on expiration for booking {}", bookingId, e);
+      }
    }
 
    private void releaseCouponIfPresent(Booking booking) {

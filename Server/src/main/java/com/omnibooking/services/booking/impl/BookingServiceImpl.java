@@ -68,6 +68,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -474,17 +475,8 @@ public class BookingServiceImpl implements BookingService {
                EventConstants.BOOKING_CONFIRMED_MAIL,
                emailEvent);
 
-         // Evict partner bookings list cache to show the new booking on their management
-         // page
-         try {
-            Cache cache = cacheManager.getCache("partner_bookings");
-            if (cache != null) {
-               cache.evict(roomType.getProperty().getOwner().getId());
-               log.info("Evicted partner_bookings cache for partner: {}", roomType.getProperty().getOwner().getId());
-            }
-         } catch (Exception e) {
-            log.error("Failed to evict partner_bookings cache", e);
-         }
+         // Evict partner bookings list and stats cache
+         evictPartnerCaches(roomType.getProperty().getOwner().getId());
       }
 
       bookingCreatedCounter.increment();
@@ -649,18 +641,8 @@ public class BookingServiceImpl implements BookingService {
       // STEP 6: Metrics (only once)
       bookingConfirmedCounter.increment();
 
-      // Evict partner bookings list cache to show the new booking on their management
-      // page
-      try {
-         Cache cache = cacheManager.getCache("partner_bookings");
-         if (cache != null) {
-            cache.evict(booking.getRoomType().getProperty().getOwner().getId());
-            log.info("Evicted partner_bookings cache for partner: {}",
-                  booking.getRoomType().getProperty().getOwner().getId());
-         }
-      } catch (Exception e) {
-         log.error("Failed to evict partner_bookings cache", e);
-      }
+      // Evict partner bookings list and stats cache
+      evictPartnerCaches(booking.getRoomType().getProperty().getOwner().getId());
    }
 
    @Override
@@ -690,6 +672,7 @@ public class BookingServiceImpl implements BookingService {
       }
 
       bookingCancelledCounter.increment();
+      evictPartnerCaches(booking.getRoomType().getProperty().getOwner().getId());
    }
 
    @Override
@@ -777,6 +760,30 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException("BOOKING_001", "Room not available for date: " + availability.getAvailabilityDate(),
                   HttpStatus.BAD_REQUEST);
          }
+      }
+   }
+
+   private void evictPartnerCaches(UUID partnerId) {
+      if (partnerId == null)
+         return;
+      try {
+         Cache bookingsCache = cacheManager.getCache("partner_bookings");
+         if (bookingsCache != null) {
+            bookingsCache.evict(partnerId);
+            log.info("Evicted partner_bookings cache for partner: {}", partnerId);
+         }
+      } catch (Exception e) {
+         log.error("Failed to evict partner_bookings cache", e);
+      }
+      try {
+         Cache statsCache = cacheManager.getCache("partner_stats");
+         if (statsCache != null) {
+            String currentMonthKey = partnerId.toString() + ":" + YearMonth.now().toString();
+            statsCache.evict(currentMonthKey);
+            log.info("Evicted partner_stats cache key: {} for partner: {}", currentMonthKey, partnerId);
+         }
+      } catch (Exception e) {
+         log.error("Failed to evict partner_stats cache", e);
       }
    }
 

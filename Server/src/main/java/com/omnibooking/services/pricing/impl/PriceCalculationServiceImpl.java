@@ -23,7 +23,10 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -235,6 +238,62 @@ public class PriceCalculationServiceImpl implements PriceCalculationService {
          discount = totalStayPrice;
       }
       return discount;
+   }
+
+   @Override
+   public Map<UUID, BigDecimal> calculateStayPricesForRoomTypes(UUID propertyId, List<UUID> roomTypeIds,
+         LocalDate checkIn, LocalDate checkOut, int guestCount) {
+      if (roomTypeIds == null || roomTypeIds.isEmpty()) {
+         return Collections.emptyMap();
+      }
+      if (checkOut.isBefore(checkIn) || checkOut.isEqual(checkIn)) {
+         throw new IllegalArgumentException("Check-out date must be after check-in date");
+      }
+
+      List<RoomType> roomTypes = roomTypeRepository.findAllById(roomTypeIds);
+      for (RoomType rt : roomTypes) {
+         if (!rt.getProperty().getId().equals(propertyId)) {
+            throw new IllegalArgumentException("Room type " + rt.getId() + " does not belong to the specified property");
+         }
+      }
+
+      List<PriceRule> rules = priceRuleRepository.findByPropertyIdAndIsActiveTrue(propertyId);
+      List<RoomAvailability> availabilities = roomAvailabilityRepository
+            .findByRoomTypeIdsAndAvailabilityDateRange(roomTypeIds, checkIn, checkOut);
+
+      Map<UUID, List<RoomAvailability>> availabilityMap = availabilities.stream()
+            .collect(Collectors.groupingBy(a -> a.getRoomType().getId()));
+
+      List<LocalDate> stayDates = checkIn.datesUntil(checkOut).collect(Collectors.toList());
+      Map<UUID, BigDecimal> resultPriceMap = new HashMap<>();
+
+      for (RoomType roomType : roomTypes) {
+         UUID roomTypeId = roomType.getId();
+         List<PriceRule> applicableRulesForRoom = rules.stream()
+               .filter(r -> r.getRoomType() == null || r.getRoomType().getId().equals(roomTypeId))
+               .collect(Collectors.toList());
+
+         List<RoomAvailability> roomAvailabilities = availabilityMap.getOrDefault(roomTypeId, List.of());
+         Map<LocalDate, BigDecimal> priceOverrides = roomAvailabilities.stream()
+               .filter(a -> a.getPriceOverride() != null)
+               .collect(Collectors.toMap(RoomAvailability::getAvailabilityDate, RoomAvailability::getPriceOverride));
+
+         BigDecimal totalFinal = BigDecimal.ZERO;
+         for (LocalDate date : stayDates) {
+            BigDecimal basePrice = priceOverrides.getOrDefault(date, roomType.getBasePrice());
+
+            PricingEngine.PricingResult result = pricingEngine.calculatePrice(
+                  applicableRulesForRoom,
+                  date,
+                  basePrice,
+                  guestCount);
+
+            totalFinal = totalFinal.add(result.finalPrice());
+         }
+         resultPriceMap.put(roomTypeId, totalFinal);
+      }
+
+      return resultPriceMap;
    }
 
 }

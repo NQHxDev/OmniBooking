@@ -84,14 +84,31 @@ generate-mock-users:
 # Docker Development (Local Infrastructure)
 .PHONY: docker-infra
 docker-infra:
-	@echo "Starting infrastructure..."
+	@echo "Starting minimal development infrastructure (DB, Redis, Kafka, ES)..."
+	@docker-compose -p omnibooking-dev --env-file env/.env up -d db redis kafka elasticsearch
+	@echo "Waiting for Elasticsearch to be ready..."
+	@until [ "$$(docker inspect --format='{{.State.Health.Status}}' omnibooking-elastic)" = "healthy" ]; do \
+		printf '.'; \
+		sleep 2; \
+	done
+	@echo "\nMinimal infrastructure is Ready..."
+
+.PHONY: docker-infra-full
+docker-infra-full:
+	@echo "Starting full development infrastructure..."
 	@docker-compose -p omnibooking-dev --env-file env/.env up -d db redis kafka kafdrop elasticsearch kibana prometheus grafana
 	@echo "Waiting for Elasticsearch to be ready..."
 	@until [ "$$(docker inspect --format='{{.State.Health.Status}}' omnibooking-elastic)" = "healthy" ]; do \
 		printf '.'; \
 		sleep 2; \
 	done
-	@echo "\nInfrastructure (DB, Redis, Kafka, ES, Prometheus, Grafana) is Ready..."
+	@echo "\nFull infrastructure is Ready..."
+
+.PHONY: docker-infra-tools
+docker-infra-tools:
+	@echo "Starting optional tools (Kafdrop, Kibana, Prometheus, Grafana)..."
+	@docker-compose -p omnibooking-dev --env-file env/.env up -d kafdrop kibana prometheus grafana
+	@echo "Tools are started..."
 
 .PHONY: docker-stop
 docker-stop:
@@ -241,10 +258,12 @@ help:
 	@echo "    make seed-db       - Generate mock-users.json and run Server with --seed argument"
 	@echo ""
 	@echo "  Docker Development (Local Infrastructure):"
-	@echo "    make docker-infra  - Start DB, Redis, Kafka, ES, etc. in Docker"
-	@echo "    make docker-stop   - Stop development infrastructure services"
-	@echo "    make docker-down   - Stop and clean development infrastructure (remove volumes)"
-	@echo "    make docker-restart - Rebuild and restart development infrastructure"
+	@echo "    make docker-infra       - Start minimal DB, Redis, Kafka, ES in Docker"
+	@echo "    make docker-infra-full  - Start full infrastructure (including monitoring/UIs)"
+	@echo "    make docker-infra-tools - Start optional tools (Kafdrop, Kibana, Prometheus, Grafana)"
+	@echo "    make docker-stop        - Stop development infrastructure services"
+	@echo "    make docker-down        - Stop and clean development infrastructure (remove volumes)"
+	@echo "    make docker-restart     - Rebuild and restart development infrastructure"
 	@echo "  Docker Production Stack:"
 	@echo "    make docker-build  - Build and start all services in Production Docker"
 	@echo "    make docker-rebuild - Stop, rebuild, and restart Production Docker services (optimal)"

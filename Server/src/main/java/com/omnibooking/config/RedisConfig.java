@@ -17,6 +17,7 @@ import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import com.omnibooking.services.pricing.PriceCalculationService.StayPriceResult;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -78,7 +79,10 @@ public class RedisConfig {
       mapper.registerModule(new JavaTimeModule());
       mapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
       mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
+      mapper.activateDefaultTyping(
+            mapper.getPolymorphicTypeValidator(),
+            ObjectMapper.DefaultTyping.NON_FINAL,
+            JsonTypeInfo.As.PROPERTY);
       return mapper;
    }
 

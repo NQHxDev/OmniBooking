@@ -34,6 +34,9 @@ public class PartnerLegalProfile extends BaseEntity {
    @Column(name = "legal_owner_name", nullable = false, length = 255)
    private String legalOwnerName;
 
+   @Column(name = "profile_search_hash", length = 255)
+   private String profileSearchHash;
+
    @Builder.Default
    @Column(name = "is_active", nullable = false)
    private Boolean isActive = true;

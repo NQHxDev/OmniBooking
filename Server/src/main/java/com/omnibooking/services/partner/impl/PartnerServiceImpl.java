@@ -1,6 +1,7 @@
 package com.omnibooking.services.partner.impl;
 
 import com.omnibooking.dto.PartnerStatsResponse;
+import com.omnibooking.dto.event.EmailEvent;
 import com.omnibooking.model.Booking;
 import com.omnibooking.model.enums.BookingStatus;
 import com.omnibooking.model.enums.ReviewStatus;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -25,6 +27,13 @@ import com.omnibooking.dto.PartnerBookingResponse;
 import com.omnibooking.repository.property.ReviewRepository;
 import com.omnibooking.services.core.EncryptionService;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import com.omnibooking.repository.user.UserProfileRepository;
+import com.omnibooking.services.communication.MailService;
+import com.omnibooking.services.core.OutboxService;
+import com.omnibooking.util.OtpUtils;
+import com.omnibooking.constant.EventConstants;
+import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -37,8 +46,17 @@ public class PartnerServiceImpl implements PartnerService {
 
    private final EncryptionService encryptionService;
 
+   private final StringRedisTemplate redisTemplate;
+
+   private final UserProfileRepository userProfileRepository;
+
+   private final MailService mailService;
+
+   private final OutboxService outboxService;
+
    @Override
    @Transactional(readOnly = true)
+   @Cacheable(value = "partner_stats", key = "#partnerId.toString() + ':' + T(java.time.YearMonth).now().toString()", sync = true)
    public PartnerStatsResponse getPartnerStats(UUID partnerId) {
       log.info("Calculating partner stats for partner: {}", partnerId);
 
@@ -115,8 +133,34 @@ public class PartnerServiceImpl implements PartnerService {
                .setScale(1, RoundingMode.HALF_UP)
                .doubleValue();
       }
+
+      ZoneId zone = ZoneId.systemDefault();
+      Instant currentMonthStart = startOfCurrentMonth.atStartOfDay(zone).toInstant();
+      Instant currentMonthEnd = now.atTime(23, 59, 59, 999999999).atZone(zone).toInstant();
+      Instant previousMonthStart = startOfPreviousMonth.atStartOfDay(zone).toInstant();
+      Instant previousMonthEnd = endOfPreviousMonth.atTime(23, 59, 59, 999999999).atZone(zone).toInstant();
+
+      Double currentMonthAvg = reviewRepository.getAverageRatingByOwnerIdAndDateRange(
+            partnerId, ReviewStatus.PUBLISHED, currentMonthStart, currentMonthEnd);
+      Double previousMonthAvg = reviewRepository.getAverageRatingByOwnerIdAndDateRange(
+            partnerId, ReviewStatus.PUBLISHED, previousMonthStart, previousMonthEnd);
+
       String ratingChange = "+0.0";
       boolean ratingUp = true;
+
+      // Option A: If the current month contains no reviews, delta is +0.0
+      if (currentMonthAvg != null) {
+         double baseAvg = previousMonthAvg != null ? previousMonthAvg
+               : (avgRating != null ? avgRating : currentMonthAvg);
+         double diff = currentMonthAvg - baseAvg;
+         if (diff >= 0) {
+            ratingChange = "+" + String.format(Locale.US, "%.1f", diff);
+            ratingUp = true;
+         } else {
+            ratingChange = String.format(Locale.US, "%.1f", diff);
+            ratingUp = false;
+         }
+      }
 
       return PartnerStatsResponse.builder()
             .monthlyRevenue(revenueStr)
@@ -172,7 +216,7 @@ public class PartnerServiceImpl implements PartnerService {
 
    @Override
    @Transactional(readOnly = true)
-   @Cacheable(value = "partner_bookings", key = "#partnerId")
+   @Cacheable(value = "partner_bookings", key = "#partnerId", sync = true)
    public List<PartnerBookingResponse> getPartnerBookings(UUID partnerId) {
       log.info("Fetching and caching bookings list for partner: {}", partnerId);
 
@@ -211,6 +255,36 @@ public class PartnerServiceImpl implements PartnerService {
                .build());
       }
       return response;
+   }
+
+   @Override
+   @Transactional
+   public boolean sendPartnerOtp(UUID userId, String email, String username) {
+      String lockKey = "otp:lock:" + userId;
+      Boolean isLocked = redisTemplate.hasKey(lockKey);
+      if (Boolean.TRUE.equals(isLocked)) {
+         log.warn("Partner OTP request ignored due to cooldown for user: {}", userId);
+         return false;
+      }
+
+      String otpCode = OtpUtils.generateAlphanumericOtp();
+      String redisKey = "otp:partner:" + userId;
+      redisTemplate.opsForValue().set(redisKey, otpCode, 10, TimeUnit.MINUTES);
+      redisTemplate.opsForValue().set(lockKey, "locked", 30, TimeUnit.SECONDS);
+
+      String fullName = userProfileRepository.findById(userId)
+            .map(profile -> profile.getDisplayName())
+            .orElse(username);
+
+      EmailEvent emailEvent = mailService.buildPartnerOtpEmailEvent(email, fullName, otpCode);
+      outboxService.saveEvent(
+            userId,
+            "PARTNER",
+            EventConstants.PARTNER_OTP_SEND,
+            emailEvent);
+
+      log.info("Partner OTP recorded in outbox for email: {}", email);
+      return true;
    }
 
 }

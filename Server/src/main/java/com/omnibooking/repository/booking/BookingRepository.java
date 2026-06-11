@@ -29,7 +29,12 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
    long countByGuestPhoneSearchHash(String phoneSearchHash);
 
-   @Query("SELECT b FROM Booking b WHERE b.roomType.property.owner.id = :ownerId AND b.deletedAt IS NULL")
+   /**
+    * Fetch bookings along with roomType and property.
+    * WARNING: Do NOT add collection fetch joins (e.g. One-to-Many) to this method
+    * to avoid Cartesian product explosion and duplicate rows.
+    */
+   @Query("SELECT b FROM Booking b JOIN FETCH b.roomType rt JOIN FETCH rt.property WHERE rt.property.owner.id = :ownerId AND b.deletedAt IS NULL")
    List<Booking> findAllByPartnerId(@Param("ownerId") UUID ownerId);
 
    /** Atomic expiration — race-safe against concurrent payment callbacks */

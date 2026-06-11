@@ -12,4 +12,6 @@ public interface PartnerService {
 
    List<PartnerBookingResponse> getPartnerBookings(UUID partnerId);
 
+   boolean sendPartnerOtp(UUID userId, String email, String username);
+
 }

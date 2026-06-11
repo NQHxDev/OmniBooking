@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,17 +33,25 @@ public interface ReviewRepository extends JpaRepository<Review, UUID>, JpaSpecif
    @Query("SELECT SUM(r.rating) FROM Review r WHERE r.property.id = :propertyId AND r.deletedAt IS NULL AND r.status = :status")
    Long sumActiveRatingsByPropertyId(@Param("propertyId") UUID propertyId, @Param("status") ReviewStatus status);
 
+   // @formatter:off
    /**
     * Calculates the average rating score for a partner.
     * Business rules:
-    * - Only includes active, published reviews (r.deletedAt IS NULL and status =
-    * PUBLISHED).
-    * - Excludes reviews belonging to soft-deleted properties (r.property.deletedAt
-    * IS NULL).
-    * - Includes reviews belonging to disabled/inactive properties
-    * (r.property.isActive is ignored) to reflect historical reputation.
+    * - Only includes active, published reviews (r.deletedAt IS NULL and status = PUBLISHED).
+    * - Excludes reviews belonging to soft-deleted properties (r.property.deletedAt IS NULL).
+    * - Includes reviews belonging to disabled/inactive properties (r.property.isActive is ignored) to reflect historical reputation.
     */
+   // @formatter:on
    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.property.owner.id = :ownerId AND r.deletedAt IS NULL AND r.property.deletedAt IS NULL AND r.status = :status")
    Double getAverageRatingByOwnerId(@Param("ownerId") UUID ownerId, @Param("status") ReviewStatus status);
+
+   @Query("SELECT AVG(r.rating) FROM Review r WHERE r.property.owner.id = :ownerId " +
+         "AND r.deletedAt IS NULL AND r.property.deletedAt IS NULL AND r.status = :status " +
+         "AND r.createdAt >= :startDate AND r.createdAt <= :endDate")
+   Double getAverageRatingByOwnerIdAndDateRange(
+         @Param("ownerId") UUID ownerId,
+         @Param("status") ReviewStatus status,
+         @Param("startDate") Instant startDate,
+         @Param("endDate") Instant endDate);
 
 }

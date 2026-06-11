@@ -4,6 +4,7 @@ import com.omnibooking.model.Coupon;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface PriceCalculationService {
@@ -13,6 +14,9 @@ public interface PriceCalculationService {
 
    StayPriceResult calculateStayPriceWithCoupon(UUID propertyId, UUID roomTypeId, LocalDate checkIn, LocalDate checkOut,
          int guestCount, String couponCode);
+
+   Map<UUID, BigDecimal> calculateStayPricesForRoomTypes(UUID propertyId, List<UUID> roomTypeIds,
+         LocalDate checkIn, LocalDate checkOut, int guestCount);
 
    BigDecimal calculateCouponDiscount(Coupon coupon, BigDecimal totalStayPrice);
 

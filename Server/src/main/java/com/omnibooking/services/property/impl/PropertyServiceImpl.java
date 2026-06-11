@@ -44,6 +44,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.UUID;
@@ -52,6 +53,8 @@ import java.util.stream.Collectors;
 import java.time.LocalDate;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
+import java.text.Normalizer;
 
 @Slf4j
 @Service
@@ -292,7 +295,7 @@ public class PropertyServiceImpl implements PropertyService {
 
    private List<PropertyResponse> mapToPropertyResponses(List<Property> properties) {
       if (properties.isEmpty()) {
-         return List.of();
+         return new ArrayList<>();
       }
 
       List<UUID> propertyIds = properties.stream().map(Property::getId).toList();
@@ -319,7 +322,7 @@ public class PropertyServiceImpl implements PropertyService {
                      .reviewCount(p.getReviewCount())
                      .build();
             })
-            .toList();
+            .collect(Collectors.toCollection(ArrayList::new));
    }
 
    private String getMainImageUrl(UUID propertyId) {
@@ -355,6 +358,17 @@ public class PropertyServiceImpl implements PropertyService {
             .toList();
    }
 
+   private String normalizeLegalField(String value) {
+      if (value == null) {
+         return "";
+      }
+      String normalized = Normalizer.normalize(value, Normalizer.Form.NFC);
+      return normalized
+            .toLowerCase(Locale.ROOT)
+            .replaceAll("\\s+", " ")
+            .trim();
+   }
+
    private void savePartnerLegalProfile(User partner, String regNum, String taxCode,
          String ownerName) {
       if (regNum == null || regNum.isBlank() ||
@@ -363,29 +377,53 @@ public class PropertyServiceImpl implements PropertyService {
          return;
       }
 
+      String normalizedRegNum = normalizeLegalField(regNum);
+      String normalizedTaxCode = normalizeLegalField(taxCode);
+      String normalizedOwnerName = normalizeLegalField(ownerName);
+      String plainConcat = normalizedRegNum + "|" + normalizedTaxCode + "|" + normalizedOwnerName;
+      String incomingHash = encryptionService.createBlindIndex(plainConcat);
+
       List<PartnerLegalProfile> allProfiles = partnerLegalProfileRepository.findByPartnerId(partner.getId());
       PartnerLegalProfile matchedProfile = null;
 
       for (PartnerLegalProfile profile : allProfiles) {
-         try {
-            String decryptedRegNum = encryptionService.decrypt(profile.getBusinessRegistrationNumber());
-            String decryptedTaxCode = encryptionService.decrypt(profile.getTaxCode());
-            String decryptedOwnerName = encryptionService.decrypt(profile.getLegalOwnerName());
-
-            if (regNum.trim().equalsIgnoreCase(decryptedRegNum.trim()) &&
-                  taxCode.trim().equalsIgnoreCase(decryptedTaxCode.trim()) &&
-                  ownerName.trim().equalsIgnoreCase(decryptedOwnerName.trim())) {
+         if (profile.getProfileSearchHash() != null) {
+            if (profile.getProfileSearchHash().equals(incomingHash)) {
                matchedProfile = profile;
                break;
             }
-         } catch (Exception e) {
-            log.error("Failed to decrypt profile: {}", profile.getId(), e);
+         } else {
+            // Fallback decryption for backward compatibility
+            try {
+               String decryptedRegNum = normalizeLegalField(
+                     encryptionService.decrypt(profile.getBusinessRegistrationNumber()));
+               String decryptedTaxCode = normalizeLegalField(encryptionService.decrypt(profile.getTaxCode()));
+               String decryptedOwnerName = normalizeLegalField(encryptionService.decrypt(profile.getLegalOwnerName()));
+
+               if (normalizedRegNum.equals(decryptedRegNum) &&
+                     normalizedTaxCode.equals(decryptedTaxCode) &&
+                     normalizedOwnerName.equals(decryptedOwnerName)) {
+
+                  // Backfill hash so we don't have to decrypt next time
+                  profile.setProfileSearchHash(incomingHash);
+                  partnerLegalProfileRepository.save(profile);
+
+                  matchedProfile = profile;
+                  break;
+               }
+            } catch (Exception e) {
+               log.error("Failed to decrypt profile for compatibility: {}", profile.getId(), e);
+            }
          }
       }
 
       if (matchedProfile != null) {
          if (Boolean.TRUE.equals(matchedProfile.getIsActive())) {
-            // Already active, do nothing
+            // Already active, check if hash needs update (in case it matched via fallback)
+            if (matchedProfile.getProfileSearchHash() == null) {
+               matchedProfile.setProfileSearchHash(incomingHash);
+               partnerLegalProfileRepository.save(matchedProfile);
+            }
             return;
          }
          // Reactivate the matched profile
@@ -397,6 +435,9 @@ public class PropertyServiceImpl implements PropertyService {
             partnerLegalProfileRepository.save(oldest);
          }
          matchedProfile.setIsActive(true);
+         if (matchedProfile.getProfileSearchHash() == null) {
+            matchedProfile.setProfileSearchHash(incomingHash);
+         }
          partnerLegalProfileRepository.save(matchedProfile);
       } else {
          // Create a new one
@@ -413,6 +454,7 @@ public class PropertyServiceImpl implements PropertyService {
                .businessRegistrationNumber(encryptionService.encrypt(regNum.trim()))
                .taxCode(encryptionService.encrypt(taxCode.trim()))
                .legalOwnerName(encryptionService.encrypt(ownerName.trim()))
+               .profileSearchHash(incomingHash)
                .isActive(true)
                .build();
          partnerLegalProfileRepository.save(newProfile);
@@ -423,7 +465,7 @@ public class PropertyServiceImpl implements PropertyService {
    @Transactional(readOnly = true)
    public PropertyDetailResponse getPropertyDetailForPartner(UUID propertyId, UUID ownerId) {
       Property property = propertyRepository.findById(propertyId)
-            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND)); // Property not found
+            .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
 
       if (!property.getOwner().getId().equals(ownerId)) {
          throw new AppException(ErrorCode.UNAUTHORIZED);
@@ -443,16 +485,21 @@ public class PropertyServiceImpl implements PropertyService {
             ? property.getAmenities().stream().map(Amenity::getName).toList()
             : List.of();
 
-      List<RoomTypeResponse> roomTypes = roomTypeRepository.findByPropertyId(propertyId).stream()
+      List<RoomType> roomTypeList = roomTypeRepository.findByPropertyId(propertyId);
+      List<UUID> roomTypeIds = roomTypeList.stream().map(RoomType::getId).toList();
+      Map<UUID, BigDecimal> currentPrices;
+      try {
+         currentPrices = priceCalculationService.calculateStayPricesForRoomTypes(
+               propertyId, roomTypeIds, LocalDate.now(), LocalDate.now().plusDays(1), 2);
+      } catch (Exception e) {
+         log.error("Failed to calculate batch stay prices for property: {}", propertyId, e);
+         currentPrices = Map.of();
+      }
+
+      final Map<UUID, BigDecimal> finalPrices = currentPrices;
+      List<RoomTypeResponse> roomTypes = roomTypeList.stream()
             .map(r -> {
-               BigDecimal currentPrice;
-               try {
-                  var result = priceCalculationService.calculateStayPrice(r.getProperty().getId(), r.getId(),
-                        LocalDate.now(), LocalDate.now().plusDays(1), 2);
-                  currentPrice = result.totalFinalPrice();
-               } catch (Exception e) {
-                  currentPrice = r.getBasePrice();
-               }
+               BigDecimal currentPrice = finalPrices.getOrDefault(r.getId(), r.getBasePrice());
                return RoomTypeResponse.builder()
                      .id(r.getId())
                      .name(r.getName())
@@ -501,16 +548,21 @@ public class PropertyServiceImpl implements PropertyService {
             ? property.getAmenities().stream().map(Amenity::getName).toList()
             : List.of();
 
-      List<RoomTypeResponse> roomTypes = roomTypeRepository.findByPropertyId(propertyId).stream()
+      List<RoomType> roomTypeList = roomTypeRepository.findByPropertyId(propertyId);
+      List<UUID> roomTypeIds = roomTypeList.stream().map(RoomType::getId).toList();
+      Map<UUID, BigDecimal> currentPrices;
+      try {
+         currentPrices = priceCalculationService.calculateStayPricesForRoomTypes(
+               propertyId, roomTypeIds, LocalDate.now(), LocalDate.now().plusDays(1), 2);
+      } catch (Exception e) {
+         log.error("Failed to calculate batch stay prices for property: {}", propertyId, e);
+         currentPrices = Map.of();
+      }
+
+      final Map<UUID, BigDecimal> finalPrices = currentPrices;
+      List<RoomTypeResponse> roomTypes = roomTypeList.stream()
             .map(r -> {
-               BigDecimal currentPrice;
-               try {
-                  var result = priceCalculationService.calculateStayPrice(r.getProperty().getId(), r.getId(),
-                        LocalDate.now(), LocalDate.now().plusDays(1), 2);
-                  currentPrice = result.totalFinalPrice();
-               } catch (Exception e) {
-                  currentPrice = r.getBasePrice();
-               }
+               BigDecimal currentPrice = finalPrices.getOrDefault(r.getId(), r.getBasePrice());
                return RoomTypeResponse.builder()
                      .id(r.getId())
                      .name(r.getName())
