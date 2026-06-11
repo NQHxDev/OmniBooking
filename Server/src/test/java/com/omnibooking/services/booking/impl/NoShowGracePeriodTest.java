@@ -59,7 +59,8 @@ public class NoShowGracePeriodTest {
       when(config.getNoShowGracePeriodHours()).thenReturn(24);
 
       // @formatter:off
-      // Transition fails because now is within the 24-hour grace period from check-in.
+      // Transition fails because now is within the 24-hour grace period from check-in
+      // @formatter:on
       AppException exception = assertThrows(AppException.class, () -> {
          bookingStateMachine.transition(booking, BookingStatus.NO_SHOW, "No show test", user);
       });

@@ -55,6 +55,7 @@ import com.omnibooking.services.booking.BookingStateMachine;
 import com.omnibooking.services.booking.InventoryService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.f4b6a3.uuid.UuidCreator;
 import com.omnibooking.config.BookingConfigProperties;
 import com.omnibooking.model.PriceRuleVersion;
 import io.micrometer.core.instrument.Counter;
@@ -68,6 +69,7 @@ import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -166,6 +168,8 @@ public class BookingServiceImpl implements BookingService {
 
       RoomType roomType = roomTypeRepository.findById(request.getRoomTypeId())
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Room type not found"));
+
+      checkQuickAvailability(roomType, request.getCheckInDate(), request.getCheckOutDate(), request.getNumRooms());
 
       // Resolve User (Logged in vs. Guest)
       User user = null;
@@ -328,11 +332,15 @@ public class BookingServiceImpl implements BookingService {
          booking.setExpiresAt(Instant.now().plus(bookingConfig.getHoldDurationMinutes(), ChronoUnit.MINUTES));
       }
 
+      // Room Availability Check & Locks (Deduct first to hold locks, ensuring
+      // correctness before booking is saved)
+      inventoryService.deductInventoryOnly(roomType, request.getCheckInDate(), request.getCheckOutDate(),
+            request.getNumRooms());
+
       booking = bookingRepository.saveAndFlush(booking);
 
-      // Room Availability Check & Locks (delegated to InventoryService after booking
-      // is saved)
-      inventoryService.reserveInventory(booking, roomType, request.getCheckInDate(), request.getCheckOutDate(),
+      // Write Reserve Audit Log after booking is saved (having a valid database ID)
+      inventoryService.writeReserveAuditLog(booking, roomType, request.getCheckInDate(), request.getCheckOutDate(),
             request.getNumRooms());
 
       // Collect all rule IDs for batch load
@@ -346,7 +354,11 @@ public class BookingServiceImpl implements BookingService {
             .stream()
             .collect(Collectors.toMap(v -> v.getPriceRule().getId(), v -> v));
 
-      // Save Booking Price Breakdown and Applied Rule Versions
+      // Save Booking Price Breakdown and Applied Rule Versions using optimized
+      // saveAll batch inserts
+      List<BookingPriceBreakdown> breakdowns = new ArrayList<>();
+      List<BookingAppliedRuleVersion> appliedRuleVersions = new ArrayList<>();
+
       for (var dp : stayPrice.dailyPrices()) {
          BigDecimal dayBase = dp.basePrice().multiply(numRoomsDec);
          BigDecimal daySeasonal = dp.seasonalAdjustment().multiply(numRoomsDec);
@@ -356,7 +368,9 @@ public class BookingServiceImpl implements BookingService {
          BigDecimal dayFinal = dp.finalPrice().multiply(numRoomsDec);
          BigDecimal dayDiscount = preCouponDayPrice.subtract(dayFinal);
 
+         UUID breakdownId = UuidCreator.getTimeOrderedEpoch();
          BookingPriceBreakdown breakdown = BookingPriceBreakdown.builder()
+               .id(breakdownId)
                .booking(booking)
                .stayDate(dp.date())
                .basePrice(dayBase)
@@ -368,8 +382,7 @@ public class BookingServiceImpl implements BookingService {
                .appliedCouponId(coupon != null ? coupon.getId() : null)
                .appliedCouponCode(coupon != null ? coupon.getCode() : null)
                .build();
-
-         breakdown = bookingPriceBreakdownRepository.save(breakdown);
+         breakdowns.add(breakdown);
 
          for (UUID ruleId : dp.appliedRuleIds()) {
             PriceRuleVersion ruleVer = latestVersions.get(ruleId);
@@ -391,16 +404,21 @@ public class BookingServiceImpl implements BookingService {
                }
 
                if (ruleAdjustment.compareTo(BigDecimal.ZERO) != 0) {
+                  UUID appliedRuleId = UuidCreator.getTimeOrderedEpoch();
                   BookingAppliedRuleVersion appliedRuleVer = BookingAppliedRuleVersion.builder()
+                        .id(appliedRuleId)
                         .bookingPriceBreakdown(breakdown)
                         .priceRuleVersion(ruleVer)
                         .adjustmentAmount(ruleAdjustment)
                         .build();
-                  bookingAppliedRuleVersionRepository.save(appliedRuleVer);
+                  appliedRuleVersions.add(appliedRuleVer);
                }
             }
          }
       }
+
+      bookingPriceBreakdownRepository.saveAll(breakdowns);
+      bookingAppliedRuleVersionRepository.saveAll(appliedRuleVersions);
 
       // Create Booking Status Log
       BookingStatusLog logEntry = BookingStatusLog.builder()
@@ -745,6 +763,20 @@ public class BookingServiceImpl implements BookingService {
       } else {
          NumberFormat nf = NumberFormat.getCurrencyInstance(Locale.US);
          return nf.format(amount.setScale(2, RoundingMode.HALF_UP));
+      }
+   }
+
+   private void checkQuickAvailability(RoomType roomType, LocalDate checkIn, LocalDate checkOut, int numRooms) {
+      if (numRooms > roomType.getTotalRooms()) {
+         throw new AppException("BOOKING_001", "Requested number of rooms exceeds total rooms", HttpStatus.BAD_REQUEST);
+      }
+      List<RoomAvailability> availabilities = roomAvailabilityRepository.findByRoomTypeIdAndAvailabilityDateRange(
+            roomType.getId(), checkIn, checkOut);
+      for (RoomAvailability availability : availabilities) {
+         if (Boolean.TRUE.equals(availability.getIsClosed()) || availability.getAvailableCount() < numRooms) {
+            throw new AppException("BOOKING_001", "Room not available for date: " + availability.getAvailabilityDate(),
+                  HttpStatus.BAD_REQUEST);
+         }
       }
    }
 

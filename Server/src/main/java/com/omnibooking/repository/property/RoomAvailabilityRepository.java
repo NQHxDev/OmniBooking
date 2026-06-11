@@ -46,4 +46,7 @@ public interface RoomAvailabilityRepository extends JpaRepository<RoomAvailabili
          @Param("date") LocalDate date,
          @Param("rooms") int rooms);
 
+   @Query("SELECT r FROM RoomAvailability r WHERE r.availableCount > r.roomType.totalRooms")
+   List<RoomAvailability> findOverfilledAvailabilities();
+
 }

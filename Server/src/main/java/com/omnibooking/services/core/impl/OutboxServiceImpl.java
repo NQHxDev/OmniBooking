@@ -12,6 +12,8 @@ import com.omnibooking.services.core.OutboxService;
 import com.omnibooking.services.core.EventMetadataProvider;
 import com.omnibooking.services.core.EventEnvelope;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Gauge;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -296,16 +298,17 @@ public class OutboxServiceImpl implements OutboxService {
       }
       return switch (eventType) {
          case EventConstants.USER_REGISTERED_MAIL,
-              EventConstants.USER_REGISTERED,
-              EventConstants.USER_RESEND_VERIFICATION_MAIL,
-              EventConstants.RESEND_VERIFICATION,
-              EventConstants.USER_FORGOT_PASSWORD_MAIL,
-              EventConstants.FORGOT_PASSWORD,
-              EventConstants.SECURITY_OTP_SEND,
-              EventConstants.TWO_FACTOR_OTP_SEND,
-              EventConstants.PARTNER_OTP_SEND,
-              EventConstants.TWO_FACTOR_ENABLED,
-              EventConstants.BOOKING_CONFIRMED_MAIL -> KafkaConfig.MAIL_TOPIC;
+               EventConstants.USER_REGISTERED,
+               EventConstants.USER_RESEND_VERIFICATION_MAIL,
+               EventConstants.RESEND_VERIFICATION,
+               EventConstants.USER_FORGOT_PASSWORD_MAIL,
+               EventConstants.FORGOT_PASSWORD,
+               EventConstants.SECURITY_OTP_SEND,
+               EventConstants.TWO_FACTOR_OTP_SEND,
+               EventConstants.PARTNER_OTP_SEND,
+               EventConstants.TWO_FACTOR_ENABLED,
+               EventConstants.BOOKING_CONFIRMED_MAIL ->
+            KafkaConfig.MAIL_TOPIC;
 
          case EventConstants.PROPERTY_SYNC -> KafkaConfig.PROPERTY_SYNC_TOPIC;
 
@@ -325,6 +328,40 @@ public class OutboxServiceImpl implements OutboxService {
       int deleted = outboxEventRepository.deleteProcessedEventsBefore(threshold, OutboxStatus.PROCESSED);
       if (deleted > 0) {
          log.info("Purged {} processed outbox events older than 30 days", deleted);
+      }
+   }
+
+   @PostConstruct
+   public void initMetrics() {
+      Gauge.builder("outbox.pending_events", this, OutboxServiceImpl::getPendingEventsCount)
+            .description("Number of unsent outbox events")
+            .register(meterRegistry);
+
+      Gauge.builder("outbox.oldest_event_age_seconds", this, OutboxServiceImpl::getOldestEventAgeSeconds)
+            .description("Age of the oldest unprocessed outbox event in seconds")
+            .register(meterRegistry);
+   }
+
+   private double getPendingEventsCount() {
+      try {
+         return outboxEventRepository.countByStatusIn(List.of(OutboxStatus.PENDING, OutboxStatus.PROCESSING));
+      } catch (Exception e) {
+         log.error("Failed to fetch outbox pending events count metric", e);
+         return 0;
+      }
+   }
+
+   private double getOldestEventAgeSeconds() {
+      try {
+         Instant oldest = outboxEventRepository
+               .findOldestEventCreatedAt(List.of(OutboxStatus.PENDING, OutboxStatus.PROCESSING));
+         if (oldest == null) {
+            return 0;
+         }
+         return Duration.between(oldest, Instant.now()).toSeconds();
+      } catch (Exception e) {
+         log.error("Failed to fetch outbox oldest event age metric", e);
+         return 0;
       }
    }
 

@@ -8,6 +8,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -16,7 +17,10 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 @Entity
-@Table(name = "inventory_operations")
+@Table(name = "inventory_operations", uniqueConstraints = {
+      @UniqueConstraint(name = "uq_inventory_ops_booking_date_type", columnNames = { "booking_id", "availability_date",
+            "operation_type" })
+})
 @Getter
 @Setter
 @NoArgsConstructor

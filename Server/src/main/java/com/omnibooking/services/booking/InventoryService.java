@@ -14,6 +14,10 @@ public interface InventoryService {
    void reserveInventory(Booking booking, RoomType roomType,
          LocalDate checkIn, LocalDate checkOut, int numRooms);
 
+   void deductInventoryOnly(RoomType roomType, LocalDate checkIn, LocalDate checkOut, int numRooms);
+
+   void writeReserveAuditLog(Booking booking, RoomType roomType, LocalDate checkIn, LocalDate checkOut, int numRooms);
+
    /**
     * Releases inventory for a booking and records RELEASE audit entries.
     * Called ONLY after an atomic status transition has already succeeded.

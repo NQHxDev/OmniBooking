@@ -4,9 +4,12 @@ import com.omnibooking.model.InventoryOperation;
 import com.omnibooking.model.enums.BookingStatus;
 import com.omnibooking.model.enums.OperationType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,5 +29,33 @@ public interface InventoryOperationRepository extends JpaRepository<InventoryOpe
          @Param("reserveType") OperationType reserveType,
          @Param("releaseType") OperationType releaseType,
          @Param("statuses") List<BookingStatus> statuses);
+
+   boolean existsByBookingIdAndAvailabilityDateAndOperationType(
+         UUID bookingId, LocalDate availabilityDate, OperationType operationType);
+
+   @Modifying
+   @Query(value = "INSERT INTO inventory_operations (id, booking_id, room_type_id, availability_date, operation_type, num_rooms, created_at, updated_at, version) "
+         +
+         "VALUES (:id, :bookingId, :roomTypeId, :availabilityDate, :operationType, :numRooms, NOW(), NOW(), 0) " +
+         "ON CONFLICT DO NOTHING", nativeQuery = true)
+   int insertOperationIdempotently(
+         @Param("id") UUID id,
+         @Param("bookingId") UUID bookingId,
+         @Param("roomTypeId") UUID roomTypeId,
+         @Param("availabilityDate") LocalDate availabilityDate,
+         @Param("operationType") String operationType,
+         @Param("numRooms") int numRooms);
+
+   @Modifying
+   @Query(value = "INSERT INTO inventory_operations (id, booking_id, room_type_id, availability_date, operation_type, num_rooms, created_at, updated_at, version) "
+         +
+         "VALUES (:id, :bookingId, :roomTypeId, :availabilityDate, :operationType, :numRooms, NOW(), NOW(), 0)", nativeQuery = true)
+   int insertOperationStandard(
+         @Param("id") UUID id,
+         @Param("bookingId") UUID bookingId,
+         @Param("roomTypeId") UUID roomTypeId,
+         @Param("availabilityDate") LocalDate availabilityDate,
+         @Param("operationType") String operationType,
+         @Param("numRooms") int numRooms);
 
 }

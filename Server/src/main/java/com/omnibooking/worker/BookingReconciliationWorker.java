@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.Counter;
 import io.sentry.CheckIn;
 import io.sentry.CheckInStatus;
 import io.sentry.Sentry;
+import io.sentry.SentryLevel;
 import io.sentry.protocol.SentryId;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,8 @@ import com.omnibooking.model.enums.PaymentGatewayStatus;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import java.util.UUID;
+import com.omnibooking.repository.property.RoomAvailabilityRepository;
+import com.omnibooking.model.RoomAvailability;
 
 @Component
 @RequiredArgsConstructor
@@ -69,6 +72,8 @@ public class BookingReconciliationWorker {
 
    private final PaymentEventRepository paymentEventRepository;
 
+   private final RoomAvailabilityRepository roomAvailabilityRepository;
+
    /**
     * Runs every 30 minutes. Detects and reports/repairs discrepancies.
     */
@@ -83,6 +88,9 @@ public class BookingReconciliationWorker {
 
          // 1. Inventory Reconciliation
          reconcileInventory();
+
+         // 1b. Room Availability Overfill Reconciliation (Alert-Only)
+         reconcileRoomAvailability();
 
          // 2. Booking Status Reconciliation
          reconcileStuckBookings();
@@ -250,6 +258,22 @@ public class BookingReconciliationWorker {
          }
          reconciliationCouponLeakCounter.increment(leaked.size());
          reconciliationAnomalyCounter.increment(leaked.size());
+      }
+   }
+
+   private void reconcileRoomAvailability() {
+      List<RoomAvailability> overfilled = roomAvailabilityRepository.findOverfilledAvailabilities();
+      if (!overfilled.isEmpty()) {
+         log.error("[RECONCILIATION] Found {} room availability records exceeding capacity limit:", overfilled.size());
+         for (RoomAvailability ra : overfilled) {
+            String msg = String.format(
+                  "[INVENTORY_ANOMALY] Room availability exceeds capacity for RoomType ID: %s, Date: %s. Available: %d, Total rooms: %d",
+                  ra.getRoomType().getId(), ra.getAvailabilityDate(), ra.getAvailableCount(),
+                  ra.getRoomType().getTotalRooms());
+            log.error(msg);
+            Sentry.captureMessage(msg, SentryLevel.ERROR);
+            reconciliationAnomalyCounter.increment();
+         }
       }
    }
 

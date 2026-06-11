@@ -23,4 +23,9 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> 
    @Query("DELETE FROM OutboxEvent o WHERE o.status = :status AND o.createdAt < :threshold")
    int deleteProcessedEventsBefore(@Param("threshold") Instant threshold, @Param("status") OutboxStatus status);
 
+   long countByStatusIn(List<OutboxStatus> statuses);
+
+   @Query("SELECT MIN(o.createdAt) FROM OutboxEvent o WHERE o.status IN :statuses")
+   Instant findOldestEventCreatedAt(@Param("statuses") List<OutboxStatus> statuses);
+
 }
