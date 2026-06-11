@@ -95,6 +95,7 @@ public class CouponController {
             .build();
 
       Coupon created = couponService.createCoupon(coupon, principal.getId());
+
       return ApiResponse.success(mapToResponse(created), "Coupon created successfully", null);
    }
 
@@ -134,6 +135,7 @@ public class CouponController {
             .build();
 
       Coupon updated = couponService.updateCoupon(id, details, principal.getId());
+
       return ApiResponse.success(mapToResponse(updated), "Coupon updated successfully", null);
    }
 
@@ -150,6 +152,7 @@ public class CouponController {
       }
 
       couponService.deleteCoupon(id, principal.getId());
+
       return ApiResponse.success(null, "Coupon deleted successfully", null);
    }
 
@@ -217,6 +220,7 @@ public class CouponController {
             reservation.getId(),
             reservation.getReservationToken(),
             reservation.getExpiresAt());
+
       return ApiResponse.success(response, "Coupon slot reserved successfully", null);
    }
 

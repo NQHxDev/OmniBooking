@@ -18,6 +18,7 @@ import com.omnibooking.model.RoomType;
 import com.omnibooking.model.User;
 import com.omnibooking.model.UserProfile;
 import com.omnibooking.model.enums.BookingStatus;
+import com.omnibooking.model.enums.ReservationStatus;
 import com.omnibooking.model.enums.RuleType;
 import com.omnibooking.model.enums.TransactionStatus;
 import com.omnibooking.model.enums.TransactionType;
@@ -58,6 +59,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.f4b6a3.uuid.UuidCreator;
 import com.omnibooking.config.BookingConfigProperties;
 import com.omnibooking.model.PriceRuleVersion;
+import com.omnibooking.services.pricing.PriceCalculationService.StayPriceResult;
 import io.micrometer.core.instrument.Counter;
 import org.springframework.dao.DataIntegrityViolationException;
 import java.time.Instant;
@@ -234,7 +236,7 @@ public class BookingServiceImpl implements BookingService {
          var reservation = couponReservationRepository.findByReservationToken(token)
                .orElseThrow(
                      () -> new AppException("BOOKING_003", "Coupon reservation not found", HttpStatus.BAD_REQUEST));
-         if (reservation.getStatus() != com.omnibooking.model.enums.ReservationStatus.ACTIVE) {
+         if (reservation.getStatus() != ReservationStatus.ACTIVE) {
             throw new AppException("BOOKING_003", "Coupon reservation is not active", HttpStatus.BAD_REQUEST);
          }
          coupon = reservation.getCoupon();
@@ -260,7 +262,7 @@ public class BookingServiceImpl implements BookingService {
       }
 
       // Calculate stay price with coupon
-      com.omnibooking.services.pricing.PriceCalculationService.StayPriceResult stayPrice = priceCalculationService
+      StayPriceResult stayPrice = priceCalculationService
             .calculateStayPriceWithCoupon(
                   roomType.getProperty().getId(),
                   roomType.getId(),

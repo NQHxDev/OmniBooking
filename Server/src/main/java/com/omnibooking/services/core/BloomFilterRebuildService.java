@@ -19,8 +19,11 @@ import java.util.concurrent.TimeUnit;
 public class BloomFilterRebuildService {
 
    private final UserRepository userRepository;
+
    private final BloomFilterService bloomFilterService;
+
    private final StringRedisTemplate redisTemplate;
+
    private final MeterRegistry meterRegistry;
 
    private static final String CHECKPOINT_KEY = "bloom_rebuild_checkpoint";
@@ -34,7 +37,8 @@ public class BloomFilterRebuildService {
       // Check if checkpoint exists indicating resumption
       var ops = redisTemplate.opsForValue();
       if (ops == null) {
-         log.warn("StringRedisTemplate.opsForValue() returned null. Skipping Bloom Filter rebuild (expected if Redis is mocked in tests).");
+         log.warn(
+               "StringRedisTemplate.opsForValue() returned null. Skipping Bloom Filter rebuild (expected if Redis is mocked in tests).");
          return;
       }
       String checkpointVal = ops.get(CHECKPOINT_KEY);
@@ -75,11 +79,13 @@ public class BloomFilterRebuildService {
                // Save checkpoint after successful batch processing
                if (lastId != null) {
                   redisTemplate.opsForValue().set(CHECKPOINT_KEY, lastId.toString());
-                  log.info("Bloom filter rebuild: processed batch of {} users, saved checkpoint lastId: {}", batch.size(), lastId);
+                  log.info("Bloom filter rebuild: processed batch of {} users, saved checkpoint lastId: {}",
+                        batch.size(), lastId);
                }
             }
          } catch (Exception e) {
-            log.error("Error encountered during Bloom Filter rebuild at lastId: {}. Process will resume on next start.", lastId, e);
+            log.error("Error encountered during Bloom Filter rebuild at lastId: {}. Process will resume on next start.",
+                  lastId, e);
             throw e;
          }
       }
@@ -92,7 +98,8 @@ public class BloomFilterRebuildService {
       meterRegistry.timer("omnibooking.bloom.rebuild.duration").record(duration, TimeUnit.MILLISECONDS);
       meterRegistry.counter("omnibooking.bloom.rebuild.users_processed").increment(totalProcessed);
 
-      log.info("Bloom Filter rebuild finished successfully in {} ms. Total users rebuilt: {}", duration, totalProcessed);
+      log.info("Bloom Filter rebuild finished successfully in {} ms. Total users rebuilt: {}", duration,
+            totalProcessed);
    }
 
 }

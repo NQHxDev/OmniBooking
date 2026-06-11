@@ -31,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 public class SecurityController {
 
    private final SecurityVerificationService securityVerificationService;
+
    private final StringRedisTemplate redisTemplate;
 
    @PostMapping("/otp/request")

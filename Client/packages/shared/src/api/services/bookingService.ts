@@ -1,3 +1,4 @@
+import { v7 as uuidv7 } from "uuid";
 import apiClient from "../apiClient";
 import { ApiResponse } from "./authService";
 
@@ -58,11 +59,20 @@ export interface StayPriceResult {
 }
 
 export const bookingService = {
-   create: async (request: CreateBookingRequest): Promise<BookingResponse> => {
+   create: async (
+      request: CreateBookingRequest,
+      idempotencyKey?: string
+   ): Promise<BookingResponse> => {
+      const key = idempotencyKey || uuidv7();
       const response = await apiClient.post<unknown, ApiResponse<BookingResponse>>(
          "/bookings",
          request,
-         { withCredentials: true }
+         {
+            headers: {
+               "X-Idempotency-Key": key,
+            },
+            withCredentials: true,
+         }
       );
       return response.data;
    },

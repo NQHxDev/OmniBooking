@@ -1,6 +1,7 @@
 package com.omnibooking.services.core;
 
 import com.omnibooking.config.AppProperties;
+import com.omnibooking.model.Currency;
 import com.omnibooking.model.ExchangeRate;
 import com.omnibooking.repository.payment.CurrencyRepository;
 import com.omnibooking.repository.payment.ExchangeRateRepository;
@@ -96,7 +97,7 @@ public class CurrencyService {
 
             // Get list of supported currency codes from DB
             List<String> supportedCodes = currencyRepository.findAll().stream()
-                  .map(com.omnibooking.model.Currency::getCode)
+                  .map(Currency::getCode)
                   .collect(Collectors.toList());
 
             rates.forEach((code, value) -> {

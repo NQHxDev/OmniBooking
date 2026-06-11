@@ -2,9 +2,12 @@ package com.omnibooking.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
+import com.omnibooking.model.enums.IdempotencyStatus;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.UUID;
@@ -34,9 +37,10 @@ public class ProcessedEvent {
    @Builder.Default
    private Instant processedAt = Instant.now();
 
+   @Enumerated(EnumType.STRING)
    @Column(name = "status", nullable = false, length = 20)
    @Builder.Default
-   private String status = "PROCESSING";
+   private IdempotencyStatus status = IdempotencyStatus.PROCESSING;
 
    @Column(name = "updated_at", nullable = false)
    @Builder.Default

@@ -8,6 +8,7 @@ import com.omnibooking.model.Booking;
 import com.omnibooking.model.Transaction;
 import com.omnibooking.model.PaymentEvent;
 import com.omnibooking.model.enums.TransactionStatus;
+import com.omnibooking.model.enums.TransactionType;
 import com.omnibooking.model.enums.PaymentGatewayStatus;
 import com.omnibooking.repository.booking.BookingRepository;
 import com.omnibooking.repository.payment.TransactionRepository;
@@ -109,6 +110,7 @@ public class MomoPaymentServiceImpl implements MomoPaymentService {
             .amount(booking.getDepositAmount()) // USD amount
             .localAmount(BigDecimal.valueOf(amount)) // exact VND amount sent to gateway
             .localCurrency("VND")
+            .transactionType(TransactionType.PAYMENT)
             .paymentMethod(getProviderName())
             .status(TransactionStatus.PENDING)
             .providerOrderId(orderId)
@@ -268,7 +270,7 @@ public class MomoPaymentServiceImpl implements MomoPaymentService {
          paymentEventRepository.save(sigFailEvent);
 
          throw new AppException("PAYMENT_005", "Signature verification failed",
-               org.springframework.http.HttpStatus.BAD_REQUEST);
+               HttpStatus.BAD_REQUEST);
       }
 
       log.info("MoMo UAT callback signature verified successfully.");

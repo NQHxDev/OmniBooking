@@ -1,6 +1,7 @@
 package com.omnibooking.services.core.impl;
 
 import com.omnibooking.model.ProcessedEvent;
+import com.omnibooking.model.enums.IdempotencyStatus;
 import com.omnibooking.repository.infra.ProcessedEventRepository;
 import com.omnibooking.services.core.IdempotencyService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import java.util.UUID;
 public class IdempotencyServiceImpl implements IdempotencyService {
 
    private final ProcessedEventRepository processedEventRepository;
+
    private final MeterRegistry meterRegistry;
 
    @Override
@@ -46,7 +48,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
                   .processedAt(now)
                   .updatedAt(now)
                   .leaseUntil(now.plus(Duration.ofMinutes(5)))
-                  .status("PROCESSING")
+                  .status(IdempotencyStatus.PROCESSING)
                   .build();
             processedEventRepository.saveAndFlush(processedEvent);
             log.info("Successfully claimed new event: eventId={}, consumerGroup={}", eventId, consumerGroup);
@@ -63,11 +65,11 @@ public class IdempotencyServiceImpl implements IdempotencyService {
       ProcessedEvent existing = existingOpt.get();
       boolean isLeaseExpired = existing.getLeaseUntil() != null && existing.getLeaseUntil().isBefore(now);
 
-      if ("FAILED".equals(existing.getStatus()) || ("PROCESSING".equals(existing.getStatus()) && isLeaseExpired)) {
-         if ("PROCESSING".equals(existing.getStatus()) && isLeaseExpired) {
+      if (existing.getStatus() == IdempotencyStatus.FAILED || (existing.getStatus() == IdempotencyStatus.PROCESSING && isLeaseExpired)) {
+         if (existing.getStatus() == IdempotencyStatus.PROCESSING && isLeaseExpired) {
             meterRegistry.counter("omnibooking.lease.takeover").increment();
          }
-         existing.setStatus("PROCESSING");
+         existing.setStatus(IdempotencyStatus.PROCESSING);
          existing.setUpdatedAt(now);
          existing.setLeaseUntil(now.plus(Duration.ofMinutes(5)));
          processedEventRepository.saveAndFlush(existing);
@@ -77,7 +79,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
          return true;
       }
 
-      if ("PROCESSING".equals(existing.getStatus())) {
+      if (existing.getStatus() == IdempotencyStatus.PROCESSING) {
          log.warn("Event is currently being processed by another consumer instance: eventId={}, consumerGroup={}",
                eventId, consumerGroup);
          throw new AppException(ErrorCode.IDEMPOTENCY_KEY_PROCESSING);
@@ -96,7 +98,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
       }
       ProcessedEvent.ProcessedEventId id = new ProcessedEvent.ProcessedEventId(eventId, consumerGroup);
       processedEventRepository.findById(id).ifPresent(processedEvent -> {
-         processedEvent.setStatus("COMPLETED");
+         processedEvent.setStatus(IdempotencyStatus.COMPLETED);
          processedEvent.setUpdatedAt(Instant.now());
          processedEvent.setLeaseUntil(Instant.now().plus(365, ChronoUnit.DAYS));
          processedEventRepository.saveAndFlush(processedEvent);
@@ -113,7 +115,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
       try {
          ProcessedEvent.ProcessedEventId id = new ProcessedEvent.ProcessedEventId(eventId, consumerGroup);
          processedEventRepository.findById(id).ifPresent(processedEvent -> {
-            processedEvent.setStatus("FAILED");
+            processedEvent.setStatus(IdempotencyStatus.FAILED);
             processedEvent.setUpdatedAt(Instant.now());
             processedEvent.setLeaseUntil(Instant.now());
             processedEventRepository.saveAndFlush(processedEvent);
@@ -138,7 +140,8 @@ public class IdempotencyServiceImpl implements IdempotencyService {
          log.info("Successfully renewed lease for event: eventId={}, consumerGroup={}, leaseUntil={}",
                eventId, consumerGroup, newLeaseUntil);
       } else {
-         log.warn("Failed to renew lease for event (not in PROCESSING or lease already expired): eventId={}, consumerGroup={}",
+         log.warn(
+               "Failed to renew lease for event (not in PROCESSING or lease already expired): eventId={}, consumerGroup={}",
                eventId, consumerGroup);
       }
    }

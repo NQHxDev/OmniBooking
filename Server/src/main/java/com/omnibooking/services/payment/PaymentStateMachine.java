@@ -10,15 +10,16 @@ import java.util.Set;
 public class PaymentStateMachine {
 
    private static final Map<TransactionStatus, Set<TransactionStatus>> TRANSITIONS = Map.of(
-         TransactionStatus.PENDING, Set.of(TransactionStatus.SUCCESS, TransactionStatus.FAILED, TransactionStatus.CANCELLED),
-         TransactionStatus.SUCCESS, Set.of(TransactionStatus.REFUNDED, TransactionStatus.VOIDED)
-   );
+         TransactionStatus.PENDING,
+         Set.of(TransactionStatus.SUCCESS, TransactionStatus.FAILED, TransactionStatus.CANCELLED),
+         TransactionStatus.SUCCESS, Set.of(TransactionStatus.REFUNDED, TransactionStatus.VOIDED));
 
    /**
-    * Transitions a transaction's status to a target state, validating the legality of the transition.
+    * Transitions a transaction's status to a target state, validating the legality
+    * of the transition.
     *
     * @param transaction the transaction to transition
-    * @param target the target TransactionStatus
+    * @param target      the target TransactionStatus
     * @throws IllegalStateException if the transition is not allowed
     */
    public void transition(Transaction transaction, TransactionStatus target) {

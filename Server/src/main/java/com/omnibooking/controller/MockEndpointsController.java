@@ -35,6 +35,7 @@ public class MockEndpointsController {
       response.put("paymentId", "pay-123456");
       response.put("amount", request.get("amount"));
       response.put("status", "INITIALIZED");
+
       return ResponseEntity.ok(ApiResponse.success(response, "Payment initialized successfully", requestId));
    }
 
@@ -49,6 +50,7 @@ public class MockEndpointsController {
       response.put("refundId", "ref-789012");
       response.put("amount", request.get("amount"));
       response.put("status", "SUCCESS");
+
       return ResponseEntity.ok(ApiResponse.success(response, "Refund request created successfully", requestId));
    }
 
@@ -64,6 +66,7 @@ public class MockEndpointsController {
       response.put("code", request.get("code"));
       response.put("discountAmount", 15.0);
       response.put("status", "REDEEMED");
+
       return ResponseEntity.ok(ApiResponse.success(response, "Coupon redeemed successfully", requestId));
    }
 

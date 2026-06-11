@@ -4,6 +4,8 @@ import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.security.Anonymous;
 import com.omnibooking.services.payment.PaymentProvider;
 import com.omnibooking.services.payment.PaymentProviderFactory;
+
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -34,7 +36,7 @@ public class PaymentController {
    public ResponseEntity<ApiResponse<Map<String, String>>> createPayment(
          @PathVariable String provider,
          @RequestBody Map<String, String> request,
-         jakarta.servlet.http.HttpServletRequest httpRequest) {
+         HttpServletRequest httpRequest) {
       String requestId = (String) httpRequest.getAttribute("requestId");
       String bookingIdStr = request.get("bookingId");
       if (bookingIdStr == null || bookingIdStr.trim().isEmpty()) {
@@ -48,6 +50,7 @@ public class PaymentController {
          String payUrl = paymentProvider.createPaymentLink(bookingId);
          Map<String, String> data = new HashMap<>();
          data.put("payUrl", payUrl);
+
          return ResponseEntity.ok(
                ApiResponse.success(data, provider.toUpperCase() + " payment link generated successfully", requestId));
       } catch (IllegalArgumentException e) {

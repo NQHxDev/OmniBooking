@@ -34,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.File;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -274,16 +275,19 @@ public class PropertySeeder {
 
          // Seed Media for Property (Main banner)
          String bannerImageId = UuidCreator.getTimeOrderedEpoch().toString();
-         String bannerPublicId = MediaConstants.getPropertyPublicId(property.getId().toString(), bannerImageId);
+         String propertiesFolder = appProperties.getCloudinary().getPropertiesBaseFolder();
+         String bannerPublicId = MediaConstants.getPropertyPublicId(propertiesFolder, property.getId().toString(),
+               bannerImageId);
          String bannerUrl = MediaConstants.getCloudinaryUrl(cloudName, bannerPublicId, "webp");
 
          if (assetsDir != null) {
             String bannerFileName = BANNER_FILE_NAMES[i % BANNER_FILE_NAMES.length];
-            java.io.File bannerFile = new java.io.File(assetsDir, "banners/" + bannerFileName);
+            File bannerFile = new File(assetsDir, "banners/" + bannerFileName);
             if (bannerFile.exists()) {
                try {
-                  byte[] fileBytes = java.nio.file.Files.readAllBytes(bannerFile.toPath());
-                  cloudinaryService.upload(fileBytes, MediaConstants.getPropertyFolder(property.getId().toString()),
+                  byte[] fileBytes = Files.readAllBytes(bannerFile.toPath());
+                  cloudinaryService.upload(fileBytes,
+                        MediaConstants.getPropertyFolder(propertiesFolder, property.getId().toString()),
                         bannerImageId);
                   log.info("Uploaded banner for property {}: {}", propertyName, bannerFileName);
                } catch (Exception e) {

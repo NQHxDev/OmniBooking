@@ -23,6 +23,7 @@ import {
    Ticket,
    Loader2,
 } from "lucide-react";
+import { v7 as uuidv7 } from "uuid";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useSettingStore } from "@/store/useSettingStore";
 import { propertyService, PropertyDetailResponse } from "@/services/propertyService";
@@ -91,6 +92,7 @@ export default function BookingPage() {
    const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
    const [reservationToken, setReservationToken] = useState<string | null>(null);
    const [couponLoading, setCouponLoading] = useState(false);
+   const [idempotencyKey] = useState(() => uuidv7());
    const [couponError, setCouponError] = useState<string | null>(null);
    const [pricingBreakdown, setPricingBreakdown] = useState<StayPriceResult | null>(null);
    const [paymentMethod, setPaymentMethod] = useState<"visa" | "momo" | "banking">("visa");
@@ -337,20 +339,23 @@ export default function BookingPage() {
       const fullE164 = guestPhone ? selectedCountry.callingCode + digitsToValidate : undefined;
 
       try {
-         const response = await bookingService.create({
-            roomTypeId,
-            checkInDate: checkin,
-            checkOutDate: checkout,
-            numRooms: roomsCount,
-            guestName,
-            guestEmail,
-            guestPhone: fullE164,
-            specialRequests: specialRequests || undefined,
-            couponId: appliedCoupon?.id || undefined,
-            reservationToken: reservationToken || undefined,
-            currency,
-            paymentMethod: paymentMethod.toUpperCase(),
-         });
+         const response = await bookingService.create(
+            {
+               roomTypeId,
+               checkInDate: checkin,
+               checkOutDate: checkout,
+               numRooms: roomsCount,
+               guestName,
+               guestEmail,
+               guestPhone: fullE164,
+               specialRequests: specialRequests || undefined,
+               couponId: appliedCoupon?.id || undefined,
+               reservationToken: reservationToken || undefined,
+               currency,
+               paymentMethod: paymentMethod.toUpperCase(),
+            },
+            idempotencyKey
+         );
 
          if (requiresDeposit && (paymentMethod === "momo" || paymentMethod === "visa")) {
             const payData = await paymentService.createMomoPayment(response.id);

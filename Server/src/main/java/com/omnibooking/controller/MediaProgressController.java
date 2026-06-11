@@ -33,7 +33,9 @@ import java.util.UUID;
 public class MediaProgressController {
 
    private final MediaProgressService progressService;
+
    private final SseProgressDispatcher sseDispatcher;
+
    private final AppProperties appProperties;
 
    @PostMapping("/{propertyId}/init")

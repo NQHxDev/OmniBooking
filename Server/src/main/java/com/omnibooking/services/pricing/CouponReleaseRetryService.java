@@ -9,4 +9,5 @@ public interface CouponReleaseRetryService {
    void processPendingRetries();
 
    void purgeOldRetryRecords();
+
 }

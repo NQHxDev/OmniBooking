@@ -21,8 +21,8 @@ public class EmailEvent implements Serializable {
 
    private String subject;
 
-   private String content; // HTML content
+   private String content;
 
-   private Map<String, Object> templateModel; // Optional for dynamic templates
+   private Map<String, Object> templateModel;
 
 }

@@ -31,9 +31,6 @@ public class DestinationController {
       String ipAddress = getClientIp(request);
       String countryCode = geoLocationService.getCountryCode(ipAddress);
 
-      // log.info("Fetching trending destinations for IP: {} (Country: {}) with
-      // locale: {}", ipAddress, countryCode, locale);
-
       List<DestinationSuggestionResponse> trending = destinationService.getTrending(countryCode, locale);
 
       return ApiResponse.success(trending);

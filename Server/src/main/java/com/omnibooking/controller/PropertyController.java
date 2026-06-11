@@ -7,6 +7,8 @@ import com.omnibooking.dto.PropertyResponse;
 import com.omnibooking.dto.IncompleteUploadResponse;
 import com.omnibooking.services.property.PropertyService;
 import com.omnibooking.util.SecurityUtils;
+import com.omnibooking.dto.PropertyDetailResponse;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -21,7 +23,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import com.omnibooking.dto.PropertyDetailResponse;
 
 import java.util.List;
 import java.util.UUID;

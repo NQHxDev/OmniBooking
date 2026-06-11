@@ -2,6 +2,7 @@ package com.omnibooking.aspect;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.omnibooking.model.IdempotencyKey;
+import com.omnibooking.model.enums.IdempotencyStatus;
 import com.omnibooking.repository.elasticsearch.DestinationElasticsearchRepository;
 import com.omnibooking.repository.elasticsearch.PropertyElasticsearchRepository;
 import com.omnibooking.repository.infra.IdempotencyKeyRepository;
@@ -179,7 +180,7 @@ public class IdempotencyIntegrationTest {
             .id(UUID.randomUUID())
             .idempotencyKey(key)
             .endpoint("POST /payments")
-            .processingStatus("FAILED")
+            .processingStatus(IdempotencyStatus.FAILED)
             .createdAt(Instant.now())
             .expiresAt(Instant.now().plusSeconds(3600))
             .processingStartedAt(Instant.now())
@@ -231,7 +232,7 @@ public class IdempotencyIntegrationTest {
             .idempotencyKey(key)
             .endpoint("POST /payments")
             .requestHash(hash)
-            .processingStatus("PROCESSING")
+            .processingStatus(IdempotencyStatus.PROCESSING)
             .createdAt(Instant.now().minus(15, ChronoUnit.MINUTES))
             .expiresAt(Instant.now().plusSeconds(3600))
             .processingStartedAt(Instant.now().minus(15, ChronoUnit.MINUTES))
@@ -278,7 +279,7 @@ public class IdempotencyIntegrationTest {
             .idempotencyKey(key)
             .endpoint("POST /payments")
             .requestHash(hash)
-            .processingStatus("COMPLETED")
+            .processingStatus(IdempotencyStatus.COMPLETED)
             .responseStatus(200)
             .responsePayload(null)
             .responseCached(false)

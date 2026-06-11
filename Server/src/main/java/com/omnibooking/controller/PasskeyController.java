@@ -34,6 +34,7 @@ import java.util.List;
 public class PasskeyController {
 
    private final PasskeyService passkeyService;
+
    private final SecurityVerificationService securityVerificationService;
 
    @PostMapping("/register/options")
@@ -46,7 +47,6 @@ public class PasskeyController {
 
       String requestId = (String) httpRequest.getAttribute("requestId");
 
-      // Kiểm tra xem phiên có được tin tưởng (xác thực OTP trong 30p) không
       if (!securityVerificationService.isSessionTrusted(principal.getId())) {
          return ResponseEntity.status(ErrorCode.SECURITY_VERIFICATION_REQUIRED.getStatus())
                .body(ApiResponse.error(ErrorCode.SECURITY_VERIFICATION_REQUIRED.getMessage(),

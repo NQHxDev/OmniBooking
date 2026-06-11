@@ -43,6 +43,34 @@ public class RegistrationQueueServiceImpl implements RegistrationQueueService {
    @Value("${omnibooking.kafka.registration.topic-name:registration-request-topic}")
    private String topicName;
 
+   private boolean looksEncrypted(String value) {
+      return value != null && value.startsWith("enc:");
+   }
+
+   private String encryptForInbox(String plaintextPassword) {
+      String activeKeyId = encryptionService.getActiveKeyId();
+      String cipherText = encryptionService.encrypt(plaintextPassword, activeKeyId);
+      return "enc:" + activeKeyId + ":" + cipherText;
+   }
+
+   private String decryptInboxPassword(String encryptedPassword) {
+      if (encryptedPassword == null) {
+         throw new IllegalArgumentException("Password must not be null");
+      }
+      String[] parts = encryptedPassword.split(":", 3);
+      if (parts.length != 3 || parts[1].isEmpty() || parts[2].isEmpty()) {
+         throw new IllegalArgumentException("Invalid encrypted password format");
+      }
+      String keyId = parts[1];
+      String cipherText = parts[2];
+      try {
+         return encryptionService.decrypt(cipherText, keyId);
+      } catch (Exception e) {
+         log.error("Failed to decrypt password using keyId: {}", keyId, e);
+         throw new RuntimeException("Encryption key not found or decryption failed for keyId: " + keyId, e);
+      }
+   }
+
    @Transactional
    @Override
    public void pushToQueue(RegisterRequest request) {
@@ -55,12 +83,34 @@ public class RegistrationQueueServiceImpl implements RegistrationQueueService {
             return;
          }
 
+         // Validate Null or Empty Passwords
+         String password = request.getPassword();
+         if (password == null || password.isBlank()) {
+            throw new IllegalArgumentException("Password must not be empty");
+         }
+
+         // Double Encryption Protection
+         if (looksEncrypted(password)) {
+            throw new IllegalArgumentException("Password is already encrypted");
+         }
+
          // Initial Redis Registration Result to PENDING (10 minutes)
          String resultKey = "registration_result:" + request.getRequestId();
          redisTemplate.opsForValue().set(resultKey, "PENDING", 10, TimeUnit.MINUTES);
 
-         // Save raw request in PostgreSQL inbox (durability check)
-         String payload = objectMapper.writeValueAsString(request);
+         // Save request in PostgreSQL inbox with password encrypted for security (no plaintext password in DB!)
+         String dbEncryptedPassword = encryptForInbox(password);
+
+         RegisterRequest dbRequest = RegisterRequest.builder()
+               .email(request.getEmail())
+               .fullName(request.getFullName())
+               .requestId(request.getRequestId())
+               .rememberMe(request.isRememberMe())
+               .turnstileToken(request.getTurnstileToken())
+               .password(dbEncryptedPassword)
+               .build();
+
+         String payload = objectMapper.writeValueAsString(dbRequest);
          RegistrationInbox inbox = RegistrationInbox.builder()
                .requestId(reqId)
                .payload(payload)
@@ -71,15 +121,22 @@ public class RegistrationQueueServiceImpl implements RegistrationQueueService {
          logJson("registration_queued_inbox", request.getRequestId(), request.getEmail(),
                "Saved pending registration request to inbox");
 
-         // Register after-commit hook to publish to Kafka
-         TransactionSynchronizationManager.registerSynchronization(
-               new TransactionSynchronization() {
-                  @Override
-                  public void afterCommit() {
-                     publishToKafkaAsync(request, reqId);
-                  }
-               });
+         // Register after-commit hook to publish to Kafka (uses original request with plaintext password)
+         if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                  new TransactionSynchronization() {
+                     @Override
+                     public void afterCommit() {
+                        publishToKafkaAsync(request, reqId);
+                     }
+                  });
+         } else {
+            log.info("Transaction synchronization is not active, skipping automatic publish to Kafka in pushToQueue");
+         }
 
+      } catch (IllegalArgumentException e) {
+         log.error("Validation failed for registration request", e);
+         throw e;
       } catch (Exception e) {
          log.error("Failed to process registration request", e);
          throw new RuntimeException("System is busy, please try again later", e);
@@ -91,9 +148,15 @@ public class RegistrationQueueServiceImpl implements RegistrationQueueService {
    public void publishToKafkaAsync(RegisterRequest request, UUID reqId) {
       MDC.put("requestId", request.getRequestId());
       try {
+         // Retrieve and potentially decrypt password from request (in case it came from DB and is encrypted)
+         String plainPassword = request.getPassword();
+         if (looksEncrypted(plainPassword)) {
+            plainPassword = decryptInboxPassword(plainPassword);
+         }
+
          // Encrypt password using AES-256-GCM with active key
          String activeKeyId = encryptionService.getActiveKeyId();
-         String encryptedPassword = encryptionService.encrypt(request.getPassword(), activeKeyId);
+         String encryptedPassword = encryptionService.encrypt(plainPassword, activeKeyId);
 
          // Build Kafka message
          RegistrationMessage message = RegistrationMessage.builder()
@@ -126,6 +189,7 @@ public class RegistrationQueueServiceImpl implements RegistrationQueueService {
          logJson("registration_queue_failed", request.getRequestId(), request.getEmail(),
                "Error preparing/publishing registration request to Kafka: " + e.getMessage());
          handleIngressFailure(reqId, e);
+         throw e instanceof RuntimeException ? (RuntimeException) e : new RuntimeException(e);
       } finally {
          MDC.remove("requestId");
       }

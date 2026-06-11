@@ -22,12 +22,17 @@ import java.util.UUID;
 public class CouponReleaseRetryServiceImpl implements CouponReleaseRetryService {
 
    private final CouponReleaseRetryRepository couponReleaseRetryRepository;
+
    private final CouponReservationService couponReservationService;
+
    private final Counter couponReleaseRetryCounter;
+
    private final Counter couponReleaseRetrySuccessCounter;
+
    private final Counter couponReleaseRetryFailureCounter;
 
    private static final long[] RETRY_DELAYS_MINUTES = { 1, 5, 15, 60, 360 }; // 1m, 5m, 15m, 1h, 6h
+
    private static final int MAX_ATTEMPTS = 5;
 
    @Override

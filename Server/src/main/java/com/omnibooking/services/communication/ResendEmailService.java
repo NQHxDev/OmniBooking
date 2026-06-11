@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 public class ResendEmailService {
 
    private final Resend resend;
+
    private final String fromEmail;
 
    public ResendEmailService(AppProperties appProperties) {

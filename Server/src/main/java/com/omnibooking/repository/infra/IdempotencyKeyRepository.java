@@ -29,15 +29,17 @@ public interface IdempotencyKeyRepository extends JpaRepository<IdempotencyKey, 
 
    @Modifying
    @Transactional
-   @Query("UPDATE IdempotencyKey i SET i.processingStatus = 'PROCESSING', i.processingStartedAt = :now " +
-         "WHERE i.idempotencyKey = :key AND i.endpoint = :endpoint AND i.processingStatus = 'PROCESSING' AND i.processingStartedAt < :staleTime AND i.requestHash = :hash")
+   @Query("UPDATE IdempotencyKey i SET i.processingStatus = com.omnibooking.model.enums.IdempotencyStatus.PROCESSING, i.processingStartedAt = :now "
+         +
+         "WHERE i.idempotencyKey = :key AND i.endpoint = :endpoint AND i.processingStatus = com.omnibooking.model.enums.IdempotencyStatus.PROCESSING AND i.processingStartedAt < :staleTime AND i.requestHash = :hash")
    int reclaimStaleKey(@Param("key") String key, @Param("endpoint") String endpoint, @Param("hash") String hash,
          @Param("now") Instant now, @Param("staleTime") Instant staleTime);
 
    @Modifying
    @Transactional
-   @Query("UPDATE IdempotencyKey i SET i.processingStatus = 'PROCESSING', i.processingStartedAt = :now " +
-         "WHERE i.idempotencyKey = :key AND i.endpoint = :endpoint AND i.processingStatus = 'FAILED' AND i.requestHash = :hash")
+   @Query("UPDATE IdempotencyKey i SET i.processingStatus = com.omnibooking.model.enums.IdempotencyStatus.PROCESSING, i.processingStartedAt = :now "
+         +
+         "WHERE i.idempotencyKey = :key AND i.endpoint = :endpoint AND i.processingStatus = com.omnibooking.model.enums.IdempotencyStatus.FAILED AND i.requestHash = :hash")
    int reclaimFailedKey(@Param("key") String key, @Param("endpoint") String endpoint, @Param("hash") String hash,
          @Param("now") Instant now);
 

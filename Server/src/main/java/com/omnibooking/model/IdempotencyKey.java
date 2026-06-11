@@ -2,9 +2,12 @@ package com.omnibooking.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import com.omnibooking.model.enums.IdempotencyStatus;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
@@ -45,8 +48,9 @@ public class IdempotencyKey {
    @Column(name = "response_status")
    private Integer responseStatus;
 
+   @Enumerated(EnumType.STRING)
    @Column(name = "processing_status", nullable = false, length = 50)
-   private String processingStatus;
+   private IdempotencyStatus processingStatus;
 
    @Column(name = "response_cached", nullable = false)
    @Builder.Default

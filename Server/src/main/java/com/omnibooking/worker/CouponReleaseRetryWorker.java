@@ -46,4 +46,5 @@ public class CouponReleaseRetryWorker {
          log.error("Error running Coupon Release Retry cleanup job", e);
       }
    }
+
 }

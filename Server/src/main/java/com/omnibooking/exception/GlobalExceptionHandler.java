@@ -3,8 +3,11 @@ package com.omnibooking.exception;
 import com.omnibooking.config.observability.ModuleTagResolver;
 import com.omnibooking.dto.ApiResponse;
 
+import io.sentry.Sentry;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestCookieException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 
 @RestControllerAdvice
 @Slf4j
@@ -125,21 +129,23 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.error(message, ErrorCode.INVALID_KEY.getCode(), null, requestId));
    }
 
-   @ExceptionHandler(org.springframework.web.context.request.async.AsyncRequestTimeoutException.class)
+   @ExceptionHandler(AsyncRequestTimeoutException.class)
    public ResponseEntity<Void> handleAsyncRequestTimeoutException() {
-      // Async request timeout is a normal lifecycle completion event (e.g. for SSE
-      // streams), not an error.
+      // @formatter:off
+      // Async request timeout is a normal lifecycle completion event (e.g. for SSE streams), not an error.
       // Returning 200 OK completes the request cleanly from Spring's perspective.
+      // @formatter:on
       return ResponseEntity.ok().build();
    }
 
-   @ExceptionHandler(java.io.IOException.class)
-   public ResponseEntity<Void> handleIOException(java.io.IOException ex) {
+   @ExceptionHandler(IOException.class)
+   public ResponseEntity<Void> handleIOException(IOException ex) {
       if (ex.getMessage() != null
             && (ex.getMessage().contains("Client disconnect") || ex.getMessage().contains("Broken pipe"))) {
          log.debug("Client disconnected during async request: {}", ex.getMessage());
          return ResponseEntity.ok().build();
       }
+
       throw new RuntimeException(ex);
    }
 
@@ -154,8 +160,8 @@ public class GlobalExceptionHandler {
       // Check if Sentry has already captured this exception (via LoggingAspect)
       if (request.getAttribute("sentry_captured") == null) {
          String module = ModuleTagResolver.resolveModule(ex.getClass());
-         io.sentry.Sentry.setTag("module", module);
-         io.sentry.Sentry.captureException(ex);
+         Sentry.setTag("module", module);
+         Sentry.captureException(ex);
          request.setAttribute("sentry_captured", Boolean.TRUE);
       }
 

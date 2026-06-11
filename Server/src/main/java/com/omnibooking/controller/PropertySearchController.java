@@ -4,6 +4,7 @@ import com.omnibooking.document.PropertyDocument;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.services.property.PropertySearchService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/properties/search")
 @RequiredArgsConstructor
+@Slf4j
 public class PropertySearchController {
 
    private final PropertySearchService propertySearchService;
@@ -36,14 +38,13 @@ public class PropertySearchController {
          @RequestParam(required = false) Double minRating,
          Pageable pageable) {
 
-      System.out
-            .println("API Search request: ss=" + ss + ", minPrice=" + minPrice + ", maxPrice=" + maxPrice + ", stars="
-                  + stars + ", propertyType=" + propertyType + ", amenities=" + amenities + ", minRating=" + minRating);
+      log.info("API Search request: ss={}, minPrice={}, maxPrice={}, stars={}, propertyType={}, amenities={}, minRating={}",
+            ss, minPrice, maxPrice, stars, propertyType, amenities, minRating);
 
       Page<PropertyDocument> results = propertySearchService.searchProperties(
             ss, minPrice, maxPrice, stars, propertyType, amenities, minRating, pageable);
 
-      System.out.println("API Search results count: " + results.getTotalElements());
+      log.info("API Search results count: {}", results.getTotalElements());
 
       return ApiResponse.success(results);
    }

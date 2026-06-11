@@ -28,6 +28,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -94,13 +96,13 @@ public class AuthController {
       String requestId = (String) httpRequest.getAttribute("requestId");
       request.setRequestId(requestId);
 
-      org.slf4j.MDC.put("requestId", requestId);
+      MDC.put("requestId", requestId);
       try {
          logJson("registration_received", requestId, request.getEmail(), "Received registration request");
          // Push to Redis Queue for Batch Processing
          registrationQueueService.pushToQueue(request);
       } finally {
-         org.slf4j.MDC.remove("requestId");
+         MDC.remove("requestId");
       }
 
       return ResponseEntity.status(HttpStatus.ACCEPTED)
@@ -157,14 +159,14 @@ public class AuthController {
 
    private void logJson(String event, String requestId, String email, String message) {
       try {
-         java.util.Map<String, Object> logPayload = new java.util.HashMap<>();
+         Map<String, Object> logPayload = new HashMap<>();
          logPayload.put("requestId", requestId);
          logPayload.put("event", event);
          if (email != null) {
             logPayload.put("email", email);
          }
          logPayload.put("message", message);
-         logPayload.put("timestamp", java.time.Instant.now().toString());
+         logPayload.put("timestamp", Instant.now().toString());
          log.info(objectMapper.writeValueAsString(logPayload));
       } catch (Exception e) {
          log.error("Failed to write JSON log", e);
@@ -207,6 +209,7 @@ public class AuthController {
       }
 
       AuthResponse authResponse = authService.refresh(sessionId, refreshToken, ip, userAgent, httpResponse);
+
       return ResponseEntity.ok(ApiResponse.success(authResponse, "Token refreshed successfully", requestId));
    }
 

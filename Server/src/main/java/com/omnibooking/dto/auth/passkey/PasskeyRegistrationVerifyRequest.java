@@ -15,7 +15,7 @@ public class PasskeyRegistrationVerifyRequest {
 
    private String type;
 
-   private Object response; // This will be complex, usually we map to a Map or specific WebAuthn structure
+   private Object response;
 
    private String label;
 

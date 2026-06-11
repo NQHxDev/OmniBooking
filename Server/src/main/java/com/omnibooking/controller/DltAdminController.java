@@ -30,14 +30,14 @@ public class DltAdminController {
          @PathVariable String requestId,
          Principal principal,
          HttpServletRequest httpRequest) {
-      
+
       String reqIdStr = (String) httpRequest.getAttribute("requestId");
       UUID reqId = UUID.fromString(requestId);
       String initiator = principal != null ? principal.getName() : "SYSTEM_ADMIN";
-      
+
       boolean success = replayService.replayRequest(reqId, initiator);
-      
-      return ResponseEntity.ok(ApiResponse.success(success, 
+
+      return ResponseEntity.ok(ApiResponse.success(success,
             success ? "DLT request successfully replayed" : "DLT request replay failed", reqIdStr));
    }
 
@@ -49,14 +49,14 @@ public class DltAdminController {
 
       String reqIdStr = (String) httpRequest.getAttribute("requestId");
       String initiator = principal != null ? principal.getName() : "SYSTEM_ADMIN";
-      
+
       List<UUID> uuids = requestIds.stream()
             .map(UUID::fromString)
             .collect(Collectors.toList());
 
       int successCount = replayService.replayBatch(uuids, initiator);
 
-      return ResponseEntity.ok(ApiResponse.success(successCount, 
+      return ResponseEntity.ok(ApiResponse.success(successCount,
             "DLT batch replay completed. Success count: " + successCount, reqIdStr));
    }
 
@@ -71,7 +71,7 @@ public class DltAdminController {
 
       int successCount = replayService.replayPartition(partitionId, initiator);
 
-      return ResponseEntity.ok(ApiResponse.success(successCount, 
+      return ResponseEntity.ok(ApiResponse.success(successCount,
             "DLT partition replay completed. Success count: " + successCount, reqIdStr));
    }
 
@@ -85,7 +85,7 @@ public class DltAdminController {
 
       int successCount = replayService.replayAll(initiator);
 
-      return ResponseEntity.ok(ApiResponse.success(successCount, 
+      return ResponseEntity.ok(ApiResponse.success(successCount,
             "DLT replay all completed. Success count: " + successCount, reqIdStr));
    }
 

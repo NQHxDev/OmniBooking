@@ -7,6 +7,7 @@ import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.exception.IdempotencyConflictException;
 import com.omnibooking.exception.IdempotencyResponseNotReplayableException;
 import com.omnibooking.model.IdempotencyKey;
+import com.omnibooking.model.enums.IdempotencyStatus;
 import com.omnibooking.repository.infra.IdempotencyKeyRepository;
 import com.omnibooking.util.SecurityUtils;
 import io.micrometer.core.instrument.Counter;
@@ -181,7 +182,7 @@ public class IdempotencyAspectTest {
             .idempotencyKey(key)
             .endpoint("POST /api/test")
             .requestHash("hash-failed")
-            .processingStatus("COMPLETED")
+            .processingStatus(IdempotencyStatus.COMPLETED)
             .responseStatus(202)
             .responsePayload("\"Cached Data\"")
             .responseCached(true)
@@ -226,7 +227,7 @@ public class IdempotencyAspectTest {
             .idempotencyKey(key)
             .endpoint("POST /api/test")
             .requestHash("hash-failed")
-            .processingStatus("PROCESSING")
+            .processingStatus(IdempotencyStatus.PROCESSING)
             .createdAt(Instant.now())
             .expiresAt(Instant.now().plusSeconds(3600))
             .processingStartedAt(Instant.now()) // Not stale yet
@@ -258,7 +259,7 @@ public class IdempotencyAspectTest {
             .idempotencyKey(key)
             .endpoint("POST /api/test")
             .requestHash("different-hash") // Does not match "hash-failed"
-            .processingStatus("COMPLETED")
+            .processingStatus(IdempotencyStatus.COMPLETED)
             .build();
 
       when(idempotencyKeyRepository.findByIdempotencyKeyAndEndpoint(key, "POST /api/test"))
@@ -286,7 +287,7 @@ public class IdempotencyAspectTest {
             .idempotencyKey(key)
             .endpoint("POST /api/test")
             .requestHash("hash-failed")
-            .processingStatus("COMPLETED")
+            .processingStatus(IdempotencyStatus.COMPLETED)
             .responseCached(false) // Not replayable
             .build();
 

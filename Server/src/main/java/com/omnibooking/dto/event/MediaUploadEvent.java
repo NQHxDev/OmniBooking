@@ -24,7 +24,6 @@ public class MediaUploadEvent implements Serializable {
 
    private String fileName;
 
-   // Target entity info
    private String entityId;
 
    private String entityType;

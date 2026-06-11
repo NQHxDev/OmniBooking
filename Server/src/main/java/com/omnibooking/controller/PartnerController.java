@@ -1,6 +1,7 @@
 package com.omnibooking.controller;
 
 import com.omnibooking.dto.ApiResponse;
+import com.omnibooking.security.RedisSessionInfo;
 import com.omnibooking.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -117,7 +118,7 @@ public class PartnerController {
       boolean rememberMe = false;
       if (sessionId != null) {
          try {
-            com.omnibooking.security.RedisSessionInfo sessionInfo = authService.getSessionInfo(sessionId);
+            RedisSessionInfo sessionInfo = authService.getSessionInfo(sessionId);
             if (sessionInfo != null) {
                rememberMe = sessionInfo.isRememberMe();
             }

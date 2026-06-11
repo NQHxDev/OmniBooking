@@ -17,6 +17,6 @@ public class PropertySyncEvent {
 
    private UUID propertyId;
 
-   private String operation; // CREATE, UPDATE, DELETE
+   private String operation;
 
 }

@@ -29,6 +29,7 @@ public class BookingStateMachine {
          BookingStatus.CANCELLED, Set.of(BookingStatus.REFUNDED));
 
    private final BookingConfigProperties config;
+
    private final BookingStatusLogRepository statusLogRepository;
 
    /**
@@ -85,10 +86,10 @@ public class BookingStateMachine {
                      "Cannot check-out before check-out date", HttpStatus.BAD_REQUEST);
          }
          case NO_SHOW -> {
-            // Use Instant-based calculation to support arbitrary grace periods
-            // (e.g. 2h, 6h, 12h, 36h) without integer division precision loss.
-            // check_in_date is LocalDate → convert to start-of-day Instant in system
-            // timezone.
+            // @formatter:off
+            // Use Instant-based calculation to support arbitrary grace periods (e.g. 2h, 6h, 12h, 36h) without integer division precision loss.
+            // check_in_date is LocalDate → convert to start-of-day Instant in system timezone.
+            // @formatter:on
             Instant checkInInstant = booking.getCheckInDate()
                   .atStartOfDay(ZoneId.systemDefault()).toInstant();
             Instant noShowDeadline = checkInInstant

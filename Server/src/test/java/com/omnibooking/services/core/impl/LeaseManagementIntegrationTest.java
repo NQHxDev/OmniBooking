@@ -2,6 +2,7 @@ package com.omnibooking.services.core.impl;
 
 import com.omnibooking.exception.AppException;
 import com.omnibooking.model.ProcessedEvent;
+import com.omnibooking.model.enums.IdempotencyStatus;
 import com.omnibooking.repository.infra.ProcessedEventRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -62,7 +63,7 @@ public class LeaseManagementIntegrationTest {
       ProcessedEvent event = ProcessedEvent.builder()
             .eventId(eventId)
             .consumerGroup(consumerGroup)
-            .status("COMPLETED")
+            .status(IdempotencyStatus.COMPLETED)
             .build();
 
       when(processedEventRepository.findByIdForWrite(eventId, consumerGroup)).thenReturn(Optional.of(event));
@@ -81,7 +82,7 @@ public class LeaseManagementIntegrationTest {
       ProcessedEvent event = ProcessedEvent.builder()
             .eventId(eventId)
             .consumerGroup(consumerGroup)
-            .status("PROCESSING")
+            .status(IdempotencyStatus.PROCESSING)
             .leaseUntil(Instant.now().plus(Duration.ofMinutes(2)))
             .build();
 
@@ -100,7 +101,7 @@ public class LeaseManagementIntegrationTest {
       ProcessedEvent event = ProcessedEvent.builder()
             .eventId(eventId)
             .consumerGroup(consumerGroup)
-            .status("PROCESSING")
+            .status(IdempotencyStatus.PROCESSING)
             .leaseUntil(Instant.now().minus(Duration.ofMinutes(1)))
             .build();
 

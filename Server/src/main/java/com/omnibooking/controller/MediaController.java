@@ -5,6 +5,7 @@ import com.omnibooking.dto.event.MediaUploadEvent;
 import com.omnibooking.services.media.MediaProducer;
 import com.omnibooking.services.media.MediaProgressService;
 import com.omnibooking.constant.MediaConstants;
+import com.omnibooking.config.AppProperties;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,8 @@ public class MediaController {
 
    private final MediaProgressService mediaProgressService;
 
+   private final AppProperties appProperties;
+
    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
    @PreAuthorize("hasAuthority(T(com.omnibooking.constant.SecurityConstants.Roles).PARTNER) and !hasAuthority(T(com.omnibooking.constant.SecurityConstants.Roles).ADMIN)")
    @Operation(summary = "Upload media for property (Partner Only)")
@@ -46,7 +49,7 @@ public class MediaController {
       MediaUploadEvent event = MediaUploadEvent.builder()
             .correlationId(correlationId)
             .fileBytes(file.getBytes())
-            .folder(MediaConstants.getPropertyFolder(entityId))
+            .folder(MediaConstants.getPropertyFolder(appProperties.getCloudinary().getPropertiesBaseFolder(), entityId))
             .fileName(file.getOriginalFilename())
             .entityId(entityId)
             .entityType(entityType)

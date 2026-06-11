@@ -31,10 +31,13 @@ public class MediaProgressServiceImpl implements MediaProgressService {
    private static final String ACTIVE_ZSET_KEY = "media:progress:active";
 
    private final StringRedisTemplate redisTemplate;
+
    private final ApplicationEventPublisher eventPublisher;
+
    private final AppProperties appProperties;
 
    private DefaultRedisScript<Long> queuedScript;
+
    private DefaultRedisScript<Long> updateScript;
 
    @PostConstruct
@@ -64,8 +67,7 @@ public class MediaProgressServiceImpl implements MediaProgressService {
             "status", "PROCESSING",
             "percentage", "0",
             "lastUpdatedAt", String.valueOf(now),
-            "ownerId", ownerId.toString()
-      );
+            "ownerId", ownerId.toString());
 
       redisTemplate.opsForHash().putAll(key, fields);
       redisTemplate.expire(key, Duration.ofSeconds(ttl));
@@ -85,15 +87,13 @@ public class MediaProgressServiceImpl implements MediaProgressService {
       List<String> keys = Arrays.asList(
             progressKey(propertyId),
             progressKey(propertyId) + ":queued_ids",
-            ACTIVE_ZSET_KEY
-      );
+            ACTIVE_ZSET_KEY);
       Long result = redisTemplate.execute(queuedScript, keys,
             correlationId,
             now,
             String.valueOf(config.getUploadWeight()),
             String.valueOf(config.getProcessingWeight()),
-            propertyId.toString()
-      );
+            propertyId.toString());
 
       boolean changed = result != null && result == 1L;
       if (changed) {
@@ -129,8 +129,7 @@ public class MediaProgressServiceImpl implements MediaProgressService {
             parseInt(entries, "failed"),
             (String) entries.getOrDefault("status", "PROCESSING"),
             parseInt(entries, "percentage"),
-            parseLong(entries, "lastUpdatedAt")
-      ));
+            parseLong(entries, "lastUpdatedAt")));
    }
 
    @Override
@@ -146,8 +145,7 @@ public class MediaProgressServiceImpl implements MediaProgressService {
             key,
             key + ":queued_ids",
             key + ":completed_ids",
-            key + ":failed_ids"
-      ));
+            key + ":failed_ids"));
       redisTemplate.opsForZSet().remove(ACTIVE_ZSET_KEY, propertyId.toString());
       log.info("[MediaProgress] Cleaned up progress data for property: {}", propertyId);
    }
@@ -160,16 +158,14 @@ public class MediaProgressServiceImpl implements MediaProgressService {
       List<String> keys = Arrays.asList(
             progressKey(propertyId),
             progressKey(propertyId) + ":" + setSuffix,
-            ACTIVE_ZSET_KEY
-      );
+            ACTIVE_ZSET_KEY);
       Long result = redisTemplate.execute(updateScript, keys,
             correlationId,
             fieldName,
             now,
             String.valueOf(config.getUploadWeight()),
             String.valueOf(config.getProcessingWeight()),
-            propertyId.toString()
-      );
+            propertyId.toString());
 
       boolean changed = result != null && result == 1L;
       if (changed) {
@@ -203,7 +199,8 @@ public class MediaProgressServiceImpl implements MediaProgressService {
 
    private int parseInt(Map<Object, Object> map, String field) {
       Object val = map.get(field);
-      if (val == null) return 0;
+      if (val == null)
+         return 0;
       try {
          return Integer.parseInt(val.toString());
       } catch (NumberFormatException e) {
@@ -213,7 +210,8 @@ public class MediaProgressServiceImpl implements MediaProgressService {
 
    private long parseLong(Map<Object, Object> map, String field) {
       Object val = map.get(field);
-      if (val == null) return 0L;
+      if (val == null)
+         return 0L;
       try {
          return Long.parseLong(val.toString());
       } catch (NumberFormatException e) {

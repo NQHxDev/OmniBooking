@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import lombok.extern.slf4j.Slf4j;
@@ -15,8 +16,10 @@ import lombok.extern.slf4j.Slf4j;
 public class BloomFilterWarmupTask implements CommandLineRunner {
 
    private final BloomFilterService bloomFilterService;
+
    private final BloomFilterRebuildService rebuildService;
-   private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+
+   private final StringRedisTemplate redisTemplate;
 
    @Override
    public void run(String... args) {

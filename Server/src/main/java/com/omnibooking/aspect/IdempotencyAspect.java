@@ -9,6 +9,7 @@ import com.omnibooking.exception.ErrorCode;
 import com.omnibooking.exception.IdempotencyConflictException;
 import com.omnibooking.exception.IdempotencyResponseNotReplayableException;
 import com.omnibooking.model.IdempotencyKey;
+import com.omnibooking.model.enums.IdempotencyStatus;
 import com.omnibooking.repository.infra.IdempotencyKeyRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
@@ -105,8 +106,8 @@ public class IdempotencyAspect {
          throw new IdempotencyConflictException("Idempotency key reused with different request payload");
       }
 
-      String status = existingKey.getProcessingStatus();
-      if ("PROCESSING".equals(status)) {
+      IdempotencyStatus status = existingKey.getProcessingStatus();
+      if (status == IdempotencyStatus.PROCESSING) {
          Instant staleTime = Instant.now().minus(10, ChronoUnit.MINUTES);
          if (existingKey.getProcessingStartedAt().isBefore(staleTime)) {
             log.info("Detected stale PROCESSING record for key: {}, endpoint: {}. Reclaiming...", key, endpoint);
@@ -119,7 +120,7 @@ public class IdempotencyAspect {
          }
          meterRegistry.counter("idempotency.processing").increment();
          throw new AppException(ErrorCode.IDEMPOTENCY_KEY_PROCESSING);
-      } else if ("FAILED".equals(status)) {
+      } else if (status == IdempotencyStatus.FAILED) {
          log.info("Reclaiming failed idempotency record for key: {}, endpoint: {}", key, endpoint);
          int reclaimed = idempotencyKeyRepository.reclaimFailedKey(key, endpoint, requestBodyHash, Instant.now());
          if (reclaimed == 1) {
@@ -128,7 +129,7 @@ public class IdempotencyAspect {
          }
          meterRegistry.counter("idempotency.processing").increment();
          throw new AppException(ErrorCode.IDEMPOTENCY_KEY_PROCESSING);
-      } else if ("COMPLETED".equals(status)) {
+      } else if (status == IdempotencyStatus.COMPLETED) {
          if (!existingKey.isResponseCached()) {
             log.warn("Idempotency response payload was not cached due to size restrictions. Key: {}, Endpoint: {}", key,
                   endpoint);
@@ -151,7 +152,7 @@ public class IdempotencyAspect {
          result = joinPoint.proceed();
       } catch (Throwable t) {
          log.error("Error processing business logic for idempotency key: {}, updating to FAILED state.", key, t);
-         updateStatus(id, "FAILED", 500, null, false);
+         updateStatus(id, IdempotencyStatus.FAILED, 500, null, false);
          throw t;
       }
 
@@ -173,12 +174,12 @@ public class IdempotencyAspect {
          responseCached = false;
       }
 
-      updateStatus(id, "COMPLETED", statusCode, bodyJson, responseCached);
+      updateStatus(id, IdempotencyStatus.COMPLETED, statusCode, bodyJson, responseCached);
       meterRegistry.counter("idempotency.miss").increment();
       return result;
    }
 
-   private void updateStatus(UUID id, String status, Integer responseStatus, String responsePayload,
+   private void updateStatus(UUID id, IdempotencyStatus status, Integer responseStatus, String responsePayload,
          boolean responseCached) {
       try {
          idempotencyKeyRepository.findById(id).ifPresent(idempKey -> {

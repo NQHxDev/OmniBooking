@@ -191,6 +191,8 @@ public class AppProperties {
       private String apiKey;
       @NotBlank
       private String apiSecret;
+      @NotBlank
+      private String propertiesBaseFolder;
    }
 
    @Data

@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CurrencyController {
 
    private final CurrencyRepository currencyRepository;
+
    private final CurrencyService currencyService;
 
    @GetMapping
