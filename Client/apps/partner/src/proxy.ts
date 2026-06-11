@@ -83,6 +83,14 @@ function parseSetCookie(setCookieStr: string): ParsedCookie | null {
 export async function proxy(request: NextRequest) {
    const { pathname } = request.nextUrl;
 
+   // Xác định ngôn ngữ (locale) hiện tại
+   const segments = pathname.split("/");
+   const locale = routing.locales.includes(segments[1] as "vi" | "en")
+      ? segments[1]
+      : routing.defaultLocale;
+
+   const getLocalePrefix = (loc: string) => (loc === routing.defaultLocale ? "" : `/${loc}`);
+
    // 0. Edge-level redirects for root routes to preserve locale and avoid 404
    if (pathname === "/" || pathname === "/en") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
@@ -209,7 +217,7 @@ export async function proxy(request: NextRequest) {
 
    // If we still don't have a token, redirect to login
    if (!token) {
-      const loginUrl = new URL(`${webUrl}/auth/login`);
+      const loginUrl = new URL(`${webUrl}${getLocalePrefix(locale)}/auth/login`);
       loginUrl.searchParams.set("callbackUrl", callbackUrl);
       const redirectResponse = NextResponse.redirect(loginUrl);
       // Clear expired cookies to prevent infinite loops
@@ -244,7 +252,7 @@ export async function proxy(request: NextRequest) {
 
       if (!isPartner) {
          // Redirect to consumer web app with access denied
-         const loginUrl = new URL(`${webUrl}/auth/login`);
+         const loginUrl = new URL(`${webUrl}${getLocalePrefix(locale)}/auth/login`);
          loginUrl.searchParams.set("callbackUrl", callbackUrl);
          loginUrl.searchParams.set("error", "unauthorized_role");
          return NextResponse.redirect(loginUrl);
@@ -265,7 +273,7 @@ export async function proxy(request: NextRequest) {
    } catch (error) {
       console.error("JWT verification failed at the Edge middleware:", error);
       // Redirect to login page on expiration/invalid token
-      const loginUrl = new URL(`${webUrl}/auth/login`);
+      const loginUrl = new URL(`${webUrl}${getLocalePrefix(locale)}/auth/login`);
       loginUrl.searchParams.set("callbackUrl", callbackUrl);
       const redirectResponse = NextResponse.redirect(loginUrl);
       redirectResponse.cookies.delete("access_token");

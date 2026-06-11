@@ -202,7 +202,8 @@
          "acceptedFormats": "PNG, JPG or WEBP (Max 10MB/file)",
          "uploading": "Uploading...",
          "mainImage": "Main photo",
-         "invalidFile": "File {name} is not a valid image"
+         "invalidFile": "File {name} is not a valid image",
+         "addMore": "Add photo"
       },
       "authGuard": {
          "denied": "Access Denied",

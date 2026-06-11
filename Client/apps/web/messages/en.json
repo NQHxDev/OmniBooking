@@ -134,6 +134,7 @@
    "Errors": {
       "AUTH_001": "Username already exists",
       "AUTH_002": "Email already exists",
+      "FAILED_DUPLICATE_EMAIL": "Email already exists",
       "AUTH_003": "Invalid email or password",
       "AUTH_004": "Required role not found",
       "AUTH_005": "Invalid session or expired refresh token",

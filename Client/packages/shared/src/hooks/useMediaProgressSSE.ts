@@ -56,8 +56,21 @@ export function useMediaProgressSSE(propertyId: string | null) {
          pollIntervalRef.current = setInterval(fetchProgress, 3000); // poll every 3s
       };
 
-      // Establish EventSource
-      const sseUrl = `/api/v1/media/progress/${propertyId}/stream`;
+      // Establish EventSource directly to backend port to bypass Next.js dev proxy buffering/drops
+      let apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api/v1/";
+
+      // Dynamic hostname sync for localhost/127.0.0.1 to prevent CORS and Cookie credentials mismatch
+      if (typeof window !== "undefined") {
+         const currentHostname = window.location.hostname;
+         if (currentHostname === "127.0.0.1" || currentHostname === "localhost") {
+            apiBase = apiBase
+               .replace("localhost", currentHostname)
+               .replace("127.0.0.1", currentHostname);
+         }
+      }
+
+      const base = apiBase.endsWith("/") ? apiBase : `${apiBase}/`;
+      const sseUrl = `${base}media/progress/${propertyId}/stream`;
       const eventSource = new EventSource(sseUrl, {
          withCredentials: true,
       });

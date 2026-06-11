@@ -3,37 +3,73 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useTranslations } from "next-intl";
-import {
-   X,
-   Minimize2,
-   Maximize2,
-   CheckCircle2,
-   AlertTriangle,
-   ImageIcon,
-   Loader2,
-} from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { X, Minimize2, CheckCircle2, AlertTriangle, ImageIcon, Loader2 } from "lucide-react";
 import { UploadJob } from "@/types/media";
 
 interface UploadProgressWidgetProps {
    job: UploadJob;
    onDismiss: () => void;
+   bottomOffset?: number;
+   index?: number;
 }
 
-export default function UploadProgressWidget({ job, onDismiss }: UploadProgressWidgetProps) {
+export default function UploadProgressWidget({
+   job,
+   onDismiss,
+   bottomOffset = 0,
+   index = 0,
+}: UploadProgressWidgetProps) {
    const t = useTranslations("Partner.uploadProgress");
+   const queryClient = useQueryClient();
+   const router = useRouter();
    const [minimized, setMinimized] = useState(false);
    const [elapsedSeconds, setElapsedSeconds] = useState(0);
+   const [displayedProcessed, setDisplayedProcessed] = useState(0);
 
    const isTerminal =
       job.status === "COMPLETED" || job.status === "PARTIAL_SUCCESS" || job.status === "FAILED";
 
-   // Elapsed time tracker
+   // Easing logic for processing counter
    useEffect(() => {
+      if (job.processed > displayedProcessed) {
+         const isDone = job.status === "COMPLETED" || job.status === "PARTIAL_SUCCESS";
+         const delay = isDone ? 150 : 300; // Increment faster if complete to wrap up nicely
+         const timer = setTimeout(() => {
+            setDisplayedProcessed((prev) => Math.min(prev + 1, job.processed));
+         }, delay);
+         return () => clearTimeout(timer);
+      } else if (job.processed < displayedProcessed) {
+         const timer = setTimeout(() => {
+            setDisplayedProcessed(job.processed);
+         }, 0);
+         return () => clearTimeout(timer);
+      }
+   }, [job.processed, displayedProcessed, job.status]);
+
+   // Calculate percentage based on smooth displayed count
+   const displayedPercentage =
+      job.total > 0
+         ? Math.min(100, Math.round((displayedProcessed / job.total) * 100))
+         : job.percentage;
+
+   // Elapsed time tracker - freezes when terminal
+   useEffect(() => {
+      if (isTerminal) {
+         const endTime = job.lastUpdatedAt || Date.now();
+         const seconds = Math.max(0, Math.floor((endTime - job.connectedAt) / 1000));
+         const timer = setTimeout(() => {
+            setElapsedSeconds(seconds);
+         }, 0);
+         return () => clearTimeout(timer);
+      }
+
       const interval = setInterval(() => {
          setElapsedSeconds(Math.floor((Date.now() - job.connectedAt) / 1000));
       }, 1000);
       return () => clearInterval(interval);
-   }, [job.connectedAt]);
+   }, [job.connectedAt, isTerminal, job.lastUpdatedAt]);
 
    // Auto-dismiss on COMPLETED after 5s
    useEffect(() => {
@@ -42,6 +78,14 @@ export default function UploadProgressWidget({ job, onDismiss }: UploadProgressW
          return () => clearTimeout(timer);
       }
    }, [job.status, onDismiss]);
+
+   // Invalidate incomplete uploads query and refresh page data when processing finishes
+   useEffect(() => {
+      if (job.status === "COMPLETED" || job.status === "PARTIAL_SUCCESS") {
+         queryClient.invalidateQueries({ queryKey: ["incomplete-uploads"] });
+         router.refresh();
+      }
+   }, [job.status, queryClient, router]);
 
    const formatElapsed = useCallback((seconds: number) => {
       if (seconds < 60) return `${seconds}s`;
@@ -58,18 +102,19 @@ export default function UploadProgressWidget({ job, onDismiss }: UploadProgressW
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
-            className="fixed bottom-4 left-4 z-50"
+            style={{ bottom: `${16 + bottomOffset + index * 8}px` }}
+            className="fixed right-4 z-50"
          >
             <button
                onClick={() => setMinimized(false)}
-               className="relative flex h-14 w-14 items-center justify-center rounded-full bg-gray-900/85 backdrop-blur-xl shadow-2xl border border-white/10 transition-transform hover:scale-105"
+               className="relative flex h-14 w-14 items-center justify-center rounded-full bg-white/90 dark:bg-gray-900/85 backdrop-blur-xl shadow-2xl border border-gray-200/50 dark:border-white/10 transition-transform hover:scale-105"
             >
-               <ImageIcon className="h-6 w-6 text-white" />
+               <ImageIcon className="h-6 w-6 text-gray-700 dark:text-white" />
                {!isTerminal && (
                   <span className="absolute -top-1 -right-1 flex h-5 w-5">
                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
                      <span className="relative inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white">
-                        {job.percentage}%
+                        {displayedPercentage}%
                      </span>
                   </span>
                )}
@@ -97,7 +142,8 @@ export default function UploadProgressWidget({ job, onDismiss }: UploadProgressW
          animate={{ y: 0, opacity: 1, scale: 1 }}
          exit={{ y: 100, opacity: 0, scale: 0.95 }}
          transition={{ type: "spring", damping: 25, stiffness: 300 }}
-         className="fixed bottom-4 left-4 z-50 w-96 rounded-2xl bg-gray-900/85 backdrop-blur-xl shadow-2xl border border-white/10 overflow-hidden"
+         style={{ bottom: `${16 + bottomOffset + index * 8}px` }}
+         className="fixed right-4 z-50 w-96 rounded-2xl bg-white/90 dark:bg-gray-900/85 backdrop-blur-xl shadow-2xl border border-gray-200/80 dark:border-white/10 overflow-hidden"
       >
          {/* Header */}
          <div className="flex items-center justify-between px-4 pt-4 pb-2">
@@ -108,23 +154,25 @@ export default function UploadProgressWidget({ job, onDismiss }: UploadProgressW
                   {statusConfig.icon}
                </div>
                <div>
-                  <h4 className="text-sm font-semibold text-white leading-tight">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white leading-tight">
                      {t(statusConfig.titleKey)}
                   </h4>
-                  <p className="text-xs text-gray-400 truncate max-w-[200px]">{job.propertyName}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]">
+                     {job.propertyName}
+                  </p>
                </div>
             </div>
             <div className="flex items-center gap-1">
                <button
                   onClick={() => setMinimized(true)}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-950 dark:hover:text-white"
                >
                   <Minimize2 className="h-3.5 w-3.5" />
                </button>
                {isTerminal && (
                   <button
                      onClick={onDismiss}
-                     className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+                     className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-950 dark:hover:text-white"
                   >
                      <X className="h-3.5 w-3.5" />
                   </button>
@@ -134,10 +182,10 @@ export default function UploadProgressWidget({ job, onDismiss }: UploadProgressW
 
          {/* Progress bar */}
          <div className="px-4 py-2">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
                <div
                   className={`h-full rounded-full transition-all duration-600 ease-out ${statusConfig.barClass}`}
-                  style={{ width: `${Math.max(job.percentage, 2)}%` }}
+                  style={{ width: `${Math.max(displayedPercentage, 2)}%` }}
                />
             </div>
          </div>
@@ -146,31 +194,37 @@ export default function UploadProgressWidget({ job, onDismiss }: UploadProgressW
          <div className="flex items-center justify-between px-4 pb-4">
             <div className="flex flex-col gap-0.5">
                {job.status === "COMPLETED" ? (
-                  <span className="text-xs text-emerald-400 font-medium">
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                      {t("completedIn", { time: elapsedSeconds.toString() })}
                   </span>
                ) : job.status === "FAILED" ? (
-                  <span className="text-xs text-red-400 font-medium">{t("failed")}</span>
+                  <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                     {t("failed")}
+                  </span>
                ) : job.status === "PARTIAL_SUCCESS" ? (
-                  <span className="text-xs text-amber-400 font-medium">
+                  <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
                      {t("imagesFailed", {
                         success: (job.processed - job.failed).toString(),
                         failed: job.failed.toString(),
                      })}
                   </span>
                ) : (
-                  <span className="text-xs text-gray-300">
+                  <span className="text-xs text-gray-600 dark:text-gray-300">
                      {t("imagesProcessed", {
-                        processed: job.processed.toString(),
+                        processed: displayedProcessed.toString(),
                         total: job.total.toString(),
                      })}
                   </span>
                )}
                {!isTerminal && (
-                  <span className="text-[10px] text-gray-500">{formatElapsed(elapsedSeconds)}</span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                     {formatElapsed(elapsedSeconds)}
+                  </span>
                )}
             </div>
-            <span className="text-lg font-bold tabular-nums text-white">{job.percentage}%</span>
+            <span className="text-lg font-bold tabular-nums text-gray-900 dark:text-white">
+               {displayedPercentage}%
+            </span>
          </div>
       </motion.div>
    );

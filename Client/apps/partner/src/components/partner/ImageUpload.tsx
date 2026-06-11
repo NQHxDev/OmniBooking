@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Upload, X, Image as ImageIcon, Loader2, Plus } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -36,21 +36,36 @@ export default function ImageUpload({
       }
    };
 
+   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
    // Drag & Drop logic for reordering
    const handleDragStart = (e: React.DragEvent, index: number) => {
+      e.stopPropagation();
       setDraggedIndex(index);
       e.dataTransfer.effectAllowed = "move";
       // To work in Firefox
       e.dataTransfer.setData("text/plain", index.toString());
    };
 
-   const handleDragOverItem = (e: React.DragEvent) => {
+   const handleDragOverItem = (e: React.DragEvent, index: number) => {
       e.preventDefault();
+      e.stopPropagation();
       e.dataTransfer.dropEffect = "move";
+      if (draggedIndex !== null && draggedIndex !== index) {
+         setDragOverIndex(index);
+      }
+   };
+
+   const handleDragLeaveItem = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragOverIndex(null);
    };
 
    const handleDropItem = (e: React.DragEvent, targetIndex: number) => {
       e.preventDefault();
+      e.stopPropagation();
+      setDragOverIndex(null);
       if (draggedIndex === null || draggedIndex === targetIndex) return;
 
       const newImages = [...images];
@@ -64,7 +79,10 @@ export default function ImageUpload({
 
    const onDragOver = useCallback((e: React.DragEvent) => {
       e.preventDefault();
-      setIsDragging(true);
+      // Only show upload overlay when dragging actual files from outside the browser
+      if (e.dataTransfer.types.includes("Files")) {
+         setIsDragging(true);
+      }
    }, []);
 
    const onDragLeave = useCallback((e: React.DragEvent) => {
@@ -89,41 +107,84 @@ export default function ImageUpload({
    );
 
    return (
-      <div className="space-y-4">
-         <div
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
-            className={`relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-10 transition-all duration-300 ${
-               isDragging
-                  ? "border-[#006ce4] bg-blue-50/50 scale-[0.99]"
-                  : "border-zinc-200 hover:border-zinc-300 bg-zinc-50/30"
-            }`}
-         >
-            <input
-               type="file"
-               multiple
-               accept="image/*"
-               onChange={handleFileChange}
-               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm border border-zinc-100 mb-4">
-               <Upload className="h-6 w-6 text-zinc-600" />
+      <div
+         onDragOver={onDragOver}
+         onDragLeave={onDragLeave}
+         onDrop={onDrop}
+         className="relative w-full transition-all duration-300"
+      >
+         {/* Premium Drag and Drop Overlay */}
+         {isDragging && (
+            <div className="absolute inset-0 z-30 bg-blue-50/80 backdrop-blur-[2px] border-2 border-dashed border-[#006ce4] rounded-2xl flex flex-col items-center justify-center animate-in fade-in duration-200">
+               <Upload className="h-8 w-8 text-[#006ce4] animate-bounce mb-2" />
+               <span className="text-sm font-semibold text-[#006ce4]">{t("clickToUpload")}</span>
             </div>
-            <p className="text-sm font-semibold text-zinc-900">{t("clickToUpload")}</p>
-            <p className="text-xs text-zinc-500 mt-1">{t("acceptedFormats")}</p>
-         </div>
+         )}
 
-         {images.length > 0 && (
+         {images.length === 0 ? (
+            <div
+               className={`relative flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-10 transition-all duration-300 ${
+                  isDragging
+                     ? "border-[#006ce4] bg-blue-50/50 scale-[0.99]"
+                     : "border-zinc-200 hover:border-zinc-300 bg-zinc-50/30"
+               }`}
+            >
+               <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+               />
+               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm border border-zinc-100 mb-4">
+                  <Upload className="h-6 w-6 text-zinc-600" />
+               </div>
+               <p className="text-sm font-semibold text-zinc-900">{t("clickToUpload")}</p>
+               <p className="text-xs text-zinc-500 mt-1">{t("acceptedFormats")}</p>
+            </div>
+         ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+               {/* Add More card at the start of the grid */}
+               <div className="relative aspect-square rounded-xl overflow-hidden border-2 border-dashed border-zinc-200 hover:border-[#006ce4] hover:bg-zinc-50 transition-all duration-300 group cursor-pointer">
+                  {/* Blurry background of the main image */}
+                  <Image
+                     src={images[0].preview}
+                     alt="Main blur background"
+                     fill
+                     sizes="(max-width: 768px) 50vw, 25vw"
+                     className="object-cover blur-[5px] opacity-40 scale-105"
+                     unoptimized
+                  />
+                  <input
+                     type="file"
+                     multiple
+                     accept="image/*"
+                     onChange={handleFileChange}
+                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-black/5 group-hover:bg-transparent transition-colors">
+                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md border border-zinc-100 mb-2 group-hover:scale-110 transition-transform">
+                        <Plus className="h-5 w-5 text-zinc-600 group-hover:text-[#006ce4] transition-colors" />
+                     </div>
+                     <span className="text-xs font-semibold text-zinc-700 group-hover:text-[#006ce4] transition-colors">
+                        {t("addMore")}
+                     </span>
+                  </div>
+               </div>
+
+               {/* Existing uploaded images */}
                {images.map((img, index) => (
                   <div
                      key={index}
                      draggable
                      onDragStart={(e) => handleDragStart(e, index)}
-                     onDragOver={handleDragOverItem}
+                     onDragOver={(e) => handleDragOverItem(e, index)}
+                     onDragLeave={handleDragLeaveItem}
                      onDrop={(e) => handleDropItem(e, index)}
-                     onDragEnd={() => setDraggedIndex(null)}
+                     onDragEnd={() => {
+                        setDraggedIndex(null);
+                        setDragOverIndex(null);
+                     }}
                      className={`group relative aspect-square rounded-xl overflow-hidden border-2 transition-all cursor-move ${
                         draggedIndex === index
                            ? "opacity-40 border-[#006ce4] scale-95"
@@ -166,6 +227,15 @@ export default function ImageUpload({
                         <div className="absolute top-2 left-2 h-6 w-6 flex items-center justify-center rounded-md bg-black/40 text-[10px] font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
                            #{index + 1}
                         </div>
+                     )}
+
+                     {/* Insertion edge indicator (Rendered last so it sits on top of everything) */}
+                     {dragOverIndex === index && draggedIndex !== null && (
+                        <div
+                           className={`absolute top-0 bottom-0 w-[5px] bg-[#006ce4] z-50 shadow-[0_0_8px_rgba(0,108,228,0.5)] ${
+                              draggedIndex < index ? "right-0" : "left-0"
+                           }`}
+                        />
                      )}
                   </div>
                ))}

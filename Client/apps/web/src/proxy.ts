@@ -128,11 +128,15 @@ export async function proxy(request: NextRequest) {
 
    const getLocalePrefix = (loc: string) => (loc === routing.defaultLocale ? "" : `/${loc}`);
 
+   // Xác định xem trang hiện tại có phải trang Auth không
+   const isAuthPage = /^\/(?:[a-z]{2}\/)?auth\/(?!verify)/.test(pathname);
+
    const refreshedCookies: ParsedCookie[] = [];
    let isRefreshSuccess = false;
 
    // Nếu access token (accessToken) đã hết hạn hoặc không tồn tại, nhưng có refresh token
-   if ((!accessToken || isTokenExpired(accessToken)) && refreshToken) {
+   // BỎ QUA HOÀN TOÀN silent refresh trên trang auth để tránh loop và cải thiện hiệu năng
+   if (!isAuthPage && (!accessToken || isTokenExpired(accessToken)) && refreshToken) {
       try {
          const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8080";
          const cleanBackend = backendUrl.replace(/\/$/, "");
@@ -185,7 +189,13 @@ export async function proxy(request: NextRequest) {
             // Refresh thất bại (ví dụ refresh token cũng hết hạn) -> Xóa cookie và đẩy về trang đăng nhập
             const browserUrl = getBrowserUrl(request);
             const loginUrl = new URL(`${getLocalePrefix(locale)}/auth/login`, browserUrl);
-            loginUrl.searchParams.set("callbackUrl", pathname);
+
+            // Chỉ thêm callbackUrl nếu trang gốc không phải là trang auth
+            const isAuth = /auth\//.test(pathname);
+            if (!isAuth) {
+               loginUrl.searchParams.set("callbackUrl", pathname + request.nextUrl.search);
+            }
+
             const response = NextResponse.redirect(loginUrl);
             response.cookies.delete("access_token");
             response.cookies.delete("session_id");
@@ -222,10 +232,10 @@ export async function proxy(request: NextRequest) {
    }
 
    const hasSession = !!(sessionId || refreshToken);
+   const hasValidSession = !!(accessToken && !isTokenExpired(accessToken));
 
-   // GUEST GUARD: Nếu đã đăng nhập thì không cho vào trang đăng nhập/đăng ký
-   const isAuthPage = /^\/(?:[a-z]{2}\/)?auth\/(?!verify)/.test(pathname);
-   if (isAuthPage && hasSession) {
+   // GUEST GUARD: Nếu đã đăng nhập (với token hợp lệ) thì không cho vào trang đăng nhập/đăng ký
+   if (isAuthPage && hasValidSession) {
       const browserUrl = getBrowserUrl(request);
       const browserHost =
          request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
@@ -253,7 +263,12 @@ export async function proxy(request: NextRequest) {
    if (isProtected && !hasSession) {
       const browserUrl = getBrowserUrl(request);
       const loginUrl = new URL(`${getLocalePrefix(locale)}/auth/login`, browserUrl);
-      loginUrl.searchParams.set("callbackUrl", pathname);
+
+      const isAuth = /auth\//.test(pathname);
+      if (!isAuth) {
+         loginUrl.searchParams.set("callbackUrl", pathname + request.nextUrl.search);
+      }
+
       return NextResponse.redirect(loginUrl);
    }
 

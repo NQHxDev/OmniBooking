@@ -143,7 +143,7 @@ export default function CreatePropertyForm() {
 
          // 2. Init media progress tracking + add job to store
          await propertyService.initMediaProgress(property.id, images.length);
-         addJob(property.id, data.name);
+         addJob(property.id, data.name, images.length);
 
          // 3. Fire-and-forget image uploads (tracked via SSE)
          images.forEach((img, index) => {

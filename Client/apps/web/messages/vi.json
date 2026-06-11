@@ -134,6 +134,7 @@
    "Errors": {
       "AUTH_001": "Tên đăng nhập đã tồn tại",
       "AUTH_002": "Email này đã được sử dụng",
+      "FAILED_DUPLICATE_EMAIL": "Email này đã được sử dụng",
       "AUTH_003": "Email hoặc mật khẩu không chính xác",
       "AUTH_004": "Quyền truy cập không hợp lệ",
       "AUTH_005": "Phiên làm việc hết hạn",
@@ -362,7 +363,7 @@
          "successSub": "Cảm ơn bạn đã lựa chọn OmniBooking.com. Hồ sơ của bạn đã được gửi đi và đang trong quá trình xét duyệt",
          "redirectMessage": "Hệ thống sẽ tự động chuyển đến Dashboard sau {count} giây...",
          "goHome": "Về trang chủ",
-         "viewIntro": "Xem giới thiệu lại",
+         "viewDashboard": "Đi đến Dashboard",
          "secureSsl": "Secure SSL",
          "privateData": "Private Data",
          "verifiedPartner": "Verified Partner",

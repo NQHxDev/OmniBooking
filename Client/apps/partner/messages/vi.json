@@ -202,7 +202,8 @@
          "acceptedFormats": "PNG, JPG hoặc WEBP (Tối đa 10MB/file)",
          "uploading": "Đang tải...",
          "mainImage": "Ảnh chính",
-         "invalidFile": "File {name} không phải là ảnh hợp lệ"
+         "invalidFile": "File {name} không phải là ảnh hợp lệ",
+         "addMore": "Thêm ảnh"
       },
       "authGuard": {
          "denied": "Truy cập bị từ chối",

@@ -22,6 +22,29 @@ import AuthBranding from "@/components/AuthBranding";
 import Turnstile, { type TurnstileRef } from "@/components/Turnstile";
 import { env } from "@/env";
 
+function getSafeCallbackUrl(urlStr: string | null): string {
+   if (!urlStr) return "/";
+
+   let decodedUrl = urlStr;
+   try {
+      decodedUrl = decodeURIComponent(urlStr);
+   } catch {
+      // Safely fall back to default path on malformed URI error
+      return "/";
+   }
+
+   // Only allow relative paths starting with / but not //, and exclude auth pages to avoid redirect loops
+   if (
+      decodedUrl.startsWith("/") &&
+      !decodedUrl.startsWith("//") &&
+      !decodedUrl.includes("/auth/")
+   ) {
+      return decodedUrl;
+   }
+
+   return "/";
+}
+
 export default function AuthPage() {
    const t = useTranslations("Auth");
    const tc = useTranslations("Common");
@@ -41,7 +64,8 @@ export default function AuthPage() {
       fullName: "",
       rememberMe: false,
    });
-   const [loading, setLoading] = useState(false);
+   const [loadingType, setLoadingType] = useState<"submit" | "google" | "zalo" | null>(null);
+   const loading = loadingType !== null;
    const [showPassword, setShowPassword] = useState(false);
    const [error, setError] = useState("");
    const [showOtp, setShowOtp] = useState(false);
@@ -99,8 +123,9 @@ export default function AuthPage() {
 
    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      setLoading(true);
+      setLoadingType("submit");
       setError("");
+      let keepLoading = false;
 
       try {
          if (showOtp) {
@@ -111,20 +136,9 @@ export default function AuthPage() {
                rememberMe: formData.rememberMe,
             });
             setAuth(finalUser as UserType);
-            let targetUrl = callbackUrl || "/";
-            if (targetUrl === "undefined" || targetUrl.startsWith("undefined/")) {
-               targetUrl = "/";
-            }
-            if (
-               targetUrl.startsWith("http://") ||
-               targetUrl.startsWith("https://") ||
-               targetUrl.startsWith("//")
-            ) {
-               window.location.href = targetUrl;
-            } else {
-               router.push(targetUrl);
-               router.refresh();
-            }
+            const targetUrl = getSafeCallbackUrl(callbackUrl);
+            router.push(targetUrl);
+            router.refresh();
             return;
          }
 
@@ -132,14 +146,14 @@ export default function AuthPage() {
             const missing = getMissingRequirements(formData.password);
             if (missing.length > 0) {
                setError(t("passwordMissingRequirements") + missing.map((m) => t(m)).join(", "));
-               setLoading(false);
+               setLoadingType(null);
                return;
             }
          }
 
          if (!turnstileToken) {
             setError(te("AUTH_018"));
-            setLoading(false);
+            setLoadingType(null);
             return;
          }
 
@@ -160,26 +174,16 @@ export default function AuthPage() {
 
          if (isLogin) {
             setAuth(result as UserType);
-            let targetUrl = callbackUrl || "/";
-            if (targetUrl === "undefined" || targetUrl.startsWith("undefined/")) {
-               targetUrl = "/";
-            }
-            if (
-               targetUrl.startsWith("http://") ||
-               targetUrl.startsWith("https://") ||
-               targetUrl.startsWith("//")
-            ) {
-               window.location.href = targetUrl;
-            } else {
-               router.push(targetUrl);
-               router.refresh();
-            }
+            const targetUrl = getSafeCallbackUrl(callbackUrl);
+            router.push(targetUrl);
+            router.refresh();
          } else {
             // Handle Async Registration via SSE
             const registerResponse = result as ApiResponse<UserType>;
             const requestId = registerResponse.requestId;
 
             if (requestId) {
+               keepLoading = true;
                // Use relative path to EventSource so next proxy rewrite handles it correctly
                const fullSseUrl = `/api/v1/auth/subscribe/${requestId}`;
 
@@ -208,12 +212,12 @@ export default function AuthPage() {
                                  "Vui lòng kiểm tra email để kích hoạt tài khoản.",
                               duration: 6000,
                            });
-                           setLoading(false);
+                           setLoadingType(null);
                            router.push("/auth/login");
                            return;
                         } else if (response.data && response.data.status.startsWith("FAILED")) {
                            setError(te(response.data.message) || te("GEN_999"));
-                           setLoading(false);
+                           setLoadingType(null);
                            return;
                         }
                      } catch (err) {
@@ -227,7 +231,7 @@ export default function AuthPage() {
                      } else {
                         // Polling timeout reached
                         setError(te("GEN_999"));
-                        setLoading(false);
+                        setLoadingType(null);
                      }
                   };
 
@@ -259,30 +263,20 @@ export default function AuthPage() {
                      // 2. Set local auth state
                      setAuth(finalUserData);
                      eventSource.close();
+                     setLoadingType(null);
 
                      toast.success(t("successRegister"), {
                         description: t("successRegisterDesc"),
                         duration: 6000,
                      });
 
-                     let targetUrl = callbackUrl || "/";
-                     if (targetUrl === "undefined" || targetUrl.startsWith("undefined/")) {
-                        targetUrl = "/";
-                     }
-                     if (
-                        targetUrl.startsWith("http://") ||
-                        targetUrl.startsWith("https://") ||
-                        targetUrl.startsWith("//")
-                     ) {
-                        window.location.href = targetUrl;
-                     } else {
-                        router.push(targetUrl);
-                        router.refresh();
-                     }
+                     const targetUrl = getSafeCallbackUrl(callbackUrl);
+                     router.push(targetUrl);
+                     router.refresh();
                   } catch (err) {
                      console.error("Failed to finalize registration session:", err);
                      setError(te("GEN_999"));
-                     setLoading(false);
+                     setLoadingType(null);
                      eventSource.close();
                   }
                });
@@ -303,6 +297,7 @@ export default function AuthPage() {
          // Reset Turnstile on error
          turnstileRef.current?.reset();
          setTurnstileToken(null);
+         keepLoading = false;
 
          const error = err as { message?: string; errorCode?: string };
 
@@ -320,12 +315,14 @@ export default function AuthPage() {
 
          setError(errorMessage);
       } finally {
-         setLoading(false);
+         if (!keepLoading) {
+            setLoadingType(null);
+         }
       }
    };
 
    const handleOAuthLogin = async (provider: string) => {
-      setLoading(true);
+      setLoadingType(provider as "google" | "zalo");
       try {
          const response = await authService.getOAuth2Url(provider);
          if (response && response.data) {
@@ -338,7 +335,7 @@ export default function AuthPage() {
             errorMessage = te(error.errorCode);
          }
          toast.error(errorMessage);
-         setLoading(false);
+         setLoadingType(null);
       }
    };
 
@@ -571,7 +568,7 @@ export default function AuthPage() {
                         disabled={loading}
                         className="group flex w-full items-center justify-center gap-2 rounded-xl bg-[#006ce4] py-4 text-sm font-bold text-white shadow-xl shadow-blue-200 transition-all hover:bg-[#0057b7] active:scale-[0.98] disabled:opacity-70 cursor-pointer"
                      >
-                        {loading ? (
+                        {loadingType === "submit" ? (
                            <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
                            <>
@@ -616,7 +613,7 @@ export default function AuthPage() {
                               disabled={loading}
                               className="flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white py-3.5 text-sm font-bold shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-[0.98] disabled:opacity-70 cursor-pointer"
                            >
-                              {loading ? (
+                              {loadingType === "google" ? (
                                  <Loader2 className="h-5 w-5 animate-spin text-[#006ce4]" />
                               ) : (
                                  <>
@@ -631,7 +628,7 @@ export default function AuthPage() {
                               disabled={loading}
                               className="flex items-center justify-center gap-2 rounded-xl bg-[#0068ff] py-3.5 text-sm font-bold text-white shadow-sm hover:bg-[#0055d4] transition-all active:scale-[0.98] disabled:opacity-70 cursor-pointer"
                            >
-                              {loading ? (
+                              {loadingType === "zalo" ? (
                                  <Loader2 className="h-5 w-5 animate-spin text-white" />
                               ) : (
                                  <>

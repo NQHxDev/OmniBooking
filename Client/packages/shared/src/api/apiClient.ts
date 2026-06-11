@@ -62,6 +62,28 @@ interface PromiseHandlers {
 
 let isRefreshing = false;
 let failedQueue: PromiseHandlers[] = [];
+let isRedirectingToLogin = false;
+
+function getLocalizedLoginUrl(): string {
+   if (typeof window === "undefined") return "/auth/login";
+   const pathname = window.location.pathname;
+   const search = window.location.search;
+   const hash = window.location.hash;
+   const segments = pathname.split("/");
+   const firstSegment = segments[1];
+
+   // Only use supported locale vi, default to prefix-free for en
+   const locale = firstSegment === "vi" ? "vi" : "";
+   const localePrefix = locale ? `/${locale}` : "";
+
+   // Exclude auth pages from callbackUrl to prevent self-referencing redirect loops
+   const isAuthPage = /auth\//.test(pathname);
+   const callbackQuery = isAuthPage
+      ? ""
+      : `?callbackUrl=${encodeURIComponent(pathname + search + hash)}`;
+
+   return `${localePrefix}/auth/login${callbackQuery}`;
+}
 
 const processQueue = (error: unknown, token: string | null = null) => {
    failedQueue.forEach((prom) => {
@@ -113,8 +135,11 @@ apiClient.interceptors.response.use(
                .catch((refreshError) => {
                   processQueue(refreshError);
                   if (typeof window !== "undefined") {
-                     localStorage.removeItem("auth-storage");
-                     window.location.href = "/auth/login";
+                     if (!isRedirectingToLogin) {
+                        isRedirectingToLogin = true;
+                        localStorage.removeItem("auth-storage");
+                        window.location.href = getLocalizedLoginUrl();
+                     }
                   }
                   reject(refreshError);
                })
@@ -127,8 +152,11 @@ apiClient.interceptors.response.use(
       // Only show global toast if not explicitly skipped
       if (status === 401 && (errorCode === "AUTH_005" || errorCode === "AUTH_007")) {
          if (typeof window !== "undefined" && !originalRequest?._skipRedirect) {
-            localStorage.removeItem("auth-storage");
-            window.location.href = "/auth/login";
+            if (!isRedirectingToLogin) {
+               isRedirectingToLogin = true;
+               localStorage.removeItem("auth-storage");
+               window.location.href = getLocalizedLoginUrl();
+            }
          }
          return Promise.reject(error);
       }

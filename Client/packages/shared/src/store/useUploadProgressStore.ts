@@ -3,7 +3,7 @@ import { MediaProgressSSE, UploadJob } from "@/types/media";
 
 interface UploadProgressState {
    jobs: Record<string, UploadJob>;
-   addJob: (propertyId: string, propertyName: string) => void;
+   addJob: (propertyId: string, propertyName: string, totalImages?: number) => void;
    updateFromSSE: (propertyId: string, data: MediaProgressSSE) => void;
    dismissJob: (propertyId: string) => void;
    removeJob: (propertyId: string) => void;
@@ -12,14 +12,14 @@ interface UploadProgressState {
 export const useUploadProgressStore = create<UploadProgressState>()((set) => ({
    jobs: {},
 
-   addJob: (propertyId, propertyName) =>
+   addJob: (propertyId, propertyName, totalImages = 0) =>
       set((state) => ({
          jobs: {
             ...state.jobs,
             [propertyId]: {
                propertyId,
                propertyName,
-               total: 0,
+               total: totalImages,
                queued: 0,
                processed: 0,
                failed: 0,
