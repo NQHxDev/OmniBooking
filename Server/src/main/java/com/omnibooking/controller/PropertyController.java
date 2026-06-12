@@ -1,5 +1,6 @@
 package com.omnibooking.controller;
 
+import com.omnibooking.annotation.Idempotent;
 import com.omnibooking.dto.ApiResponse;
 import com.omnibooking.dto.PartnerLegalProfileResponse;
 import com.omnibooking.dto.PropertyRequest;
@@ -38,6 +39,7 @@ public class PropertyController {
 
    @PostMapping
    @PreAuthorize("hasAuthority(T(com.omnibooking.constant.SecurityConstants.Roles).PARTNER)")
+   @Idempotent
    @Operation(summary = "Register a new property (Partner Only)")
    public ApiResponse<PropertyResponse> createProperty(@Valid @RequestBody PropertyRequest request) {
       UUID userId = SecurityUtils.getCurrentUserId();

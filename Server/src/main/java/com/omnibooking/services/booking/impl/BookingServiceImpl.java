@@ -38,6 +38,8 @@ import com.omnibooking.model.Transaction;
 import com.omnibooking.model.PaymentEvent;
 import com.omnibooking.repository.payment.PaymentEventRepository;
 import com.omnibooking.services.payment.PaymentStateMachine;
+import com.omnibooking.model.Property;
+import com.omnibooking.model.enums.PropertyStatus;
 import com.omnibooking.security.UserPrincipal;
 import com.omnibooking.services.booking.BookingService;
 import com.omnibooking.services.communication.MailService;
@@ -171,6 +173,13 @@ public class BookingServiceImpl implements BookingService {
 
       RoomType roomType = roomTypeRepository.findById(request.getRoomTypeId())
             .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND, "Room type not found"));
+
+      Property property = roomType.getProperty();
+      if (property == null || !Boolean.TRUE.equals(property.getIsActive())
+            || property.getStatus() != PropertyStatus.ACTIVE) {
+         throw new AppException(ErrorCode.INVALID_KEY,
+               "Cơ sở lưu trú hiện không hoạt động hoặc đang trong quá trình thiết lập.");
+      }
 
       checkQuickAvailability(roomType, request.getCheckInDate(), request.getCheckOutDate(), request.getNumRooms());
 

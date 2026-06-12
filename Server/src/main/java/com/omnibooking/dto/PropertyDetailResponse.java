@@ -51,4 +51,6 @@ public class PropertyDetailResponse {
 
    private List<RoomTypeResponse> roomTypes;
 
+   private String status;
+
 }

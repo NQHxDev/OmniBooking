@@ -35,6 +35,7 @@ public interface PropertyRepository extends JpaRepository<Property, UUID>, JpaSp
    List<Property> findByOwnerId(UUID ownerId);
 
    @Query("SELECT p FROM Property p WHERE p.isActive = true " +
+         "AND p.status = com.omnibooking.model.enums.PropertyStatus.ACTIVE " +
          "AND EXISTS (SELECT m FROM com.omnibooking.model.Media m WHERE m.entityId = p.id AND m.entityType = 'PROPERTY' AND m.isMain = true) "
          +
          "ORDER BY (SELECT COUNT(b) FROM Booking b WHERE b.roomType.property = p " +
@@ -44,6 +45,7 @@ public interface PropertyRepository extends JpaRepository<Property, UUID>, JpaSp
    List<Property> findFeaturedProperties(@Param("startDate") Instant startDate, Pageable pageable);
 
    @Query("SELECT p FROM Property p WHERE p.isActive = true " +
+         "AND p.status = com.omnibooking.model.enums.PropertyStatus.ACTIVE " +
          "AND EXISTS (SELECT m FROM com.omnibooking.model.Media m WHERE m.entityId = p.id AND m.entityType = 'PROPERTY' AND m.isMain = true) "
          +
          "ORDER BY p.createdAt DESC")

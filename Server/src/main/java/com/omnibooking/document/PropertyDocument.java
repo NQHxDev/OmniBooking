@@ -67,4 +67,7 @@ public class PropertyDocument {
    @Field(type = FieldType.Boolean)
    private Boolean isActive;
 
+   @Field(type = FieldType.Keyword)
+   private String status;
+
 }

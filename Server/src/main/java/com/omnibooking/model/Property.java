@@ -1,6 +1,7 @@
 package com.omnibooking.model;
 
 import com.omnibooking.model.enums.PropertyType;
+import com.omnibooking.model.enums.PropertyStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -110,5 +111,10 @@ public class Property extends BaseEntity {
 
    @Column(name = "expected_image_count")
    private Integer expectedImageCount;
+
+   @Enumerated(EnumType.STRING)
+   @Column(name = "status", nullable = false, length = 30)
+   @Builder.Default
+   private PropertyStatus status = PropertyStatus.ACTIVE;
 
 }

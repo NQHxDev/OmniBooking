@@ -258,7 +258,21 @@ CREATE TABLE IF NOT EXISTS properties (
    average_rating NUMERIC(4,2) DEFAULT 0.00,
    review_count INTEGER DEFAULT 0,
    rating_sum BIGINT DEFAULT 0,
-   expected_image_count INTEGER
+   expected_image_count INTEGER,
+   status VARCHAR(30) NOT NULL DEFAULT 'PENDING_SETUP'
+);
+
+-- Create outbox table for property setup
+CREATE TABLE IF NOT EXISTS property_created_outbox (
+   id UUID PRIMARY KEY,
+   property_id UUID NOT NULL UNIQUE,
+   status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+   retry_count INTEGER NOT NULL DEFAULT 0,
+   last_error VARCHAR(1000),
+   next_retry_at TIMESTAMP WITH TIME ZONE,
+   lease_until TIMESTAMP WITH TIME ZONE,
+   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS room_types (
@@ -668,6 +682,9 @@ CREATE INDEX idx_coupons_code ON coupons(code);
 CREATE INDEX idx_media_entity ON media(entity_id, entity_type);
 
 CREATE INDEX idx_outbox_processing ON outbox_events(status, next_retry_at) WHERE status IN ('PENDING', 'PROCESSING');
+-- Index for scanning and picking outbox records
+CREATE INDEX idx_prop_outbox_processing ON property_created_outbox(status, next_retry_at, lease_until)
+WHERE status IN ('PENDING', 'PROCESSING');
 CREATE INDEX idx_idempotency_keys_expires_at ON idempotency_keys (expires_at);
 CREATE INDEX idx_social_accounts_user_id ON social_accounts(user_id);
 CREATE INDEX idx_social_accounts_provider_id ON social_accounts(provider, provider_id);

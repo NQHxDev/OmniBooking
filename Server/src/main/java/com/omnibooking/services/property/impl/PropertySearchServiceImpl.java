@@ -115,6 +115,14 @@ public class PropertySearchServiceImpl implements PropertySearchService {
                            .gte(rating)))));
       }
 
+      // Only ACTIVE properties are searchable
+      boolBuilder.filter(new Query.Builder()
+            .term(new TermQuery.Builder()
+                  .field("status")
+                  .value("ACTIVE")
+                  .build())
+            .build());
+
       NativeQuery nativeQuery = NativeQuery.builder()
             .withQuery(new Query.Builder().bool(boolBuilder.build()).build())
             .withPageable(pageable)

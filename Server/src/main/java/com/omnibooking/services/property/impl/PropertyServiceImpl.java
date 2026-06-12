@@ -40,15 +40,18 @@ import com.omnibooking.dto.PartnerLegalProfileResponse;
 import com.omnibooking.model.PartnerLegalProfile;
 import com.omnibooking.repository.user.PartnerLegalProfileRepository;
 import com.omnibooking.services.core.EncryptionService;
-import com.omnibooking.dto.event.PropertyCreatedEvent;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Propagation;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Timer;
+import com.omnibooking.model.enums.OutboxStatus;
+import com.omnibooking.model.PropertyCreatedOutbox;
+import com.omnibooking.repository.infra.PropertyCreatedOutboxRepository;
+import com.omnibooking.model.enums.PropertyStatus;
 
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -89,20 +92,19 @@ public class PropertyServiceImpl implements PropertyService {
 
    private final PriceCalculationService priceCalculationService;
 
-   private final ApplicationEventPublisher eventPublisher;
-
    private final AmenityHelper amenityHelper;
 
    private final Counter propertyCreatedCounter;
 
    private final Timer availabilityGenerationDurationTimer;
 
+   private final PropertyCreatedOutboxRepository propertyCreatedOutboxRepository;
+
    private final ConcurrentHashMap<String, Object> locks = new ConcurrentHashMap<>();
 
    @Override
    @Transactional
    @Caching(evict = {
-         @CacheEvict(value = "properties", allEntries = true),
          @CacheEvict(value = "partner_properties", key = "#ownerId")
    })
    public PropertyResponse createProperty(PropertyRequest request, UUID ownerId) {
@@ -124,12 +126,20 @@ public class PropertyServiceImpl implements PropertyService {
          amenitySet = resolveAndSaveAmenities(request.getAmenities());
       }
 
+      // Safe Enum Parsing
+      PropertyType propertyType;
+      try {
+         propertyType = PropertyType.valueOf(request.getPropertyType().toUpperCase());
+      } catch (IllegalArgumentException e) {
+         throw new AppException(ErrorCode.INVALID_KEY, "Loại cơ sở lưu trú không hợp lệ: " + request.getPropertyType());
+      }
+
       // 2. Build and save Property with amenities set directly
       Property property = Property.builder()
             .owner(owner)
             .name(request.getName())
             .description(request.getDescription())
-            .propertyType(PropertyType.valueOf(request.getPropertyType()))
+            .propertyType(propertyType)
             .address(request.getAddress())
             .city(normalizeCityName(request.getCity()))
             .country(request.getCountry())
@@ -142,6 +152,7 @@ public class PropertyServiceImpl implements PropertyService {
             .legalOwnerName(encryptedOwnerName)
             .expectedImageCount(request.getExpectedImageCount())
             .isActive(true)
+            .status(PropertyStatus.PENDING_SETUP)
             .amenities(amenitySet)
             .build();
 
@@ -174,9 +185,14 @@ public class PropertyServiceImpl implements PropertyService {
          roomTypeIds = savedRoomTypes.stream().map(RoomType::getId).toList();
       }
 
-      // 5. Publish event to initialize availability asynchronously/after commit
+      // 5. Save setup job to transactional outbox
       if (!roomTypeIds.isEmpty()) {
-         eventPublisher.publishEvent(new PropertyCreatedEvent(this, saved.getId(), roomTypeIds));
+         PropertyCreatedOutbox outbox = PropertyCreatedOutbox.builder()
+               .propertyId(saved.getId())
+               .status(OutboxStatus.PENDING)
+               .build();
+         propertyCreatedOutboxRepository.save(outbox);
+         log.info("Saved property setup outbox record for property: {}", saved.getId());
       }
 
       // Increment property created metric
@@ -191,6 +207,7 @@ public class PropertyServiceImpl implements PropertyService {
             .imageUrl(getMainImageUrl(saved.getId()))
             .averageRating(saved.getAverageRating())
             .reviewCount(saved.getReviewCount())
+            .status(saved.getStatus().name())
             .build();
    }
 
@@ -202,19 +219,27 @@ public class PropertyServiceImpl implements PropertyService {
       }
 
       availabilityGenerationDurationTimer.record(() -> {
-         log.info("Initializing room availability for {} room types", roomTypeIds.size());
+         log.info("Initializing room availability for {} room types in bulk", roomTypeIds.size());
          List<RoomAvailability> availabilities = new ArrayList<>();
          LocalDate startDate = LocalDate.now();
          LocalDate endDate = startDate.plusDays(90);
 
-         for (UUID roomTypeId : roomTypeIds) {
-            RoomType roomType = roomTypeRepository.findById(roomTypeId)
-                  .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+         // Batch load RoomTypes
+         List<RoomType> roomTypes = roomTypeRepository.findAllById(roomTypeIds);
 
-            // Idempotency check: load existing dates
-            List<LocalDate> existingDates = roomAvailabilityRepository.findAvailabilityDatesByRoomTypeIdAndDateRange(
-                  roomTypeId, startDate, endDate);
-            Set<LocalDate> existingSet = new HashSet<>(existingDates);
+         // Batch load existing availability dates
+         List<Object[]> existingDatesRaw = roomAvailabilityRepository
+               .findAvailabilityDatesByRoomTypeIdsAndDateRange(roomTypeIds, startDate, endDate);
+
+         Map<UUID, Set<LocalDate>> existingMap = new HashMap<>();
+         for (Object[] row : existingDatesRaw) {
+            UUID rtId = (UUID) row[0];
+            LocalDate date = (LocalDate) row[1];
+            existingMap.computeIfAbsent(rtId, k -> new HashSet<>()).add(date);
+         }
+
+         for (RoomType roomType : roomTypes) {
+            Set<LocalDate> existingSet = existingMap.getOrDefault(roomType.getId(), Set.of());
 
             for (int i = 0; i < 90; i++) {
                LocalDate date = startDate.plusDays(i);
@@ -611,6 +636,7 @@ public class PropertyServiceImpl implements PropertyService {
             .averageRating(property.getAverageRating())
             .reviewCount(property.getReviewCount())
             .roomTypes(roomTypes)
+            .status(property.getStatus().name())
             .build();
    }
 
@@ -671,6 +697,7 @@ public class PropertyServiceImpl implements PropertyService {
             .averageRating(property.getAverageRating())
             .reviewCount(property.getReviewCount())
             .roomTypes(roomTypes)
+            .status(property.getStatus().name())
             .build();
    }
 

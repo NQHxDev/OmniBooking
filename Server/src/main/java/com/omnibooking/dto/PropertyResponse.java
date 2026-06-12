@@ -34,4 +34,6 @@ public class PropertyResponse implements Serializable {
 
    private Integer reviewCount;
 
+   private String status;
+
 }

@@ -306,4 +306,30 @@ public class MetricsConfig {
             .register(r);
    }
 
+   @Bean
+   public Counter propertySetupSuccessCounter(MeterRegistry r) {
+      return Counter.builder("property_setup_success_total")
+            .description("Total number of properties successfully set up").register(r);
+   }
+
+   @Bean
+   public Counter propertySetupFailedCounter(MeterRegistry r) {
+      return Counter.builder("property_setup_failed_total")
+            .description("Total number of property setup failures (retry attempts)").register(r);
+   }
+
+   @Bean
+   public Counter propertySetupDeadCounter(MeterRegistry r) {
+      return Counter.builder("property_setup_dead_total")
+            .description("Total number of property setup dead/final failures").register(r);
+   }
+
+   @Bean
+   public Timer propertySetupDurationTimer(MeterRegistry r) {
+      return Timer.builder("property_setup_duration_seconds")
+            .description("Duration of property setup execution in seconds")
+            .publishPercentiles(0.5, 0.95, 0.99)
+            .register(r);
+   }
+
 }
