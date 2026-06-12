@@ -23,6 +23,7 @@ import com.omnibooking.repository.property.RoomAvailabilityRepository;
 import com.omnibooking.repository.property.AmenityRepository;
 import com.omnibooking.services.property.PropertyService;
 import com.omnibooking.services.property.PropertyImagesCacheService;
+import com.omnibooking.services.pricing.PriceCalculationService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,11 @@ import com.omnibooking.dto.PartnerLegalProfileResponse;
 import com.omnibooking.model.PartnerLegalProfile;
 import com.omnibooking.repository.user.PartnerLegalProfileRepository;
 import com.omnibooking.services.core.EncryptionService;
+import com.omnibooking.dto.event.PropertyCreatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.annotation.Propagation;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Timer;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -81,7 +87,15 @@ public class PropertyServiceImpl implements PropertyService {
 
    private final CacheManager cacheManager;
 
-   private final com.omnibooking.services.pricing.PriceCalculationService priceCalculationService;
+   private final PriceCalculationService priceCalculationService;
+
+   private final ApplicationEventPublisher eventPublisher;
+
+   private final AmenityHelper amenityHelper;
+
+   private final Counter propertyCreatedCounter;
+
+   private final Timer availabilityGenerationDurationTimer;
 
    private final ConcurrentHashMap<String, Object> locks = new ConcurrentHashMap<>();
 
@@ -104,6 +118,13 @@ public class PropertyServiceImpl implements PropertyService {
             ? encryptionService.encrypt(request.getLegalOwnerName())
             : null;
 
+      // 1. Resolve Amenities first (to avoid saving the Property entity twice)
+      Set<Amenity> amenitySet = null;
+      if (request.getAmenities() != null && !request.getAmenities().isEmpty()) {
+         amenitySet = resolveAndSaveAmenities(request.getAmenities());
+      }
+
+      // 2. Build and save Property with amenities set directly
       Property property = Property.builder()
             .owner(owner)
             .name(request.getName())
@@ -121,34 +142,20 @@ public class PropertyServiceImpl implements PropertyService {
             .legalOwnerName(encryptedOwnerName)
             .expectedImageCount(request.getExpectedImageCount())
             .isActive(true)
+            .amenities(amenitySet)
             .build();
 
       Property saved = propertyRepository.save(Objects.requireNonNull(property));
 
-      // Save/reactivate partner legal profile
+      // 3. Save/reactivate partner legal profile
       savePartnerLegalProfile(owner, request.getBusinessRegistrationNumber(), request.getTaxCode(),
             request.getLegalOwnerName());
 
-      // Save Amenities
-      if (request.getAmenities() != null && !request.getAmenities().isEmpty()) {
-         Set<Amenity> amenitySet = new HashSet<>();
-         for (String name : request.getAmenities()) {
-            Amenity amenity = amenityRepository.findByNameIgnoreCase(name)
-                  .orElseGet(() -> {
-                     Amenity newAmenity = Amenity.builder()
-                           .name(name)
-                           .category(AmenityCategory.GENERAL)
-                           .build();
-                     return amenityRepository.save(newAmenity);
-                  });
-            amenitySet.add(amenity);
-         }
-         saved.setAmenities(amenitySet);
-         saved = propertyRepository.save(saved);
-      }
-
-      // Save Room Types & Initialize Availability
+      // 4. Save Room Types and gather room type IDs (do NOT generate RoomAvailability
+      // here)
+      List<UUID> roomTypeIds = new ArrayList<>();
       if (request.getRoomTypes() != null && !request.getRoomTypes().isEmpty()) {
+         List<RoomType> roomTypesToSave = new ArrayList<>();
          for (RoomTypeRequest roomRequest : request.getRoomTypes()) {
             RoomType roomType = RoomType.builder()
                   .property(saved)
@@ -161,28 +168,19 @@ public class PropertyServiceImpl implements PropertyService {
                   .roomSizeSqm(roomRequest.getRoomSizeSqm())
                   .bedType(roomRequest.getBedType())
                   .build();
-
-            RoomType savedRoom = roomTypeRepository.save(roomType);
-
-            // Initialize Availability for the next 90 days
-            LocalDate startDate = LocalDate.now();
-            for (int i = 0; i < 90; i++) {
-               LocalDate date = startDate.plusDays(i);
-               RoomAvailability availability = RoomAvailability.builder()
-                     .roomType(savedRoom)
-                     .availabilityDate(date)
-                     .availableCount(savedRoom.getTotalRooms())
-                     .isClosed(false)
-                     .build();
-               roomAvailabilityRepository.save(availability);
-            }
+            roomTypesToSave.add(roomType);
          }
+         List<RoomType> savedRoomTypes = roomTypeRepository.saveAll(roomTypesToSave);
+         roomTypeIds = savedRoomTypes.stream().map(RoomType::getId).toList();
       }
 
-      // Immediate sync to Elasticsearch has been removed because property images are
-      // processed asynchronously.
-      // The property will be indexed in Elasticsearch once the main image upload
-      // finishes in MediaConsumer.
+      // 5. Publish event to initialize availability asynchronously/after commit
+      if (!roomTypeIds.isEmpty()) {
+         eventPublisher.publishEvent(new PropertyCreatedEvent(this, saved.getId(), roomTypeIds));
+      }
+
+      // Increment property created metric
+      propertyCreatedCounter.increment();
 
       return PropertyResponse.builder()
             .id(saved.getId())
@@ -194,6 +192,122 @@ public class PropertyServiceImpl implements PropertyService {
             .averageRating(saved.getAverageRating())
             .reviewCount(saved.getReviewCount())
             .build();
+   }
+
+   @Override
+   @Transactional(propagation = Propagation.REQUIRES_NEW)
+   public void initializeRoomAvailability(List<UUID> roomTypeIds) {
+      if (roomTypeIds == null || roomTypeIds.isEmpty()) {
+         return;
+      }
+
+      availabilityGenerationDurationTimer.record(() -> {
+         log.info("Initializing room availability for {} room types", roomTypeIds.size());
+         List<RoomAvailability> availabilities = new ArrayList<>();
+         LocalDate startDate = LocalDate.now();
+         LocalDate endDate = startDate.plusDays(90);
+
+         for (UUID roomTypeId : roomTypeIds) {
+            RoomType roomType = roomTypeRepository.findById(roomTypeId)
+                  .orElseThrow(() -> new AppException(ErrorCode.NOT_FOUND));
+
+            // Idempotency check: load existing dates
+            List<LocalDate> existingDates = roomAvailabilityRepository.findAvailabilityDatesByRoomTypeIdAndDateRange(
+                  roomTypeId, startDate, endDate);
+            Set<LocalDate> existingSet = new HashSet<>(existingDates);
+
+            for (int i = 0; i < 90; i++) {
+               LocalDate date = startDate.plusDays(i);
+               if (existingSet.contains(date)) {
+                  continue; // Skip if record already exists
+               }
+               RoomAvailability availability = RoomAvailability.builder()
+                     .roomType(roomType)
+                     .availabilityDate(date)
+                     .availableCount(roomType.getTotalRooms())
+                     .isClosed(false)
+                     .build();
+               availabilities.add(availability);
+            }
+         }
+
+         if (!availabilities.isEmpty()) {
+            roomAvailabilityRepository.saveAll(availabilities);
+            log.info("Successfully persisted {} availability records in batch", availabilities.size());
+         }
+      });
+   }
+
+   private Set<Amenity> resolveAndSaveAmenities(List<String> names) {
+      if (names == null || names.isEmpty()) {
+         return Set.of();
+      }
+
+      Set<String> cleanNames = names.stream()
+            .filter(Objects::nonNull)
+            .map(this::normalizeAmenityName)
+            .filter(name -> !name.isEmpty())
+            .collect(Collectors.toSet());
+
+      if (cleanNames.isEmpty()) {
+         return Set.of();
+      }
+
+      // Single lookup query for all names
+      List<Amenity> existing = amenityRepository.findByNameInIgnoreCase(cleanNames);
+      Map<String, Amenity> existingMap = existing.stream()
+            .collect(Collectors.toMap(
+                  a -> a.getName().toLowerCase(Locale.ROOT),
+                  a -> a,
+                  (a1, a2) -> a1));
+
+      Set<Amenity> result = new HashSet<>(existing);
+      List<Amenity> toSave = new ArrayList<>();
+
+      for (String name : cleanNames) {
+         String key = name.toLowerCase(Locale.ROOT);
+         if (!existingMap.containsKey(key)) {
+            toSave.add(Amenity.builder()
+                  .name(name)
+                  .category(AmenityCategory.GENERAL)
+                  .build());
+         }
+      }
+
+      if (!toSave.isEmpty()) {
+         try {
+            // Normal path: save all new amenities in a single REQUIRES_NEW transaction
+            List<Amenity> saved = amenityHelper.saveAllInNewTransaction(toSave);
+            result.addAll(saved);
+         } catch (Exception e) {
+            log.warn("Failed to batch save new amenities in one transaction. Resolving individually: {}",
+                  e.getMessage());
+            // Fallback path: save or lookup individually to handle concurrent insertions
+            for (Amenity amenity : toSave) {
+               try {
+                  Amenity saved = amenityHelper.saveInNewTransaction(amenity);
+                  result.add(saved);
+               } catch (Exception ex) {
+                  Amenity existingAmenity = amenityRepository.findByNameIgnoreCase(amenity.getName())
+                        .orElseThrow(() -> new AppException(ErrorCode.INTERNAL_SERVER_ERROR,
+                              "Failed to resolve amenity: " + amenity.getName()));
+                  result.add(existingAmenity);
+               }
+            }
+         }
+      }
+
+      return result;
+   }
+
+   private String normalizeAmenityName(String name) {
+      if (name == null) {
+         return "";
+      }
+      String normalized = Normalizer.normalize(name, Normalizer.Form.NFC);
+      return normalized
+            .replaceAll("\\s+", " ")
+            .trim();
    }
 
    @Override
@@ -383,47 +497,12 @@ public class PropertyServiceImpl implements PropertyService {
       String plainConcat = normalizedRegNum + "|" + normalizedTaxCode + "|" + normalizedOwnerName;
       String incomingHash = encryptionService.createBlindIndex(plainConcat);
 
-      List<PartnerLegalProfile> allProfiles = partnerLegalProfileRepository.findByPartnerId(partner.getId());
-      PartnerLegalProfile matchedProfile = null;
-
-      for (PartnerLegalProfile profile : allProfiles) {
-         if (profile.getProfileSearchHash() != null) {
-            if (profile.getProfileSearchHash().equals(incomingHash)) {
-               matchedProfile = profile;
-               break;
-            }
-         } else {
-            // Fallback decryption for backward compatibility
-            try {
-               String decryptedRegNum = normalizeLegalField(
-                     encryptionService.decrypt(profile.getBusinessRegistrationNumber()));
-               String decryptedTaxCode = normalizeLegalField(encryptionService.decrypt(profile.getTaxCode()));
-               String decryptedOwnerName = normalizeLegalField(encryptionService.decrypt(profile.getLegalOwnerName()));
-
-               if (normalizedRegNum.equals(decryptedRegNum) &&
-                     normalizedTaxCode.equals(decryptedTaxCode) &&
-                     normalizedOwnerName.equals(decryptedOwnerName)) {
-
-                  // Backfill hash so we don't have to decrypt next time
-                  profile.setProfileSearchHash(incomingHash);
-                  partnerLegalProfileRepository.save(profile);
-
-                  matchedProfile = profile;
-                  break;
-               }
-            } catch (Exception e) {
-               log.error("Failed to decrypt profile for compatibility: {}", profile.getId(), e);
-            }
-         }
-      }
+      PartnerLegalProfile matchedProfile = partnerLegalProfileRepository
+            .findByPartnerIdAndProfileSearchHash(partner.getId(), incomingHash)
+            .orElse(null);
 
       if (matchedProfile != null) {
          if (Boolean.TRUE.equals(matchedProfile.getIsActive())) {
-            // Already active, check if hash needs update (in case it matched via fallback)
-            if (matchedProfile.getProfileSearchHash() == null) {
-               matchedProfile.setProfileSearchHash(incomingHash);
-               partnerLegalProfileRepository.save(matchedProfile);
-            }
             return;
          }
          // Reactivate the matched profile
@@ -435,9 +514,6 @@ public class PropertyServiceImpl implements PropertyService {
             partnerLegalProfileRepository.save(oldest);
          }
          matchedProfile.setIsActive(true);
-         if (matchedProfile.getProfileSearchHash() == null) {
-            matchedProfile.setProfileSearchHash(incomingHash);
-         }
          partnerLegalProfileRepository.save(matchedProfile);
       } else {
          // Create a new one

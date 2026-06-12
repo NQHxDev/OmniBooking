@@ -33,4 +33,6 @@ public interface PropertyService {
 
    void dismissIncompleteUpload(UUID propertyId, UUID ownerId);
 
+   void initializeRoomAvailability(List<UUID> roomTypeIds);
+
 }

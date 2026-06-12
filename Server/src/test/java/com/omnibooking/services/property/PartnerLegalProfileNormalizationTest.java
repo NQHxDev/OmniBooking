@@ -76,28 +76,26 @@ public class PartnerLegalProfileNormalizationTest {
    }
 
    @Test
-   public void testProfileNormalizationAndBackfill() {
-      // 1. Giả lập bản ghi cũ (không có profile_search_hash)
+   public void testProfileNormalizationAndMatch() {
+      // 1. Giả lập bản ghi đã có profile_search_hash (được chuẩn hóa từ trước)
       String rawRegNum = "GP-123456";
       String rawTaxCode = "MST-789012";
       String rawOwnerName = "NGUYỄN VĂN A";
+
+      String expectedConcat = "gp-123456|mst-789012|nguyễn văn a";
+      String expectedHash = encryptionService.createBlindIndex(expectedConcat);
 
       PartnerLegalProfile oldProfile = PartnerLegalProfile.builder()
             .partner(testOwner)
             .businessRegistrationNumber(encryptionService.encrypt(rawRegNum))
             .taxCode(encryptionService.encrypt(rawTaxCode))
             .legalOwnerName(encryptionService.encrypt(rawOwnerName))
-            .profileSearchHash(null) // Bản ghi cũ không có hash
+            .profileSearchHash(expectedHash) // Đã có hash chuẩn hóa
             .isActive(true)
             .build();
       oldProfile = partnerLegalProfileRepository.save(oldProfile);
 
-      assertNull(oldProfile.getProfileSearchHash());
-
-      // 2. Gọi createProperty với thông tin trùng khớp nhưng có biến thể khoảng trắng
-      // và chữ hoa/thường
-      // "Gp-123456" (chữ hoa/thường), " MST-789012 " (khoảng trắng thừa), "Nguyễn Văn
-      // A" (nhiều khoảng trắng liên tiếp)
+      // 2. Gọi createProperty với thông tin trùng khớp nhưng có biến thể khoảng trắng và chữ hoa/thường
       PropertyRequest request = PropertyRequest.builder()
             .name("Partner Luxury Villa")
             .propertyType("HOTEL")
@@ -112,19 +110,12 @@ public class PartnerLegalProfileNormalizationTest {
 
       propertyService.createProperty(request, testOwner.getId());
 
-      // 3. Xác minh rằng bản ghi cũ đã được so khớp và BACKFILL hash thành công
-      // (không tạo bản ghi mới)
+      // 3. Xác minh rằng bản ghi cũ đã được so khớp thành công bằng hash trực tiếp (không tạo bản ghi mới)
       List<PartnerLegalProfile> profiles = partnerLegalProfileRepository.findByPartnerId(testOwner.getId());
       assertEquals(1, profiles.size());
 
       PartnerLegalProfile updatedProfile = profiles.get(0);
       assertEquals(oldProfile.getId(), updatedProfile.getId());
-      assertNotNull(updatedProfile.getProfileSearchHash());
-
-      // 4. Xác minh giá trị hash chuẩn hóa trùng khớp với blind index tính toán bằng
-      // thuật toán chuẩn hóa
-      String expectedConcat = "gp-123456|mst-789012|nguyễn văn a";
-      String expectedHash = encryptionService.createBlindIndex(expectedConcat);
       assertEquals(expectedHash, updatedProfile.getProfileSearchHash());
    }
 

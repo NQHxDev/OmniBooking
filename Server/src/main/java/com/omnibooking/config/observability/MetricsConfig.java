@@ -274,4 +274,36 @@ public class MetricsConfig {
             .register(registry);
    }
 
+   @Bean
+   public Counter propertyCreatedCounter(MeterRegistry r) {
+      return Counter.builder("property_created_total")
+            .description("Total number of properties created").register(r);
+   }
+
+   @Bean
+   public Counter availabilityGenerationSuccessCounter(MeterRegistry r) {
+      return Counter.builder("availability_generation_success_total")
+            .description("Total number of successful availability generations").register(r);
+   }
+
+   @Bean
+   public Counter availabilityGenerationFailedCounter(MeterRegistry r) {
+      return Counter.builder("availability_generation_failed_total")
+            .description("Total number of failed availability generations").register(r);
+   }
+
+   @Bean
+   public Counter availabilityRegenerationCounter(MeterRegistry r) {
+      return Counter.builder("availability_regeneration_total")
+            .description("Total number of availability regenerations via reconciliation").register(r);
+   }
+
+   @Bean
+   public Timer availabilityGenerationDurationTimer(MeterRegistry r) {
+      return Timer.builder("availability_generation_duration")
+            .description("Duration of availability generation execution")
+            .publishPercentiles(0.5, 0.95, 0.99)
+            .register(r);
+   }
+
 }

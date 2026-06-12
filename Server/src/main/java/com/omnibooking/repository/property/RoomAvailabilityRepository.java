@@ -25,6 +25,13 @@ public interface RoomAvailabilityRepository extends JpaRepository<RoomAvailabili
          @Param("startDate") LocalDate startDate,
          @Param("endDate") LocalDate endDate);
 
+   @Query("SELECT r.availabilityDate FROM RoomAvailability r WHERE r.roomType.id = :roomTypeId " +
+         "AND r.availabilityDate >= :startDate AND r.availabilityDate < :endDate")
+   List<LocalDate> findAvailabilityDatesByRoomTypeIdAndDateRange(
+         @Param("roomTypeId") UUID roomTypeId,
+         @Param("startDate") LocalDate startDate,
+         @Param("endDate") LocalDate endDate);
+
    @Query("SELECT r FROM RoomAvailability r WHERE r.roomType.id IN :roomTypeIds " +
          "AND r.availabilityDate >= :startDate AND r.availabilityDate < :endDate")
    List<RoomAvailability> findByRoomTypeIdsAndAvailabilityDateRange(

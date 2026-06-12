@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS amenities (
    id UUID PRIMARY KEY,
-   name VARCHAR(100) NOT NULL UNIQUE,
+   name VARCHAR(100) NOT NULL,
    category VARCHAR(50), -- GENERAL, ROOM, BATHROOM, KITCHEN
    icon_url VARCHAR(255),
    version BIGINT DEFAULT 0,
@@ -644,6 +644,7 @@ CREATE INDEX idx_users_username ON users(username);
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_roles_name ON roles(name);
 CREATE INDEX idx_permissions_name ON permissions(name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_amenities_name_lower ON amenities(LOWER(name));
 CREATE INDEX idx_user_profiles_user_id ON user_profiles(user_id);
 CREATE INDEX idx_user_profiles_phone_search_hash ON user_profiles(phone_search_hash);
 
